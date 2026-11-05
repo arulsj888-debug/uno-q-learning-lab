@@ -189,6 +189,7 @@ class App {
     if (this.pulseObjs) this.viewer.outline.edgeStrength = 2.5 + 4 * (0.5 + 0.5 * Math.sin(performance.now() / 260));
     const bz = this.toneState && this.bench.get(this.toneState.item);
     if (bz) bz.vibrate(true);
+    this.updateCallout();
   }
 
   // ------------------------------------------------------------------ selection & camera
@@ -225,20 +226,30 @@ class App {
 
   select(id, { fly = true, card = true } = {}) {
     this.selected = id;
-    if (!id) { this.setOutline([]); this.hoverMarker.visible = false; if (this.mode === 'explore') this.showWelcome(); else this.hideFloat(); return; }
+    if (!id) {
+      this.setOutline([]);
+      this.hoverMarker.visible = false;
+      if (this.mode === 'explore') this.showWelcome();
+      else this.hideFloat();
+      this.hideCallout();
+      return;
+    }
     if (id.startsWith('pin:')) {
       const pinId = id.slice(4); const p = this.board.pins[pinId];
       this.setOutline([]);
       this.hoverMarker.visible = true; this.hoverMarker.position.copy(p.pos).add(new THREE.Vector3(0, 0.2, 0));
       if (fly) this.focus(id);
       if (card) this.showCard(this.pinCard(pinId));
+      if (this.mode === 'explore') this.showCallout(id);
     } else if (HW_INFO[id]) {
+      this.hideCallout();
       if (card) this.showCard(this.infoCard(HW_INFO[id]));
     } else {
       this.hoverMarker.visible = false;
       this.setOutline(this.groupsFor(id));
       if (fly) this.focus(id);
       if (card && PARTS[id]) this.showCard(this.infoCard(PARTS[id], id));
+      if (this.mode === 'explore') this.showCallout(id);
     }
     document.querySelectorAll('#side .item').forEach(b => b.classList.toggle('on', b.dataset.id === id));
   }
@@ -270,6 +281,152 @@ class App {
     if (info.src) h += `<div class="src">Source: ${info.src}</div>`;
     return h + '</div>';
   }
+
+  // ------------------------------------------------------------------ 3D Callout Annotation
+  showCallout(id) {
+    if (!id || this.mode !== 'explore') {
+      this.hideCallout();
+      return;
+    }
+
+    let title = '', ref = '', tag = '', line1 = '', line2 = '', pos = null, isBottom = false;
+
+    if (id.startsWith('pin:')) {
+      const pinId = id.slice(4);
+      const p = this.board.pins[pinId];
+      if (!p) return;
+      pos = p.pos.clone().add(new THREE.Vector3(0, 0.4, 0));
+      const info = findPin(pinId);
+      title = info ? `Pin ${info.label}` : `Pin ${pinId}`;
+      ref = info && info.mcu && info.mcu !== '—' ? info.mcu : `${info ? info.header : 'Header'}`;
+      tag = info && info.v ? info.v : '3.3V';
+      const fns = info && info.fn ? info.fn.join(', ') : '';
+      line1 = fns ? `Functions: ${fns}` : 'Direct microcontroller input/output pin.';
+      line2 = info && info.note ? info.note : 'Connect sensors, actuators, or test probes here.';
+    } else if (PARTS[id]) {
+      const part = PARTS[id];
+      const pc = this.board.partCenter(id);
+      if (!pc || !pc.box) return;
+      isBottom = BOTTOM_PARTS.has(id);
+      pos = pc.center.clone();
+      pos.y = isBottom ? pc.box.min.y - 0.2 : pc.box.max.y + 0.2;
+
+      title = part.name;
+      ref = part.ref ? part.ref.split('·')[0].trim() : '';
+      tag = part.tag ? part.tag.split('·')[0].trim() : 'Hardware';
+
+      if (part.simple && part.simple.length >= 2) {
+        line1 = part.simple[0];
+        line2 = part.simple[1];
+      } else {
+        const parts = part.summary ? part.summary.split('. ') : [];
+        line1 = parts[0] ? (parts[0].endsWith('.') ? parts[0] : parts[0] + '.') : part.name;
+        line2 = parts[1] ? (parts[1].endsWith('.') ? parts[1] : parts[1] + '.') : 'Inspect specs on the right panel.';
+      }
+    } else {
+      this.hideCallout();
+      return;
+    }
+
+    const tEl = $('#callout-title'); if (tEl) tEl.textContent = title;
+    const rEl = $('#callout-ref'); if (rEl) { rEl.textContent = ref; rEl.style.display = ref ? 'inline' : 'none'; }
+    const gEl = $('#callout-tag'); if (gEl) { gEl.textContent = tag; gEl.style.display = tag ? 'inline-flex' : 'none'; }
+    const l1El = $('#callout-line1'); if (l1El) l1El.innerHTML = `<span>${line1}</span>`;
+    const l2El = $('#callout-line2'); if (l2El) l2El.innerHTML = `<span>${line2}</span>`;
+
+    this.calloutTarget = { id, pos, bottom: isBottom };
+    this.updateCallout();
+  }
+
+  hideCallout() {
+    this.calloutTarget = null;
+    if (this.calloutOverlay) this.calloutOverlay.style.display = 'none';
+  }
+
+  updateCallout() {
+    if (!this.calloutTarget || this.mode !== 'explore' || !this.calloutOverlay) {
+      if (this.calloutOverlay && this.calloutOverlay.style.display !== 'none') {
+        this.calloutOverlay.style.display = 'none';
+      }
+      return;
+    }
+
+    const stage = $('#stage');
+    if (!stage) return;
+    const w = stage.clientWidth;
+    const h = stage.clientHeight;
+    if (!w || !h) return;
+
+    // Project target 3D point to 2D screen coordinates
+    const p = this.calloutTarget.pos.clone().project(this.viewer.camera);
+
+    // Behind camera check
+    if (p.z > 1.0) {
+      this.calloutOverlay.style.display = 'none';
+      return;
+    }
+
+    const tx = (p.x * 0.5 + 0.5) * w;
+    const ty = (-p.y * 0.5 + 0.5) * h;
+
+    // Off-screen check
+    if (tx < -80 || tx > w + 80 || ty < -80 || ty > h + 80) {
+      this.calloutOverlay.style.display = 'none';
+      return;
+    }
+
+    // Normal check: if part is top-side and camera is underneath (or vice versa), hide
+    const isBottom = this.calloutTarget.bottom;
+    const camDir = this.viewer.camera.position.clone().sub(this.viewer.controls.target).normalize();
+    if ((!isBottom && camDir.y < -0.15) || (isBottom && camDir.y > 0.15)) {
+      this.calloutOverlay.style.display = 'none';
+      return;
+    }
+
+    this.calloutOverlay.style.display = 'block';
+
+    const box = this.calloutBox;
+    const bw = box ? (box.offsetWidth || 295) : 295;
+    const bh = box ? (box.offsetHeight || 115) : 115;
+    const pad = 18;
+
+    // Horizontal positioning:
+    // If target is in the right 55% of the stage, place box to the left; otherwise to the right
+    let bx = (tx > w * 0.45) ? (tx - bw - 65) : (tx + 65);
+    bx = Math.max(pad, Math.min(w - bw - pad, bx));
+
+    // Vertical positioning:
+    let by = ty - bh * 0.45;
+    by = Math.max(pad, Math.min(h - bh - pad - 25, by));
+
+    if (box) box.style.transform = `translate(${Math.round(bx)}px, ${Math.round(by)}px)`;
+
+    // Calculate line connection point on the box
+    const attachX = (bx > tx) ? bx : (bx + bw);
+    const attachY = Math.round(by + Math.min(bh * 0.5, 45));
+
+    // Elbow point
+    const elbowX = Math.round(tx + (attachX - tx) * 0.5);
+
+    const pts = `${Math.round(tx)},${Math.round(ty)} ${elbowX},${attachY} ${Math.round(attachX)},${attachY}`;
+
+    if (this.calloutLine) this.calloutLine.setAttribute('points', pts);
+    if (this.calloutLineGlow) this.calloutLineGlow.setAttribute('points', pts);
+
+    if (this.calloutPulse) {
+      this.calloutPulse.setAttribute('cx', Math.round(tx));
+      this.calloutPulse.setAttribute('cy', Math.round(ty));
+    }
+    if (this.calloutOuter) {
+      this.calloutOuter.setAttribute('cx', Math.round(tx));
+      this.calloutOuter.setAttribute('cy', Math.round(ty));
+    }
+    if (this.calloutInner) {
+      this.calloutInner.setAttribute('cx', Math.round(tx));
+      this.calloutInner.setAttribute('cy', Math.round(ty));
+    }
+  }
+
   pinCard(pinId) {
     const p = findPin(pinId);
     const hdr = p.header === 'JDIGITAL' ? JDIGITAL : p.header === 'JANALOG' ? JANALOG : JSPI;
@@ -327,7 +484,7 @@ class App {
     this.mode = mode;
     $('#app').className = 'mode-' + mode;
     document.querySelectorAll('.modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
-    this.hideFloat(); this.clearTemp();
+    this.hideFloat(); this.clearTemp(); this.hideCallout();
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
     if (mode === 'explore') {
       this.sim.stop(); this.stopSound(); this.lamp.intensity = 0;
@@ -790,8 +947,18 @@ class App {
 
   // ------------------------------------------------------------------ UI bindings
   bindUI() {
+    this.calloutOverlay = $('#callout-overlay');
+    this.calloutBox = $('#callout-box');
+    this.calloutLine = $('#callout-line');
+    this.calloutLineGlow = $('#callout-line-glow');
+    this.calloutPulse = $('#callout-dot-pulse');
+    this.calloutOuter = $('#callout-dot-outer');
+    this.calloutInner = $('#callout-dot-inner');
+    const cClose = $('#callout-close');
+    if (cClose) cClose.onclick = () => this.hideCallout();
+
     document.querySelectorAll('.modes button').forEach(b => b.onclick = () => this.setMode(b.dataset.mode));
-    $('#v-home').onclick = () => this.view('home');
+    $('#v-home').onclick = () => { this.view('home'); this.select(null); };
     $('#v-top').onclick = () => this.view('top');
     $('#v-bottom').onclick = () => this.view('bottom');
     $('#v-rotate').onclick = e => { const c = this.viewer.controls; c.autoRotate = !c.autoRotate; e.currentTarget.classList.toggle('on', c.autoRotate); };

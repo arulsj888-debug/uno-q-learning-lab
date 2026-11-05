@@ -31,6 +31,39 @@
   <main id="stage">
     <div id="tooltip"></div>
     <div id="float-card"></div>
+    <div id="callout-overlay" class="callout-overlay" style="display: none;">
+      <svg id="callout-svg" class="callout-svg" aria-hidden="true">
+        <defs>
+          <filter id="callout-glow-filter" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <polyline id="callout-line-glow" class="callout-line-glow" points="0,0 0,0" />
+        <polyline id="callout-line" class="callout-line" points="0,0 0,0" />
+        <circle id="callout-dot-pulse" class="callout-dot-pulse" cx="0" cy="0" r="7" />
+        <circle id="callout-dot-outer" class="callout-dot-outer" cx="0" cy="0" r="4.5" />
+        <circle id="callout-dot-inner" class="callout-dot-inner" cx="0" cy="0" r="2" />
+      </svg>
+      <div id="callout-box" class="callout-box">
+        <button id="callout-close" class="callout-close" title="Close" aria-label="Close">×</button>
+        <div class="callout-header">
+          <span id="callout-tag" class="callout-tag"></span>
+          <span id="callout-ref" class="callout-ref"></span>
+        </div>
+        <div id="callout-title" class="callout-title"></div>
+        <div id="callout-body" class="callout-body">
+          <div id="callout-line1" class="callout-item"></div>
+          <div id="callout-line2" class="callout-item"></div>
+        </div>
+        <div class="callout-footer">
+          <span class="callout-hint">Quick summary · Full details on right</span>
+        </div>
+      </div>
+    </div>
     <div id="legend">Drag to rotate · Scroll to zoom · Right-drag to pan · Click any part</div>
     <div id="loading"><div class="spin"></div><p>Building the UNO Q…</p></div>
   </main>

@@ -178,3 +178,197 @@ code { background: #0d1217; border: 1px solid #253040; border-radius: 5px; paddi
 #dock.with-io .code-wrap { grid-template-columns: 1fr 200px; }
 .pxgrid { grid-template-columns: repeat(13, 17px); gap: 2px; width: max-content; }
 .px { width: 17px; height: 17px; aspect-ratio: auto; }
+
+/* ---------------- 3D callout annotation */
+.callout-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 6;
+  transition: opacity 0.2s ease-out;
+}
+.callout-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.callout-line-glow {
+  fill: none;
+  stroke: var(--teal2);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.35;
+  filter: blur(2px);
+}
+.callout-line {
+  fill: none;
+  stroke: var(--teal2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.callout-dot-pulse {
+  fill: none;
+  stroke: var(--teal2);
+  stroke-width: 1.5;
+  opacity: 0.8;
+  animation: calloutPulse 2s infinite ease-out;
+}
+@keyframes calloutPulse {
+  0% { r: 3px; opacity: 1; }
+  100% { r: 11px; opacity: 0; }
+}
+.callout-dot-outer {
+  fill: var(--teal2);
+}
+.callout-dot-inner {
+  fill: #ffffff;
+}
+.callout-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: auto;
+  width: 295px;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+  padding: 12px 14px 10px;
+  background: rgba(12, 18, 26, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid var(--teal2);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 0 16px rgba(0, 168, 181, 0.22);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+.callout-close {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  border-radius: 4px;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.callout-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.callout-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 22px;
+  min-width: 0;
+}
+.callout-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 168, 181, 0.2);
+  border: 1px solid rgba(54, 209, 220, 0.45);
+  color: var(--teal2);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+.callout-tag::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #46d37e;
+  box-shadow: 0 0 5px #46d37e;
+  flex-shrink: 0;
+}
+.callout-ref {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+.callout-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #ffffff;
+  margin: 1px 0 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+.callout-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 2px;
+}
+.callout-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11.5px;
+  line-height: 1.42;
+  color: #d5e5f3;
+  min-width: 0;
+}
+.callout-item::before {
+  content: '•';
+  color: var(--teal2);
+  font-weight: bold;
+  font-size: 13px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.callout-item span {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.callout-footer {
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.callout-hint {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
