@@ -3,7 +3,7 @@ injectSpeedInsights();
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Viewer } from './viewer.js';
-import { initMaterials } from './materials.js';
+import { initMaterials, canvasTex, noise } from './materials.js';
 import { UnoQBoard } from './board.js';
 import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y } from './hardware.js';
 import { Bench } from './bench.js';
@@ -80,24 +80,70 @@ class App {
     this.lamp.target.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 0, 0)));
     s.add(this.lamp, this.lamp.target);
     this.lux = 300; this.tempC = 25; this.distCm = 40;
-    // obstacle + 15° beam cone in front of the HC-SR04 (Lesson 13)
-    this.obstacle = new THREE.Mesh(new THREE.BoxGeometry(70, 50, 8), new THREE.MeshStandardMaterial({ color: 0xc9b38a, roughness: 0.8 }));
+    // ---- Lesson 13 scene, all at true scale (1 unit = 1 mm) -------------------------------------------
+    // obstacle: a corrugated cardboard box standing on the desk (flat, hard face — what the datasheet asks for)
+    {
+      const BW = 260, BH = 180, BD = 180;
+      const kraft = (seed, tape) => canvasTex(512, 512, (c, w, h) => {
+        c.fillStyle = '#b8905a'; c.fillRect(0, 0, w, h); noise(c, w, h, 16);
+        for (let i = 0; i < 900; i++) { c.strokeStyle = `rgba(${90 + Math.random() * 40},${60 + Math.random() * 30},30,0.12)`; c.lineWidth = 1; const x = Math.random() * w, y = Math.random() * h; c.beginPath(); c.moveTo(x, y); c.lineTo(x + (Math.random() - 0.5) * 18, y + (Math.random() - 0.5) * 4); c.stroke(); }
+        const e = c.createLinearGradient(0, 0, w, 0); e.addColorStop(0, 'rgba(70,45,20,0.28)'); e.addColorStop(0.04, 'rgba(0,0,0,0)'); e.addColorStop(0.96, 'rgba(0,0,0,0)'); e.addColorStop(1, 'rgba(70,45,20,0.28)');
+        c.fillStyle = e; c.fillRect(0, 0, w, h);
+        if (tape) { c.fillStyle = 'rgba(205,170,110,0.75)'; c.fillRect(w * 0.42, 0, w * 0.16, h); c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(w * 0.42, 0, 3, h); }
+      });
+      const side = new THREE.MeshStandardMaterial({ map: kraft(1, false), roughness: 0.92 });
+      const top = new THREE.MeshStandardMaterial({ map: kraft(2, true), roughness: 0.85 });
+      const frontM = new THREE.MeshStandardMaterial({ map: kraft(3, false), roughness: 0.92 });
+      this.obstacle = new THREE.Mesh(new THREE.BoxGeometry(BW, BH, BD), [side, side, top, side, frontM, side]);
+      this.obstacle.userData.size = [BW, BH, BD];
+    }
     this.obstacle.visible = false; this.obstacle.castShadow = true; this.obstacle.receiveShadow = true; s.add(this.obstacle);
-    this.obstacle.userData.hw = 'obstacle';
-    { const el = document.createElement('div'); el.className = 'part-label pin'; this.obstacleLabel = new CSS2DObject(el); this.obstacleLabel.position.set(0, 32, 0); this.obstacle.add(this.obstacleLabel); }
-    // sound waves: blue = burst leaving T, orange = echo coming back to R (slowed down a lot)
+    this.obstacle.traverse(o => { o.userData.hw = 'obstacle'; });
+    { const el = document.createElement('div'); el.className = 'part-label pin'; this.obstacleLabel = new CSS2DObject(el); this.obstacleLabel.position.set(0, 105, -90); this.obstacle.add(this.obstacleLabel); }
+    // tape measure on the desk, zero at the front of the transducers (true-scale mm / cm marks)
+    this.tape = new THREE.Group(); this.tape.visible = false; s.add(this.tape);
+    this.tapeClip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+    for (let seg = 0; seg < 21; seg++) {
+      const tex = canvasTex(80, 800, (c, w, h) => {
+        c.fillStyle = '#f2c414'; c.fillRect(0, 0, w, h); noise(c, w, h, 8);
+        c.fillStyle = '#141414';
+        for (let mm = 0; mm < 200; mm++) {
+          const y = mm * 4, cm = mm % 10 === 0, half = mm % 5 === 0;
+          c.fillRect(0, y, cm ? 34 : half ? 24 : 14, mm % 10 === 0 ? 2.2 : 1.2);
+        }
+        c.font = '700 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        for (let cmI = 0; cmI < 20; cmI++) {
+          const n = seg * 20 + cmI; if (n === 0) continue;
+          c.save(); c.translate(56, cmI * 40); c.rotate(Math.PI / 2); c.fillStyle = n % 10 === 0 ? '#c8161d' : '#141414'; c.fillText(String(n), 0, 0); c.restore();
+        }
+      });
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(19, 200), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.45, metalness: 0.15, clippingPlanes: [this.tapeClip] }));
+      m.rotation.x = -Math.PI / 2; m.position.set(0, 0, seg * 200 + 100); m.receiveShadow = true; m.raycast = () => {};
+      this.tape.add(m);
+    }
+    this.tapeHook = new THREE.Mesh(new THREE.BoxGeometry(19, 7, 0.8), new THREE.MeshStandardMaterial({ color: 0xb9bcc0, metalness: 1, roughness: 0.35 }));
+    this.tapeHook.raycast = () => {}; s.add(this.tapeHook); this.tapeHook.visible = false;
+    // sound: 8 wavefronts one wavelength apart (40 kHz in air: λ = 343 m/s ÷ 40 000 Hz ≈ 8.6 mm), drawn at true size
+    this.deskClip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(DESK_Y + 0.5));
+    this.wallClip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+    this.faceClip = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const cap = (half, dir) => { const gg = new THREE.SphereGeometry(1, 64, 8, 0, Math.PI * 2, 0, half); gg.rotateX(dir * Math.PI / 2); return gg; };
+    const outGeo = cap(7.5 * Math.PI / 180, 1), backGeo = outGeo;
     this.waves = { out: [], back: [], anim: null };
-    const ringGeo = new THREE.RingGeometry(0.86, 1.0, 64);
-    for (let i = 0; i < 6; i++) {
-      const back = i >= 3;
-      const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: back ? 0xffa53a : 0x4fd6ff, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+    for (let i = 0; i < 16; i++) {
+      const back = i >= 8;
+      const m = new THREE.Mesh(back ? backGeo : outGeo, new THREE.MeshBasicMaterial({
+        color: back ? 0xffa340 : 0x58c8ff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending, clippingPlanes: back ? [this.deskClip, this.wallClip, this.faceClip] : [this.deskClip, this.wallClip] }));
       m.visible = false; m.renderOrder = 7; m.raycast = () => {}; s.add(m);
       (back ? this.waves.back : this.waves.out).push(m);
     }
-    this.waves.flash = new THREE.Mesh(new THREE.CircleGeometry(7.6, 40), new THREE.MeshBasicMaterial({ color: 0xffa53a, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    // receiver "hears": a faint glow on the R grille when the echo arrives
+    this.waves.flash = new THREE.Mesh(new THREE.CircleGeometry(6.1, 40), new THREE.MeshBasicMaterial({ color: 0xffb860, transparent: true, opacity: 0, depthWrite: false }));
     this.waves.flash.raycast = () => {}; this.waves.flash.renderOrder = 8; s.add(this.waves.flash);
-    this.waves.tflash = new THREE.Mesh(new THREE.CircleGeometry(7.6, 40), new THREE.MeshBasicMaterial({ color: 0x4fd6ff, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    this.waves.tflash = new THREE.Mesh(new THREE.CircleGeometry(6.1, 40), new THREE.MeshBasicMaterial({ color: 0x9fe6ff, transparent: true, opacity: 0, depthWrite: false }));
     this.waves.tflash.raycast = () => {}; this.waves.tflash.renderOrder = 8; s.add(this.waves.tflash);
+    this.beam = { visible: false };
     this.beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 40, 1, true), new THREE.MeshBasicMaterial({ color: 0x35d0ff, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }));
     this.beam.visible = false; this.beam.raycast = () => {}; s.add(this.beam);
     const mk = (x0, z0, z1, color) => {
@@ -229,6 +275,7 @@ class App {
   setOutline(objs) { this.viewer.outline.selectedObjects = objs; }
 
   view(name, ms = 1100) {
+    if (name === 'sonar' && this.sonarGeom()) return this.frameSonar(ms);
     const v = VIEWS[name];
     if (!ms) { this.viewer.controls.target.copy(v.t); this.viewer.camera.position.copy(v.t.clone().add(v.d.clone().normalize().multiplyScalar(v.dist))); return Promise.resolve(); }
     return this.viewer.flyTo(v.t, v.dist, v.d, ms);
@@ -535,7 +582,7 @@ class App {
     this.hideFloat(); this.clearTemp(); this.hideCallout();
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
     if (mode === 'explore') {
-      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.obstacle.visible = false; this.beam.visible = false;
+      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar();
       this.lesson = null;
       this.renderSide();
       this.select(null, { card: false });
@@ -566,7 +613,7 @@ class App {
     this.sim.stop(); this.stopSound(); this.outputsOff();
     this.lesson = L; this.stepIdx = 0; this.inQuiz = false;
     this.board.setMatrix(null);
-    this.lamp.intensity = 0; this.obstacle.visible = false; this.beam.visible = false;
+    this.lamp.intensity = 0; this.hideSonar();
     if (L.circuit) { this.bench.setDefs(L.circuit); this.bb.group.visible = true; }
     else { this.bench.clear(); this.bench.setDefs([]); this.bb.group.visible = false; this.strips.visible = false; }
     if (L.id === 'l1' && this.usbPlugged) await this.plug(false);
@@ -613,8 +660,8 @@ class App {
     }
     if ($('#knob')) { $('#knob').oninput = e => this.setKnob(+e.target.value / 1000); this.setKnob(this.knobValue()); }
     if ($('#lux')) { $('#lux').oninput = e => this.setLux(this.sliderToLux(+e.target.value)); document.querySelectorAll('[data-lux]').forEach(b => b.onclick = () => this.setLux(+b.dataset.lux)); this.setLux(this.lux); }
-    if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist)); this.setDist(this.distCm); }
-    else { this.obstacle.visible = false; this.beam.visible = false; this.waves.anim = null; }
+    if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); $('#dist').onchange = e => this.setDist(+e.target.value, true); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist, true)); this.setDist(this.distCm); }
+    else this.hideSonar();
     this.refreshPickTargets();
     if ($('#tempc')) { $('#tempc').oninput = e => this.setTemp(+e.target.value); this.setTemp(this.tempC); }
     this.lamp.intensity = w.includes('light') ? this.lampIntensity() : 0;
@@ -681,7 +728,7 @@ class App {
       const animate = i > 0 && i === prev + 1 && S.have ? S.have.filter(id => !before.includes(id) && !this.bench.items[id]) : [];
       await this.bench.build(st.have, animate, alive);
       this.refreshPickTargets();
-      if ($('#dist')) this.setDist(this.distCm);
+      if ($('#dist')) this.setDist(this.distCm, S.view === 'sonar');
       if (!alive()) return;
       if (S.holes) this.holeLabels(S.holes);
       if (S.trace) { const objs = this.bench.groups(S.trace); this.setOutline(objs); this.pulseObjs = objs; }
@@ -836,40 +883,51 @@ class App {
   // ---- HC-SR04 model: datasheet µs = cm × 58; UNO Q pulseIn() resolves 100 µs (Zephyr tick, see Lesson 13)
   echoUs() { return this.distCm * 58; }
   pulseInUs() { return Math.floor(this.echoUs() / 100) * 100; }
-  // the 3D distance is compressed (log scale) so 2 cm … 4 m fits next to the breadboard
-  visMm(cm) { return 25 + 235 * Math.log(cm / 2) / Math.log(200); }
-  cmFromVis(mm) { return 2 * Math.exp((mm - 25) / 235 * Math.log(200)); }
+  // ---- Lesson 13: true-scale sonar ------------------------------------------------------------------
   sonarGeom() {
     const us = this.bench.get('us1'); if (!us) return null;
     const g = this.bench.items.us1.group.position;
     const y = g.y + us.beamY, face = g.z + us.beamZ;
     return { us, g, y, face, T: new THREE.Vector3(g.x + us.tx, y, face), R: new THREE.Vector3(g.x + us.rx, y, face) };
   }
-  setDist(cm) {
+  setDist(cm, reframe = false) {
     this.distCm = Math.min(400, Math.max(2, cm));
     const sl = $('#dist'); if (sl && document.activeElement !== sl) sl.value = this.distCm;
     const G = this.sonarGeom();
     if (G) {
-      const shown = this.visMm(this.distCm);
+      const [BW, BH, BD] = this.obstacle.userData.size, wallZ = G.face + this.distCm * 10;
       const wasVis = this.obstacle.visible;
-      this.obstacle.position.set(G.g.x, G.y + 14, G.face + shown + 4); this.obstacle.visible = true;
+      this.obstacle.position.set(G.g.x, DESK_Y + BH / 2, wallZ + BD / 2); this.obstacle.visible = true;
       if (!wasVis) this.refreshPickTargets();
       this.obstacleLabel.element.textContent = `${this.distCm.toFixed(1)} cm`;
-      const r = Math.tan(7.5 * Math.PI / 180) * shown + 7.5;            // 15° full angle from the T transducer
-      this.beam.scale.set(r, shown, r); this.beam.rotation.set(-Math.PI / 2, 0, 0);
-      this.beam.position.set(G.T.x, G.y, G.face + shown / 2); this.beam.visible = true;
-      this.beam.material.opacity = 0.07;
+      this.tape.visible = true; this.tape.position.set(G.g.x + 32, DESK_Y + 0.25, G.face);
+      this.tapeClip.constant = wallZ; this.tapeHook.visible = true; this.tapeHook.position.set(G.g.x + 32, DESK_Y + 3.6, wallZ - 0.4);
+      this.wallClip.constant = wallZ; this.faceClip.constant = -G.face;
+      if (reframe) this.frameSonar(800);
     }
     const e = this.echoUs(), q = this.pulseInUs(), el = $('#dist-val');
     if (el) el.innerHTML = `Obstacle <b>${this.distCm.toFixed(1)} cm</b> → ECHO HIGH ≈ <b>${Math.round(e)} µs</b> → pulseIn() on UNO Q ≈ <b>${q} µs</b> → <b>${(q / 58).toFixed(1)} cm</b>`;
-    this.drawTiming(null);
+    if (!this.waves.anim) this.drawTiming(null);
   }
-  // one measurement: trigger → 8-cycle burst from T → echo back to R (datasheet timing diagram), slowed down
+  hideSonar() { this.obstacle.visible = false; this.tape.visible = false; this.tapeHook.visible = false; this.waves.anim = null; this.updateWaves(); }
+  frameSonar(ms = 1000) {
+    const G = this.sonarGeom(); if (!G) return this.view('bench', ms);
+    const d = this.distCm * 10, BD = this.obstacle.userData.size[2];
+    const mid = new THREE.Vector3(G.g.x, DESK_Y + 35, G.face - 30 + (d + BD * 0.6 + 30) / 2);
+    const span = d + BD * 0.6 + 90;
+    const dist = Math.max(230, span * 1.3);
+    return this.viewer.flyTo(mid, dist, new THREE.Vector3(0.93, 0.36, 0.06), ms);
+  }
+  // one measurement: TRIG → 8-cycle burst from T → echo from the box back to R (datasheet timing diagram).
+  // Shown slowed down; the wavefront spacing is the true 40 kHz wavelength.
   sonarBurst() {
-    const G = this.sonarGeom(); if (!G || (this.waves.anim && performance.now() - this.waves.anim.t0 < this.waves.anim.total)) return;
-    const d = this.obstacle.position.z - 4 - G.face, v = 0.42;               // mm per ms (visual speed)
-    const tOut = d / v;
-    this.waves.anim = { t0: performance.now(), G, d, v, tOut, trig: 60, gap: 28, total: 60 + 2 * tOut + 3 * 28 + 260 };
+    const G = this.sonarGeom(); if (!G || this.waves.anim) return;
+    const d = this.distCm * 10, lambda = 343 / 40;                        // mm
+    const image = new THREE.Vector3(G.T.x, G.y, 2 * (G.face + d) - G.T.z);  // mirror image of T behind the flat face
+    const rt = 2 * d, T = 650 + 950 * Math.min(1, d / 1500);               // visual round-trip time (ms)
+    const v = (image.distanceTo(G.R)) / T;                                 // mm per ms (slowed down)
+    this.waves.anim = { t0: performance.now(), G, d, lambda, image, v, trig: 70, hear: image.distanceTo(G.R) / v, burst: 8 * lambda / v };
+    this.waves.anim.total = 70 + this.waves.anim.hear + this.waves.anim.burst + 320;
   }
   updateWaves() {
     const W = this.waves, A = W.anim;
@@ -877,45 +935,42 @@ class App {
     if (!A) return hideAll();
     const t = performance.now() - A.t0;
     if (t > A.total || !this.obstacle.visible) { W.anim = null; hideAll(); this.drawTiming(null); return; }
-    const { G, v, tOut, trig, gap } = A, spread = Math.tan(7.5 * Math.PI / 180), obsZ = G.face + A.d;
-    W.out.forEach((m, i) => {
-      const ti = t - trig - i * gap;
-      if (ti < 0 || ti > tOut) { m.visible = false; return; }
-      const dz = v * ti, r = 7.2 + spread * dz;
-      m.visible = true; m.position.set(G.T.x, G.y, G.face + dz); m.scale.setScalar(r);
-      m.material.opacity = 0.95 - 0.35 * ti / tOut;
-    });
-    W.back.forEach((m, i) => {
-      const tj = t - trig - tOut - i * gap;
-      if (tj < 0 || tj > tOut) { m.visible = false; return; }
-      const k = tj / tOut, dz = v * tj;
-      // the echo spreads out from the obstacle and reaches the receiver R
-      m.visible = true; m.position.set(G.g.x + (G.R.x - G.g.x) * k, G.y, obsZ - dz); m.scale.setScalar(4 + 14 * k);
-      m.material.opacity = 0.95 - 0.3 * k;
-    });
-    const tSend = t - trig, tHear = t - trig - 2 * tOut;
-    W.tflash.position.set(G.T.x, G.y, G.face + 0.2); W.tflash.material.opacity = tSend >= 0 && tSend < 3 * gap ? 0.55 : 0;
-    W.flash.position.set(G.R.x, G.y, G.face + 0.2); W.flash.material.opacity = tHear >= 0 && tHear < 260 ? 0.65 * (1 - tHear / 260) : 0;
+    const { G, v, lambda, image, d, trig } = A, travel = v * (t - trig);
+    for (let i = 0; i < 8; i++) {
+      const s = travel - i * lambda;                               // radius of wavefront i (mm)
+      const env = Math.sin(Math.PI * (i + 0.5) / 8);               // burst envelope
+      const o = W.out[i], b = W.back[i];
+      if (s > 0 && s < d + 12) {
+        o.visible = true; o.position.copy(G.T); o.scale.setScalar(s);
+        o.material.opacity = 0.55 * env * (1 - 0.4 * s / (d + 12));
+      } else o.visible = false;
+      if (s > d && s < image.distanceTo(G.R) + 15) {
+        b.visible = true; b.position.copy(image); b.lookAt(G.R); b.scale.setScalar(s);
+        b.material.opacity = 0.5 * env * (1 - 0.35 * (s - d) / (d + 15));
+      } else b.visible = false;
+    }
+    const tSend = t - trig, tHear = t - trig - A.hear;
+    W.tflash.position.set(G.T.x, G.y, G.face - 1.5); W.tflash.material.opacity = tSend >= 0 && tSend < A.burst ? 0.45 : 0;
+    W.flash.position.set(G.R.x, G.y, G.face - 1.5); W.flash.material.opacity = tHear >= 0 && tHear < A.burst + 200 ? 0.6 * (1 - tHear / (A.burst + 200)) : 0;
     this.drawTiming(t);
   }
-  // datasheet timing diagram, with a cursor that follows the animation
+  // datasheet timing diagram with a cursor that follows the animation
   drawTiming(t) {
     const c = $('#sonar-timing'); if (!c) return;
     const g = c.getContext('2d'), w = c.width, h = c.height, A = this.waves.anim;
-    const tOut = A ? A.tOut : this.visMm(this.distCm) / 0.42, trig = 60, gap = 28;
-    const total = 60 + 2 * tOut + 3 * gap + 260, X = ms => 92 + (w - 102) * ms / total;
+    const trig = 70, burst = A ? A.burst : 120, hear = A ? A.hear : 600;
+    const total = trig + hear + burst + 320, X = ms => 92 + (w - 102) * ms / total;
     g.fillStyle = '#070b0e'; g.fillRect(0, 0, w, h);
     g.font = '12px Consolas, monospace'; g.textBaseline = 'middle';
-    const rows = [['TRIG (D7)', 18, '#ffd34d'], ['Burst from T', 46, '#4fd6ff'], ['ECHO (D8)', 74, '#ffa53a']];
-    for (const [name, y, col] of rows) { g.fillStyle = '#8fa3b5'; g.fillText(name, 6, y); g.strokeStyle = 'rgba(255,255,255,0.08)'; g.beginPath(); g.moveTo(92, y + 8); g.lineTo(w - 10, y + 8); g.stroke(); g.strokeStyle = col; }
+    const rows = [['TRIG (D7)', 18], ['Burst from T', 46], ['ECHO (D8)', 74]];
+    for (const [name, y] of rows) { g.fillStyle = '#8fa3b5'; g.fillText(name, 6, y); g.strokeStyle = 'rgba(255,255,255,0.08)'; g.lineWidth = 1; g.beginPath(); g.moveTo(92, y + 8); g.lineTo(w - 10, y + 8); g.stroke(); }
     const step = (y, segs, col) => { g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(92, y + 8); for (const [a, b] of segs) { g.lineTo(X(a), y + 8); g.lineTo(X(a), y - 6); g.lineTo(X(b), y - 6); g.lineTo(X(b), y + 8); } g.lineTo(w - 10, y + 8); g.stroke(); };
-    step(18, [[0, trig]], '#ffd34d');
-    const burst = []; for (let i = 0; i < 8; i++) { const a = trig + i * (3 * gap / 8); burst.push([a, a + 3 * gap / 16]); }
-    step(46, burst, '#4fd6ff');
-    const echoHi = trig + 3 * gap, echoLo = trig + 2 * tOut;
-    step(74, [[echoHi, Math.max(echoHi + 4, echoLo)]], '#ffa53a');
-    g.fillStyle = '#ffd7a8'; g.fillText(`HIGH for ${Math.round(this.echoUs())} µs → ${(this.echoUs() / 58).toFixed(1)} cm`, Math.min(X(echoHi) + 6, w - 230), 101);
-    if (t != null) { g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1; g.beginPath(); g.moveTo(X(Math.min(t, total)), 8); g.lineTo(X(Math.min(t, total)), h - 6); g.stroke(); }
+    step(18, [[0, trig * 0.8]], '#ffd34d');
+    const cyc = []; for (let i = 0; i < 8; i++) { const a = trig + i * burst / 8; cyc.push([a, a + burst / 16]); }
+    step(46, cyc, '#9fe6ff');
+    step(74, [[trig + burst, Math.max(trig + burst + 4, trig + hear)]], '#ffbf73');
+    g.fillStyle = '#ffd7a8'; g.fillText(`ECHO HIGH ${Math.round(this.echoUs())} µs = round trip → ${(this.echoUs() / 58).toFixed(1)} cm`, 96, 101);
+    if (t != null) { const x = X(Math.min(t, total)); g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, 6); g.lineTo(x, 88); g.stroke(); }
   }
   tmp36Volts() { return Math.min(2.0, Math.max(0.1, 0.5 + this.tempC / 100)); }   // datasheet: 0.5 V at 0 °C, 10 mV/°C
   setTemp(t) {
@@ -945,11 +1000,13 @@ class App {
         window.addEventListener('pointerup', up);
       } else if (hit.id === 'obstacle') {
         e.stopPropagation(); this.viewer.controls.enabled = false;
-        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.obstacle.position.y), p = new THREE.Vector3();
+        const G0 = this.sonarGeom(); if (!G0) { this.viewer.controls.enabled = true; return; }
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -hit.point.y), p = new THREE.Vector3();
+        const off = hit.point.z - (G0.face + this.distCm * 10);
         const mv = ev => {
           const G = this.sonarGeom(); if (!G) return;
           this.viewer.setPointer(ev); this.viewer.raycaster.setFromCamera(this.viewer.pointer, this.viewer.camera);
-          if (this.viewer.raycaster.ray.intersectPlane(plane, p)) this.setDist(this.cmFromVis(Math.max(25, Math.min(260, p.z - 4 - G.face))));
+          if (this.viewer.raycaster.ray.intersectPlane(plane, p)) this.setDist((p.z - off - G.face) / 10);
         };
         const up = () => { this.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
         window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);

@@ -381,55 +381,120 @@ export class TMP36 {
 }
 
 // ---------------------------------------------------------------- HC-SR04 ultrasonic ranging module
-// Elecfreaks HC-SR04 datasheet: 45 × 20 × 15 mm, pins Vcc · Trig · Echo · Gnd (left → right seen from the front).
-// Local frame: transducers face +z, pins point down at x = −3.81 / −1.27 / +1.27 / +3.81 (Vcc … Gnd).
+// Elecfreaks HC-SR04 datasheet: 45 × 20 × 15 mm; front photo: transmitter "T" left, receiver "R" right,
+// crystal "Y1" top centre, "HC-SR04" under it, pins Vcc · Trig · Echo · Gnd along the bottom edge.
+// Local frame: transducers face +z, PCB centred on z = 0, pins point down at x = −3.81 / −1.27 / +1.27 / +3.81.
+let _brushed = null, _mesh = null;
+function brushedTex() {
+  if (_brushed) return _brushed;
+  _brushed = canvasTex(512, 128, (c, w, h) => {
+    c.fillStyle = '#c9cbcd'; c.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y++) { const v = 180 + Math.random() * 60; c.fillStyle = `rgba(${v},${v},${v + 3},0.5)`; c.fillRect(0, y, w, 1); }
+    for (let i = 0; i < 260; i++) { c.fillStyle = `rgba(255,255,255,${Math.random() * 0.25})`; c.fillRect(Math.random() * w, Math.random() * h, 20 + Math.random() * 80, 1); }
+  });
+  _brushed.wrapS = _brushed.wrapT = THREE.RepeatWrapping;
+  return _brushed;
+}
+function meshTex() {
+  if (_mesh) return _mesh;
+  _mesh = canvasTex(512, 512, (c, w, h) => {
+    c.fillStyle = '#121314'; c.fillRect(0, 0, w, h);
+    const p = 8;                                   // woven grille, ≈0.2 mm pitch at this scale
+    for (let y = 0; y < h; y += p) for (let x = 0; x < w; x += p) {
+      const odd = ((x + y) / p) % 2;
+      c.fillStyle = odd ? '#3b3d40' : '#2a2c2e'; c.fillRect(x + 1, y + 1, p - 2, p - 2);
+      c.fillStyle = 'rgba(255,255,255,0.10)'; c.fillRect(x + 1, y + 1, p - 2, 1);
+    }
+    const r = c.createRadialGradient(w / 2, h / 2, w * 0.1, w / 2, h / 2, w / 2);
+    r.addColorStop(0, 'rgba(0,0,0,0)'); r.addColorStop(1, 'rgba(0,0,0,0.55)');
+    c.fillStyle = r; c.fillRect(0, 0, w, h);
+  });
+  return _mesh;
+}
+
 export class HCSR04 {
   constructor() {
     const g = this.group = new THREE.Group();
-    const y0 = 3.2, W = 45, H = 20, T = 1.6;               // PCB bottom edge 3.2 mm above the breadboard
-    const front = canvasTex(900, 400, (c, w, h) => {
-      c.fillStyle = '#1f5fa8'; c.fillRect(0, 0, w, h); noise(c, w, h, 8);
-      const k = w / W;
-      c.fillStyle = '#eef2f6'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = `700 ${Math.round(1.9 * k)}px Arial, Helvetica, sans-serif`; c.fillText('HC-SR04', w / 2, 9.6 * k);
-      c.font = `600 ${Math.round(1.2 * k)}px Arial`; c.fillText('Y1', w / 2, 7.2 * k);
-      c.font = `700 ${Math.round(2.0 * k)}px Arial`; c.fillText('T', 2.6 * k, (H - 2.2) * k); c.fillText('R', (W - 2.6) * k, (H - 2.2) * k);
-      c.font = `700 ${Math.round(1.55 * k)}px Arial`;
-      [['Vcc', -3.81], ['Trig', -1.27], ['Echo', 1.27], ['Gnd', 3.81]].forEach(([t, x]) => {
-        c.save(); c.translate((W / 2 + x) * k, (H - 3.6) * k); c.rotate(-Math.PI / 2); c.fillText(t, 0, 0); c.restore();
+    const y0 = 3.0, W = 45, H = 20, T = 1.6, k = 24;      // k = texture px per mm
+    const pcbBlue = '#1c5aa6';
+    const silk = (c, f) => { c.save(); c.fillStyle = '#f3f5f7'; c.strokeStyle = '#f3f5f7'; f(); c.restore(); };
+    const front = canvasTex(W * k, H * k, (c, w, h) => {
+      const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#2163b3'); gr.addColorStop(1, '#17519a');
+      c.fillStyle = gr; c.fillRect(0, 0, w, h); noise(c, w, h, 7);
+      // copper traces under the solder mask (slightly lighter blue)
+      c.strokeStyle = 'rgba(120,175,240,0.22)'; c.lineWidth = 0.35 * k; c.lineCap = 'round';
+      for (const [x, s] of [[-3.81, -1], [-1.27, -0.4], [1.27, 0.4], [3.81, 1]]) {
+        c.beginPath(); c.moveTo((W / 2 + x) * k, (H - 1.3) * k); c.lineTo((W / 2 + x) * k, (H - 4) * k); c.lineTo((W / 2 + x + s * 3) * k, (H - 6.5) * k); c.stroke();
+      }
+      silk(c, () => {
+        c.lineWidth = 0.18 * k;
+        for (const x of [-13, 13]) { c.beginPath(); c.arc((W / 2 + x) * k, (H / 2) * k, 8.5 * k, 0, Math.PI * 2); c.stroke(); }
+        c.strokeRect((W / 2 - 5.6) * k, (H - 6.0) * k, 11.2 * k, 5.2 * k);   // crystal outline area hidden under the part
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.font = `700 ${Math.round(1.75 * k)}px Arial, Helvetica, sans-serif`; c.fillText('HC-SR04', w / 2, 9.4 * k);
+        c.font = `700 ${Math.round(1.1 * k)}px Arial`; c.fillText('Y1', w / 2, 7.2 * k);
+        c.font = `700 ${Math.round(1.9 * k)}px Arial`; c.fillText('T', 4.4 * k, (H - 1.5) * k); c.fillText('R', (W - 4.4) * k, (H - 1.5) * k);
+        c.font = `700 ${Math.round(1.25 * k)}px Arial`;
+        [['VCC', -3.81], ['Trig', -1.27], ['Echo', 1.27], ['GND', 3.81]].forEach(([t, x]) => { c.save(); c.translate((W / 2 + x) * k, (H - 5.0) * k); c.rotate(-Math.PI / 2); c.fillText(t, 0, 0); c.restore(); });
       });
+      // tinned pin pads and corner mounting holes
+      for (const x of [-3.81, -1.27, 1.27, 3.81]) { c.fillStyle = '#d9dbde'; c.beginPath(); c.arc((W / 2 + x) * k, (H - 1.4) * k, 0.85 * k, 0, Math.PI * 2); c.fill(); c.fillStyle = '#6b6f73'; c.beginPath(); c.arc((W / 2 + x) * k, (H - 1.4) * k, 0.45 * k, 0, Math.PI * 2); c.fill(); }
+      for (const [x, y] of [[1.4, 1.4], [W - 1.4, 1.4], [1.4, H - 1.4], [W - 1.4, H - 1.4]]) { c.fillStyle = '#d9dbde'; c.beginPath(); c.arc(x * k, y * k, 0.95 * k, 0, Math.PI * 2); c.fill(); c.fillStyle = '#0d0f12'; c.beginPath(); c.arc(x * k, y * k, 0.55 * k, 0, Math.PI * 2); c.fill(); }
     });
-    const pcbSide = new THREE.MeshStandardMaterial({ color: 0x1b4f8f, roughness: 0.6 });
-    const pcb = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), [pcbSide, pcbSide, pcbSide, pcbSide, new THREE.MeshStandardMaterial({ map: front, roughness: 0.5 }), pcbSide]);
+    const back = canvasTex(W * k / 2, H * k / 2, (c, w, h) => {
+      c.fillStyle = '#17519a'; c.fillRect(0, 0, w, h); noise(c, w, h, 7);
+      c.strokeStyle = 'rgba(120,175,240,0.22)'; c.lineWidth = 4;
+      for (let i = 0; i < 14; i++) { c.beginPath(); c.moveTo(Math.random() * w, Math.random() * h); c.lineTo(Math.random() * w, Math.random() * h); c.stroke(); }
+    });
+    const edge = new THREE.MeshStandardMaterial({ color: 0x1a4f8f, roughness: 0.6 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), [edge, edge, edge, edge,
+      new THREE.MeshPhysicalMaterial({ map: front, roughness: 0.45, clearcoat: 0.35, clearcoatRoughness: 0.4 }),
+      new THREE.MeshPhysicalMaterial({ map: back, roughness: 0.5, clearcoat: 0.3 })]);
     pcb.position.set(0, y0 + H / 2, 0); g.add(pcb);
-    // two Ø16 mm transducers on the front, 26 mm apart (T = transmitter, R = receiver)
-    const mesh = canvasTex(256, 256, (c, w, h) => {
-      c.fillStyle = '#1a1a1a'; c.fillRect(0, 0, w, h);
-      c.strokeStyle = '#4a4a4a'; c.lineWidth = 2;
-      for (let i = 0; i < w; i += 9) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(w, i); c.stroke(); }
-    });
+
+    // transducers: Ø16 mm brushed-aluminium cans with a rolled lip and a recessed woven grille
+    const cy = y0 + H / 2, z0 = T / 2, L = 12;
+    const alu = new THREE.MeshStandardMaterial({ map: brushedTex(), color: 0xffffff, metalness: 1, roughness: 0.3 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.7 });
+    const grille = new THREE.MeshStandardMaterial({ map: meshTex(), bumpMap: meshTex(), bumpScale: 0.6, roughness: 0.75, metalness: 0.4 });
     for (const x of [-13, 13]) {
-      const can = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 12, 48, 1, true), M.steelSatin);
-      can.rotation.x = Math.PI / 2; can.position.set(x, y0 + H / 2, T / 2 + 6); g.add(can);
-      const lip = new THREE.Mesh(new THREE.TorusGeometry(7.6, 0.45, 12, 48), M.steelSatin);
-      lip.position.set(x, y0 + H / 2, T / 2 + 12); g.add(lip);
-      const face = new THREE.Mesh(new THREE.CircleGeometry(7.4, 48), new THREE.MeshStandardMaterial({ map: mesh, roughness: 0.9 }));
-      face.position.set(x, y0 + H / 2, T / 2 + 11.4); g.add(face);
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, L, 72, 1, true), alu);
+      can.rotation.x = Math.PI / 2; can.position.set(x, cy, z0 + L / 2); g.add(can);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(7.7, 0.32, 14, 72), alu); lip.position.set(x, cy, z0 + L - 0.05); g.add(lip);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(6.1, 7.55, 72), dark); ring.position.set(x, cy, z0 + L - 0.25); g.add(ring);
+      const well = new THREE.Mesh(new THREE.CylinderGeometry(6.15, 6.15, 1.4, 64, 1, true), new THREE.MeshStandardMaterial({ color: 0x0a0a0b, roughness: 0.9, side: THREE.BackSide }));
+      well.rotation.x = Math.PI / 2; well.position.set(x, cy, z0 + L - 0.95); g.add(well);
+      const face = new THREE.Mesh(new THREE.CircleGeometry(6.15, 64), grille); face.position.set(x, cy, z0 + L - 1.6); g.add(face);
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(8.15, 8.15, 0.5, 72), dark); foot.rotation.x = Math.PI / 2; foot.position.set(x, cy, z0 + 0.25); g.add(foot);
     }
-    // crystal (HC-49) between the transducers
-    const xtal = new THREE.Mesh(new THREE.CapsuleGeometry(1.6, 6.5, 6, 16), M.steelSatin);
-    xtal.rotation.z = Math.PI / 2; xtal.position.set(0, y0 + H - 3.4, T / 2 + 1.7); g.add(xtal);
-    // 4-pin header on the back, straight pins down into the breadboard
-    const hdr = new THREE.Mesh(new THREE.BoxGeometry(10.2, 2.5, 2.5), M.blackPlastic);
-    hdr.position.set(0, y0 + 1.25, -T / 2 - 1.25); g.add(hdr);
+    // crystal Y1 (HC-49S style metal can lying on the PCB)
+    const xtal = new THREE.Mesh(new THREE.CapsuleGeometry(2.25, 6.0, 8, 24), new THREE.MeshStandardMaterial({ color: 0xe6e6e6, metalness: 1, roughness: 0.22 }));
+    xtal.rotation.z = Math.PI / 2; xtal.scale.set(1, 1, 0.78); xtal.position.set(0, y0 + H - 3.4, z0 + 1.75); g.add(xtal);
+    const xbase = new THREE.Mesh(new THREE.BoxGeometry(11.0, 4.9, 0.5), dark); xbase.position.set(0, y0 + H - 3.4, z0 + 0.25); g.add(xbase);
+    // back side: three SOIC chips + passives (the module's driver / receiver electronics)
+    const chipMat = new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.55 });
+    for (const [x, len] of [[-12, 8.6], [0, 9.9], [12, 4.9]]) {
+      const ic = new THREE.Mesh(new THREE.BoxGeometry(3.9, len, 1.5), chipMat); ic.position.set(x, cy + 1, -T / 2 - 0.75); g.add(ic);
+      const n = Math.round(len / 1.27);
+      for (let i = 0; i < n; i++) for (const sx of [-1, 1]) {
+        const lead = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.4, 0.25), M.tin);
+        lead.position.set(x + sx * 2.45, cy + 1 - len / 2 + 0.6 + i * 1.27, -T / 2 - 0.15); g.add(lead);
+      }
+    }
+    for (let i = 0; i < 10; i++) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.25, 0.5), new THREE.MeshStandardMaterial({ color: i % 3 ? 0x8d7f6a : 0x161616, roughness: 0.6 }));
+      p.position.set(-18 + i * 4, y0 + 3 + (i % 2) * 2, -T / 2 - 0.25); g.add(p);
+    }
+    // 4-pin straight header: plastic spacer under the PCB edge, gold pins down into the breadboard
+    const hdr = new THREE.Mesh(new THREE.BoxGeometry(10.16, 2.5, 2.5), M.blackPlastic); hdr.position.set(0, y0 - 1.25, 0); g.add(hdr);
     for (const x of [-3.81, -1.27, 1.27, 3.81]) {
-      const pin = new THREE.Mesh(new THREE.BoxGeometry(0.64, 9.5, 0.64), M.gold);
-      pin.position.set(x, y0 + 4.75 - 7.5, -T / 2 - 1.25); g.add(pin);
+      const pin = new THREE.Mesh(new THREE.BoxGeometry(0.64, 9.0, 0.64), M.gold); pin.position.set(x, y0 + 1.5 - 4.5, 0); g.add(pin);
+      const fil = new THREE.Mesh(new THREE.ConeGeometry(0.9, 0.7, 16), M.solder); fil.position.set(x, y0 + 1.4, T / 2 + 0.35); fil.rotation.x = -Math.PI / 2; g.add(fil);
     }
     tagHW(g, 'hcsr04');
-    this.beamZ = T / 2 + 12;
-    this.tx = -13; this.rx = 13;            // T (transmitter) left, R (receiver) right, seen from the front
-    this.beamY = y0 + H / 2;
+    this.beamZ = z0 + L;                      // front plane of the transducers
+    this.beamY = cy;
+    this.tx = -13; this.rx = 13;              // T (transmitter) left, R (receiver) right, seen from the front
   }
 }
 

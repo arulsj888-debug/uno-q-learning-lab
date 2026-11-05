@@ -20,6 +20,7 @@ export class Viewer {
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 0.95;
     r.shadowMap.enabled = true;
+    r.localClippingEnabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(r.domElement);
 
@@ -33,12 +34,12 @@ export class Viewer {
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.035).texture;
     scene.environmentIntensity = 0.5;
 
-    this.camera = new THREE.PerspectiveCamera(32, 1, 2, 4000);
+    this.camera = new THREE.PerspectiveCamera(32, 1, 2, 16000);
     this.camera.position.set(-62, 92, 118);
 
     const c = this.controls = new OrbitControls(this.camera, r.domElement);
     c.enableDamping = true; c.dampingFactor = 0.08;
-    c.minDistance = 18; c.maxDistance = 520;
+    c.minDistance = 18; c.maxDistance = 6500;
     c.minPolarAngle = 0.001; c.maxPolarAngle = Math.PI - 0.001;
     c.target.set(0, 0, 0);
     c.rotateSpeed = 0.75; c.zoomSpeed = 1.1; c.panSpeed = 0.8;
@@ -111,9 +112,9 @@ export class Viewer {
       for (let i = 0; i <= w; i += 64) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, h); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(w, i); g.stroke(); }
       g.strokeStyle = 'rgba(255,255,255,0.025)'; g.lineWidth = 1;
       for (let i = 0; i <= w; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, h); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(w, i); g.stroke(); }
-    }, { repeat: [3, 3] });
+    }, { repeat: [34, 34] });
     const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, metalness: 0, transparent: true });
-    const mesh = this.desk = new THREE.Mesh(new THREE.CircleGeometry(420, 96), mat);
+    const mesh = this.desk = new THREE.Mesh(new THREE.CircleGeometry(4800, 160), mat);
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.y = -6.05;
     mesh.receiveShadow = true;

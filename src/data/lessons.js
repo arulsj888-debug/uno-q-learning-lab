@@ -1116,11 +1116,11 @@ export const LESSONS = [
       },
       {
         title: 'Run it & move the obstacle', view: 'sonar', showCode: true, power: true, action: 'run',
-        body: `<p><b>Drag the obstacle</b> in the 3D view, or use the slider / quick buttons below.</p>
-        <ul><li><b style="color:#4fd6ff">Blue rings</b> = the 40 kHz burst leaving the transmitter <b>T</b>.</li>
-        <li><b style="color:#ffa53a">Orange rings</b> = the echo bouncing back to the receiver <b>R</b>.</li>
-        <li>The timing diagram shows TRIG → burst → <b>ECHO HIGH</b> for the whole round trip, as in the datasheet.</li></ul>
-        <p class="sim">Simulated and slowed down a lot: in reality 40 cm takes only 2.3 ms there and back. The echo time is µs = distance × 58 (datasheet formula), rounded down to 100 µs steps like <code>pulseIn()</code> on the UNO Q. The 3D distance is compressed so 2 cm – 4 m fits on the desk; the label on the obstacle shows the real distance.</p>`,
+        body: `<p>A cardboard box stands in front of the sensor — everything is drawn at <b>true scale</b>, with a tape measure from the front of the transducers. <b>Drag the box</b>, or use the slider / quick buttons.</p>
+        <ul><li><b style="color:#9fe6ff">Blue wavefronts</b> leave the transmitter <b>T</b>. Their spacing is the real wavelength of 40 kHz sound in air: 343 m/s ÷ 40 000 Hz ≈ <b>8.6 mm</b>. There are 8 of them — the datasheet’s 8-cycle burst.</li>
+        <li><b style="color:#ffbf73">Orange wavefronts</b> are the echo. A flat face reflects sound as if it came from a mirror image of T behind the box; the receiver <b>R</b> lights up when the echo reaches it.</li>
+        <li>The timing diagram shows TRIG → burst → <b>ECHO HIGH for the whole round trip</b>, as in the datasheet. Compare the printed distance with the tape measure.</li></ul>
+        <p class="sim">Simulated and slowed down: in reality 40 cm takes only 2.3 ms there and back. The echo time is µs = distance × 58 (datasheet formula), rounded down to 100 µs steps like <code>pulseIn()</code> on the UNO Q. Real readings also vary a little (see the next step).</p>`,
       },
       {
         title: 'Why real readings vary', view: 'bench',
