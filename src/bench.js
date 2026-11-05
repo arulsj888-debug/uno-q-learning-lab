@@ -1,0 +1,144 @@
+// Generic breadboard bench: builds a lesson circuit from a plain description.
+//   { id:'r1', type:'resistor', a:'c10', b:'c14' }
+//   { id:'led1', type:'led', anode:'d14', cathode:'d15' }
+//   { id:'btn1', type:'button', col:20 }            legs e20 e22 f20 f22 (straddles the gap)
+//   { id:'pot1', type:'pot', row:'e', col:24 }       legs e24 e26 e28
+//   { id:'bz1', type:'buzzer', plus:'e23', minus:'e26' }
+//   { id:'ldr1', type:'ldr', a:'e22', b:'e23' }
+//   { id:'t1', type:'tmp36', row:'e', col:18 }        legs +VS e18, VOUT e19, GND e20 (flat face toward +z)
+//   { id:'w1', type:'wire', from:'D5', to:'a10', color:'yellow' }
+import * as THREE from 'three';
+import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, DESK_Y } from './hardware.js';
+
+const HOLE = /^([a-j])(\d{1,2})$/;
+
+export class Bench {
+  constructor(scene, board, bb) {
+    this.scene = scene; this.board = board; this.bb = bb;
+    this.items = {};        // id -> { def, obj, group }
+    this.defs = [];
+    this.trayN = 0;
+  }
+
+  point(ref) {
+    const m = HOLE.exec(ref);
+    if (m) return this.bb.hole(m[1], +m[2]);
+    const p = this.board.pins[ref];
+    if (!p) throw new Error('unknown endpoint ' + ref);
+    return p.pos.clone();
+  }
+
+  has(ids) { return ids.every(id => !!this.items[id]); }
+  get(id) { return this.items[id] && this.items[id].obj; }
+
+  /** lesson circuit description */
+  setDefs(defs) {
+    for (const id of Object.keys(this.items)) if (!defs.find(d => d.id === id)) this.remove(id);
+    this.defs = defs;
+  }
+
+  remove(id) {
+    const it = this.items[id]; if (!it) return;
+    this.scene.remove(it.group);
+    delete this.items[id];
+  }
+  clear() { for (const id of Object.keys(this.items)) this.remove(id); this.hideTray(); }
+
+  // ------------------------------------------------------------ tray (parts waiting next to the breadboard)
+  showTray(placedIds) {
+    this.hideTray();
+    let k = 0;
+    this.tray = [];
+    for (const d of this.defs) {
+      if (d.type === 'wire' || placedIds.includes(d.id) || this.items[d.id]) continue;
+      const { obj } = this.create(d);
+      const g = obj.group;
+      g.position.set(52 + (k % 2) * 13, DESK_Y + 3.0, 50 + Math.floor(k / 2) * 16);
+      g.rotation.set(0, 0.5, 0);
+      g.userData.trayOf = d.id;
+      this.scene.add(g); this.tray.push({ id: d.id, obj });
+      k++;
+    }
+  }
+  hideTray() { if (this.tray) for (const t of this.tray) this.scene.remove(t.obj.group); this.tray = []; }
+
+  // ------------------------------------------------------------ building
+  create(d) {
+    let obj;
+    switch (d.type) {
+      case 'resistor': obj = new Resistor(d.bands, this.point(d.a).distanceTo(this.point(d.b)), d.hw || 'resistor'); break;
+      case 'ldr': obj = new LDR(); break;
+      case 'tmp36': obj = new TMP36(); break;
+      case 'led': obj = new LED5mm(d.color); break;
+      case 'button': obj = new PushButton(); break;
+      case 'pot': obj = new Potentiometer(); break;
+      case 'buzzer': obj = new PiezoBuzzer(); break;
+      case 'wire': obj = new JumperWire(this.point(d.from), this.point(d.to), d.color, { id: 'jumper', lift: d.lift ?? 10, depthA: 5, depthB: 5 }); break;
+      default: throw new Error('unknown part ' + d.type);
+    }
+    return { obj };
+  }
+
+  pose(d) {
+    const P = r => this.point(r);
+    switch (d.type) {
+      case 'resistor': { const a = P(d.a), b = P(d.b); return { pos: a.clone().lerp(b, 0.5), rotY: Math.atan2(-(b.z - a.z), b.x - a.x) }; }
+      case 'led': { const a = P(d.anode), c = P(d.cathode); return { pos: a.clone().lerp(c, 0.5), rotY: Math.atan2(-(a.z - c.z), a.x - c.x) }; }
+      case 'button': { const a = this.bb.hole('e', d.col), b = this.bb.hole('f', d.col + 2); return { pos: a.clone().lerp(b, 0.5), rotY: 0 }; }
+      case 'pot': { return { pos: this.bb.hole(d.row, d.col + 2), rotY: 0 }; }
+      case 'buzzer': { const p = P(d.plus), m = P(d.minus); return { pos: p.clone().lerp(m, 0.5), rotY: Math.atan2(-(m.z - p.z), m.x - p.x) }; }
+      case 'ldr': { const a = P(d.a), b = P(d.b); return { pos: a.clone().lerp(b, 0.5), rotY: Math.atan2(-(b.z - a.z), b.x - a.x) }; }
+      case 'tmp36': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
+      default: return null;
+    }
+  }
+
+  async add(d, animate) {
+    if (this.items[d.id]) return;
+    let fromTray = null;
+    if (this.tray) { const i = this.tray.findIndex(t => t.id === d.id); if (i >= 0) { fromTray = this.tray[i]; this.tray.splice(i, 1); } }
+    const obj = fromTray ? fromTray.obj : this.create(d).obj;
+    const g = obj.group;
+    this.items[d.id] = { def: d, obj, group: g };
+    if (d.type === 'wire') {
+      this.scene.add(g);
+      if (animate) await obj.grow(1100);
+      return;
+    }
+    const { pos, rotY } = this.pose(d);
+    if (!fromTray) this.scene.add(g);
+    if (animate) await moveTo(g, pos, rotY, fromTray ? 900 : 700, !fromTray);
+    else { g.position.copy(pos); g.rotation.set(0, rotY, 0); }
+  }
+
+  /** make exactly `ids` present; parts listed in `animateIds` are animated in order */
+  async build(ids, animateIds = [], alive = () => true) {
+    for (const id of Object.keys(this.items)) if (!ids.includes(id)) this.remove(id);
+    this.showTray(ids.filter(id => !animateIds.includes(id)));
+    for (const d of this.defs) {
+      if (!ids.includes(d.id) || this.items[d.id]) continue;
+      const anim = animateIds.includes(d.id);
+      if (anim && !alive()) return;
+      await this.add(d, anim && alive());
+    }
+  }
+
+  groups(ids) { return ids.map(id => this.items[id] && this.items[id].group).filter(Boolean); }
+  pickables() { return [...Object.values(this.items).map(i => i.group), ...(this.tray || []).map(t => t.obj.group)]; }
+}
+
+function moveTo(obj, pos, rotY, ms, drop) {
+  const p0 = drop ? pos.clone().add(new THREE.Vector3(0, 30, 0)) : obj.position.clone();
+  const r0 = drop ? rotY : obj.rotation.y;
+  obj.rotation.set(0, r0, 0);
+  const lift = drop ? 0 : 22, t0 = performance.now();
+  return new Promise(res => {
+    const step = () => {
+      const k = Math.min(1, (performance.now() - t0) / ms), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      obj.position.lerpVectors(p0, pos, e); obj.position.y += Math.sin(Math.PI * e) * lift;
+      obj.rotation.y = r0 + (rotY - r0) * e;
+      if (k < 1) requestAnimationFrame(step); else res();
+    };
+    step();
+  });
+}

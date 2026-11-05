@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arduino UNO Q · 3D Learning Lab</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div id="app" class="mode-explore">
+  <header id="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 64 30" class="logo" aria-hidden="true"><ellipse cx="17" cy="15" rx="13.5" ry="12" fill="none" stroke="currentColor" stroke-width="4"/><ellipse cx="47" cy="15" rx="13.5" ry="12" fill="none" stroke="currentColor" stroke-width="4"/><rect x="11" y="13.2" width="12" height="3.6" fill="currentColor"/><rect x="41" y="13.2" width="12" height="3.6" fill="currentColor"/><rect x="45.2" y="9" width="3.6" height="12" fill="currentColor"/></svg>
+      <div><b>Arduino UNO Q</b><span>3D Learning Lab</span></div>
+    </div>
+    <nav class="modes">
+      <button data-mode="explore" class="on">Explore the board</button>
+      <button data-mode="lessons">Lessons</button>
+    </nav>
+    <div class="tools">
+      <button id="v-home" title="Reset the view">⟲ Reset</button>
+      <button id="v-top" title="View the top side">Top</button>
+      <button id="v-bottom" title="Turn the board over">Bottom</button>
+      <button id="v-rotate" class="tgl" title="Rotate 360° automatically">⟳ 360°</button>
+      <button id="v-labels" class="tgl" title="Show part names">Labels</button>
+    </div>
+  </header>
+
+  <aside id="side"></aside>
+
+  <main id="stage">
+    <div id="tooltip"></div>
+    <div id="float-card"></div>
+    <div id="legend">Drag to rotate · Scroll to zoom · Right-drag to pan · Click any part</div>
+    <div id="loading"><div class="spin"></div><p>Building the UNO Q…</p></div>
+  </main>
+
+  <aside id="panel"></aside>
+
+  <section id="dock">
+    <div class="dock-code">
+      <div class="dock-head">
+        <span class="file">sketch.ino</span>
+        <div class="runbar">
+          <span id="slider-wrap"><label>delay <input id="speed" type="range" min="100" max="2000" step="100" value="1000"> <b id="speed-val">1000 ms</b></label></span>
+          <button id="run" class="primary">▶ Run</button>
+          <button id="stop">■ Stop</button>
+        </div>
+      </div>
+      <div class="code-wrap"><pre id="code"></pre><div id="explain">Click a line to see what it does.</div></div>
+    </div>
+    <div class="dock-io" id="dock-io"></div>
+    <div class="dock-serial">
+      <div class="dock-head"><span class="file">Serial Monitor</span><span id="pinlevel"></span></div>
+      <pre id="serial"></pre>
+    </div>
+  </section>
+</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

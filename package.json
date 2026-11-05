@@ -1,0 +1,15 @@
+{
+  "name": "uno-q-learning-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interactive 3D learning lab for the Arduino UNO Q",
+  "scripts": {
+    "dev": "node tools/serve.js",
+    "build": "node tools/build.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "qrcode-generator": "^1.5.2",
+    "three": "^0.187.0"
+  }
+}
