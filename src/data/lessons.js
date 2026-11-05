@@ -1190,32 +1190,17 @@ export const LESSONS = [
       },
       {
         title: 'How a PIR sensor works', view: 'bench',
-        body: `<p><b>PIR</b> = <b>Passive InfraRed</b>. It sends nothing out (unlike the HC-SR04) — it only <b>receives</b> the infrared heat that people give off.</p>
-        <ul><li>Inside are <b>two sensing elements</b> side by side. When a warm body moves across, it reaches one element before the other; that <b>difference</b> is what triggers the sensor.</li>
-        <li>The white dome is a <b>Fresnel lens</b>: it splits the room into many zones and focuses them onto the elements.</li>
-        <li>So it detects <b>movement across</b> the sensor best. Walking <b>straight toward</b> it changes both elements almost equally — the datasheet says the sensor is then “insensitive or does not work”.</li>
-        <li>It does <b>not</b> detect a person who stands completely still.</li></ul>`,
+        body: `<p><b>PIR</b> = <b>Passive InfraRed</b>. It does not send anything out — it only <b>feels the heat</b> (infrared) that a hand or a person gives off.</p>
+        <ul><li>It reacts when something warm <b>moves across</b> in front of it.</li><li>Something warm that <b>stays still</b> is <b>not</b> detected.</li></ul>
+        <table class="kv"><tr><th>Its output (OUT pin)</th><th></th></tr><tr><td>Motion</td><td><b>HIGH</b> = 3.3 V</td></tr><tr><td>No motion</td><td><b>LOW</b> = 0 V</td></tr></table>
+        <p>After the last movement it keeps OUT HIGH for a few seconds (set by a small knob on the back; ≈5 s at its minimum), then goes LOW.</p>`,
       },
       {
-        title: 'Datasheet facts and the controls', view: 'bench',
-        body: `<table class="kv"><tr><th>HC-SR501</th><th>Datasheet</th></tr>
-        <tr><td>Supply</td><td>5–20 V DC (another line says 4.5 V min)</td></tr>
-        <tr><td>Output</td><td><b>3.3 V</b> = motion, <b>0 V</b> = none</td></tr>
-        <tr><td>Range</td><td>about 3 m … 7 m (<b>sensitivity</b> pot)</td></tr>
-        <tr><td>Angle</td><td>less than 120° (one copy says a 110° cone)</td></tr>
-        <tr><td>Hold time</td><td>about 5 s … 5 min (<b>time-delay</b> pot)</td></tr>
-        <tr><td>Trigger jumper</td><td><b>H</b> = repeatable, <b>L</b> = single</td></tr>
-        <tr><td>Start-up</td><td>about 1 minute; 0–3 false pulses meanwhile</td></tr>
-        <tr><td>Temperature</td><td>−15 … +70 °C</td></tr></table>
-        <p>After each HIGH period there is a short <b>blocking time</b> in which new motion is ignored (the datasheet gives 2.5 s as the default in its feature text, and 0.2 s “lock time” in its spec list).</p>`,
-      },
-      {
-        title: 'Safe to connect to the UNO Q?', view: 'bench', pins: ['5V', 'D2', 'GND3'],
-        body: `<table class="kv"><tr><th>Pin</th><th>Check</th></tr>
-        <tr><td>VCC</td><td>needs 5–20 V → UNO Q <b>5V</b> pin. Not 3V3 — that is below the minimum.</td></tr>
-        <tr><td>OUT</td><td>gives <b>3.3 V</b> (the module has its own 3.3 V regulator, “7133” in the schematic) → safe on <b>any</b> UNO Q pin, no level shifting needed.</td></tr>
-        <tr><td>GND</td><td>to GND.</td></tr></table>
-        <p class="tip">Compare with the HC-SR04: its ECHO is 5 V and needs a 5 V-tolerant pin. The PIR’s 3.3 V output has no such limit.</p>`,
+        title: 'Where do the 3 pins go?', view: 'bench', pins: ['5V', 'D2', 'GND3'],
+        body: `<table class="kv"><tr><th>PIR pin</th><th>Goes to</th><th>Why</th></tr>
+        <tr><td>VCC</td><td><b>5V</b></td><td>it needs 5–20 V (3.3 V is too low)</td></tr>
+        <tr><td>OUT</td><td><b>D2</b></td><td>its signal is only 3.3 V → safe on any UNO Q pin</td></tr>
+        <tr><td>GND</td><td><b>GND</b></td><td>common ground</td></tr></table>`,
       },
       {
         title: 'Step 1 — set up the sensor', view: 'bench', power: false, have: [...LED_IDS, 'pir1'], labels: [['pir1', 'HC-SR501 PIR sensor'], ['led1', 'Alarm LED (on D5)']],
@@ -1240,34 +1225,19 @@ export const LESSONS = [
       },
       { title: 'The code', view: 'bench', showCode: true, body: `<p>Wait for start-up, then copy the PIR output to the LED and print a message whenever it changes.</p>` },
       {
-        title: 'Run it: wave your hand', view: 'room', showCode: true, power: true, action: 'run', labels: [['pir1', 'PIR sensor'], ['led1', 'Alarm LED (D5)']],
-        body: `<p>A hand waves <b>across</b> in front of the sensor. The light-blue fan on the desk is the area the lens watches (it really continues to 3–7 m).</p>
-        <ol><li>First the sensor warms up — the sketch waits.</li><li>Hand moves inside the fan → OUT <b>HIGH</b> → <b>alarm LED on</b> → “Motion detected!”.</li>
-        <li>Delay time over → OUT LOW → LED off → “Motion ended”.</li></ol>
-        <p>Try <b>Move toward</b> and <b>Hold still</b>: the sensor hardly reacts — exactly as the datasheet describes.</p>
-        <p class="sim">Simulated: the 1-minute start-up is shortened to 6 s (also the sketch’s <code>delay(60000)</code>). Detection is modelled from the datasheet (field of view, sideways motion only).</p>`,
-      },
-      {
-        title: 'Experiment: delay and trigger jumper', view: 'room', showCode: true, power: true,
-        body: `<ul><li><b>Time delay</b>: OUT stays HIGH at least this long after a detection.</li>
-        <li><b>Jumper H (repeatable)</b>: while the person keeps moving, every new detection restarts the delay, so OUT stays HIGH until they leave.</li>
-        <li><b>Jumper L (single)</b>: OUT goes LOW when the delay ends even if they are still moving; after the blocking time it can trigger again.</li>
-        <li><b>Sensitivity</b>: shrinks or grows the detection range (≈ 3–7 m).</li></ul>
-        <p>Watch the <b>timeline</b> below: blue = motion seen, yellow = OUT.</p>`,
-      },
-      {
-        title: 'Good to know', view: 'bench',
-        body: `<ul><li>Mount it so people walk <b>across</b> its view, not straight at it.</li>
-        <li>Keep it away from lamps, heaters and moving air — the datasheet warns they cause false triggers.</li>
-        <li>In summer at 30–32 °C, close to body temperature, the range gets shorter (datasheet).</li>
-        <li>It only says <b>“motion yes/no”</b> — not how far or how many people.</li></ul>`,
+        title: 'Run it: wave your hand', view: 'room', showCode: true, power: true, action: 'run',
+        body: `<ol><li><b>Warm-up</b> (a few seconds here; a real sensor needs about 1 minute). Wait until the sensor says <b>Watching</b>.</li>
+        <li>Click <b>👋 Wave hand</b>. The hand passes in front of the sensor →<br>Sensor <b>MOTION!</b> → OUT <b>HIGH</b> → <b>LED ON</b>.</li>
+        <li>Stop waving → about <b>5 s later</b> → OUT LOW → <b>LED OFF</b>.</li>
+        <li>Click <b>✋ Hold hand still</b>: the hand is in front, but it does not move → <b>nothing happens</b>.</li></ol>
+        <p class="sim">Simulated: the start-up time is shortened; the ≈5 s hold time is the sensor’s minimum setting.</p>`,
       },
       {
         title: 'Summary', view: 'bench',
-        body: `<ul><li>PIR = passive infrared: detects <b>moving</b> warm bodies, best when they move across.</li>
-        <li>VCC → 5V; OUT is 3.3 V → any pin; read it with <code>digitalRead()</code>.</li>
-        <li>Pots: sensitivity (3–7 m) and time delay (≈5 s–5 min); jumper H = repeatable, L = single trigger.</li>
-        <li>Allow about 1 minute to start up.</li></ul>`,
+        body: `<ul><li>A PIR feels <b>moving</b> warm things (hands, people).</li>
+        <li>VCC → 5V, OUT → D2, GND → GND. Read OUT with <code>digitalRead()</code>: HIGH = motion.</li>
+        <li>The knobs on the back set the hold time and the range; the jumper sets the trigger mode.</li>
+        <li>A real sensor needs about 1 minute to start up.</li></ul>`,
       },
     ],
     quiz: [

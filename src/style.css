@@ -383,3 +383,15 @@ code { background: #0d1217; border: 1px solid #253040; border-radius: 5px; paddi
 #pir-state .hi { color: #ffd34d; }
 
 .part-label.tag3d { border-color: #ffd34d; background: rgba(9,13,18,.92); color: #fff; font-size: 12.5px; padding: 4px 9px; }
+
+.pirstat { display: flex; align-items: stretch; gap: 6px; }
+.pirstat > div:not(.arrow) { flex: 1; background: #10161d; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; text-align: center; }
+.pirstat span { display: block; font-size: 11px; color: var(--muted); }
+.pirstat b { display: block; font-size: 15px; margin-top: 2px; font-family: Consolas, monospace; }
+.pirstat b.on { color: #ffd34d; text-shadow: 0 0 10px rgba(255,211,77,.6); }
+.pirstat b.warm { color: #9fe6ff; }
+.pirstat b.off { color: #7a8794; }
+.pirstat .arrow { align-self: center; color: var(--muted); }
+#ps-note { font-size: 12.5px; color: #cfe3ee; margin-top: 6px; }
+.part-label.pirtag { font-size: 13px; font-weight: 700; padding: 4px 10px; border-color: #5b6b7a; color: #cdd7e1; }
+.part-label.pirtag.on { border-color: #ffd34d; color: #1b1300; background: #ffd34d; box-shadow: 0 0 14px rgba(255,211,77,.7); }
