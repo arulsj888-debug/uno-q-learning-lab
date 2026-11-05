@@ -252,6 +252,31 @@ export const PROGRAMS = {
     }
   },
 
+  async pir(rt, o) {
+    let lastState = 0;
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.pinMode('D2', 'INPUT');
+    await rt.at(8); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(9); rt.serialBegin(9600);
+    await rt.at(10); rt.println('PIR warming up (about 1 minute)...');
+    await rt.at(11); await rt.delay(o.warmupMs ?? 60000);
+    await rt.at(12); rt.println('Ready');
+    for (;;) {
+      await rt.at(15);
+      await rt.at(16); const motion = rt.digitalRead('D2');
+      await rt.at(17);
+      if (motion === 1) { await rt.at(18); rt.digitalWrite('D5', 1); } else { await rt.at(20); rt.digitalWrite('D5', 0); }
+      await rt.at(22);
+      if (motion !== lastState) {
+        await rt.at(23);
+        if (motion === 1) { await rt.at(24); rt.println('Motion detected!'); } else { await rt.at(26); rt.println('Motion ended'); }
+        await rt.at(28); lastState = motion;
+      }
+      await rt.at(30); await rt.delay(50);
+    }
+  },
+
   async buzzer(rt) {
     const notes = [262, 294, 330, 349, 392, 440, 494, 523];
     await rt.at(2); await rt.at(3);

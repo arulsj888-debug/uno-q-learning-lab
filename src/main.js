@@ -5,7 +5,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Viewer } from './viewer.js';
 import { initMaterials, canvasTex, noise } from './materials.js';
 import { UnoQBoard } from './board.js';
-import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y } from './hardware.js';
+import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, Mannequin } from './hardware.js';
 import { Bench } from './bench.js';
 import { PARTS, CATEGORIES, BOARD_FACTS } from './data/parts.js';
 import { JDIGITAL, JANALOG, JSPI, JCTL, findPin } from './data/pins.js';
@@ -57,7 +57,7 @@ class App {
     this.refreshPickTargets();
     this.setMode('explore');
     this.view('home', 0);
-    this.viewer.tickers.add(() => this.tick());
+    this.viewer.tickers.add(dt => this.tick(dt));
   }
 
   hideLoading() {
@@ -144,6 +144,23 @@ class App {
     this.waves.tflash = new THREE.Mesh(new THREE.CircleGeometry(6.1, 40), new THREE.MeshBasicMaterial({ color: 0x9fe6ff, transparent: true, opacity: 0, depthWrite: false }));
     this.waves.tflash.raycast = () => {}; this.waves.tflash.renderOrder = 8; s.add(this.waves.tflash);
     this.beam = { visible: false };
+    // ---- Lesson 14: room with a walking person and the PIR detection area on the floor
+    this.person = new Mannequin(); this.person.group.visible = false; s.add(this.person.group);
+    {
+      const tex = canvasTex(512, 512, (c, w, h) => {
+        const img = c.createImageData(w, h);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const u = (x / w) * 2 - 1, v = 1 - (y / h) * 2, r = Math.hypot(u, v), a = Math.atan2(u, -v) * 180 / Math.PI;
+          let alpha = 0;
+          if (r <= 1 && Math.abs(a) <= 55) { const band = Math.floor((a + 55) / 6.875) % 2, ring = Math.floor(r * 7) % 2; alpha = (band ^ ring) ? 30 : 12; if (r > 0.985) alpha = 120; }
+          const i = (y * w + x) * 4; img.data[i] = 120; img.data[i + 1] = 215; img.data[i + 2] = 255; img.data[i + 3] = alpha;
+        }
+        c.putImageData(img, 0, 0);
+      }, { srgb: false });
+      this.pirFan = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+      this.pirFan.rotation.x = -Math.PI / 2; this.pirFan.visible = false; this.pirFan.raycast = () => {}; this.pirFan.renderOrder = 2; s.add(this.pirFan);
+    }
+    this.pirReset();
     this.beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 40, 1, true), new THREE.MeshBasicMaterial({ color: 0x35d0ff, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }));
     this.beam.visible = false; this.beam.raycast = () => {}; s.add(this.beam);
     const mk = (x0, z0, z1, color) => {
@@ -179,7 +196,7 @@ class App {
     else { this.powerOff(); await plugUsb(this.cable, this.board, false); }
     this.refreshPickTargets();
   }
-  powerOn() { this.board.powered = true; this.board.setPowerLed(true); }
+  powerOn() { this.board.powered = true; this.board.setPowerLed(true); this.pirPowered(); }
   powerOff() {
     this.sim.stop(); this.board.powered = false; this.bootToken = null;
     this.board.setPowerLed(false); this.board.setMatrix(null);
@@ -252,7 +269,8 @@ class App {
       this.partLabels.push(l);
     }
   }
-  tick() {
+  tick(dt = 0.016) {
+    this.pirTick(Math.min(dt, 0.1));
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -276,6 +294,7 @@ class App {
 
   view(name, ms = 1100) {
     if (name === 'sonar' && this.sonarGeom()) return this.frameSonar(ms);
+    if (name === 'room') return this.frameRoom(ms);
     const v = VIEWS[name];
     if (!ms) { this.viewer.controls.target.copy(v.t); this.viewer.camera.position.copy(v.t.clone().add(v.d.clone().normalize().multiplyScalar(v.dist))); return Promise.resolve(); }
     return this.viewer.flyTo(v.t, v.dist, v.d, ms);
@@ -582,7 +601,7 @@ class App {
     this.hideFloat(); this.clearTemp(); this.hideCallout();
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
     if (mode === 'explore') {
-      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar();
+      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false);
       this.lesson = null;
       this.renderSide();
       this.select(null, { card: false });
@@ -613,7 +632,7 @@ class App {
     this.sim.stop(); this.stopSound(); this.outputsOff();
     this.lesson = L; this.stepIdx = 0; this.inQuiz = false;
     this.board.setMatrix(null);
-    this.lamp.intensity = 0; this.hideSonar();
+    this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false);
     if (L.circuit) { this.bench.setDefs(L.circuit); this.bb.group.visible = true; }
     else { this.bench.clear(); this.bench.setDefs([]); this.bb.group.visible = false; this.strips.visible = false; }
     if (L.id === 'l1' && this.usbPlugged) await this.plug(false);
@@ -647,6 +666,16 @@ class App {
     if (w.includes('light')) h += `<div class="io-block"><div class="io-title">Light on the sensor <span class="io-note">(simulated)</span></div><input id="lux" type="range" min="0" max="1000" value="${Math.round(this.luxToSlider(this.lux))}"><div class="io-tools">${[['Dark', 0.01], ['Dim', 10], ['Room light', 300], ['Torch', 2000]].map(([t, v]) => `<button class="lvl" data-lux="${v}">${t}</button>`).join('')}</div><div id="lux-val" class="io-val"></div></div>`;
     if (w.includes('temp')) h += `<div class="io-block"><div class="io-title">Temperature around the TMP36 <span class="io-note">(simulated)</span></div><input id="tempc" type="range" min="-40" max="125" step="0.5" value="${this.tempC}"><div id="temp-val" class="io-val"></div></div>`;
     if (w.includes('distance')) h += `<div class="io-block"><div class="io-title">Obstacle in front of the sensor <span class="io-note">(simulated)</span></div><input id="dist" type="range" min="2" max="400" step="0.5" value="${this.distCm}"><div class="io-tools">${[5, 20, 40, 100, 250, 400].map(v => `<button class="lvl" data-dist="${v}">${v} cm</button>`).join('')}</div><div id="dist-val" class="io-val"></div><div class="io-note">or drag the obstacle in the 3D view</div></div><div class="io-block"><div class="io-title">Timing (HC-SR04 datasheet) · animation slowed down</div><canvas id="sonar-timing" width="560" height="112"></canvas></div>`;
+    if (w.includes('pir')) {
+      const P = this.pir;
+      h += `<div class="io-block"><div class="io-title">The person <span class="io-note">(simulated)</span></div><div class="io-tools">${[['across', 'Walk across'], ['toward', 'Walk toward'], ['still', 'Stand still']].map(([k, t]) => `<button class="lvl ${P.mode === k ? 'on' : ''}" data-pmode="${k}">${t}</button>`).join('')}</div>
+        <div class="io-note">Distance from the sensor <b id="pir-dist-v">${P.distM.toFixed(1)} m</b></div><input id="pir-dist" type="range" min="0.8" max="8" step="0.1" value="${P.distM}"></div>
+        <div class="io-block"><div class="io-title">HC-SR501 settings</div>
+        <div class="io-note">Sensitivity pot → range <b id="pir-range-v">${P.rangeM} m</b></div><input id="pir-range" type="range" min="3" max="7" step="0.5" value="${P.rangeM}">
+        <div class="io-note">Time-delay pot → hold <b id="pir-delay-v">${P.delayS} s</b></div><input id="pir-delay" type="range" min="5" max="300" step="1" value="${P.delayS}">
+        <div class="io-tools">Trigger jumper ${['H', 'L'].map(j => `<button class="lvl ${P.jumper === j ? 'on' : ''}" data-jp="${j}">${j} · ${j === 'H' ? 'repeatable' : 'single'}</button>`).join('')}</div></div>
+        <div class="io-block"><div id="pir-state" class="io-val"></div><canvas id="pir-timeline" width="560" height="96"></canvas></div>`;
+    }
     if (w.includes('knob')) h += `<div class="io-block"><div class="io-title">Potentiometer knob</div><input id="knob" type="range" min="0" max="1000" value="${Math.round(this.knobValue() * 1000)}"><div id="knob-val" class="io-val"></div><div class="io-note">or drag the knob in the 3D view</div></div>`;
     if (w.includes('pwm')) h += `<div class="io-block"><div class="io-title">analogWrite(D5, <b id="pwm-v">128</b>)</div><input id="pwm" type="range" min="0" max="255" value="128"></div>`;
     if (w.includes('scope')) h += `<div class="io-block"><div class="io-title">Oscilloscope · ${L.scopePin || 'D5'} <span class="io-note">(simulated)</span></div><canvas id="scope" width="560" height="170"></canvas><div id="scope-info" class="io-val"></div></div>`;
@@ -663,6 +692,16 @@ class App {
     if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); $('#dist').onchange = e => this.setDist(+e.target.value, true); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist, true)); this.setDist(this.distCm); }
     else this.hideSonar();
     this.refreshPickTargets();
+    if ($('#pir-dist')) {
+      const P = this.pir;
+      document.querySelectorAll('[data-pmode]').forEach(b => b.onclick = () => { P.mode = b.dataset.pmode; if (P.mode === 'toward') P.distM = 6.5; document.querySelectorAll('[data-pmode]').forEach(x => x.classList.toggle('on', x === b)); });
+      $('#pir-dist').oninput = e => { P.distM = +e.target.value; $('#pir-dist-v').textContent = P.distM.toFixed(1) + ' m'; };
+      $('#pir-dist').onchange = () => this.frameRoom(700);
+      $('#pir-range').oninput = e => { P.rangeM = +e.target.value; $('#pir-range-v').textContent = P.rangeM + ' m'; this.updateFan(); };
+      $('#pir-delay').oninput = e => { P.delayS = +e.target.value; $('#pir-delay-v').textContent = P.delayS >= 60 ? `${Math.floor(P.delayS / 60)} min ${P.delayS % 60} s` : P.delayS + ' s'; };
+      document.querySelectorAll('[data-jp]').forEach(b => b.onclick = () => { P.jumper = b.dataset.jp; document.querySelectorAll('[data-jp]').forEach(x => x.classList.toggle('on', x === b)); });
+    }
+    this.showRoom(w.includes('pir') && !!this.pirSensor());
     if ($('#tempc')) { $('#tempc').oninput = e => this.setTemp(+e.target.value); this.setTemp(this.tempC); }
     this.lamp.intensity = w.includes('light') ? this.lampIntensity() : 0;
     if ($('#pwm')) $('#pwm').oninput = e => this.applyManualPwm(+e.target.value);
@@ -729,6 +768,8 @@ class App {
       await this.bench.build(st.have, animate, alive);
       this.refreshPickTargets();
       if ($('#dist')) this.setDist(this.distCm, S.view === 'sonar');
+      this.showRoom(!!(L.widgets && L.widgets.includes('pir')) && !!this.pirSensor());
+      if (S.view === 'room') this.frameRoom();
       if (!alive()) return;
       if (S.holes) this.holeLabels(S.holes);
       if (S.trace) { const objs = this.bench.groups(S.trace); this.setOutline(objs); this.pulseObjs = objs; }
@@ -972,6 +1013,97 @@ class App {
     g.fillStyle = '#ffd7a8'; g.fillText(`ECHO HIGH ${Math.round(this.echoUs())} µs = round trip → ${(this.echoUs() / 58).toFixed(1)} cm`, 96, 101);
     if (t != null) { const x = X(Math.min(t, total)); g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, 6); g.lineTo(x, 88); g.stroke(); }
   }
+  // ---- Lesson 14: HC-SR501 behaviour (manufacturer datasheet) ----------------------------------------
+  //  • output HIGH (3.3 V) while motion is detected, for the time-delay setting (about 5 s … 5 min)
+  //  • jumper H = repeatable trigger (each new motion restarts the delay), L = single trigger
+  //  • after each HIGH period a blocking time follows (datasheet feature text: 2.5 s default)
+  //  • about 1 minute to initialise after power-up; it may output 0–3 pulses meanwhile (simulated: 6 s)
+  //  • sensitive to motion ACROSS the lens; little or no response to motion straight toward it
+  pirReset() {
+    this.pir = { out: 0, until: 0, blockUntil: 0, readyAt: 0, lastTrig: 0, hist: [], mode: 'across', distM: 2.5, rangeM: 7, delayS: 5, jumper: 'H', personX: -2200, dirX: 1, phase: 0, spurious: [] };
+  }
+  pirPowered() {
+    const now = performance.now(), P = this.pir;
+    P.readyAt = now + 6000; P.out = 0; P.until = 0; P.blockUntil = 0;
+    P.spurious = [[now + 1800, now + 2900]];                     // one false pulse during initialisation
+  }
+  pirSensor() { return this.bench.get('pir1'); }
+  pirLens() { const s = this.pirSensor(); return s ? s.lens() : null; }
+  frameRoom(ms = 1100) {
+    const L = this.pirLens(); if (!L) return this.view('bench', ms);
+    const d = this.pir.distM * 1000;
+    const target = new THREE.Vector3(L.x, 650, L.z + d * 0.55);
+    return this.viewer.flyTo(target, Math.max(4200, d * 1.25 + 3200), new THREE.Vector3(-0.32, 0.42, -0.85), ms);
+  }
+  showRoom(on) {
+    this.person.group.visible = on; this.pirFan.visible = on;
+    if (on) this.updateFan();
+  }
+  updateFan() {
+    const L = this.pirLens(); if (!L) return;
+    const r = this.pir.rangeM * 1000;
+    this.pirFan.position.set(L.x, DESK_Y + 2, L.z); this.pirFan.scale.set(r, r, 1);
+  }
+  pirTick(dt) {
+    const P = this.pir; if (!P || !this.person) return;
+    const now = performance.now(), sensor = this.pirSensor(), L = sensor && this.pirLens();
+    const powered = this.board.powered && this.lesson && this.lesson.io && this.lesson.io.D2 && this.wired(this.lesson.io.D2);
+    // move the person
+    let moving = false;
+    if (L && this.person.group.visible) {
+      const speed = 1.2;                                            // m/s, normal walking pace
+      if (P.mode === 'across') {
+        P.personX += P.dirX * speed * dt * 1000;
+        if (Math.abs(P.personX) > 2400) { P.dirX *= -1; P.personX = Math.sign(P.personX) * 2400; }
+        this.person.group.position.set(L.x + P.personX, DESK_Y, L.z + P.distM * 1000);
+        this.person.group.rotation.y = P.dirX > 0 ? Math.PI / 2 : -Math.PI / 2;
+        moving = true;
+      } else if (P.mode === 'toward') {
+        P.distM -= speed * dt; if (P.distM < 0.8) P.distM = 6.5;
+        this.person.group.position.set(L.x + 150, DESK_Y, L.z + P.distM * 1000);
+        this.person.group.rotation.y = Math.PI;
+        moving = true;
+        const sl = $('#pir-dist'); if (sl) sl.value = P.distM;
+      } else {
+        this.person.group.position.set(L.x + P.personX, DESK_Y, L.z + P.distM * 1000);
+      }
+      P.phase += moving ? dt * 7.5 : 0;
+      this.person.pose(P.phase, moving);
+    }
+    // detection: inside the range and the lens' field of view (< 120°, datasheet), moving across the lens
+    let trig = false;
+    if (powered && L && this.person.group.visible) {
+      const dx = this.person.group.position.x - L.x, dz = this.person.group.position.z - L.z;
+      const r = Math.hypot(dx, dz), ang = Math.abs(Math.atan2(dx, dz)) * 180 / Math.PI;
+      if (moving && P.mode === 'across' && r <= P.rangeM * 1000 && ang <= 55) trig = true;
+    }
+    if (!powered) { P.out = 0; }
+    else if (now < P.readyAt) { P.out = P.spurious.some(([a, b]) => now >= a && now < b) ? 1 : 0; }
+    else if (P.out) {
+      if (trig && P.jumper === 'H') P.until = now + P.delayS * 1000;     // repeatable trigger: delay restarts
+      if (now >= P.until) { P.out = 0; P.blockUntil = now + 2500; }
+    } else if (trig && now >= P.blockUntil) { P.out = 1; P.until = now + P.delayS * 1000; }
+    // history for the OUT timeline (last 30 s)
+    if (!P.lastHist || now - P.lastHist > 100) { P.lastHist = now; P.hist.push([now, P.out, trig ? 1 : 0]); while (P.hist.length && now - P.hist[0][0] > 30000) P.hist.shift(); this.drawPirTimeline(); }
+    const st = $('#pir-state');
+    if (st) {
+      let s = !powered ? 'No power' : now < P.readyAt ? `Warming up… ${Math.ceil((P.readyAt - now) / 1000)} s (simulated)` : P.out ? `OUT = <b class="hi">HIGH · 3.3 V</b>${P.jumper === 'H' ? ' (delay restarts while motion continues)' : ''} · ${Math.max(0, (P.until - now) / 1000).toFixed(1)} s left` : now < P.blockUntil ? 'OUT = LOW · blocking time' : 'OUT = LOW · 0 V · watching';
+      if (powered && now >= P.readyAt && P.mode === 'toward') s += ' · walking straight toward the lens is hard to detect';
+      st.innerHTML = s;
+    }
+  }
+  drawPirTimeline() {
+    const c = $('#pir-timeline'); if (!c) return;
+    const g = c.getContext('2d'), w = c.width, h = c.height, P = this.pir, now = performance.now();
+    g.fillStyle = '#070b0e'; g.fillRect(0, 0, w, h);
+    g.font = '12px Consolas, monospace'; g.textBaseline = 'middle';
+    g.fillStyle = '#8fa3b5'; g.fillText('motion', 6, 22); g.fillText('OUT (D2)', 6, 58);
+    g.fillText('−30 s', 70, h - 8); g.fillText('now', w - 32, h - 8);
+    const X = t => 70 + (w - 80) * (1 - (now - t) / 30000);
+    g.strokeStyle = 'rgba(255,255,255,0.08)'; for (let s = 0; s <= 30; s += 5) { const x = X(now - s * 1000); g.beginPath(); g.moveTo(x, 8); g.lineTo(x, h - 18); g.stroke(); }
+    const line = (idx, y, col) => { g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); P.hist.forEach(([t, o, m], i) => { const v = idx ? m : o, yy = y + 10 - v * 20; if (!i) g.moveTo(X(t), yy); else g.lineTo(X(t), yy); }); g.stroke(); };
+    line(1, 22, '#9fe6ff'); line(0, 58, '#ffd34d');
+  }
   tmp36Volts() { return Math.min(2.0, Math.max(0.1, 0.5 + this.tempC / 100)); }   // datasheet: 0.5 V at 0 °C, 10 mV/°C
   setTemp(t) {
     this.tempC = t;
@@ -1058,6 +1190,7 @@ class App {
       noTone: pin => this.onNoTone(pin),
       read: (pin, mode) => {
         const io = this.ioFor(pin);
+        if (io && io.kind === 'pir' && this.wired(io)) return this.pir.out;
         if (io && io.kind === 'button' && this.wired(io) && this.buttonDown) return 0;
         if (mode === 'INPUT_PULLUP') return 1;
         return Math.random() < 0.5 ? 0 : 1;      // an open input without pull-up floats
@@ -1145,7 +1278,7 @@ class App {
     }
     this.runStart = performance.now();
     $('#serial').innerHTML = '';
-    const opts = { getDelay: () => this.blinkDelay, slow: !L.fast };
+    const opts = { getDelay: () => this.blinkDelay, slow: !L.fast, warmupMs: 6000 };
     if (L.codes) {
       const key = this.matrixCodeKey || 'logo';
       if (key === 'logo') Object.assign(opts, { frame: LOGO_ARRAY, bits: 1 });

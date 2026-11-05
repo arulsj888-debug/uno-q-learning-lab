@@ -498,6 +498,169 @@ export class HCSR04 {
   }
 }
 
+// ---------------------------------------------------------------- HC-SR501 PIR motion sensor module
+// Manufacturer datasheet (HC-SR501, 10/29/2013) + Handson user guide: 32 × 24 mm PCB, Ø23 mm Fresnel lens,
+// M2 holes 28 mm apart; component side: BISS0001, two pots (time delay, sensitivity), H/L trigger jumper,
+// 3-pin header Power · Output · Ground (left → right, component side up, header at the bottom).
+// Local frame: lens faces +z, PCB upright, header pins point to −z. Seen from the lens side: GND left, OUT, VCC right.
+export class PIRModule {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const W = 32, Hh = 24, T = 1.6, cy = 30;          // PCB centre 30 mm above the desk (on its stand)
+    this.cy = cy;
+    const k = 20;
+    const back = canvasTex(W * k, Hh * k, (c, w, h) => {
+      c.fillStyle = '#1d6b45'; c.fillRect(0, 0, w, h); noise(c, w, h, 8);
+      c.strokeStyle = 'rgba(140,220,170,0.25)'; c.lineWidth = 0.3 * k;
+      for (let i = 0; i < 16; i++) { c.beginPath(); c.moveTo(Math.random() * w, Math.random() * h); c.lineTo(Math.random() * w, Math.random() * h); c.stroke(); }
+      for (const [x, y] of [[2, 2], [W - 2, 2], [2, Hh - 2], [W - 2, Hh - 2]]) { c.fillStyle = '#d9dbde'; c.beginPath(); c.arc(x * k, y * k, 1.6 * k, 0, 7); c.fill(); c.fillStyle = '#0c0d0e'; c.beginPath(); c.arc(x * k, y * k, 1.0 * k, 0, 7); c.fill(); }
+    });
+    const front = canvasTex(W * k / 2, Hh * k / 2, (c, w, h) => { c.fillStyle = '#1d6b45'; c.fillRect(0, 0, w, h); noise(c, w, h, 8); });
+    const edge = new THREE.MeshStandardMaterial({ color: 0x1b5e3d, roughness: 0.6 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(W, Hh, T), [edge, edge, edge, edge,
+      new THREE.MeshPhysicalMaterial({ map: front, roughness: 0.5, clearcoat: 0.3 }),
+      new THREE.MeshPhysicalMaterial({ map: back, roughness: 0.5, clearcoat: 0.3 })]);
+    // lens side is +z → the box's +z face is the "front" (index 4), component side −z (index 5)
+    pcb.position.set(0, cy, 0); g.add(pcb);
+
+    // Fresnel lens: square white flange + segmented dome (Ø23 mm)
+    const lensMat = new THREE.MeshPhysicalMaterial({ color: 0xf4f3ee, roughness: 0.55, transmission: 0.25, thickness: 1.5, flatShading: true, sheen: 0.3 });
+    const flange = new THREE.Mesh(new RoundedBoxGeometry(24, 24, 1.4, 2, 0.4), lensMat); flange.position.set(0, cy, T / 2 + 0.7); g.add(flange);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(11.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lensMat);
+    dome.rotation.x = Math.PI / 2; dome.scale.set(1, 0.9, 1); dome.position.set(0, cy, T / 2 + 1.4); g.add(dome);
+
+    // component side (−z): BISS0001 SOIC-16, two pots, trigger jumper, 7133 LDO, passives
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.55 });
+    const zb = -T / 2;
+    const ic = new THREE.Mesh(new THREE.BoxGeometry(3.9, 9.9, 1.5), dark); ic.position.set(-8, cy + 1, zb - 0.75); g.add(ic);
+    for (let i = 0; i < 8; i++) for (const sx of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.4, 0.25), M.tin); l.position.set(-8 + sx * 2.45, cy + 1 - 4.45 + i * 1.27, zb - 0.15); g.add(l); }
+    const potBase = new THREE.MeshStandardMaterial({ color: 0xf0efe8, roughness: 0.6 }), potTop = new THREE.MeshStandardMaterial({ color: 0xe0782a, roughness: 0.45 });
+    for (const x of [-4, 5]) {                        // time delay (left) and sensitivity (right) seen from the component side
+      const b = new THREE.Mesh(new THREE.BoxGeometry(6.6, 6.6, 3.2), potBase); b.position.set(x, cy + Hh / 2 - 4.5, zb - 1.6); g.add(b);
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 1.2, 24), potTop); t.rotation.x = Math.PI / 2; t.position.set(x, cy + Hh / 2 - 4.5, zb - 3.6); g.add(t);
+      const slot = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.3), dark); slot.position.set(x, cy + Hh / 2 - 4.5, zb - 4.25); g.add(slot);
+    }
+    const jp = new THREE.Mesh(new THREE.BoxGeometry(2.5, 7.6, 2.5), M.blackPlastic); jp.position.set(-13.2, cy + 5, zb - 1.25); g.add(jp);
+    const jcap = new THREE.Mesh(new THREE.BoxGeometry(2.6, 5.0, 3.6), new THREE.MeshStandardMaterial({ color: 0xf2c418, roughness: 0.5 })); jcap.position.set(-13.2, cy + 6.3, zb - 3.5); g.add(jcap);
+    const ldo = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.5, 1.5), dark); ldo.position.set(10, cy - 4, zb - 0.75); g.add(ldo);
+    for (let i = 0; i < 9; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.25, 0.5), new THREE.MeshStandardMaterial({ color: i % 3 ? 0x8d7f6a : 0x161616, roughness: 0.6 })); p.position.set(-1 + (i % 3) * 3.2, cy - 1 + Math.floor(i / 3) * 2.6, zb - 0.25); g.add(p); }
+
+    // 3-pin header near the bottom edge, pins pointing −z
+    this.pinY = cy - Hh / 2 + 2.6;
+    const hdr = new THREE.Mesh(new THREE.BoxGeometry(7.62, 2.5, 2.5), M.blackPlastic); hdr.position.set(0, this.pinY, zb - 1.25); g.add(hdr);
+    this.pinX = { GND: -2.54, OUT: 0, VCC: 2.54 };
+    for (const x of Object.values(this.pinX)) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.64, 9), M.gold); p.position.set(x, this.pinY, zb - 4.5); g.add(p); }
+    this.pinTipZ = zb - 9;
+
+    // clear acrylic stand: base plate + two edge clips
+    const acr = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transmission: 0.9, thickness: 3, ior: 1.49, transparent: true, opacity: 0.6 });
+    const base = new THREE.Mesh(new RoundedBoxGeometry(46, 3, 34, 2, 0.6), acr); base.position.set(0, 1.5, -4); g.add(base);
+    for (const sx of [-1, 1]) { const clip = new THREE.Mesh(new RoundedBoxGeometry(3, cy + 4, 8, 2, 0.6), acr); clip.position.set(sx * (W / 2 + 1.2), (cy + 4) / 2, 0); g.add(clip); }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const f = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.8, 16), dark); f.position.set(sx * 19, 0.4, -4 + sz * 13); g.add(f); }
+    tagHW(g, 'pir');
+  }
+  /** world position of a header pin tip and the direction the pin points (out of the module) */
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    const pos = this.group.localToWorld(new THREE.Vector3(this.pinX[name], this.pinY, this.pinTipZ + 6));
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion()));
+    return { pos, dir };
+  }
+  /** world position of the lens centre */
+  lens() { this.group.updateMatrixWorld(true); return this.group.localToWorld(new THREE.Vector3(0, this.cy, 12)); }
+}
+
+// ---------------------------------------------------------------- female–male jumper wire
+// A: female housing slid onto a horizontal header pin (dir = direction the pin points). B: male pin into a socket.
+export class FemaleJumper {
+  constructor(pinPos, dir, b, color = 'yellow', { lift = 30, id = 'jumper' } = {}) {
+    const g = this.group = new THREE.Group();
+    const housing = new THREE.MeshPhysicalMaterial({ color: 0x141414, roughness: 0.5, clearcoat: 0.3 });
+    const ins = new THREE.MeshPhysicalMaterial({ color: WIRE[color] || color, roughness: 0.35, clearcoat: 0.5, clearcoatRoughness: 0.3 });
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+    const a = this.endA = new THREE.Group();
+    const hs = new THREE.Mesh(new RoundedBoxGeometry(2.6, 14, 2.6, 2, 0.25), housing); hs.position.y = 4; a.add(hs);
+    const boot = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 3, 16), ins); boot.position.y = 12.3; a.add(boot);
+    a.position.copy(pinPos); a.quaternion.copy(q); g.add(a);
+    const e = this.endB = new THREE.Group();
+    const hs2 = new THREE.Mesh(new RoundedBoxGeometry(2.5, 14, 2.5, 2, 0.25), housing); hs2.position.y = 7; e.add(hs2);
+    const pin = new THREE.Mesh(new THREE.BoxGeometry(0.64, 5.5, 0.64), M.gold); pin.position.y = -2.5; e.add(pin);
+    const boot2 = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 3, 16), ins); boot2.position.y = 15.3; e.add(boot2);
+    e.position.copy(b); g.add(e);
+    const up = new THREE.Vector3(0, 1, 0);
+    const p0 = pinPos.clone().addScaledVector(dir, 13.8), p1 = p0.clone().addScaledVector(dir, 18).addScaledVector(up, 4);
+    const pb = b.clone().addScaledVector(up, 16.5), p3 = pb.clone().addScaledVector(up, lift * 0.5);
+    const mid = p1.clone().lerp(p3, 0.5); mid.y = Math.max(p1.y, p3.y) + lift * 0.5;
+    this.tubeGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([p0, p1, mid, p3, pb], false, 'centripetal'), 160, 0.72, 12, false);
+    g.add(new THREE.Mesh(this.tubeGeo, ins));
+    tagHW(g, id);
+  }
+  async grow(ms = 1200) {
+    const total = this.tubeGeo.index.count;
+    this.endB.visible = false;
+    await tween(ms, e => { this.tubeGeo.setDrawRange(0, Math.floor(total * e / 3) * 3); });
+    this.tubeGeo.setDrawRange(0, Infinity);
+    this.endB.visible = true;
+    const b0 = this.endB.position.y;
+    await tween(350, e => { this.endB.position.y = b0 + 8 * (1 - e); });
+  }
+}
+
+// ---------------------------------------------------------------- person (shown as a life-size wooden artist's mannequin)
+export class Mannequin {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const grain = canvasTex(256, 256, (c, w, h) => {
+      c.fillStyle = '#d6ab72'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 70; i++) { c.strokeStyle = `rgba(${120 + Math.random() * 40},${80 + Math.random() * 30},40,${0.12 + Math.random() * 0.15})`; c.lineWidth = 1 + Math.random() * 2; c.beginPath(); const y = Math.random() * h; c.moveTo(0, y); c.bezierCurveTo(w * 0.3, y + (Math.random() - 0.5) * 30, w * 0.7, y + (Math.random() - 0.5) * 30, w, y + (Math.random() - 0.5) * 10); c.stroke(); }
+    });
+    grain.wrapS = grain.wrapT = THREE.RepeatWrapping;
+    const wood = new THREE.MeshPhysicalMaterial({ map: grain, roughness: 0.42, clearcoat: 0.45, clearcoatRoughness: 0.35 });
+    const joint = new THREE.MeshPhysicalMaterial({ color: 0xa9784a, roughness: 0.4, clearcoat: 0.4 });
+    const seg = (len, r0, r1) => { const m = new THREE.Mesh(new THREE.CapsuleGeometry((r0 + r1) / 2, len, 8, 20), wood); m.position.y = -len / 2 - (r0 + r1) / 2; m.castShadow = true; return m; };
+    const ball = r => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), joint); m.castShadow = true; return m; };
+    const hips = this.hips = new THREE.Group(); hips.position.y = 930; g.add(hips);
+    const pelvis = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), wood); pelvis.scale.set(170, 110, 105); hips.add(pelvis);
+    const chest = new THREE.Group(); chest.position.y = 110; hips.add(chest);
+    const waist = ball(62); waist.position.y = 20; chest.add(waist);
+    const torso = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), wood); torso.scale.set(185, 230, 115); torso.position.y = 250; chest.add(torso);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(42, 50, 90, 16), wood); neck.position.y = 500; chest.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 20), wood); head.scale.set(92, 120, 102); head.position.y = 640; chest.add(head);
+    this.limbs = {};
+    const leg = side => {
+      const hip = new THREE.Group(); hip.position.set(side * 95, -60, 0); hips.add(hip);
+      hip.add(ball(68)); const thigh = seg(330, 70, 55); hip.add(thigh);
+      const knee = new THREE.Group(); knee.position.y = -455; hip.add(knee); knee.add(ball(52)); knee.add(seg(330, 52, 40));
+      const ankle = new THREE.Group(); ankle.position.y = -420; knee.add(ankle); ankle.add(ball(38));
+      const foot = new THREE.Mesh(new THREE.CapsuleGeometry(40, 150, 6, 12), wood); foot.rotation.x = Math.PI / 2; foot.position.set(0, -42, 60); ankle.add(foot);
+      return { hip, knee };
+    };
+    const arm = side => {
+      const sh = new THREE.Group(); sh.position.set(side * 205, 480, 0); chest.add(sh);
+      sh.add(ball(58)); sh.add(seg(250, 48, 40));
+      const el = new THREE.Group(); el.position.y = -345; sh.add(el); el.add(ball(40)); el.add(seg(230, 38, 30));
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), wood); hand.scale.set(38, 75, 22); hand.position.y = -345; el.add(hand);
+      sh.rotation.z = side * 0.08;
+      return { sh, el };
+    };
+    this.limbs.L = leg(1); this.limbs.R = leg(-1); this.limbs.aL = arm(1); this.limbs.aR = arm(-1);
+    const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ map: canvasTex(128, 128, (c, w, h) => { const r = c.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w / 2); r.addColorStop(0, 'rgba(0,0,0,0.55)'); r.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = r; c.fillRect(0, 0, w, h); }, { srgb: false }), transparent: true, depthWrite: false }));
+    shadow.rotation.x = -Math.PI / 2; shadow.scale.set(330, 260, 1); shadow.position.y = 1; shadow.raycast = () => {}; g.add(shadow);
+    this.phase = 0;
+    tagHW(g, 'person');
+  }
+  /** walking pose; speed 0 = standing */
+  pose(phase, walking) {
+    const s = walking ? Math.sin(phase) : 0, c = walking ? Math.cos(phase) : 0;
+    this.limbs.L.hip.rotation.x = 0.45 * s; this.limbs.R.hip.rotation.x = -0.45 * s;
+    this.limbs.L.knee.rotation.x = walking ? Math.max(0, -0.9 * c) * 0.8 + 0.05 : 0.02;
+    this.limbs.R.knee.rotation.x = walking ? Math.max(0, 0.9 * c) * 0.8 + 0.05 : 0.02;
+    this.limbs.aL.sh.rotation.x = -0.4 * s; this.limbs.aR.sh.rotation.x = 0.4 * s;
+    this.limbs.aL.el.rotation.x = -0.25 - 0.15 * Math.abs(s); this.limbs.aR.el.rotation.x = -0.25 - 0.15 * Math.abs(s);
+    this.hips.position.y = 930 + (walking ? 18 * Math.abs(c) : 0);
+  }
+}
+
 export async function dropIn(obj, from = 30, ms = 700) {
   const y = obj.position.y;
   obj.visible = true;
@@ -595,6 +758,18 @@ export const HW_INFO = {
     ],
     warn: 'Check the flat face before powering up: if +VS and GND are swapped the sensor does not work and can be damaged.',
     src: 'Analog Devices TMP35/TMP36/TMP37 datasheet, Rev. F',
+  },
+  pir: {
+    name: 'HC-SR501 PIR motion sensor', tag: 'Passive infrared · 3.3 V output',
+    summary: 'Detects warm bodies that move across its view. OUT is 3.3 V while motion is detected, 0 V otherwise.',
+    points: ['Supply 5–20 V → UNO Q 5V pin.', 'Pots: sensitivity (≈3–7 m) and time delay (≈5 s–5 min). Jumper: H repeatable, L single trigger.', 'About 1 minute to start up after power-on.'],
+    warn: 'Keep lamps, heaters and moving air away from the lens — they cause false triggers (datasheet).',
+    src: 'HC-SR501 datasheet · Handson HC-SR501 user guide',
+  },
+  person: {
+    name: 'Person (life-size mannequin)', tag: 'Simulated · 1.75 m',
+    summary: 'Stands in for a person walking through the room. Its body heat is what the PIR senses.',
+    src: 'Simulation',
   },
   obstacle: {
     name: 'Obstacle', tag: 'Drag it closer or farther',

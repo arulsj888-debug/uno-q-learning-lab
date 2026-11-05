@@ -11,6 +11,10 @@ import { JDIGITAL, JANALOG, JSPI } from '../src/data/pins.js';
 const PINS = new Set([...JDIGITAL.pins, ...JANALOG.pins, ...JSPI.pins].map(p => p.id));
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
+const MOD = /^(\w+)\.(VCC|OUT|GND)$/;          // pin of an off-board module, e.g. pir1.OUT
+const isMod = r => MOD.test(r);
+const isWire = d => d.type === 'wire' || d.type === 'fwire';
+const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
 const sigOf = r => (/^GND\d?$|^SPI_GND$/.test(r) ? 'GND' : r);            // all GND pins are one net
 const colNet = h => { const [, row, c] = HOLE.exec(h); return `col${c}${'abcde'.includes(row) ? 'top' : 'bot'}`; };
 let problems = 0;
@@ -35,7 +39,7 @@ function nets(defs, pressed = false) {
   const f = a => { parent[a] ??= a; while (parent[a] !== a) a = parent[a] = parent[parent[a]] ?? parent[a]; return a; };
   const u = (a, b) => { parent[f(a)] = f(b); };
   for (const d of defs) {
-    if (d.type === 'wire') { for (const e of [d.from, d.to]) f(isHole(e) ? colNet(e) : 'PIN:' + sigOf(e)); u(isHole(d.from) ? colNet(d.from) : 'PIN:' + sigOf(d.from), isHole(d.to) ? colNet(d.to) : 'PIN:' + sigOf(d.to)); continue; }
+    if (isWire(d)) { u(node(d.from), node(d.to)); continue; }
     for (const [leg, h] of Object.entries(legs(d))) u(leg, colNet(h));
     if (d.type === 'button') { u(d.id + '.1', d.id + '.2'); u(d.id + '.3', d.id + '.4'); if (pressed) u(d.id + '.1', d.id + '.3'); }
   }
@@ -49,19 +53,20 @@ for (const L of LESSONS) {
   // 1. endpoints exist, holes used once
   const used = {};
   for (const d of all) {
-    const ends = d.type === 'wire' ? [d.from, d.to] : Object.values(legs(d));
+    const ends = isWire(d) ? [d.from, d.to] : Object.values(legs(d));
     for (const e of ends) {
       if (isHole(e)) { const [, , c] = HOLE.exec(e); if (+c < 1 || +c > 30) bad(L, `${d.id}: hole ${e} out of range`); (used[e] ??= []).push(d.id); }
+      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || byId[pid].type !== 'pir') bad(L, `${d.id}: unknown module pin ${e}`); }
       else if (!PINS.has(e)) bad(L, `${d.id}: unknown header pin ${e}`);
     }
   }
   for (const [h, ids] of Object.entries(used)) if (ids.length > 1) bad(L, `hole ${h} used twice (${ids.join(', ')})`);
   // header sockets may take only one wire each
   const sock = {};
-  for (const d of all) if (d.type === 'wire') for (const e of [d.from, d.to]) if (!isHole(e)) (sock[e] ??= []).push(d.id);
+  for (const d of all) if (isWire(d)) for (const e of [d.from, d.to]) if (!isHole(e) && !isMod(e)) (sock[e] ??= []).push(d.id);
   for (const [p, ids] of Object.entries(sock)) if (ids.length > 1) bad(L, `header socket ${p} has ${ids.length} wires`);
   // 2. no short between different header signals
-  const N = nets(all), sigs = [...new Set(all.filter(d => d.type === 'wire').flatMap(d => [d.from, d.to]).filter(e => !isHole(e)).map(sigOf))];
+  const N = nets(all), sigs = [...new Set(all.filter(isWire).flatMap(d => [d.from, d.to]).filter(e => !isHole(e) && !isMod(e)).map(sigOf))];
   for (let i = 0; i < sigs.length; i++) for (let j = i + 1; j < sigs.length; j++)
     if (N.same('PIN:' + sigs[i], 'PIN:' + sigs[j])) bad(L, `SHORT: ${sigs[i]} and ${sigs[j]} are connected together`);
   // 2b. 5 V signals must only reach 5 V-tolerant digital pins (UNO Q datasheet §9.6/9.7)
@@ -116,6 +121,12 @@ for (const L of LESSONS) {
       if (!N.same(id + '.ECHO', P)) bad(L, `${pin}: HC-SR04 Echo not on ${pin}`);
       if (!N.same(id + '.TRIG', 'PIN:' + io.trig)) bad(L, `${pin}: HC-SR04 Trig not on ${io.trig}`);
     }
+    if (io.kind === 'pir') {
+      const id = io.item;
+      if (!N.same(id + '.VCC', 'PIN:5V')) bad(L, `${pin}: PIR VCC not on 5V (datasheet: 5–20 V; 3.3 V is too low)`);
+      if (!N.same(id + '.GND', G)) bad(L, `${pin}: PIR GND not on GND`);
+      if (!N.same(id + '.OUT', P)) bad(L, `${pin}: PIR OUT not on ${pin}`);
+    }
     if (io.kind === 'buzzer') {
       const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));
       if (!r) { bad(L, `${pin}: no series resistor`); continue; }
@@ -125,7 +136,7 @@ for (const L of LESSONS) {
     }
   }
   // 4. text claims
-  const wires = all.filter(d => d.type === 'wire');
+  const wires = all.filter(isWire);
   const hasWire = (a, b) => wires.some(w => [[w.from, w.to], [w.to, w.from]].some(([x, y]) => sigOf(x) === sigOf(a) && y === b));
   L.steps.forEach((S, k) => {
     const txt = S.body.replace(/<[^>]+>/g, '');

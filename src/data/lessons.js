@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -14,6 +14,8 @@ const SRC = {
   tmp36: { t: 'Analog Devices TMP35/TMP36/TMP37 datasheet, Rev. F', u: 'https://www.analog.com/media/en/technical-documentation/data-sheets/TMP35_36_37.pdf' },
   hcsr04: { t: 'Elecfreaks HC-SR04 ultrasonic ranging module datasheet', u: 'https://cdn.sparkfun.com/datasheets/Sensors/Proximity/HCSR04.pdf' },
   prahari: { t: 'Reading HC-SR04 on Arduino UNO Q: pulseIn on Zephyr (published UNO Q readings)', u: 'https://prahari.net/giving-my-robot-its-first-sense-hc-sr04-ultrasonic-on-arduino-uno-q' },
+  sr501: { t: 'HC-SR501 PIR motion detector datasheet (manufacturer, 2013)', u: 'https://courses.ece.cornell.edu/ece5990/ECE5725_Spring2020_Projects/May_15_Demo/Smart%20Lock/W_pp445_yl656/datasheet/31227sc.pdf' },
+  sr501guide: { t: 'Handson Technology: HC-SR501 PIR user guide', u: 'https://handsontec.com/dataspecs/sensor/PIR%20SR501%20Motion%20Sensor.pdf' },
   dhtforum: { t: 'Arduino Forum: “DHT11 and UNO Q”', u: 'https://forum.arduino.cc/t/dht11-and-uno-q/1416409' },
 };
 
@@ -68,6 +70,13 @@ const US_PARTS = [
   { id: 'w19', type: 'wire', from: 'f14', to: 'GND3', color: 'black', lift: 12 },
 ];
 const US_IDS = US_PARTS.map(d => d.id);
+const PIR_PARTS = [
+  { id: 'pir1', type: 'pir', x: 84, z: 34 },
+  { id: 'w20', type: 'fwire', from: 'pir1.GND', to: 'GND3', color: 'black', lift: 24 },
+  { id: 'w21', type: 'fwire', from: 'pir1.OUT', to: 'D2', color: 'yellow', lift: 44 },
+  { id: 'w22', type: 'fwire', from: 'pir1.VCC', to: '5V', color: 'red', lift: 18 },
+];
+const PIR_IDS = PIR_PARTS.map(d => d.id);
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
 
 const BLINK_CODE = BLINK;
@@ -1145,12 +1154,122 @@ export const LESSONS = [
     ],
     sources: [SRC.hcsr04, SRC.ds, SRC.st, SRC.core, SRC.prahari],
   },
+
+  // ================================================================== 14
+  {
+    id: 'l14', num: 14, module: 4, title: 'Detect motion with a PIR sensor (HC-SR501)', level: 'Intermediate', time: '20 min',
+    goal: 'Detect people with a passive-infrared sensor, understand its delay and trigger settings, and build a motion alarm.',
+    hardware: ['Lesson 4 LED circuit (LED on D5)', 'HC-SR501 PIR motion sensor', '3 × female–male jumper wires'],
+    code: PIR_CODE, program: 'pir', fast: true, widgets: ['pir'],
+    circuit: [...LED_CIRCUIT, ...PIR_PARTS], io: { D5: IO_LED, D2: { kind: 'pir', item: 'pir1', needs: PIR_IDS } },
+    explain: {
+      2: '<b>pirPin = D2</b>. The PIR output is 3.3 V, so any UNO Q digital pin is safe.',
+      3: 'The LED from Lesson 4.',
+      4: 'Remembers the last reading, so we only print when it changes.',
+      7: '<b>INPUT</b>: the PIR drives the pin itself (HIGH or LOW), so no pull-up is needed.',
+      8: 'D5 drives the LED.',
+      9: 'Serial output on.',
+      11: '<b>delay(60000)</b>: the datasheet says the module needs about <b>1 minute</b> after power-up, and may give 0–3 false pulses meanwhile. Waiting here ignores them.',
+      16: '<b>digitalRead</b>: HIGH while the PIR reports motion (for the whole time-delay period).',
+      17: 'Motion → LED on, otherwise off.',
+      22: 'Only print when the state changes, instead of 20 times per second.',
+      24: 'Rising edge: motion started.',
+      26: 'Falling edge: the delay time has run out.',
+      28: 'Remember the new state.',
+      30: 'Check 20 times per second.',
+    },
+    steps: [
+      {
+        title: 'What you need', view: 'bench', have: LED_IDS,
+        body: `<ul><li>an <b>HC-SR501</b> PIR motion sensor (green board with a white dome)</li>
+        <li><b>3 female–male jumpers</b>: red (VCC), yellow (OUT), black (GND)</li><li>the LED on D5 from Lesson 4, as an alarm light</li></ul>
+        <p>The HC-SR501 cannot be pushed into a breadboard — its two adjustment pots stick out under the board — so it is connected with <b>female</b> jumper ends on its pins and stands on a small stand facing the room.</p>`,
+      },
+      {
+        title: 'How a PIR sensor works', view: 'bench',
+        body: `<p><b>PIR</b> = <b>Passive InfraRed</b>. It sends nothing out (unlike the HC-SR04) — it only <b>receives</b> the infrared heat that people give off.</p>
+        <ul><li>Inside are <b>two sensing elements</b> side by side. When a warm body moves across, it reaches one element before the other; that <b>difference</b> is what triggers the sensor.</li>
+        <li>The white dome is a <b>Fresnel lens</b>: it splits the room into many zones and focuses them onto the elements.</li>
+        <li>So it detects <b>movement across</b> the sensor best. Walking <b>straight toward</b> it changes both elements almost equally — the datasheet says the sensor is then “insensitive or does not work”.</li>
+        <li>It does <b>not</b> detect a person who stands completely still.</li></ul>`,
+      },
+      {
+        title: 'Datasheet facts and the controls', view: 'bench',
+        body: `<table class="kv"><tr><th>HC-SR501</th><th>Datasheet</th></tr>
+        <tr><td>Supply</td><td>5–20 V DC (another line says 4.5 V min)</td></tr>
+        <tr><td>Output</td><td><b>3.3 V</b> = motion, <b>0 V</b> = none</td></tr>
+        <tr><td>Range</td><td>about 3 m … 7 m (<b>sensitivity</b> pot)</td></tr>
+        <tr><td>Angle</td><td>less than 120° (one copy says a 110° cone)</td></tr>
+        <tr><td>Hold time</td><td>about 5 s … 5 min (<b>time-delay</b> pot)</td></tr>
+        <tr><td>Trigger jumper</td><td><b>H</b> = repeatable, <b>L</b> = single</td></tr>
+        <tr><td>Start-up</td><td>about 1 minute; 0–3 false pulses meanwhile</td></tr>
+        <tr><td>Temperature</td><td>−15 … +70 °C</td></tr></table>
+        <p>After each HIGH period there is a short <b>blocking time</b> in which new motion is ignored (the datasheet gives 2.5 s as the default in its feature text, and 0.2 s “lock time” in its spec list).</p>`,
+      },
+      {
+        title: 'Safe to connect to the UNO Q?', view: 'bench', pins: ['5V', 'D2', 'GND3'],
+        body: `<table class="kv"><tr><th>Pin</th><th>Check</th></tr>
+        <tr><td>VCC</td><td>needs 5–20 V → UNO Q <b>5V</b> pin. Not 3V3 — that is below the minimum.</td></tr>
+        <tr><td>OUT</td><td>gives <b>3.3 V</b> (the module has its own 3.3 V regulator, “7133” in the schematic) → safe on <b>any</b> UNO Q pin, no level shifting needed.</td></tr>
+        <tr><td>GND</td><td>to GND.</td></tr></table>
+        <p class="tip">Compare with the HC-SR04: its ECHO is 5 V and needs a 5 V-tolerant pin. The PIR’s 3.3 V output has no such limit.</p>`,
+      },
+      {
+        title: 'Step 1 — set up the sensor', view: 'bench', power: false, have: [...LED_IDS, 'pir1'],
+        body: `<p>Stand the PIR next to the breadboard with the <b>dome facing the room</b>.</p>
+        <p>Pin order (datasheet photo, component side facing you, pins at the bottom): <b>VCC · OUT · GND</b>. From the dome side it is mirrored: GND · OUT · VCC.</p>`,
+      },
+      {
+        title: 'Step 2 — wire it', view: 'bench', have: [...LED_IDS, ...PIR_IDS], pins: ['5V', 'D2', 'GND3'],
+        body: `<ul><li>Red: PIR <b>VCC</b> → UNO Q <b>5V</b></li><li>Yellow: PIR <b>OUT</b> → <b>D2</b></li><li>Black: PIR <b>GND</b> → <b>GND</b></li></ul>
+        <p>The female ends slide onto the PIR pins; the male ends go into the UNO Q headers.</p>`,
+      },
+      { title: 'The code', view: 'bench', showCode: true, body: `<p>Wait for start-up, then copy the PIR output to the LED and print a message whenever it changes.</p>` },
+      {
+        title: 'Run it: walk past the sensor', view: 'room', showCode: true, power: true, action: 'run',
+        body: `<p>A person walks <b>across</b> the room in front of the sensor. The floor shows the detection area (range × angle).</p>
+        <ul><li>First the sensor warms up — the sketch waits.</li><li>When the person moves inside the area, OUT goes <b>HIGH</b> → LED on → “Motion detected!”.</li>
+        <li>When the time delay runs out, OUT goes LOW → “Motion ended”.</li></ul>
+        <p>Try <b>Walk toward</b> and <b>Stand still</b>: the sensor hardly reacts — exactly as the datasheet describes.</p>
+        <p class="sim">Simulated: the 1-minute start-up is shortened to 6 s (also the sketch’s <code>delay(60000)</code>). The person is a life-size mannequin; detection is modelled from the datasheet (range, angle, sideways motion only).</p>`,
+      },
+      {
+        title: 'Experiment: delay and trigger jumper', view: 'room', showCode: true, power: true,
+        body: `<ul><li><b>Time delay</b>: OUT stays HIGH at least this long after a detection.</li>
+        <li><b>Jumper H (repeatable)</b>: while the person keeps moving, every new detection restarts the delay, so OUT stays HIGH until they leave.</li>
+        <li><b>Jumper L (single)</b>: OUT goes LOW when the delay ends even if they are still moving; after the blocking time it can trigger again.</li>
+        <li><b>Sensitivity</b>: shrinks or grows the detection range (≈ 3–7 m).</li></ul>
+        <p>Watch the <b>timeline</b>: blue = motion seen, yellow = OUT.</p>`,
+      },
+      {
+        title: 'Good to know', view: 'bench',
+        body: `<ul><li>Mount it so people walk <b>across</b> its view, not straight at it.</li>
+        <li>Keep it away from lamps, heaters and moving air — the datasheet warns they cause false triggers.</li>
+        <li>In summer at 30–32 °C, close to body temperature, the range gets shorter (datasheet).</li>
+        <li>It only says <b>“motion yes/no”</b> — not how far or how many people.</li></ul>`,
+      },
+      {
+        title: 'Summary', view: 'bench',
+        body: `<ul><li>PIR = passive infrared: detects <b>moving</b> warm bodies, best when they move across.</li>
+        <li>VCC → 5V; OUT is 3.3 V → any pin; read it with <code>digitalRead()</code>.</li>
+        <li>Pots: sensitivity (3–7 m) and time delay (≈5 s–5 min); jumper H = repeatable, L = single trigger.</li>
+        <li>Allow about 1 minute to start up.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'What does “passive” mean in Passive InfraRed?', a: ['It needs no power', 'It sends nothing out — it only receives infrared heat', 'It works only in the dark', 'It has no lens'], c: 1, why: 'A PIR only receives the infrared that warm bodies emit.' },
+      { q: 'Which UNO Q pin should power the HC-SR501?', a: ['3V3', '5V', 'D2', 'AREF'], c: 1, why: 'Datasheet supply is 5–20 V (4.5 V min), so 3.3 V is too low.' },
+      { q: 'Why can OUT go to any UNO Q digital pin, even D3?', a: ['It is open-drain', 'Its HIGH level is only 3.3 V', 'It outputs 5 V but very weakly', 'The UNO Q is 5 V'], c: 1, why: 'The datasheet gives a 3.3 V / 0 V TTL output (the module has a 3.3 V regulator).' },
+      { q: 'With the jumper on H, what happens while someone keeps moving?', a: ['OUT pulses on and off', 'OUT stays HIGH — each detection restarts the delay', 'OUT goes LOW after 5 s', 'Nothing'], c: 1, why: 'H = repeatable trigger: the delay restarts with every detection.' },
+      { q: 'Which movement is hardest for a PIR to detect?', a: ['Walking across its view', 'Walking straight toward it', 'Waving a hand sideways', 'Running past'], c: 1, why: 'Moving straight toward the lens changes both elements almost equally.' },
+    ],
+    sources: [SRC.sr501, SRC.sr501guide, SRC.ds],
+  },
 ];
 
 export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors' };
 
 export const COMING_SOON = [
-  'PIR motion sensor',
   'Servo motor', 'DC motor with a driver', 'Relay module',
   'I²C & Qwiic: Modulino® Thermo (temperature + humidity)', 'I²C displays',
   'Linux side: Python + Bridge', 'Wi-Fi web dashboard', 'Final IoT project',

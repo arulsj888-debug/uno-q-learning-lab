@@ -9,7 +9,7 @@
 //   { id:'t1', type:'tmp36', row:'e', col:18 }        legs +VS e18, VOUT e19, GND e20 (flat face toward +z)
 //   { id:'w1', type:'wire', from:'D5', to:'a10', color:'yellow' }
 import * as THREE from 'three';
-import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, DESK_Y } from './hardware.js';
+import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, DESK_Y } from './hardware.js';
 
 const HOLE = /^([a-j])(\d{1,2})$/;
 
@@ -24,6 +24,8 @@ export class Bench {
   point(ref) {
     const m = HOLE.exec(ref);
     if (m) return this.bb.hole(m[1], +m[2]);
+    const mp = /^(\w+)\.(VCC|OUT|GND)$/.exec(ref);
+    if (mp && this.items[mp[1]]) return this.items[mp[1]].obj.pin(mp[2]).pos;
     const p = this.board.pins[ref];
     if (!p) throw new Error('unknown endpoint ' + ref);
     return p.pos.clone();
@@ -51,7 +53,7 @@ export class Bench {
     let k = 0;
     this.tray = [];
     for (const d of this.defs) {
-      if (d.type === 'wire' || placedIds.includes(d.id) || this.items[d.id]) continue;
+      if ((d.type === 'wire' || d.type === 'fwire') || placedIds.includes(d.id) || this.items[d.id]) continue;
       const { obj } = this.create(d);
       const g = obj.group;
       g.position.set(52 + (k % 2) * 13, DESK_Y + 3.0, 50 + Math.floor(k / 2) * 16);
@@ -71,6 +73,8 @@ export class Bench {
       case 'ldr': obj = new LDR(); break;
       case 'tmp36': obj = new TMP36(); break;
       case 'hcsr04': obj = new HCSR04(); break;
+      case 'pir': obj = new PIRModule(); break;
+      case 'fwire': { const [pid, pn] = d.from.split('.'); const p = this.items[pid].obj.pin(pn); obj = new FemaleJumper(p.pos, p.dir, this.point(d.to), d.color, { lift: d.lift ?? 30, id: 'jumper' }); break; }
       case 'led': obj = new LED5mm(d.color); break;
       case 'button': obj = new PushButton(); break;
       case 'pot': obj = new Potentiometer(); break;
@@ -91,6 +95,7 @@ export class Bench {
       case 'buzzer': { const p = P(d.plus), m = P(d.minus); return { pos: p.clone().lerp(m, 0.5), rotY: Math.atan2(-(m.z - p.z), m.x - p.x) }; }
       case 'ldr': { const a = P(d.a), b = P(d.b); return { pos: a.clone().lerp(b, 0.5), rotY: Math.atan2(-(b.z - a.z), b.x - a.x) }; }
       case 'tmp36': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
+      case 'pir': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
       case 'hcsr04': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       default: return null;
     }
@@ -103,7 +108,7 @@ export class Bench {
     const obj = fromTray ? fromTray.obj : this.create(d).obj;
     const g = obj.group;
     this.items[d.id] = { def: d, obj, group: g };
-    if (d.type === 'wire') {
+    if ((d.type === 'wire' || d.type === 'fwire')) {
       this.scene.add(g);
       if (animate) await obj.grow(1100);
       return;

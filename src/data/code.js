@@ -244,3 +244,36 @@ void loop() {
   Serial.println(" cm");
   delay(100);                     // datasheet: wait more than 60 ms
 }`;
+
+// Lesson 14 — HC-SR501 PIR (datasheet: 3.3 V output while motion, ~1 min start-up)
+export const PIR_CODE = `// Motion alarm: HC-SR501 PIR on D2, LED on D5
+int pirPin = D2;     // PIR OUT: 3.3 V while motion is detected
+int ledPin = D5;     // LED from Lesson 4
+int lastState = LOW;
+
+void setup() {
+  pinMode(pirPin, INPUT);
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+  Serial.println("PIR warming up (about 1 minute)...");
+  delay(60000);                      // datasheet: ~1 min to start up
+  Serial.println("Ready");
+}
+
+void loop() {
+  int motion = digitalRead(pirPin);  // HIGH = motion
+  if (motion == HIGH) {
+    digitalWrite(ledPin, HIGH);
+  } else {
+    digitalWrite(ledPin, LOW);
+  }
+  if (motion != lastState) {         // print only when it changes
+    if (motion == HIGH) {
+      Serial.println("Motion detected!");
+    } else {
+      Serial.println("Motion ended");
+    }
+    lastState = motion;
+  }
+  delay(50);
+}`;
