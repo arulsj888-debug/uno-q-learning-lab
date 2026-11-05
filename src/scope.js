@@ -11,6 +11,7 @@ export class Scope {
 
   draw() {
     const { g, c } = this, w = c.width, h = c.height;
+    const W_MS = this.state && this.state.type === 'servo' ? 25 : 10;
     const top = 16, bot = h - 22, left = 34, right = w - 8;
     g.fillStyle = '#070b0e'; g.fillRect(0, 0, w, h);
     // grid: 1 ms per division
@@ -26,6 +27,13 @@ export class Scope {
     g.beginPath();
     let text = 'No signal';
     if (!s) { g.moveTo(left, Y(0)); g.lineTo(right, Y(0)); }
+    else if (s.type === 'servo') {
+      const xs = t => left + (right - left) * t / W_MS, pw = s.us / 1000;
+      g.moveTo(left, Y(0));
+      for (const t0 of [2, 22]) { g.lineTo(xs(t0), Y(0)); g.lineTo(xs(t0), Y(1)); g.lineTo(xs(Math.min(W_MS, t0 + pw)), Y(1)); g.lineTo(xs(Math.min(W_MS, t0 + pw)), Y(0)); }
+      g.lineTo(right, Y(0));
+      text = `Pulse ${s.us} µs, repeated every 20 ms (50 Hz)`;
+    }
     else if (s.type === 'dc') { g.moveTo(left, Y(s.level)); g.lineTo(right, Y(s.level)); text = s.level ? 'Steady HIGH (3.3 V)' : 'Steady LOW (0 V)'; }
     else {
       const period = 1000 / s.freq;                      // ms

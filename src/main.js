@@ -271,6 +271,7 @@ class App {
   }
   tick(dt = 0.016) {
     this.pirTick(Math.min(dt, 0.1));
+    this.servoTick(Math.min(dt, 0.1));
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -295,6 +296,7 @@ class App {
   view(name, ms = 1100) {
     if (name === 'sonar' && this.sonarGeom()) return this.frameSonar(ms);
     if (name === 'room') return this.frameRoom(ms);
+    if (name === 'servo' || name === 'servoclose') return this.frameServo(name === 'servoclose', ms);
     if (name === 'pirfront' || name === 'pirback') return this.framePir(name === 'pirback' ? 'back' : 'front', ms);
     const v = VIEWS[name];
     if (!ms) { this.viewer.controls.target.copy(v.t); this.viewer.camera.position.copy(v.t.clone().add(v.d.clone().normalize().multiplyScalar(v.dist))); return Promise.resolve(); }
@@ -671,6 +673,9 @@ class App {
         <div class="io-tools"><button id="pir-wave" class="hold">👋 Wave hand</button><button id="pir-still" class="lvl">✋ Hold hand still</button></div></div>
         <div class="io-block pirstat"><div><span>Sensor</span><b id="ps-sensor">—</b></div><div class="arrow">→</div><div><span>OUT → D2</span><b id="ps-out">—</b></div><div class="arrow">→</div><div><span>Alarm LED (D5)</span><b id="ps-led">—</b></div></div>
         <div id="ps-note" class="io-note"></div>`;
+    if (w.includes('servo')) h += `<div class="io-block pirstat"><div><span>Sketch</span><b id="sv-cmd">—</b></div><div class="arrow">→</div><div><span>Pulse on D9</span><b id="sv-us">—</b></div><div class="arrow">→</div><div><span>Arm angle</span><b id="sv-ang">—</b></div></div>
+        <div id="sv-note" class="io-note"></div>
+        <div class="io-block"><div class="io-title">Oscilloscope · D9 <span class="io-note">(simulated)</span></div><canvas id="scope" width="560" height="150"></canvas><div id="scope-info" class="io-val"></div></div>`;
     if (w.includes('knob')) h += `<div class="io-block"><div class="io-title">Potentiometer knob</div><input id="knob" type="range" min="0" max="1000" value="${Math.round(this.knobValue() * 1000)}"><div id="knob-val" class="io-val"></div><div class="io-note">or drag the knob in the 3D view</div></div>`;
     if (w.includes('pwm')) h += `<div class="io-block"><div class="io-title">analogWrite(D5, <b id="pwm-v">128</b>)</div><input id="pwm" type="range" min="0" max="255" value="128"></div>`;
     if (w.includes('scope')) h += `<div class="io-block"><div class="io-title">Oscilloscope · ${L.scopePin || 'D5'} <span class="io-note">(simulated)</span></div><canvas id="scope" width="560" height="170"></canvas><div id="scope-info" class="io-val"></div></div>`;
@@ -693,6 +698,7 @@ class App {
     this.lamp.intensity = w.includes('light') ? this.lampIntensity() : 0;
     if ($('#pwm')) $('#pwm').oninput = e => this.applyManualPwm(+e.target.value);
     this.scope = $('#scope') ? new Scope($('#scope'), $('#scope-info')) : null;
+    if (w.includes('servo')) { this.servoState = null; const sv = this.servoObj(); if (sv) { sv.target = 90; sv.setAngle(90); } }
     if ($('#sound')) $('#sound').onclick = e => { this.soundOn = !this.soundOn; e.currentTarget.textContent = this.soundOn ? '🔊 Sound on' : '🔇 Sound off'; if (!this.soundOn) this.stopSound(); };
     if (w.includes('editor')) this.bindEditor();
   }
@@ -757,7 +763,7 @@ class App {
       if ($('#dist')) this.setDist(this.distCm, S.view === 'sonar');
       this.showRoom(!!(L.widgets && L.widgets.includes('pir')) && !!this.pirSensor());
       if (S.view === 'room') this.frameRoom();
-      if (S.view === 'pirfront' || S.view === 'pirback') this.view(S.view);
+      if (S.view === 'pirfront' || S.view === 'pirback' || S.view === 'servo' || S.view === 'servoclose') this.view(S.view);
       if (S.labels) for (const [id, text] of S.labels) {
         let p;
         if (id === 'board') p = new THREE.Vector3(-8, 14, -6);
@@ -1046,6 +1052,34 @@ class App {
     const r = 320;                                               // drawn short; the real range reaches 3–7 m
     this.pirFan.position.set(L.x, DESK_Y + 2, L.z); this.pirFan.scale.set(r, r, 1);
   }
+  // ---- Lesson 15: SG90 servo ------------------------------------------------------------------------
+  servoObj() { return this.bench.get('sv1'); }
+  frameServo(close, ms = 1000) {
+    const sv = this.servoObj(); if (!sv) return this.viewer.flyTo(new THREE.Vector3(40, 0, 60), 260, new THREE.Vector3(-0.3, 0.8, 0.5), ms);
+    sv.group.updateMatrixWorld(true);
+    const p = sv.body.getWorldPosition(new THREE.Vector3());
+    if (close) return this.viewer.flyTo(p.clone().add(new THREE.Vector3(-4, 18, 0)), 115, new THREE.Vector3(-0.45, 0.62, 0.64), ms);
+    return this.viewer.flyTo(new THREE.Vector3(p.x - 45, 6, p.z - 25), 250, new THREE.Vector3(-0.25, 0.85, 0.47), ms);
+  }
+  onServo(pin, us, angle) {
+    const io = this.ioFor(pin), sv = this.servoObj();
+    const ok = io && io.kind === 'servo' && this.wired(io) && this.board.powered;
+    this.servoState = { us, angle: us == null ? null : angle, ok };
+    if (ok && sv && us != null) sv.target = angle;
+    if (this.scope && us != null) this.scope.set({ type: 'servo', us });
+    if (us != null) this.setPinLevel(`${pin}: pulse ${us} µs every 20 ms`);
+  }
+  servoTick(dt) {
+    const sv = this.servoObj(); if (!sv) return;
+    const d = sv.target - sv.angle, step = 600 * dt;            // datasheet: 0.1 s per 60° → 600°/s (no load)
+    if (Math.abs(d) > 0.01) sv.setAngle(sv.angle + Math.sign(d) * Math.min(Math.abs(d), step));
+    const st = this.servoState;
+    const set = (id, t, cls) => { const e = $(id); if (e && e.innerHTML !== t) { e.innerHTML = t; e.className = cls; } };
+    set('#sv-cmd', st && st.angle != null ? `write(${st.angle})` : '—', st && st.angle != null ? 'on' : 'off');
+    set('#sv-us', st && st.us != null ? `${st.us} µs` : '—', st && st.us != null ? 'on' : 'off');
+    set('#sv-ang', `${Math.round(sv.angle)}°`, Math.abs(sv.target - sv.angle) > 0.5 ? 'warm' : 'on');
+    set('#sv-note', !this.sim.running ? 'Press <b>▶ Run</b> to start.' : Math.abs(sv.target - sv.angle) > 0.5 ? 'Turning…' : 'Holding the angle.', 'io-note');
+  }
   pirWave() { this.pir.mode = 'wave'; this.pir.waveT0 = performance.now(); }
   pirHoldStill() { this.pir.mode = 'still'; }
   pirTick(dt) {
@@ -1201,6 +1235,7 @@ class App {
         return 0.4 + Math.random() * 0.3;         // unconnected input floats
       },
       matrix: vals => this.board.setMatrix(vals),
+      servo: (pin, us, angle) => this.onServo(pin, us, angle),
       pulse: async (pin) => {
         const io = this.ioFor(pin);
         if (io && io.kind === 'hcsr04' && this.wired(io) && this.board.powered) { const us = this.pulseInUs(); await sleep(Math.max(1, us / 1000)); this.setPinLevel(`D8 ECHO: HIGH for ${Math.round(this.echoUs())} µs → pulseIn() = ${us} µs`); return us; }
@@ -1353,7 +1388,7 @@ class App {
 
 // ------------------------------------------------------------------ tiny C++ highlighter
 const KW = new Set(['void', 'int', 'const', 'float', 'uint8_t', 'uint16_t', 'uint32_t', 'bool', 'byte', 'char', 'for', 'while', 'if', 'else', 'return', 'static', 'unsigned', 'long', 'true', 'false', 'String']);
-const CONST = new Set(['HIGH', 'LOW', 'OUTPUT', 'INPUT', 'INPUT_PULLUP', 'LED_BUILTIN', 'D4', 'D5', 'D7', 'D8', 'D9', 'A0', 'LED3_R', 'LED3_G', 'LED3_B']);
+const CONST = new Set(['HIGH', 'LOW', 'OUTPUT', 'INPUT', 'INPUT_PULLUP', 'LED_BUILTIN', 'D2', 'D4', 'D5', 'D7', 'D8', 'D9', 'A0', 'LED3_R', 'LED3_G', 'LED3_B']);
 function highlight(line) {
   if (/^\s*#include/.test(line)) return `<span class="tk-kw">${esc(line)}</span>`;
   const ci = line.indexOf('//');

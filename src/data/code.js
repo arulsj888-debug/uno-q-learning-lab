@@ -277,3 +277,22 @@ void loop() {
   }
   delay(50);
 }`;
+
+// Lesson 15 — SG90 servo with the official Servo library (Zephyr support; defaults 544–2400 µs for 0–180°)
+export const SERVO_CODE = `#include <Servo.h>
+
+Servo myServo;        // one Servo object per motor
+int servoPin = D9;    // orange signal wire
+
+void setup() {
+  myServo.attach(servoPin);   // start sending a pulse every 20 ms
+}
+
+void loop() {
+  myServo.write(0);     // 0 degrees
+  delay(1000);
+  myServo.write(90);    // 90 degrees (middle)
+  delay(1000);
+  myServo.write(180);   // 180 degrees
+  delay(1000);
+}`;

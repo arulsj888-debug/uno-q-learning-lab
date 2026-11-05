@@ -69,6 +69,9 @@ export class Sim {
       },
       delayMicroseconds: async () => { if (slow) await frame(); },
       pulseIn: async (pin, state) => { const us = await H.pulse(pin, state); check(); return us; },
+      servoAttach: (pin) => { pins[pin] = { mode: 'OUTPUT' }; H.servo(pin, null); },
+      // Servo library (Zephyr): map(angle, 0, 180, 544, 2400) µs, stored in 4 µs timer ticks
+      servoWrite: (pin, angle) => { const a = Math.min(180, Math.max(0, angle)); const us = Math.floor((Math.trunc(a * (2400 - 544) / 180) + 544) / 4) * 4; H.servo(pin, us, a); },
       tone: (pin, f, ms) => { pins[pin] = { mode: 'OUTPUT' }; tok.tonePin = pin; H.tone(pin, f, ms); },
       noTone: (pin) => { H.noTone(pin); },
       map: (x, a, b, c, d) => Math.trunc((x - a) * (d - c) / (b - a)) + c,   // Arduino integer map()
@@ -274,6 +277,21 @@ export const PROGRAMS = {
         await rt.at(28); lastState = motion;
       }
       await rt.at(30); await rt.delay(50);
+    }
+  },
+
+  async servo(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.servoAttach('D9');
+    for (;;) {
+      await rt.at(10);
+      await rt.at(11); rt.servoWrite('D9', 0);
+      await rt.at(12); await rt.delay(1000);
+      await rt.at(13); rt.servoWrite('D9', 90);
+      await rt.at(14); await rt.delay(1000);
+      await rt.at(15); rt.servoWrite('D9', 180);
+      await rt.at(16); await rt.delay(1000);
     }
   },
 

@@ -652,6 +652,64 @@ export class HandModel {
   }
 }
 
+// ---------------------------------------------------------------- SG90 micro servo
+// TowerPro SG90 datasheet: body ≈ 22.2 × 11.8 mm, height ≈ 31 mm with the gear tower, 9 g, 180°,
+// wires brown = GND, red = +5 V, orange = signal, 3-pin female plug (2.54 mm).
+// The bench item's origin is the plug on a 3-pin header in the breadboard (GND · +5V · signal, along +x);
+// `body` is the offset from the plug to the point under the servo on the desk.
+export class ServoMotor {
+  constructor(body) {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    // --- header in the breadboard + plug on top
+    const hdr = new THREE.Mesh(new THREE.BoxGeometry(7.62, 2.5, 2.5), M.blackPlastic); hdr.position.y = 1.25; g.add(sub(hdr, 'sv:plug'));
+    for (const x of [-2.54, 0, 2.54]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 12, 0.64), M.gold); p.position.set(x, 3, 0); g.add(p); }
+    const plug = new THREE.Mesh(new RoundedBoxGeometry(8.0, 14, 2.9, 2, 0.3), new THREE.MeshStandardMaterial({ color: 0x1a1a1b, roughness: 0.55 }));
+    plug.position.y = 2.5 + 7; g.add(sub(plug, 'sv:plug'));
+    // --- servo body (desk-standing, shaft up)
+    const S = this.body = new THREE.Group(); S.position.copy(body); g.add(S);
+    const blue = new THREE.MeshPhysicalMaterial({ color: 0x2a6fd6, roughness: 0.25, transmission: 0.35, thickness: 4, transparent: true, opacity: 0.92, clearcoat: 0.5 });
+    const caseM = new THREE.Mesh(new RoundedBoxGeometry(22.8, 22.7, 12.2, 2, 0.8), blue); caseM.position.y = 22.7 / 2; S.add(sub(caseM, 'sv:case'));
+    const tabs = new THREE.Mesh(new RoundedBoxGeometry(32.3, 2.5, 12.2, 2, 0.5), blue); tabs.position.y = 15.9; S.add(sub(tabs, 'sv:tabs'));
+    for (const x of [-13.85, 13.85]) { const h = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 2.6, 16), new THREE.MeshBasicMaterial({ color: 0x0b1626 })); h.position.set(x, 15.9, 0); S.add(sub(h, 'sv:tabs')); }
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(5.9, 5.9, 4.0, 40), blue); tower.position.set(-5.4, 22.7 + 2, 0); S.add(sub(tower, 'sv:case'));
+    const nub = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 4.0, 24), blue); nub.position.set(1.6, 22.7 + 2, 0); S.add(sub(nub, 'sv:case'));
+    // gears seen through the translucent case
+    const gearM = new THREE.MeshStandardMaterial({ color: 0xe9e6dc, roughness: 0.5 });
+    for (const [x, y, r] of [[-5.4, 19, 5], [2, 17, 3.6], [5.5, 13, 2.8]]) { const ge = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1.6, 20), gearM); ge.position.set(x, y, 0); S.add(sub(ge, 'sv:case')); }
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 3.2, 20), new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.4 }));
+    shaft.position.set(-5.4, 22.7 + 4 + 1.6, 0); S.add(sub(shaft, 'sv:shaft'));
+    // white single-arm horn (rotates)
+    const horn = this.horn = new THREE.Group(); horn.position.set(-5.4, 22.7 + 4 + 3.2, 0); S.add(horn);
+    const hm = new THREE.MeshPhysicalMaterial({ color: 0xf6f5f0, roughness: 0.45, clearcoat: 0.2 });
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 1.8, 28), hm); hub.position.y = 0.9; horn.add(sub(hub, 'sv:horn'));
+    const sh = new THREE.Shape(); sh.moveTo(0, -3.4); sh.lineTo(15.5, -1.7); sh.absarc(15.5, 0, 1.7, -Math.PI / 2, Math.PI / 2, false); sh.lineTo(0, 3.4); sh.lineTo(0, -3.4);
+    for (const x of [6, 9, 12, 15]) { const p = new THREE.Path(); p.absarc(x, 0, 0.55, 0, Math.PI * 2, true); sh.holes.push(p); }
+    const armGeo = new THREE.ExtrudeGeometry(sh, { depth: 1.4, bevelEnabled: true, bevelSize: 0.2, bevelThickness: 0.2, bevelSegments: 2 }); armGeo.rotateX(-Math.PI / 2);
+    const arm = new THREE.Mesh(armGeo, hm); arm.position.y = 0.3; horn.add(sub(arm, 'sv:horn'));
+    const screw = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.5, 16), M.steelSatin); screw.position.y = 2.05; horn.add(sub(screw, 'sv:horn'));
+    // label sticker
+    const lab = canvasTex(256, 128, (c, w, h) => { c.fillStyle = '#f1f1ec'; c.fillRect(0, 0, w, h); c.fillStyle = '#1b3f7a'; c.font = '700 44px Arial'; c.textAlign = 'center'; c.fillText('SG90', w / 2, 58); c.font = '600 22px Arial'; c.fillText('9g Micro Servo', w / 2, 98); });
+    const sticker = new THREE.Mesh(new THREE.PlaneGeometry(18, 9), new THREE.MeshStandardMaterial({ map: lab, roughness: 0.6 })); sticker.position.set(0, 9, 6.15); S.add(sub(sticker, 'sv:case'));
+    // --- 3-wire flat cable from the servo to the plug
+    const exitL = new THREE.Vector3(body.x + 11.4, body.y + 3.5, body.z), plugTop = new THREE.Vector3(0, 16.5, 0);
+    const cols = [0x5a3418, 0xc8231b, 0xf07a16];         // brown, red, orange
+    [-1, 0, 1].forEach((k, i) => {
+      const a = exitL.clone().add(new THREE.Vector3(0, 0, k * 1.0)), b = plugTop.clone().add(new THREE.Vector3(k * 2.54, 0, 0));
+      const c1 = a.clone().add(new THREE.Vector3(18, 0, 0)), c2 = b.clone().add(new THREE.Vector3(0, 22, 0));
+      const mid = c1.clone().lerp(c2, 0.5); mid.y += 14;
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, c1, mid, c2, b], false, 'centripetal'), 90, 0.55, 8, false), new THREE.MeshStandardMaterial({ color: cols[i], roughness: 0.45 }));
+      g.add(sub(tube, 'sv:cable'));
+    });
+    tagHW(g, 'servo');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+    this.angle = 90; this.target = 90; this.setAngle(90);
+  }
+  /** horn angle in degrees (0…180); 90 = horn pointing toward +z */
+  setAngle(a) { this.angle = a; this.horn.rotation.y = (a - 90) * Math.PI / 180 - Math.PI / 2; }
+  hornTip() { this.group.updateMatrixWorld(true); return this.horn.localToWorld(new THREE.Vector3(15.5, 2, 0)); }
+}
+
 export async function dropIn(obj, from = 30, ms = 700) {
   const y = obj.position.y;
   obj.visible = true;
@@ -808,6 +866,13 @@ export const HW_INFO = {
   'us:R': { name: 'Receiver “R”', tag: 'HC-SR04 · hears the echo', summary: 'Listens for the echo. ECHO stays HIGH until the echo arrives.', src: 'HC-SR04 datasheet' },
   'us:xtal': { name: 'Crystal Y1', tag: 'HC-SR04', summary: 'A quartz crystal: gives the module’s circuit a stable timing reference.', src: 'HC-SR04 datasheet photo' },
   'us:pins': { name: '4-pin header', tag: 'VCC · Trig · Echo · GND', summary: 'VCC to 5V, Trig to D7, Echo to D8 (5 V-tolerant), GND to GND.', src: 'HC-SR04 datasheet · UNO Q datasheet' },
+  servo: { name: 'SG90 micro servo', tag: '180° · 5 V', summary: 'A small motor with gears and a position sensor that turns to the angle you ask for and holds it.', src: 'SG90 datasheet' },
+  'sv:horn': { name: 'Horn (servo arm)', tag: 'SG90', summary: 'The white arm on the output shaft. You fix things to its small holes — it turns to the commanded angle.', src: 'SG90 datasheet' },
+  'sv:shaft': { name: 'Output shaft', tag: 'SG90', summary: 'The splined shaft that the horn pushes onto. Its total travel is about 180°.', src: 'SG90 datasheet' },
+  'sv:case': { name: 'Case with motor and gears', tag: 'SG90 · 22.2 × 11.8 mm', summary: 'Inside: a small DC motor, plastic reduction gears and a position sensor with control electronics. Weight about 9 g.', src: 'SG90 datasheet' },
+  'sv:tabs': { name: 'Mounting tabs', tag: 'SG90', summary: 'Two tabs with screw holes to fix the servo to your project.', src: 'SG90 datasheet' },
+  'sv:cable': { name: 'Servo cable', tag: 'Brown · Red · Orange', summary: 'Brown = GND, red = +5 V, orange = signal (the pulses).', src: 'SG90 datasheet' },
+  'sv:plug': { name: '3-pin plug on a header', tag: '2.54 mm', summary: 'The servo’s female plug sits on a 3-pin male header pushed into the breadboard (holes j11–j13).', src: '—' },
   obstacle: {
     name: 'Obstacle', tag: 'Drag it closer or farther',
     summary: 'A flat object in front of the sensor. Drag it in the 3D view or use the slider; the label shows the real distance.',

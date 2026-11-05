@@ -29,6 +29,7 @@ function legs(d) {
     case 'buzzer': return { [d.id + '.+']: d.plus, [d.id + '.-']: d.minus };
     case 'ldr': return { [d.id + '.1']: d.a, [d.id + '.2']: d.b };
     case 'hcsr04': return { [d.id + '.VCC']: `${d.row}${d.col}`, [d.id + '.TRIG']: `${d.row}${d.col + 1}`, [d.id + '.ECHO']: `${d.row}${d.col + 2}`, [d.id + '.GND']: `${d.row}${d.col + 3}` };
+    case 'servo': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.SIG']: `${d.row}${d.col + 2}` };
     case 'tmp36': return { [d.id + '.VS']: `${d.row}${d.col}`, [d.id + '.VO']: `${d.row}${d.col + 1}`, [d.id + '.GND']: `${d.row}${d.col + 2}` };
     default: return {};
   }
@@ -127,6 +128,12 @@ for (const L of LESSONS) {
       if (!N.same(id + '.GND', G)) bad(L, `${pin}: PIR GND not on GND`);
       if (!N.same(id + '.OUT', P)) bad(L, `${pin}: PIR OUT not on ${pin}`);
     }
+    if (io.kind === 'servo') {
+      const id = io.item;
+      if (!N.same(id + '.VCC', 'PIN:5V')) bad(L, `${pin}: servo + (red) not on 5V (SG90: 4.8 V)`);
+      if (!N.same(id + '.GND', G)) bad(L, `${pin}: servo brown not on GND`);
+      if (!N.same(id + '.SIG', P)) bad(L, `${pin}: servo signal not on ${pin}`);
+    }
     if (io.kind === 'buzzer') {
       const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));
       if (!r) { bad(L, `${pin}: no series resistor`); continue; }
@@ -154,13 +161,15 @@ for (const L of LESSONS) {
       if (/anode/.test(lab) && !/\.A$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled anode but is ${legHoles[h]}`);
       if (/cathode/.test(lab) && !/\.K$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled cathode but is ${legHoles[h]}`);
       if (/wiper/.test(lab) && !/\.W$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled wiper but is ${legHoles[h]}`);
-      if (/·\s*\+(?!VS)/.test(lab) && !/\.\+$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled + but is ${legHoles[h]}`);
+      if (/·\s*\+(?!VS|5V)/.test(lab) && !/\.\+$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled + but is ${legHoles[h]}`);
       if (/·\s*−/.test(lab) && !/\.-$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled − but is ${legHoles[h]}`);
       if (/\+VS/.test(lab) && !/\.VS$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled +VS but is ${legHoles[h]}`);
       if (/VOUT/.test(lab) && !/\.VO$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled VOUT but is ${legHoles[h]}`);
       if (/·\s*VCC/.test(lab) && !/\.VCC$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled VCC but is ${legHoles[h]}`);
       if (/·\s*TRIG/.test(lab) && !/\.TRIG$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled TRIG but is ${legHoles[h]}`);
       if (/·\s*ECHO/.test(lab) && !/\.ECHO$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled ECHO but is ${legHoles[h]}`);
+      if (/·\s*signal/.test(lab) && !/\.SIG$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled signal but is ${legHoles[h]}`);
+      if (/·\s*\+5V/.test(lab) && !/\.VCC$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled +5V but is ${legHoles[h]}`);
       if (/·\s*GND/.test(lab) && !/\.GND$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled GND but is ${legHoles[h]}`);
     }
     for (const p of S.pins || []) if (!PINS.has(p)) bad(L, `step ${k + 1}: marker for unknown pin ${p}`);

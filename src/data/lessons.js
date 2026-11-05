@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -16,6 +16,8 @@ const SRC = {
   prahari: { t: 'Reading HC-SR04 on Arduino UNO Q: pulseIn on Zephyr (published UNO Q readings)', u: 'https://prahari.net/giving-my-robot-its-first-sense-hc-sr04-ultrasonic-on-arduino-uno-q' },
   sr501: { t: 'HC-SR501 PIR motion detector datasheet (manufacturer, 2013)', u: 'https://courses.ece.cornell.edu/ece5990/ECE5725_Spring2020_Projects/May_15_Demo/Smart%20Lock/W_pp445_yl656/datasheet/31227sc.pdf' },
   sr501guide: { t: 'Handson Technology: HC-SR501 PIR user guide', u: 'https://handsontec.com/dataspecs/sensor/PIR%20SR501%20Motion%20Sensor.pdf' },
+  sg90: { t: 'TowerPro SG90 micro servo datasheet', u: 'https://www.friendlywire.com/projects/ne555-servo-safe/SG90-datasheet.pdf' },
+  servolib: { t: 'Arduino Servo library (source, incl. Zephyr support)', u: 'https://github.com/arduino-libraries/Servo' },
   dhtforum: { t: 'Arduino Forum: “DHT11 and UNO Q”', u: 'https://forum.arduino.cc/t/dht11-and-uno-q/1416409' },
 };
 
@@ -77,6 +79,13 @@ const PIR_PARTS = [
   { id: 'w22', type: 'fwire', from: 'pir1.VCC', to: '5V', color: 'red', lift: 18 },
 ];
 const PIR_IDS = PIR_PARTS.map(d => d.id);
+const SERVO_PARTS = [
+  { id: 'sv1', type: 'servo', row: 'j', col: 11, bx: 78, bz: 72 },
+  { id: 'w23', type: 'wire', from: 'f11', to: 'GND3', color: 'black', lift: 12 },
+  { id: 'w24', type: 'wire', from: 'f12', to: '5V', color: 'red', lift: 9 },
+  { id: 'w25', type: 'wire', from: 'f13', to: 'D9', color: 'orange', lift: 16 },
+];
+const SERVO_IDS = SERVO_PARTS.map(d => d.id);
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
 
 const BLINK_CODE = BLINK;
@@ -1249,12 +1258,88 @@ export const LESSONS = [
     ],
     sources: [SRC.sr501, SRC.sr501guide, SRC.ds],
   },
+
+  // ================================================================== 15
+  {
+    id: 'l15', num: 15, module: 5, title: 'Turn a servo motor to an angle (SG90)', level: 'Intermediate', time: '15 min',
+    goal: 'Make a servo motor turn to 0°, 90° and 180° with the Servo library.',
+    hardware: ['Arduino UNO Q', 'Breadboard', 'SG90 micro servo', '3-pin male header', '3 × jumper wires'],
+    code: SERVO_CODE, program: 'servo', fast: true, widgets: ['servo'],
+    circuit: SERVO_PARTS, io: { D9: { kind: 'servo', item: 'sv1', needs: SERVO_IDS } },
+    explain: {
+      1: '<b>#include &lt;Servo.h&gt;</b> — Arduino’s official Servo library. It supports the UNO Q’s Zephyr core (install it from the library list).',
+      3: 'One <b>Servo</b> object per motor.',
+      4: 'The servo’s orange signal wire goes to <b>D9</b>.',
+      7: '<b>attach()</b>: from now on the library sends a pulse on D9 every 20 ms.',
+      11: '<b>write(0)</b>: pulse 544 µs → turn to 0°.',
+      12: 'Wait 1 s (the servo needs ≈0.3 s for 180°).',
+      13: '<b>write(90)</b>: pulse 1472 µs → the middle.',
+      15: '<b>write(180)</b>: pulse 2400 µs → the other end.',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'servo', have: [],
+        body: `<p>A <b>servo</b> is a small motor that turns to an <b>exact angle</b> and holds it there — used in robot arms, RC planes, door locks and camera mounts.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">sketch: <code>write(90)</code></span></div><div class="pt-arrow">↓ D9 sends a 1472 µs pulse every 20 ms</div>
+        <div class="pt-row"><span class="pt bus">servo arm turns to 90° and stays there</span></div></div>
+        <p>Our sketch will move it <b>0° → 90° → 180°</b>, one step per second.</p>`,
+      },
+      {
+        title: 'How a servo knows the angle', view: 'servo',
+        body: `<p>Inside are a small motor, plastic gears and a position sensor. You tell it the angle with a <b>pulse</b>:</p>
+        <table class="kv"><tr><th>Pulse width</th><th>Angle</th></tr><tr><td>544 µs</td><td>0°</td></tr><tr><td>1472 µs</td><td>90° (middle)</td></tr><tr><td>2400 µs</td><td>180°</td></tr></table>
+        <p>The pulse repeats every <b>20 ms</b> (50 times per second). The <b>width</b> of the pulse — not the voltage — sets the angle.</p>
+        <p class="tip">These are the Servo library’s default limits (544–2400 µs). The SG90 datasheet gives 500–2400 µs, so they match.</p>`,
+      },
+      {
+        title: 'The three wires', view: 'servo',
+        body: `<table class="kv"><tr><th>Wire</th><th>Goes to</th></tr>
+        <tr><td><b style="color:#b0703e">Brown</b></td><td>GND</td></tr><tr><td><b style="color:#ff5a4f">Red</b></td><td><b>5V</b> (SG90: 4.8 V ≈ 5 V)</td></tr><tr><td><b style="color:#f08c3a">Orange</b></td><td><b>D9</b> (signal)</td></tr></table>
+        <p>One small SG90 can run from the UNO Q 5V pin. Bigger or several servos need their own 5 V supply (with GND connected to the UNO Q GND), because a motor can draw a lot of current when it starts or is blocked.</p>`,
+      },
+      {
+        title: 'Step 1 — place the servo', view: 'servo', power: false, have: ['sv1'], holes: ['j11 · GND', 'j12 · +5V', 'j13 · signal'],
+        body: `<p>Push a 3-pin male header into <b>j11, j12, j13</b> and plug the servo connector onto it: <b>brown → j11</b>, red → j12, <b>orange → j13</b>.</p>`,
+      },
+      {
+        title: 'Step 2 — wire it', view: 'servo', have: SERVO_IDS, pins: ['GND3', '5V', 'D9'],
+        body: `<ul><li>Black: <b>f11</b> → <b>GND</b></li><li>Red: <b>f12</b> → <b>5V</b></li><li>Orange: <b>f13</b> → <b>D9</b></li></ul>`,
+      },
+      {
+        title: 'Get to know the servo', view: 'servoclose',
+        body: `<p><b>Click each part:</b> the white <b>horn</b> (arm), the <b>output shaft</b>, the blue <b>case</b> with the gears inside, the <b>mounting tabs</b>, the <b>cable</b> and the <b>plug</b>.</p>`,
+      },
+      {
+        title: 'The code', view: 'servo', showCode: true,
+        body: `<p><code>attach()</code> once, then <code>write(angle)</code> whenever you want a new angle. Click any line to see what it does.</p>
+        <p class="tip">The Servo library is not built in: in Arduino App Lab add it to the sketch (library <b>Servo</b>), in the Arduino IDE install it from the Library Manager.</p>`,
+      },
+      {
+        title: 'Run it', view: 'servo', showCode: true, power: true, action: 'run',
+        body: `<p>Watch the three boxes below: <b>write(angle)</b> → <b>pulse on D9</b> → <b>arm angle</b>, and the oscilloscope showing the pulse getting wider and narrower.</p>
+        <p>The arm turns at the SG90’s datasheet speed: about <b>0.1 s per 60°</b>.</p>
+        <p class="sim">Simulated: pulse widths are exactly what the Servo library sends (in 4 µs steps).</p>`,
+      },
+      {
+        title: 'Summary', view: 'servo',
+        body: `<ul><li>A servo turns to the angle set by the <b>pulse width</b>: ≈0.5 ms … 2.4 ms, repeated every 20 ms.</li>
+        <li>Brown GND, red 5V, orange signal.</li><li><code>#include &lt;Servo.h&gt;</code>, <code>attach(pin)</code>, <code>write(angle)</code>.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'What sets the servo angle?', a: ['The voltage on the signal wire', 'The width of the pulse', 'How long you power it', 'The current'], c: 1, why: 'The pulse width (≈0.5–2.4 ms, every 20 ms) sets the angle.' },
+      { q: 'How often is the pulse repeated?', a: ['Every 1 ms', 'Every 20 ms', 'Every second', 'Only once'], c: 1, why: 'About every 20 ms (50 Hz) — datasheet and Servo library.' },
+      { q: 'Which wire is the signal?', a: ['Brown', 'Red', 'Orange', 'Black'], c: 2, why: 'SG90: brown = GND, red = +, orange = signal.' },
+      { q: 'With the library defaults, write(90) sends a pulse of about…', a: ['544 µs', '1000 µs', '1472 µs', '2400 µs'], c: 2, why: 'map(90, 0, 180, 544, 2400) = 1472 µs.' },
+    ],
+    sources: [SRC.sg90, SRC.servolib, SRC.ds],
+  },
 ];
 
-export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors' };
+export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion' };
 
 export const COMING_SOON = [
-  'Servo motor', 'DC motor with a driver', 'Relay module',
+  'DC motor with a driver', 'Relay module',
   'I²C & Qwiic: Modulino® Thermo (temperature + humidity)', 'I²C displays',
   'Linux side: Python + Bridge', 'Wi-Fi web dashboard', 'Final IoT project',
 ];

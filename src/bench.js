@@ -9,7 +9,7 @@
 //   { id:'t1', type:'tmp36', row:'e', col:18 }        legs +VS e18, VOUT e19, GND e20 (flat face toward +z)
 //   { id:'w1', type:'wire', from:'D5', to:'a10', color:'yellow' }
 import * as THREE from 'three';
-import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, DESK_Y } from './hardware.js';
+import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, DESK_Y } from './hardware.js';
 
 const HOLE = /^([a-j])(\d{1,2})$/;
 
@@ -74,6 +74,7 @@ export class Bench {
       case 'tmp36': obj = new TMP36(); break;
       case 'hcsr04': obj = new HCSR04(); break;
       case 'pir': obj = new PIRModule(); break;
+      case 'servo': obj = new ServoMotor(new THREE.Vector3(d.bx, DESK_Y, d.bz).sub(this.bb.hole(d.row, d.col + 1))); break;
       case 'fwire': { const [pid, pn] = d.from.split('.'); const p = this.items[pid].obj.pin(pn); obj = new FemaleJumper(p.pos, p.dir, this.point(d.to), d.color, { lift: d.lift ?? 30, id: 'jumper' }); break; }
       case 'led': obj = new LED5mm(d.color); break;
       case 'button': obj = new PushButton(); break;
@@ -96,6 +97,7 @@ export class Bench {
       case 'ldr': { const a = P(d.a), b = P(d.b); return { pos: a.clone().lerp(b, 0.5), rotY: Math.atan2(-(b.z - a.z), b.x - a.x) }; }
       case 'tmp36': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
       case 'pir': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
+      case 'servo': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
       case 'hcsr04': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       default: return null;
     }
