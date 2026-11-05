@@ -5,7 +5,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Viewer } from './viewer.js';
 import { initMaterials, canvasTex, noise } from './materials.js';
 import { UnoQBoard } from './board.js';
-import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, Mannequin } from './hardware.js';
+import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, HandModel } from './hardware.js';
 import { Bench } from './bench.js';
 import { PARTS, CATEGORIES, BOARD_FACTS } from './data/parts.js';
 import { JDIGITAL, JANALOG, JSPI, JCTL, findPin } from './data/pins.js';
@@ -145,14 +145,14 @@ class App {
     this.waves.tflash.raycast = () => {}; this.waves.tflash.renderOrder = 8; s.add(this.waves.tflash);
     this.beam = { visible: false };
     // ---- Lesson 14: room with a walking person and the PIR detection area on the floor
-    this.person = new Mannequin(); this.person.group.visible = false; s.add(this.person.group);
+    this.person = new HandModel(); this.person.group.visible = false; s.add(this.person.group);
     {
       const tex = canvasTex(512, 512, (c, w, h) => {
         const img = c.createImageData(w, h);
         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
           const u = (x / w) * 2 - 1, v = 1 - (y / h) * 2, r = Math.hypot(u, v), a = Math.atan2(u, -v) * 180 / Math.PI;
           let alpha = 0;
-          if (r <= 1 && Math.abs(a) <= 55) { const band = Math.floor((a + 55) / 6.875) % 2, ring = Math.floor(r * 7) % 2; alpha = (band ^ ring) ? 30 : 12; if (r > 0.985) alpha = 120; }
+          if (r <= 1 && Math.abs(a) <= 55) { const fade = 1 - r; const zl = Math.abs(((a + 55) % 13.75) - 6.875) > 6.3; alpha = 16 * fade + (zl ? 26 * fade : 0); if (Math.abs(a) > 54) alpha = 80 * fade; }
           const i = (y * w + x) * 4; img.data[i] = 120; img.data[i + 1] = 215; img.data[i + 2] = 255; img.data[i + 3] = alpha;
         }
         c.putImageData(img, 0, 0);
@@ -295,6 +295,7 @@ class App {
   view(name, ms = 1100) {
     if (name === 'sonar' && this.sonarGeom()) return this.frameSonar(ms);
     if (name === 'room') return this.frameRoom(ms);
+    if (name === 'pirfront' || name === 'pirback') return this.framePir(name === 'pirback' ? 'back' : 'front', ms);
     const v = VIEWS[name];
     if (!ms) { this.viewer.controls.target.copy(v.t); this.viewer.camera.position.copy(v.t.clone().add(v.d.clone().normalize().multiplyScalar(v.dist))); return Promise.resolve(); }
     return this.viewer.flyTo(v.t, v.dist, v.d, ms);
@@ -668,8 +669,8 @@ class App {
     if (w.includes('distance')) h += `<div class="io-block"><div class="io-title">Obstacle in front of the sensor <span class="io-note">(simulated)</span></div><input id="dist" type="range" min="2" max="400" step="0.5" value="${this.distCm}"><div class="io-tools">${[5, 20, 40, 100, 250, 400].map(v => `<button class="lvl" data-dist="${v}">${v} cm</button>`).join('')}</div><div id="dist-val" class="io-val"></div><div class="io-note">or drag the obstacle in the 3D view</div></div><div class="io-block"><div class="io-title">Timing (HC-SR04 datasheet) · animation slowed down</div><canvas id="sonar-timing" width="560" height="112"></canvas></div>`;
     if (w.includes('pir')) {
       const P = this.pir;
-      h += `<div class="io-block"><div class="io-title">The person <span class="io-note">(simulated)</span></div><div class="io-tools">${[['across', 'Walk across'], ['toward', 'Walk toward'], ['still', 'Stand still']].map(([k, t]) => `<button class="lvl ${P.mode === k ? 'on' : ''}" data-pmode="${k}">${t}</button>`).join('')}</div>
-        <div class="io-note">Distance from the sensor <b id="pir-dist-v">${P.distM.toFixed(1)} m</b></div><input id="pir-dist" type="range" min="0.8" max="8" step="0.1" value="${P.distM}"></div>
+      h += `<div class="io-block"><div class="io-title">Your hand in front of the sensor <span class="io-note">(simulated)</span></div><div class="io-tools">${[['across', 'Wave across'], ['toward', 'Move toward'], ['still', 'Hold still']].map(([k, t]) => `<button class="lvl ${P.mode === k ? 'on' : ''}" data-pmode="${k}">${t}</button>`).join('')}</div>
+        <div class="io-note">Distance from the lens <b id="pir-dist-v">${Math.round(P.distM * 100)} cm</b></div><input id="pir-dist" type="range" min="0.15" max="1" step="0.01" value="${P.distM}"></div>
         <div class="io-block"><div class="io-title">HC-SR501 settings</div>
         <div class="io-note">Sensitivity pot → range <b id="pir-range-v">${P.rangeM} m</b></div><input id="pir-range" type="range" min="3" max="7" step="0.5" value="${P.rangeM}">
         <div class="io-note">Time-delay pot → hold <b id="pir-delay-v">${P.delayS} s</b></div><input id="pir-delay" type="range" min="5" max="300" step="1" value="${P.delayS}">
@@ -694,10 +695,10 @@ class App {
     this.refreshPickTargets();
     if ($('#pir-dist')) {
       const P = this.pir;
-      document.querySelectorAll('[data-pmode]').forEach(b => b.onclick = () => { P.mode = b.dataset.pmode; if (P.mode === 'toward') P.distM = 6.5; document.querySelectorAll('[data-pmode]').forEach(x => x.classList.toggle('on', x === b)); });
-      $('#pir-dist').oninput = e => { P.distM = +e.target.value; $('#pir-dist-v').textContent = P.distM.toFixed(1) + ' m'; };
+      document.querySelectorAll('[data-pmode]').forEach(b => b.onclick = () => { P.mode = b.dataset.pmode; if (P.mode === 'toward') P.distM = 1.0; else if (P.distM < 0.2) P.distM = 0.4; document.querySelectorAll('[data-pmode]').forEach(x => x.classList.toggle('on', x === b)); });
+      $('#pir-dist').oninput = e => { P.distM = +e.target.value; $('#pir-dist-v').textContent = Math.round(P.distM * 100) + ' cm'; };
       $('#pir-dist').onchange = () => this.frameRoom(700);
-      $('#pir-range').oninput = e => { P.rangeM = +e.target.value; $('#pir-range-v').textContent = P.rangeM + ' m'; this.updateFan(); };
+      $('#pir-range').oninput = e => { P.rangeM = +e.target.value; $('#pir-range-v').textContent = P.rangeM + ' m'; };
       $('#pir-delay').oninput = e => { P.delayS = +e.target.value; $('#pir-delay-v').textContent = P.delayS >= 60 ? `${Math.floor(P.delayS / 60)} min ${P.delayS % 60} s` : P.delayS + ' s'; };
       document.querySelectorAll('[data-jp]').forEach(b => b.onclick = () => { P.jumper = b.dataset.jp; document.querySelectorAll('[data-jp]').forEach(x => x.classList.toggle('on', x === b)); });
     }
@@ -770,6 +771,13 @@ class App {
       if ($('#dist')) this.setDist(this.distCm, S.view === 'sonar');
       this.showRoom(!!(L.widgets && L.widgets.includes('pir')) && !!this.pirSensor());
       if (S.view === 'room') this.frameRoom();
+      if (S.view === 'pirfront' || S.view === 'pirback') this.view(S.view);
+      if (S.labels) for (const [id, text] of S.labels) {
+        let p;
+        if (id === 'board') p = new THREE.Vector3(-8, 14, -6);
+        else { const it = this.bench.items[id]; if (!it) continue; const b = new THREE.Box3().setFromObject(it.group); p = b.getCenter(new THREE.Vector3()); p.y = b.max.y + 4; }
+        this.temp(this.label(text, p, 'tag3d'));
+      }
       if (!alive()) return;
       if (S.holes) this.holeLabels(S.holes);
       if (S.trace) { const objs = this.bench.groups(S.trace); this.setOutline(objs); this.pulseObjs = objs; }
@@ -1020,7 +1028,7 @@ class App {
   //  • about 1 minute to initialise after power-up; it may output 0–3 pulses meanwhile (simulated: 6 s)
   //  • sensitive to motion ACROSS the lens; little or no response to motion straight toward it
   pirReset() {
-    this.pir = { out: 0, until: 0, blockUntil: 0, readyAt: 0, lastTrig: 0, hist: [], mode: 'across', distM: 2.5, rangeM: 7, delayS: 5, jumper: 'H', personX: -2200, dirX: 1, phase: 0, spurious: [] };
+    this.pir = { out: 0, until: 0, blockUntil: 0, readyAt: 0, lastTrig: 0, hist: [], mode: 'across', distM: 0.4, rangeM: 7, delayS: 5, jumper: 'H', personX: -2200, dirX: 1, phase: 0, spurious: [] };
   }
   pirPowered() {
     const now = performance.now(), P = this.pir;
@@ -1031,9 +1039,14 @@ class App {
   pirLens() { const s = this.pirSensor(); return s ? s.lens() : null; }
   frameRoom(ms = 1100) {
     const L = this.pirLens(); if (!L) return this.view('bench', ms);
-    const d = this.pir.distM * 1000;
-    const target = new THREE.Vector3(L.x, 650, L.z + d * 0.55);
-    return this.viewer.flyTo(target, Math.max(4200, d * 1.25 + 3200), new THREE.Vector3(-0.32, 0.42, -0.85), ms);
+    const d = (this.pir.mode === 'toward' ? 1.0 : this.pir.distM) * 1000;
+    const target = new THREE.Vector3(L.x - 20, DESK_Y + 60, L.z + d * 0.62);
+    return this.viewer.flyTo(target, Math.max(620, d * 1.3 + 560), new THREE.Vector3(-0.28, 0.86, -0.42), ms);
+  }
+  framePir(side, ms = 1000) {
+    const L = this.pirLens(); if (!L) return this.view('bench', ms);
+    const dir = side === 'back' ? new THREE.Vector3(0.35, 0.3, -0.89) : new THREE.Vector3(-0.35, 0.3, 0.89);
+    return this.viewer.flyTo(new THREE.Vector3(L.x, L.y - 4, L.z - 8), 120, dir, ms);
   }
   showRoom(on) {
     this.person.group.visible = on; this.pirFan.visible = on;
@@ -1041,7 +1054,7 @@ class App {
   }
   updateFan() {
     const L = this.pirLens(); if (!L) return;
-    const r = this.pir.rangeM * 1000;
+    const r = 1150;                                              // drawn to 1.15 m; the real range continues to 3–7 m
     this.pirFan.position.set(L.x, DESK_Y + 2, L.z); this.pirFan.scale.set(r, r, 1);
   }
   pirTick(dt) {
@@ -1051,22 +1064,18 @@ class App {
     // move the person
     let moving = false;
     if (L && this.person.group.visible) {
-      const speed = 1.2;                                            // m/s, normal walking pace
+      const hy = L.y + 55;                                          // wrist a little above the lens
       if (P.mode === 'across') {
-        P.personX += P.dirX * speed * dt * 1000;
-        if (Math.abs(P.personX) > 2400) { P.dirX *= -1; P.personX = Math.sign(P.personX) * 2400; }
-        this.person.group.position.set(L.x + P.personX, DESK_Y, L.z + P.distM * 1000);
-        this.person.group.rotation.y = P.dirX > 0 ? Math.PI / 2 : -Math.PI / 2;
+        P.personX += P.dirX * 0.45 * dt * 1000;                     // waving across at ≈0.45 m/s
+        if (Math.abs(P.personX) > 320) { P.dirX *= -1; P.personX = Math.sign(P.personX) * 320; }
         moving = true;
       } else if (P.mode === 'toward') {
-        P.distM -= speed * dt; if (P.distM < 0.8) P.distM = 6.5;
-        this.person.group.position.set(L.x + 150, DESK_Y, L.z + P.distM * 1000);
-        this.person.group.rotation.y = Math.PI;
+        P.personX = 0; P.distM -= 0.25 * dt; if (P.distM < 0.15) P.distM = 1.0;
         moving = true;
-        const sl = $('#pir-dist'); if (sl) sl.value = P.distM;
-      } else {
-        this.person.group.position.set(L.x + P.personX, DESK_Y, L.z + P.distM * 1000);
+        const sl = $('#pir-dist'); if (sl) { sl.value = P.distM; $('#pir-dist-v').textContent = Math.round(P.distM * 100) + ' cm'; }
       }
+      this.person.group.position.set(L.x + P.personX, hy, L.z + P.distM * 1000);
+      this.person.group.rotation.y = Math.PI;                        // palm toward the lens
       P.phase += moving ? dt * 7.5 : 0;
       this.person.pose(P.phase, moving);
     }
@@ -1088,7 +1097,7 @@ class App {
     const st = $('#pir-state');
     if (st) {
       let s = !powered ? 'No power' : now < P.readyAt ? `Warming up… ${Math.ceil((P.readyAt - now) / 1000)} s (simulated)` : P.out ? `OUT = <b class="hi">HIGH · 3.3 V</b>${P.jumper === 'H' ? ' (delay restarts while motion continues)' : ''} · ${Math.max(0, (P.until - now) / 1000).toFixed(1)} s left` : now < P.blockUntil ? 'OUT = LOW · blocking time' : 'OUT = LOW · 0 V · watching';
-      if (powered && now >= P.readyAt && P.mode === 'toward') s += ' · walking straight toward the lens is hard to detect';
+      if (powered && now >= P.readyAt && P.mode === 'toward') s += ' · moving straight toward the lens is hard to detect';
       st.innerHTML = s;
     }
   }

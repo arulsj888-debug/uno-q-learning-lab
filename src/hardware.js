@@ -457,7 +457,9 @@ export class HCSR04 {
     const alu = new THREE.MeshStandardMaterial({ map: brushedTex(), color: 0xffffff, metalness: 1, roughness: 0.3 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.7 });
     const grille = new THREE.MeshStandardMaterial({ map: meshTex(), bumpMap: meshTex(), bumpScale: 0.6, roughness: 0.75, metalness: 0.4 });
+    const usSub = [];
     for (const x of [-13, 13]) {
+      const sid = x < 0 ? 'us:T' : 'us:R';
       const can = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, L, 72, 1, true), alu);
       can.rotation.x = Math.PI / 2; can.position.set(x, cy, z0 + L / 2); g.add(can);
       const lip = new THREE.Mesh(new THREE.TorusGeometry(7.7, 0.32, 14, 72), alu); lip.position.set(x, cy, z0 + L - 0.05); g.add(lip);
@@ -466,10 +468,11 @@ export class HCSR04 {
       well.rotation.x = Math.PI / 2; well.position.set(x, cy, z0 + L - 0.95); g.add(well);
       const face = new THREE.Mesh(new THREE.CircleGeometry(6.15, 64), grille); face.position.set(x, cy, z0 + L - 1.6); g.add(face);
       const foot = new THREE.Mesh(new THREE.CylinderGeometry(8.15, 8.15, 0.5, 72), dark); foot.rotation.x = Math.PI / 2; foot.position.set(x, cy, z0 + 0.25); g.add(foot);
+      for (const o of [can, lip, ring, well, face, foot]) usSub.push([o, sid]);
     }
     // crystal Y1 (HC-49S style metal can lying on the PCB)
     const xtal = new THREE.Mesh(new THREE.CapsuleGeometry(2.25, 6.0, 8, 24), new THREE.MeshStandardMaterial({ color: 0xe6e6e6, metalness: 1, roughness: 0.22 }));
-    xtal.rotation.z = Math.PI / 2; xtal.scale.set(1, 1, 0.78); xtal.position.set(0, y0 + H - 3.4, z0 + 1.75); g.add(xtal);
+    xtal.rotation.z = Math.PI / 2; xtal.scale.set(1, 1, 0.78); xtal.position.set(0, y0 + H - 3.4, z0 + 1.75); g.add(xtal); usSub.push([xtal, 'us:xtal']);
     const xbase = new THREE.Mesh(new THREE.BoxGeometry(11.0, 4.9, 0.5), dark); xbase.position.set(0, y0 + H - 3.4, z0 + 0.25); g.add(xbase);
     // back side: three SOIC chips + passives (the module's driver / receiver electronics)
     const chipMat = new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.55 });
@@ -486,12 +489,13 @@ export class HCSR04 {
       p.position.set(-18 + i * 4, y0 + 3 + (i % 2) * 2, -T / 2 - 0.25); g.add(p);
     }
     // 4-pin straight header: plastic spacer under the PCB edge, gold pins down into the breadboard
-    const hdr = new THREE.Mesh(new THREE.BoxGeometry(10.16, 2.5, 2.5), M.blackPlastic); hdr.position.set(0, y0 - 1.25, 0); g.add(hdr);
+    const hdr = new THREE.Mesh(new THREE.BoxGeometry(10.16, 2.5, 2.5), M.blackPlastic); hdr.position.set(0, y0 - 1.25, 0); g.add(hdr); usSub.push([hdr, 'us:pins']);
     for (const x of [-3.81, -1.27, 1.27, 3.81]) {
       const pin = new THREE.Mesh(new THREE.BoxGeometry(0.64, 9.0, 0.64), M.gold); pin.position.set(x, y0 + 1.5 - 4.5, 0); g.add(pin);
       const fil = new THREE.Mesh(new THREE.ConeGeometry(0.9, 0.7, 16), M.solder); fil.position.set(x, y0 + 1.4, T / 2 + 0.35); fil.rotation.x = -Math.PI / 2; g.add(fil);
     }
     tagHW(g, 'hcsr04');
+    for (const [o, id] of usSub) o.userData.hw = id;
     this.beamZ = z0 + L;                      // front plane of the transducers
     this.beamY = cy;
     this.tx = -13; this.rx = 13;              // T (transmitter) left, R (receiver) right, seen from the front
@@ -524,40 +528,44 @@ export class PIRModule {
     pcb.position.set(0, cy, 0); g.add(pcb);
 
     // Fresnel lens: square white flange + segmented dome (Ø23 mm)
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
     const lensMat = new THREE.MeshPhysicalMaterial({ color: 0xf4f3ee, roughness: 0.55, transmission: 0.25, thickness: 1.5, flatShading: true, sheen: 0.3 });
-    const flange = new THREE.Mesh(new RoundedBoxGeometry(24, 24, 1.4, 2, 0.4), lensMat); flange.position.set(0, cy, T / 2 + 0.7); g.add(flange);
+    const flange = new THREE.Mesh(new RoundedBoxGeometry(24, 24, 1.4, 2, 0.4), lensMat); flange.position.set(0, cy, T / 2 + 0.7); g.add(sub(flange, 'pir:lens'));
     const dome = new THREE.Mesh(new THREE.SphereGeometry(11.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lensMat);
-    dome.rotation.x = Math.PI / 2; dome.scale.set(1, 0.9, 1); dome.position.set(0, cy, T / 2 + 1.4); g.add(dome);
+    dome.rotation.x = Math.PI / 2; dome.scale.set(1, 0.9, 1); dome.position.set(0, cy, T / 2 + 1.4); g.add(sub(dome, 'pir:lens'));
 
     // component side (−z): BISS0001 SOIC-16, two pots, trigger jumper, 7133 LDO, passives
     const dark = new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.55 });
     const zb = -T / 2;
-    const ic = new THREE.Mesh(new THREE.BoxGeometry(3.9, 9.9, 1.5), dark); ic.position.set(-8, cy + 1, zb - 0.75); g.add(ic);
-    for (let i = 0; i < 8; i++) for (const sx of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.4, 0.25), M.tin); l.position.set(-8 + sx * 2.45, cy + 1 - 4.45 + i * 1.27, zb - 0.15); g.add(l); }
+    const ic = new THREE.Mesh(new THREE.BoxGeometry(3.9, 9.9, 1.5), dark); ic.position.set(-8, cy + 1, zb - 0.75); g.add(sub(ic, 'pir:biss'));
+    for (let i = 0; i < 8; i++) for (const sx of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.4, 0.25), M.tin); l.position.set(-8 + sx * 2.45, cy + 1 - 4.45 + i * 1.27, zb - 0.15); g.add(sub(l, 'pir:biss')); }
     const potBase = new THREE.MeshStandardMaterial({ color: 0xf0efe8, roughness: 0.6 }), potTop = new THREE.MeshStandardMaterial({ color: 0xe0782a, roughness: 0.45 });
-    for (const x of [-4, 5]) {                        // time delay (left) and sensitivity (right) seen from the component side
-      const b = new THREE.Mesh(new THREE.BoxGeometry(6.6, 6.6, 3.2), potBase); b.position.set(x, cy + Hh / 2 - 4.5, zb - 1.6); g.add(b);
-      const t = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 1.2, 24), potTop); t.rotation.x = Math.PI / 2; t.position.set(x, cy + Hh / 2 - 4.5, zb - 3.6); g.add(t);
-      const slot = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.3), dark); slot.position.set(x, cy + Hh / 2 - 4.5, zb - 4.25); g.add(slot);
+    // seen from the component side (looking +z, so +x is on the left): time delay left, sensitivity right (Handson photo)
+    for (const x of [-4, 5]) {
+      const pid = x > 0 ? 'pir:delay' : 'pir:sens';
+      const b = new THREE.Mesh(new THREE.BoxGeometry(6.6, 6.6, 3.2), potBase); b.position.set(x, cy + Hh / 2 - 4.5, zb - 1.6); g.add(sub(b, pid));
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 1.2, 24), potTop); t.rotation.x = Math.PI / 2; t.position.set(x, cy + Hh / 2 - 4.5, zb - 3.6); g.add(sub(t, pid));
+      const slot = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.3), dark); slot.position.set(x, cy + Hh / 2 - 4.5, zb - 4.25); g.add(sub(slot, pid));
     }
-    const jp = new THREE.Mesh(new THREE.BoxGeometry(2.5, 7.6, 2.5), M.blackPlastic); jp.position.set(-13.2, cy + 5, zb - 1.25); g.add(jp);
-    const jcap = new THREE.Mesh(new THREE.BoxGeometry(2.6, 5.0, 3.6), new THREE.MeshStandardMaterial({ color: 0xf2c418, roughness: 0.5 })); jcap.position.set(-13.2, cy + 6.3, zb - 3.5); g.add(jcap);
-    const ldo = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.5, 1.5), dark); ldo.position.set(10, cy - 4, zb - 0.75); g.add(ldo);
+    const jp = new THREE.Mesh(new THREE.BoxGeometry(2.5, 7.6, 2.5), M.blackPlastic); jp.position.set(-13.2, cy + 5, zb - 1.25); g.add(sub(jp, 'pir:jumper'));
+    const jcap = new THREE.Mesh(new THREE.BoxGeometry(2.6, 5.0, 3.6), new THREE.MeshStandardMaterial({ color: 0xf2c418, roughness: 0.5 })); jcap.position.set(-13.2, cy + 6.3, zb - 3.5); g.add(sub(jcap, 'pir:jumper'));
+    const ldo = new THREE.Mesh(new THREE.BoxGeometry(4.5, 2.5, 1.5), dark); ldo.position.set(10, cy - 4, zb - 0.75); g.add(sub(ldo, 'pir:ldo'));
     for (let i = 0; i < 9; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.25, 0.5), new THREE.MeshStandardMaterial({ color: i % 3 ? 0x8d7f6a : 0x161616, roughness: 0.6 })); p.position.set(-1 + (i % 3) * 3.2, cy - 1 + Math.floor(i / 3) * 2.6, zb - 0.25); g.add(p); }
 
     // 3-pin header near the bottom edge, pins pointing −z
     this.pinY = cy - Hh / 2 + 2.6;
-    const hdr = new THREE.Mesh(new THREE.BoxGeometry(7.62, 2.5, 2.5), M.blackPlastic); hdr.position.set(0, this.pinY, zb - 1.25); g.add(hdr);
+    const hdr = new THREE.Mesh(new THREE.BoxGeometry(7.62, 2.5, 2.5), M.blackPlastic); hdr.position.set(0, this.pinY, zb - 1.25); g.add(sub(hdr, 'pir:header'));
     this.pinX = { GND: -2.54, OUT: 0, VCC: 2.54 };
-    for (const x of Object.values(this.pinX)) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.64, 9), M.gold); p.position.set(x, this.pinY, zb - 4.5); g.add(p); }
+    for (const [n, x] of Object.entries(this.pinX)) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 9), M.gold); p.position.set(x, this.pinY, zb - 4.5); g.add(sub(p, 'pir:' + n)); }
     this.pinTipZ = zb - 9;
 
     // clear acrylic stand: base plate + two edge clips
     const acr = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transmission: 0.9, thickness: 3, ior: 1.49, transparent: true, opacity: 0.6 });
-    const base = new THREE.Mesh(new RoundedBoxGeometry(46, 3, 34, 2, 0.6), acr); base.position.set(0, 1.5, -4); g.add(base);
-    for (const sx of [-1, 1]) { const clip = new THREE.Mesh(new RoundedBoxGeometry(3, cy + 4, 8, 2, 0.6), acr); clip.position.set(sx * (W / 2 + 1.2), (cy + 4) / 2, 0); g.add(clip); }
+    const base = new THREE.Mesh(new RoundedBoxGeometry(46, 3, 34, 2, 0.6), acr); base.position.set(0, 1.5, -4); g.add(sub(base, 'pir:stand'));
+    for (const sx of [-1, 1]) { const clip = new THREE.Mesh(new RoundedBoxGeometry(3, cy + 4, 8, 2, 0.6), acr); clip.position.set(sx * (W / 2 + 1.2), (cy + 4) / 2, 0); g.add(sub(clip, 'pir:stand')); }
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const f = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.8, 16), dark); f.position.set(sx * 19, 0.4, -4 + sz * 13); g.add(f); }
     tagHW(g, 'pir');
+    for (const [o, id] of this._sub) o.userData.hw = id;
   }
   /** world position of a header pin tip and the direction the pin points (out of the module) */
   pin(name) {
@@ -606,58 +614,41 @@ export class FemaleJumper {
   }
 }
 
-// ---------------------------------------------------------------- person (shown as a life-size wooden artist's mannequin)
-export class Mannequin {
+// ---------------------------------------------------------------- a hand (the warm object the PIR senses)
+// Adult hand at true size: palm ≈ 85 × 100 mm, fingers 60–80 mm. Palm faces −z (toward the sensor), fingers up.
+export class HandModel {
   constructor() {
     const g = this.group = new THREE.Group();
-    const grain = canvasTex(256, 256, (c, w, h) => {
-      c.fillStyle = '#d6ab72'; c.fillRect(0, 0, w, h);
-      for (let i = 0; i < 70; i++) { c.strokeStyle = `rgba(${120 + Math.random() * 40},${80 + Math.random() * 30},40,${0.12 + Math.random() * 0.15})`; c.lineWidth = 1 + Math.random() * 2; c.beginPath(); const y = Math.random() * h; c.moveTo(0, y); c.bezierCurveTo(w * 0.3, y + (Math.random() - 0.5) * 30, w * 0.7, y + (Math.random() - 0.5) * 30, w, y + (Math.random() - 0.5) * 10); c.stroke(); }
+    const skinTex = canvasTex(256, 256, (c, w, h) => {
+      c.fillStyle = '#d9a184'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 2500; i++) { c.fillStyle = `rgba(${150 + Math.random() * 60},${90 + Math.random() * 40},${70 + Math.random() * 30},0.12)`; c.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
     });
-    grain.wrapS = grain.wrapT = THREE.RepeatWrapping;
-    const wood = new THREE.MeshPhysicalMaterial({ map: grain, roughness: 0.42, clearcoat: 0.45, clearcoatRoughness: 0.35 });
-    const joint = new THREE.MeshPhysicalMaterial({ color: 0xa9784a, roughness: 0.4, clearcoat: 0.4 });
-    const seg = (len, r0, r1) => { const m = new THREE.Mesh(new THREE.CapsuleGeometry((r0 + r1) / 2, len, 8, 20), wood); m.position.y = -len / 2 - (r0 + r1) / 2; m.castShadow = true; return m; };
-    const ball = r => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), joint); m.castShadow = true; return m; };
-    const hips = this.hips = new THREE.Group(); hips.position.y = 930; g.add(hips);
-    const pelvis = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), wood); pelvis.scale.set(170, 110, 105); hips.add(pelvis);
-    const chest = new THREE.Group(); chest.position.y = 110; hips.add(chest);
-    const waist = ball(62); waist.position.y = 20; chest.add(waist);
-    const torso = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), wood); torso.scale.set(185, 230, 115); torso.position.y = 250; chest.add(torso);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(42, 50, 90, 16), wood); neck.position.y = 500; chest.add(neck);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 20), wood); head.scale.set(92, 120, 102); head.position.y = 640; chest.add(head);
-    this.limbs = {};
-    const leg = side => {
-      const hip = new THREE.Group(); hip.position.set(side * 95, -60, 0); hips.add(hip);
-      hip.add(ball(68)); const thigh = seg(330, 70, 55); hip.add(thigh);
-      const knee = new THREE.Group(); knee.position.y = -455; hip.add(knee); knee.add(ball(52)); knee.add(seg(330, 52, 40));
-      const ankle = new THREE.Group(); ankle.position.y = -420; knee.add(ankle); ankle.add(ball(38));
-      const foot = new THREE.Mesh(new THREE.CapsuleGeometry(40, 150, 6, 12), wood); foot.rotation.x = Math.PI / 2; foot.position.set(0, -42, 60); ankle.add(foot);
-      return { hip, knee };
+    const skin = new THREE.MeshPhysicalMaterial({ map: skinTex, roughness: 0.55, sheen: 0.6, sheenColor: new THREE.Color(0xffc2a8), sheenRoughness: 0.5, clearcoat: 0.08 });
+    const nail = new THREE.MeshPhysicalMaterial({ color: 0xf0c4b4, roughness: 0.25, clearcoat: 0.6 });
+    const wrist = this.wrist = new THREE.Group(); g.add(wrist);
+    const palm = new THREE.Mesh(new RoundedBoxGeometry(84, 96, 28, 6, 12), skin); palm.position.y = 48; wrist.add(palm);
+    const finger = (x, len, r, tilt) => {
+      const f = new THREE.Group(); f.position.set(x, 96, 0); f.rotation.z = tilt; wrist.add(f);
+      const a = new THREE.Mesh(new THREE.CapsuleGeometry(r, len * 0.52, 6, 14), skin); a.position.y = len * 0.3; f.add(a);
+      const b = new THREE.Mesh(new THREE.CapsuleGeometry(r * 0.92, len * 0.38, 6, 14), skin); b.position.set(0, len * 0.72, -2); b.rotation.x = 0.12; f.add(b);
+      const n = new THREE.Mesh(new THREE.SphereGeometry(r * 0.7, 12, 8), nail); n.scale.set(1, 1.3, 0.35); n.position.set(0, len * 0.86, r * 0.65); f.add(n);
+      return f;
     };
-    const arm = side => {
-      const sh = new THREE.Group(); sh.position.set(side * 205, 480, 0); chest.add(sh);
-      sh.add(ball(58)); sh.add(seg(250, 48, 40));
-      const el = new THREE.Group(); el.position.y = -345; sh.add(el); el.add(ball(40)); el.add(seg(230, 38, 30));
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), wood); hand.scale.set(38, 75, 22); hand.position.y = -345; el.add(hand);
-      sh.rotation.z = side * 0.08;
-      return { sh, el };
-    };
-    this.limbs.L = leg(1); this.limbs.R = leg(-1); this.limbs.aL = arm(1); this.limbs.aR = arm(-1);
-    const shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ map: canvasTex(128, 128, (c, w, h) => { const r = c.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w / 2); r.addColorStop(0, 'rgba(0,0,0,0.55)'); r.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = r; c.fillRect(0, 0, w, h); }, { srgb: false }), transparent: true, depthWrite: false }));
-    shadow.rotation.x = -Math.PI / 2; shadow.scale.set(330, 260, 1); shadow.position.y = 1; shadow.raycast = () => {}; g.add(shadow);
-    this.phase = 0;
-    tagHW(g, 'person');
+    this.fingers = [finger(-30, 64, 8.2, 0.06), finger(-10, 76, 8.8, 0.0), finger(10, 72, 8.6, -0.03), finger(29, 58, 7.6, -0.08)];
+    const thumb = new THREE.Group(); thumb.position.set(40, 30, 4); thumb.rotation.z = -0.75; wrist.add(thumb);
+    const t1 = new THREE.Mesh(new THREE.CapsuleGeometry(10.5, 32, 6, 14), skin); t1.position.y = 22; thumb.add(t1);
+    const t2 = new THREE.Mesh(new THREE.CapsuleGeometry(9.5, 22, 6, 14), skin); t2.position.y = 52; thumb.add(t2);
+    // forearm reaches back toward the person (away from the sensor), nearly level with the desk
+    const arm = new THREE.Group(); arm.rotation.x = 1.3; wrist.add(arm);
+    const fore = new THREE.Mesh(new THREE.CapsuleGeometry(30, 200, 8, 20), skin); fore.scale.set(1.25, 1, 0.85); fore.position.set(0, -125, 0); arm.add(fore);
+    const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(46, 50, 140, 32), new THREE.MeshStandardMaterial({ color: 0x2f4f7a, roughness: 0.85 }));
+    sleeve.position.set(0, -290, 0); arm.add(sleeve);
+    g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    tagHW(g, 'hand');
   }
-  /** walking pose; speed 0 = standing */
-  pose(phase, walking) {
-    const s = walking ? Math.sin(phase) : 0, c = walking ? Math.cos(phase) : 0;
-    this.limbs.L.hip.rotation.x = 0.45 * s; this.limbs.R.hip.rotation.x = -0.45 * s;
-    this.limbs.L.knee.rotation.x = walking ? Math.max(0, -0.9 * c) * 0.8 + 0.05 : 0.02;
-    this.limbs.R.knee.rotation.x = walking ? Math.max(0, 0.9 * c) * 0.8 + 0.05 : 0.02;
-    this.limbs.aL.sh.rotation.x = -0.4 * s; this.limbs.aR.sh.rotation.x = 0.4 * s;
-    this.limbs.aL.el.rotation.x = -0.25 - 0.15 * Math.abs(s); this.limbs.aR.el.rotation.x = -0.25 - 0.15 * Math.abs(s);
-    this.hips.position.y = 930 + (walking ? 18 * Math.abs(c) : 0);
+  pose(phase, moving) {
+    this.wrist.rotation.z = moving ? 0.12 * Math.sin(phase) : 0;
+    this.fingers.forEach((f, i) => { f.rotation.x = moving ? 0.05 * Math.sin(phase + i) : 0; });
   }
 }
 
@@ -766,11 +757,57 @@ export const HW_INFO = {
     warn: 'Keep lamps, heaters and moving air away from the lens — they cause false triggers (datasheet).',
     src: 'HC-SR501 datasheet · Handson HC-SR501 user guide',
   },
-  person: {
-    name: 'Person (life-size mannequin)', tag: 'Simulated · 1.75 m',
-    summary: 'Stands in for a person walking through the room. Its body heat is what the PIR senses.',
+  'pir:lens': {
+    name: 'Fresnel lens (white dome)', tag: 'HC-SR501 · Ø 23 mm',
+    summary: 'Splits the view into many zones and focuses their infrared light onto the sensor under the dome.',
+    points: ['Under it sits the pyroelectric sensor (datasheet: LHI778) with two sensing elements side by side.', 'A moving warm body crosses the zones → the two elements see it at different times → motion.'],
+    src: 'HC-SR501 datasheet · Handson user guide',
+  },
+  'pir:biss': {
+    name: 'BISS0001 signal-processing chip', tag: 'HC-SR501',
+    summary: 'Amplifies the tiny signal from the sensor and turns it into a clean output pulse, with the delay and blocking times.',
+    src: 'Handson HC-SR501 user guide (“LHI778 sensor and BISS0001 IC”)',
+  },
+  'pir:delay': {
+    name: 'Time-delay pot', tag: 'How long OUT stays HIGH',
+    summary: 'Sets how long OUT stays HIGH after motion is detected.',
+    points: ['Clockwise → longer (about 300 s). Counter-clockwise → shorter (about 5 s).'],
+    src: 'HC-SR501 datasheet (Adjustment)',
+  },
+  'pir:sens': {
+    name: 'Sensitivity pot', tag: 'Detection range',
+    summary: 'Sets how far away motion is detected.',
+    points: ['Clockwise → farther (about 7 m). Counter-clockwise → closer (about 3 m).'],
+    src: 'HC-SR501 datasheet (Adjustment)',
+  },
+  'pir:jumper': {
+    name: 'Trigger-mode jumper', tag: 'H = repeat · L = single',
+    summary: 'H (repeatable): every new motion restarts the delay, so OUT stays HIGH while someone keeps moving. L (single): OUT goes LOW when the delay ends, even if they still move.',
+    src: 'HC-SR501 datasheet',
+  },
+  'pir:ldo': {
+    name: '3.3 V regulator', tag: '“7133-1” in the schematic',
+    summary: 'Turns the 5 V supply into the 3.3 V the module runs on — that is why OUT is a 3.3 V signal.',
+    src: 'HC-SR501 datasheet (schematic)',
+  },
+  'pir:header': {
+    name: '3-pin header', tag: 'VCC · OUT · GND',
+    summary: 'Seen from the component side with the pins at the bottom: VCC (left), OUT (middle), GND (right). Click a single pin for details.',
+    src: 'Handson HC-SR501 user guide (pin-out photo)',
+  },
+  'pir:VCC': { name: 'VCC pin', tag: 'Power in · 5–20 V', summary: 'Supply input. On the UNO Q connect it to the 5V pin — 3.3 V is below the minimum.', src: 'HC-SR501 datasheet' },
+  'pir:OUT': { name: 'OUT pin', tag: 'Signal · 3.3 V / 0 V', summary: '3.3 V while motion is detected, 0 V otherwise. Safe on any UNO Q digital pin; here it goes to D2.', src: 'HC-SR501 datasheet' },
+  'pir:GND': { name: 'GND pin', tag: 'Ground', summary: 'Connect to a GND pin of the UNO Q.', src: 'HC-SR501 datasheet' },
+  'pir:stand': { name: 'Acrylic stand', tag: 'Not part of the module', summary: 'Just holds the sensor upright so the lens faces the area you want to watch.', src: '—' },
+  hand: {
+    name: 'A hand (warm object)', tag: 'Simulated',
+    summary: 'Your hand gives off infrared heat. Waving it across in front of the lens is the easiest way to test a PIR.',
     src: 'Simulation',
   },
+  'us:T': { name: 'Transmitter “T”', tag: 'HC-SR04 · sends sound', summary: 'Sends a burst of 8 pulses of 40 kHz ultrasound when TRIG gets a 10 µs pulse.', src: 'HC-SR04 datasheet' },
+  'us:R': { name: 'Receiver “R”', tag: 'HC-SR04 · hears the echo', summary: 'Listens for the echo. ECHO stays HIGH until the echo arrives.', src: 'HC-SR04 datasheet' },
+  'us:xtal': { name: 'Crystal Y1', tag: 'HC-SR04', summary: 'A quartz crystal: gives the module’s circuit a stable timing reference.', src: 'HC-SR04 datasheet photo' },
+  'us:pins': { name: '4-pin header', tag: 'VCC · Trig · Echo · GND', summary: 'VCC to 5V, Trig to D7, Echo to D8 (5 V-tolerant), GND to GND.', src: 'HC-SR04 datasheet · UNO Q datasheet' },
   obstacle: {
     name: 'Obstacle', tag: 'Drag it closer or farther',
     summary: 'A flat object in front of the sensor. Drag it in the 3D view or use the slider; the label shows the real distance.',

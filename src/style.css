@@ -381,3 +381,5 @@ code { background: #0d1217; border: 1px solid #253040; border-radius: 5px; paddi
 
 #pir-timeline { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #1e3a33; margin-top: 4px; }
 #pir-state .hi { color: #ffd34d; }
+
+.part-label.tag3d { border-color: #ffd34d; background: rgba(9,13,18,.92); color: #fff; font-size: 12.5px; padding: 4px 9px; }

@@ -1180,10 +1180,13 @@ export const LESSONS = [
     },
     steps: [
       {
-        title: 'What you need', view: 'bench', have: LED_IDS,
-        body: `<ul><li>an <b>HC-SR501</b> PIR motion sensor (green board with a white dome)</li>
-        <li><b>3 female–male jumpers</b>: red (VCC), yellow (OUT), black (GND)</li><li>the LED on D5 from Lesson 4, as an alarm light</li></ul>
-        <p>The HC-SR501 cannot be pushed into a breadboard — its two adjustment pots stick out under the board — so it is connected with <b>female</b> jumper ends on its pins and stands on a small stand facing the room.</p>`,
+        title: 'What we build: a motion alarm', view: 'bench', have: LED_IDS, labels: [['led1', 'Alarm LED (on D5)'], ['board', 'UNO Q']],
+        body: `<p>When something warm (a hand, a person) moves in front of the sensor, an <b>alarm LED</b> lights up.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">PIR sensor sees motion</span></div><div class="pt-arrow">↓ OUT = 3.3 V on <b>D2</b></div>
+        <div class="pt-row"><span class="pt">UNO Q sketch reads D2</span></div><div class="pt-arrow">↓ writes <b>D5</b> HIGH</div>
+        <div class="pt-row"><span class="pt bus">alarm LED turns on</span></div></div>
+        <p>The <b>LED on the breadboard</b> is the same LED + 220 Ω resistor from Lesson 4 — we reuse it as the alarm light.</p>
+        <p>New parts: an <b>HC-SR501</b> PIR sensor and <b>3 female–male jumper wires</b>.</p>`,
       },
       {
         title: 'How a PIR sensor works', view: 'bench',
@@ -1215,8 +1218,8 @@ export const LESSONS = [
         <p class="tip">Compare with the HC-SR04: its ECHO is 5 V and needs a 5 V-tolerant pin. The PIR’s 3.3 V output has no such limit.</p>`,
       },
       {
-        title: 'Step 1 — set up the sensor', view: 'bench', power: false, have: [...LED_IDS, 'pir1'],
-        body: `<p>Stand the PIR next to the breadboard with the <b>dome facing the room</b>.</p>
+        title: 'Step 1 — set up the sensor', view: 'bench', power: false, have: [...LED_IDS, 'pir1'], labels: [['pir1', 'HC-SR501 PIR sensor'], ['led1', 'Alarm LED (on D5)']],
+        body: `<p>Stand the PIR next to the breadboard with the <b>dome facing out</b>. It is not pushed into the breadboard — its pots stick out underneath — so it stands on a small stand and gets <b>female</b> jumper ends on its pins.</p>
         <p>Pin order (datasheet photo, component side facing you, pins at the bottom): <b>VCC · OUT · GND</b>. From the dome side it is mirrored: GND · OUT · VCC.</p>`,
       },
       {
@@ -1224,14 +1227,25 @@ export const LESSONS = [
         body: `<ul><li>Red: PIR <b>VCC</b> → UNO Q <b>5V</b></li><li>Yellow: PIR <b>OUT</b> → <b>D2</b></li><li>Black: PIR <b>GND</b> → <b>GND</b></li></ul>
         <p>The female ends slide onto the PIR pins; the male ends go into the UNO Q headers.</p>`,
       },
+      {
+        title: 'Get to know the module (front)', view: 'pirfront',
+        body: `<p><b>Click each part</b> of the sensor to see what it does.</p>
+        <ul><li><b>White dome</b> = Fresnel lens. Under it is the infrared sensor with two elements.</li><li>The <b>clear stand</b> only holds it upright.</li></ul>`,
+      },
+      {
+        title: 'Get to know the module (back)', view: 'pirback',
+        body: `<p>Turn it around. <b>Click each part:</b></p>
+        <ul><li>Two orange <b>pots</b>: <b>time delay</b> (left) and <b>sensitivity</b> (right)</li><li>Yellow <b>trigger jumper</b> (H / L)</li>
+        <li>The black chip: <b>BISS0001</b> signal processor</li><li>A small <b>3.3 V regulator</b></li><li>The 3 <b>pins</b>: VCC · OUT · GND</li></ul>`,
+      },
       { title: 'The code', view: 'bench', showCode: true, body: `<p>Wait for start-up, then copy the PIR output to the LED and print a message whenever it changes.</p>` },
       {
-        title: 'Run it: walk past the sensor', view: 'room', showCode: true, power: true, action: 'run',
-        body: `<p>A person walks <b>across</b> the room in front of the sensor. The floor shows the detection area (range × angle).</p>
-        <ul><li>First the sensor warms up — the sketch waits.</li><li>When the person moves inside the area, OUT goes <b>HIGH</b> → LED on → “Motion detected!”.</li>
-        <li>When the time delay runs out, OUT goes LOW → “Motion ended”.</li></ul>
-        <p>Try <b>Walk toward</b> and <b>Stand still</b>: the sensor hardly reacts — exactly as the datasheet describes.</p>
-        <p class="sim">Simulated: the 1-minute start-up is shortened to 6 s (also the sketch’s <code>delay(60000)</code>). The person is a life-size mannequin; detection is modelled from the datasheet (range, angle, sideways motion only).</p>`,
+        title: 'Run it: wave your hand', view: 'room', showCode: true, power: true, action: 'run', labels: [['pir1', 'PIR sensor'], ['led1', 'Alarm LED (D5)']],
+        body: `<p>A hand waves <b>across</b> in front of the sensor. The light-blue fan on the desk is the area the lens watches (it really continues to 3–7 m).</p>
+        <ol><li>First the sensor warms up — the sketch waits.</li><li>Hand moves inside the fan → OUT <b>HIGH</b> → <b>alarm LED on</b> → “Motion detected!”.</li>
+        <li>Delay time over → OUT LOW → LED off → “Motion ended”.</li></ol>
+        <p>Try <b>Move toward</b> and <b>Hold still</b>: the sensor hardly reacts — exactly as the datasheet describes.</p>
+        <p class="sim">Simulated: the 1-minute start-up is shortened to 6 s (also the sketch’s <code>delay(60000)</code>). Detection is modelled from the datasheet (field of view, sideways motion only).</p>`,
       },
       {
         title: 'Experiment: delay and trigger jumper', view: 'room', showCode: true, power: true,
@@ -1239,7 +1253,7 @@ export const LESSONS = [
         <li><b>Jumper H (repeatable)</b>: while the person keeps moving, every new detection restarts the delay, so OUT stays HIGH until they leave.</li>
         <li><b>Jumper L (single)</b>: OUT goes LOW when the delay ends even if they are still moving; after the blocking time it can trigger again.</li>
         <li><b>Sensitivity</b>: shrinks or grows the detection range (≈ 3–7 m).</li></ul>
-        <p>Watch the <b>timeline</b>: blue = motion seen, yellow = OUT.</p>`,
+        <p>Watch the <b>timeline</b> below: blue = motion seen, yellow = OUT.</p>`,
       },
       {
         title: 'Good to know', view: 'bench',
