@@ -1,3 +1,5 @@
+import { injectSpeedInsights } from '@vercel/speed-insights';
+injectSpeedInsights();
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Viewer } from './viewer.js';
