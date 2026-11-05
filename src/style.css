@@ -372,3 +372,9 @@ code { background: #0d1217; border: 1px solid #253040; border-radius: 5px; paddi
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+#sonar-timing { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid #1e3a33; }
+
+/* the callout never blocks clicks on the 3D board; only its close button is clickable */
+.callout-box { pointer-events: none; }
+.callout-box .callout-close { pointer-events: auto; }

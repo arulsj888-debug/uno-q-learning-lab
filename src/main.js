@@ -24,7 +24,7 @@ const VIEWS = {
   bottom: { t: new THREE.Vector3(0, -1, 0), d: new THREE.Vector3(0, -1, -0.02), dist: 132 },
   bench: { t: new THREE.Vector3(0, 0, 30), d: new THREE.Vector3(-0.28, 0.82, 0.5), dist: 235 },
   breadboard: { t: new THREE.Vector3(4, 2.4, 60), d: new THREE.Vector3(-0.1, 0.86, 0.5), dist: 115 },
-  sonar: { t: new THREE.Vector3(-8, 0, 120), d: new THREE.Vector3(-0.55, 0.62, 0.56), dist: 250 },
+  sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
 };
 const BOTTOM_PARTS = new Set(['mcu', 'emmc', 'jmisc', 'jmedia']);
 const shortName = n => n.replace(/^(Qualcomm Dragonwing™|STMicroelectronics|Qualcomm) /, '');
@@ -83,6 +83,21 @@ class App {
     // obstacle + 15° beam cone in front of the HC-SR04 (Lesson 13)
     this.obstacle = new THREE.Mesh(new THREE.BoxGeometry(70, 50, 8), new THREE.MeshStandardMaterial({ color: 0xc9b38a, roughness: 0.8 }));
     this.obstacle.visible = false; this.obstacle.castShadow = true; this.obstacle.receiveShadow = true; s.add(this.obstacle);
+    this.obstacle.userData.hw = 'obstacle';
+    { const el = document.createElement('div'); el.className = 'part-label pin'; this.obstacleLabel = new CSS2DObject(el); this.obstacleLabel.position.set(0, 32, 0); this.obstacle.add(this.obstacleLabel); }
+    // sound waves: blue = burst leaving T, orange = echo coming back to R (slowed down a lot)
+    this.waves = { out: [], back: [], anim: null };
+    const ringGeo = new THREE.RingGeometry(0.86, 1.0, 64);
+    for (let i = 0; i < 6; i++) {
+      const back = i >= 3;
+      const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: back ? 0xffa53a : 0x4fd6ff, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+      m.visible = false; m.renderOrder = 7; m.raycast = () => {}; s.add(m);
+      (back ? this.waves.back : this.waves.out).push(m);
+    }
+    this.waves.flash = new THREE.Mesh(new THREE.CircleGeometry(7.6, 40), new THREE.MeshBasicMaterial({ color: 0xffa53a, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    this.waves.flash.raycast = () => {}; this.waves.flash.renderOrder = 8; s.add(this.waves.flash);
+    this.waves.tflash = new THREE.Mesh(new THREE.CircleGeometry(7.6, 40), new THREE.MeshBasicMaterial({ color: 0x4fd6ff, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    this.waves.tflash.raycast = () => {}; this.waves.tflash.renderOrder = 8; s.add(this.waves.tflash);
     this.beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 40, 1, true), new THREE.MeshBasicMaterial({ color: 0x35d0ff, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }));
     this.beam.visible = false; this.beam.raycast = () => {}; s.add(this.beam);
     const mk = (x0, z0, z1, color) => {
@@ -107,6 +122,7 @@ class App {
     const t = [this.board.group];
     if (this.cable.visible) t.push(this.cable);
     if (this.bb.group.visible) t.push(this.bb.group, ...this.bench.pickables());
+    if (this.obstacle && this.obstacle.visible) t.push(this.obstacle);
     this.viewer.pickTargets = t;
   }
 
@@ -197,6 +213,7 @@ class App {
     if (this.pulseObjs) this.viewer.outline.edgeStrength = 2.5 + 4 * (0.5 + 0.5 * Math.sin(performance.now() / 260));
     const bz = this.toneState && this.bench.get(this.toneState.item);
     if (bz) bz.vibrate(true);
+    this.updateWaves();
     this.updateCallout();
   }
 
@@ -247,17 +264,20 @@ class App {
       this.setOutline([]);
       this.hoverMarker.visible = true; this.hoverMarker.position.copy(p.pos).add(new THREE.Vector3(0, 0.2, 0));
       if (fly) this.focus(id);
-      if (card) this.showCard(this.pinCard(pinId));
-      if (this.mode === 'explore') this.showCallout(id);
+      if (card && this.mode === 'explore') this.showCard(this.pinCard(pinId));
+      this.showCallout(id);
     } else if (HW_INFO[id]) {
-      this.hideCallout();
-      if (card) this.showCard(this.infoCard(HW_INFO[id]));
+      if (this.mode === 'lessons') {
+        const obj = this.lastHitObject(id);
+        if (obj && fly) { const b = new THREE.Box3().setFromObject(obj), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3()); this.viewer.flyTo(c, THREE.MathUtils.clamp(Math.max(sz.x, sz.y, sz.z) * 3.2, 45, 200), new THREE.Vector3(-0.32, 0.8, 0.52), 1000); }
+        this.showCallout(id);
+      } else { this.hideCallout(); if (card) this.showCard(this.infoCard(HW_INFO[id])); }
     } else {
       this.hoverMarker.visible = false;
       this.setOutline(this.groupsFor(id));
       if (fly) this.focus(id);
-      if (card && PARTS[id]) this.showCard(this.infoCard(PARTS[id], id));
-      if (this.mode === 'explore') this.showCallout(id);
+      if (card && PARTS[id] && this.mode === 'explore') this.showCard(this.infoCard(PARTS[id], id));
+      this.showCallout(id);
     }
     document.querySelectorAll('#side .item').forEach(b => b.classList.toggle('on', b.dataset.id === id));
   }
@@ -291,8 +311,17 @@ class App {
   }
 
   // ------------------------------------------------------------------ 3D Callout Annotation
+  lastHitObject(id) {
+    let o = this.lastHit && this.lastHit.id === id ? this.lastHit.object : null;
+    while (o && o.parent && o.parent.userData && o.parent.userData.hw === id) o = o.parent;
+    return o;
+  }
+  restoreStepView() {
+    const L = this.lesson, S = L && L.steps[this.stepIdx]; if (!S) return;
+    if (S.view) this.view(S.view); else if (S.focus) this.focus(S.focus, S.side);
+  }
   showCallout(id) {
-    if (!id || this.mode !== 'explore') {
+    if (!id) {
       this.hideCallout();
       return;
     }
@@ -331,10 +360,21 @@ class App {
         line1 = parts[0] ? (parts[0].endsWith('.') ? parts[0] : parts[0] + '.') : part.name;
         line2 = parts[1] ? (parts[1].endsWith('.') ? parts[1] : parts[1] + '.') : 'Inspect specs on the right panel.';
       }
+    } else if (HW_INFO[id]) {
+      const info = HW_INFO[id], obj = this.lastHitObject(id);
+      if (!obj) { this.hideCallout(); return; }
+      const b = new THREE.Box3().setFromObject(obj);
+      pos = b.getCenter(new THREE.Vector3()); pos.y = b.max.y + 0.5;
+      title = info.name; tag = info.tag || ''; ref = '';
+      const parts = info.summary ? info.summary.split('. ') : [];
+      line1 = parts[0] ? (parts[0].endsWith('.') ? parts[0] : parts[0] + '.') : info.name;
+      line2 = info.warn ? '⚠ ' + info.warn : (info.points && info.points[0]) || (parts[1] || '');
     } else {
       this.hideCallout();
       return;
     }
+    const hint = document.querySelector('.callout-hint');
+    if (hint) hint.textContent = this.mode === 'lessons' ? 'Quick info · × returns to the lesson view' : 'Quick summary · Full details on right';
 
     const tEl = $('#callout-title'); if (tEl) tEl.textContent = title;
     const rEl = $('#callout-ref'); if (rEl) { rEl.textContent = ref; rEl.style.display = ref ? 'inline' : 'none'; }
@@ -352,7 +392,7 @@ class App {
   }
 
   updateCallout() {
-    if (!this.calloutTarget || this.mode !== 'explore' || !this.calloutOverlay) {
+    if (!this.calloutTarget || !this.calloutOverlay) {
       if (this.calloutOverlay && this.calloutOverlay.style.display !== 'none') {
         this.calloutOverlay.style.display = 'none';
       }
@@ -559,7 +599,7 @@ class App {
     if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on D4</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
     if (w.includes('light')) h += `<div class="io-block"><div class="io-title">Light on the sensor <span class="io-note">(simulated)</span></div><input id="lux" type="range" min="0" max="1000" value="${Math.round(this.luxToSlider(this.lux))}"><div class="io-tools">${[['Dark', 0.01], ['Dim', 10], ['Room light', 300], ['Torch', 2000]].map(([t, v]) => `<button class="lvl" data-lux="${v}">${t}</button>`).join('')}</div><div id="lux-val" class="io-val"></div></div>`;
     if (w.includes('temp')) h += `<div class="io-block"><div class="io-title">Temperature around the TMP36 <span class="io-note">(simulated)</span></div><input id="tempc" type="range" min="-40" max="125" step="0.5" value="${this.tempC}"><div id="temp-val" class="io-val"></div></div>`;
-    if (w.includes('distance')) h += `<div class="io-block"><div class="io-title">Obstacle in front of the sensor <span class="io-note">(simulated)</span></div><input id="dist" type="range" min="2" max="400" step="0.5" value="${this.distCm}"><div class="io-tools">${[5, 20, 40, 100, 250, 400].map(v => `<button class="lvl" data-dist="${v}">${v} cm</button>`).join('')}</div><div id="dist-val" class="io-val"></div></div>`;
+    if (w.includes('distance')) h += `<div class="io-block"><div class="io-title">Obstacle in front of the sensor <span class="io-note">(simulated)</span></div><input id="dist" type="range" min="2" max="400" step="0.5" value="${this.distCm}"><div class="io-tools">${[5, 20, 40, 100, 250, 400].map(v => `<button class="lvl" data-dist="${v}">${v} cm</button>`).join('')}</div><div id="dist-val" class="io-val"></div><div class="io-note">or drag the obstacle in the 3D view</div></div><div class="io-block"><div class="io-title">Timing (HC-SR04 datasheet) · animation slowed down</div><canvas id="sonar-timing" width="560" height="112"></canvas></div>`;
     if (w.includes('knob')) h += `<div class="io-block"><div class="io-title">Potentiometer knob</div><input id="knob" type="range" min="0" max="1000" value="${Math.round(this.knobValue() * 1000)}"><div id="knob-val" class="io-val"></div><div class="io-note">or drag the knob in the 3D view</div></div>`;
     if (w.includes('pwm')) h += `<div class="io-block"><div class="io-title">analogWrite(D5, <b id="pwm-v">128</b>)</div><input id="pwm" type="range" min="0" max="255" value="128"></div>`;
     if (w.includes('scope')) h += `<div class="io-block"><div class="io-title">Oscilloscope · ${L.scopePin || 'D5'} <span class="io-note">(simulated)</span></div><canvas id="scope" width="560" height="170"></canvas><div id="scope-info" class="io-val"></div></div>`;
@@ -574,7 +614,8 @@ class App {
     if ($('#knob')) { $('#knob').oninput = e => this.setKnob(+e.target.value / 1000); this.setKnob(this.knobValue()); }
     if ($('#lux')) { $('#lux').oninput = e => this.setLux(this.sliderToLux(+e.target.value)); document.querySelectorAll('[data-lux]').forEach(b => b.onclick = () => this.setLux(+b.dataset.lux)); this.setLux(this.lux); }
     if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist)); this.setDist(this.distCm); }
-    else { this.obstacle.visible = false; this.beam.visible = false; }
+    else { this.obstacle.visible = false; this.beam.visible = false; this.waves.anim = null; }
+    this.refreshPickTargets();
     if ($('#tempc')) { $('#tempc').oninput = e => this.setTemp(+e.target.value); this.setTemp(this.tempC); }
     this.lamp.intensity = w.includes('light') ? this.lampIntensity() : 0;
     if ($('#pwm')) $('#pwm').oninput = e => this.applyManualPwm(+e.target.value);
@@ -602,7 +643,7 @@ class App {
     const prev = this.stepIdx;
     this.stepIdx = i; this.inQuiz = false;
     const S = L.steps[i];
-    this.clearTemp(); this.hideFloat();
+    this.clearTemp(); this.hideFloat(); this.hideCallout();
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
     this.strips.visible = false;
     if (S.action !== 'speedSlider') $('#slider-wrap').classList.remove('on');
@@ -640,6 +681,7 @@ class App {
       const animate = i > 0 && i === prev + 1 && S.have ? S.have.filter(id => !before.includes(id) && !this.bench.items[id]) : [];
       await this.bench.build(st.have, animate, alive);
       this.refreshPickTargets();
+      if ($('#dist')) this.setDist(this.distCm);
       if (!alive()) return;
       if (S.holes) this.holeLabels(S.holes);
       if (S.trace) { const objs = this.bench.groups(S.trace); this.setOutline(objs); this.pulseObjs = objs; }
@@ -794,20 +836,86 @@ class App {
   // ---- HC-SR04 model: datasheet µs = cm × 58; UNO Q pulseIn() resolves 100 µs (Zephyr tick, see Lesson 13)
   echoUs() { return this.distCm * 58; }
   pulseInUs() { return Math.floor(this.echoUs() / 100) * 100; }
+  // the 3D distance is compressed (log scale) so 2 cm … 4 m fits next to the breadboard
+  visMm(cm) { return 25 + 235 * Math.log(cm / 2) / Math.log(200); }
+  cmFromVis(mm) { return 2 * Math.exp((mm - 25) / 235 * Math.log(200)); }
+  sonarGeom() {
+    const us = this.bench.get('us1'); if (!us) return null;
+    const g = this.bench.items.us1.group.position;
+    const y = g.y + us.beamY, face = g.z + us.beamZ;
+    return { us, g, y, face, T: new THREE.Vector3(g.x + us.tx, y, face), R: new THREE.Vector3(g.x + us.rx, y, face) };
+  }
   setDist(cm) {
     this.distCm = Math.min(400, Math.max(2, cm));
     const sl = $('#dist'); if (sl && document.activeElement !== sl) sl.value = this.distCm;
-    const us = this.bench.get('us1');
-    if (us) {
-      const g = this.bench.items.us1.group, face = g.position.z + us.beamZ, y = g.position.y + us.beamY;
-      const shown = Math.min(this.distCm * 10, 150);                         // draw at most 15 cm away
-      this.obstacle.position.set(g.position.x, y + 14, face + shown + 4); this.obstacle.visible = true;
-      const r = Math.tan(7.5 * Math.PI / 180) * shown;                       // 15° full angle
-      this.beam.scale.set(Math.max(r, 0.1), shown, Math.max(r, 0.1)); this.beam.rotation.set(-Math.PI / 2, 0, 0);
-      this.beam.position.set(g.position.x, y, face + shown / 2); this.beam.visible = true;
+    const G = this.sonarGeom();
+    if (G) {
+      const shown = this.visMm(this.distCm);
+      const wasVis = this.obstacle.visible;
+      this.obstacle.position.set(G.g.x, G.y + 14, G.face + shown + 4); this.obstacle.visible = true;
+      if (!wasVis) this.refreshPickTargets();
+      this.obstacleLabel.element.textContent = `${this.distCm.toFixed(1)} cm`;
+      const r = Math.tan(7.5 * Math.PI / 180) * shown + 7.5;            // 15° full angle from the T transducer
+      this.beam.scale.set(r, shown, r); this.beam.rotation.set(-Math.PI / 2, 0, 0);
+      this.beam.position.set(G.T.x, G.y, G.face + shown / 2); this.beam.visible = true;
+      this.beam.material.opacity = 0.07;
     }
     const e = this.echoUs(), q = this.pulseInUs(), el = $('#dist-val');
     if (el) el.innerHTML = `Obstacle <b>${this.distCm.toFixed(1)} cm</b> → ECHO HIGH ≈ <b>${Math.round(e)} µs</b> → pulseIn() on UNO Q ≈ <b>${q} µs</b> → <b>${(q / 58).toFixed(1)} cm</b>`;
+    this.drawTiming(null);
+  }
+  // one measurement: trigger → 8-cycle burst from T → echo back to R (datasheet timing diagram), slowed down
+  sonarBurst() {
+    const G = this.sonarGeom(); if (!G || (this.waves.anim && performance.now() - this.waves.anim.t0 < this.waves.anim.total)) return;
+    const d = this.obstacle.position.z - 4 - G.face, v = 0.42;               // mm per ms (visual speed)
+    const tOut = d / v;
+    this.waves.anim = { t0: performance.now(), G, d, v, tOut, trig: 60, gap: 28, total: 60 + 2 * tOut + 3 * 28 + 260 };
+  }
+  updateWaves() {
+    const W = this.waves, A = W.anim;
+    const hideAll = () => { [...W.out, ...W.back].forEach(m => { m.visible = false; }); W.flash.material.opacity = 0; W.tflash.material.opacity = 0; };
+    if (!A) return hideAll();
+    const t = performance.now() - A.t0;
+    if (t > A.total || !this.obstacle.visible) { W.anim = null; hideAll(); this.drawTiming(null); return; }
+    const { G, v, tOut, trig, gap } = A, spread = Math.tan(7.5 * Math.PI / 180), obsZ = G.face + A.d;
+    W.out.forEach((m, i) => {
+      const ti = t - trig - i * gap;
+      if (ti < 0 || ti > tOut) { m.visible = false; return; }
+      const dz = v * ti, r = 7.2 + spread * dz;
+      m.visible = true; m.position.set(G.T.x, G.y, G.face + dz); m.scale.setScalar(r);
+      m.material.opacity = 0.95 - 0.35 * ti / tOut;
+    });
+    W.back.forEach((m, i) => {
+      const tj = t - trig - tOut - i * gap;
+      if (tj < 0 || tj > tOut) { m.visible = false; return; }
+      const k = tj / tOut, dz = v * tj;
+      // the echo spreads out from the obstacle and reaches the receiver R
+      m.visible = true; m.position.set(G.g.x + (G.R.x - G.g.x) * k, G.y, obsZ - dz); m.scale.setScalar(4 + 14 * k);
+      m.material.opacity = 0.95 - 0.3 * k;
+    });
+    const tSend = t - trig, tHear = t - trig - 2 * tOut;
+    W.tflash.position.set(G.T.x, G.y, G.face + 0.2); W.tflash.material.opacity = tSend >= 0 && tSend < 3 * gap ? 0.55 : 0;
+    W.flash.position.set(G.R.x, G.y, G.face + 0.2); W.flash.material.opacity = tHear >= 0 && tHear < 260 ? 0.65 * (1 - tHear / 260) : 0;
+    this.drawTiming(t);
+  }
+  // datasheet timing diagram, with a cursor that follows the animation
+  drawTiming(t) {
+    const c = $('#sonar-timing'); if (!c) return;
+    const g = c.getContext('2d'), w = c.width, h = c.height, A = this.waves.anim;
+    const tOut = A ? A.tOut : this.visMm(this.distCm) / 0.42, trig = 60, gap = 28;
+    const total = 60 + 2 * tOut + 3 * gap + 260, X = ms => 92 + (w - 102) * ms / total;
+    g.fillStyle = '#070b0e'; g.fillRect(0, 0, w, h);
+    g.font = '12px Consolas, monospace'; g.textBaseline = 'middle';
+    const rows = [['TRIG (D7)', 18, '#ffd34d'], ['Burst from T', 46, '#4fd6ff'], ['ECHO (D8)', 74, '#ffa53a']];
+    for (const [name, y, col] of rows) { g.fillStyle = '#8fa3b5'; g.fillText(name, 6, y); g.strokeStyle = 'rgba(255,255,255,0.08)'; g.beginPath(); g.moveTo(92, y + 8); g.lineTo(w - 10, y + 8); g.stroke(); g.strokeStyle = col; }
+    const step = (y, segs, col) => { g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(92, y + 8); for (const [a, b] of segs) { g.lineTo(X(a), y + 8); g.lineTo(X(a), y - 6); g.lineTo(X(b), y - 6); g.lineTo(X(b), y + 8); } g.lineTo(w - 10, y + 8); g.stroke(); };
+    step(18, [[0, trig]], '#ffd34d');
+    const burst = []; for (let i = 0; i < 8; i++) { const a = trig + i * (3 * gap / 8); burst.push([a, a + 3 * gap / 16]); }
+    step(46, burst, '#4fd6ff');
+    const echoHi = trig + 3 * gap, echoLo = trig + 2 * tOut;
+    step(74, [[echoHi, Math.max(echoHi + 4, echoLo)]], '#ffa53a');
+    g.fillStyle = '#ffd7a8'; g.fillText(`HIGH for ${Math.round(this.echoUs())} µs → ${(this.echoUs() / 58).toFixed(1)} cm`, Math.min(X(echoHi) + 6, w - 230), 101);
+    if (t != null) { g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1; g.beginPath(); g.moveTo(X(Math.min(t, total)), 8); g.lineTo(X(Math.min(t, total)), h - 6); g.stroke(); }
   }
   tmp36Volts() { return Math.min(2.0, Math.max(0.1, 0.5 + this.tempC / 100)); }   // datasheet: 0.5 V at 0 °C, 10 mV/°C
   setTemp(t) {
@@ -835,6 +943,16 @@ class App {
         e.stopPropagation(); this.viewer.controls.enabled = false; this.pressButton(true);
         const up = () => { this.pressButton(false); this.viewer.controls.enabled = true; window.removeEventListener('pointerup', up); };
         window.addEventListener('pointerup', up);
+      } else if (hit.id === 'obstacle') {
+        e.stopPropagation(); this.viewer.controls.enabled = false;
+        const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.obstacle.position.y), p = new THREE.Vector3();
+        const mv = ev => {
+          const G = this.sonarGeom(); if (!G) return;
+          this.viewer.setPointer(ev); this.viewer.raycaster.setFromCamera(this.viewer.pointer, this.viewer.camera);
+          if (this.viewer.raycaster.ray.intersectPlane(plane, p)) this.setDist(this.cmFromVis(Math.max(25, Math.min(260, p.z - 4 - G.face))));
+        };
+        const up = () => { this.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
       } else if (hit.id === 'pot') {
         e.stopPropagation(); this.viewer.controls.enabled = false;
         let x0 = e.clientX, f0 = this.knobValue();
@@ -921,6 +1039,7 @@ class App {
       this.setPinLevel(`LED_BUILTIN (LED3_R): <span class="${level ? 'hi' : 'lo'}">${level ? 'HIGH · 3.3 V' : 'LOW · 0 V'}</span> → <span class="${on ? 'led-on' : 'led-off'}">LED ${on ? 'ON' : 'OFF'}</span>`);
       return;
     }
+    { const us = this.ioFor('D8'); if (pin === 'D7' && level && us && us.kind === 'hcsr04' && this.wired(us) && this.board.powered) this.sonarBurst(); }
     const L = this.ledFor(pin);
     const on = !!(L && L.led && level && this.board.powered && this.wired(L.io));
     if (L && L.led) L.led.set(on);
@@ -989,7 +1108,7 @@ class App {
     this.calloutOuter = $('#callout-dot-outer');
     this.calloutInner = $('#callout-dot-inner');
     const cClose = $('#callout-close');
-    if (cClose) cClose.onclick = () => this.hideCallout();
+    if (cClose) cClose.onclick = () => { this.hideCallout(); if (this.mode === 'lessons') { this.select(null, { card: false }); this.restoreStepView(); } };
 
     document.querySelectorAll('.modes button').forEach(b => b.onclick = () => this.setMode(b.dataset.mode));
     $('#v-home').onclick = () => { this.view('home'); this.select(null); };
@@ -1036,8 +1155,9 @@ class App {
     };
     this.viewer.onPick = hit => {
       if (!hit) { if (this.mode === 'explore') this.select(null); return; }
-      if (this.mode === 'lessons' && (hit.id === 'pushbutton' || hit.id === 'pot')) return;
-      this.select(hit.id, { fly: this.mode === 'explore' });
+      if (this.mode === 'lessons' && (hit.id === 'pushbutton' || hit.id === 'pot' || hit.id === 'obstacle')) return;
+      this.lastHit = hit;
+      this.select(hit.id, { fly: true });
     };
   }
 }

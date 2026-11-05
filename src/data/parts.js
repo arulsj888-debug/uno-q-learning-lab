@@ -91,8 +91,8 @@ export const PARTS = {
     cat: 'memory', name: 'Qualcomm PM4125 PMIC', ref: 'PMIC1', tag: 'Power-management IC',
     summary: 'The power-management chip of the Qualcomm processor. It is powered from the 5 V system bus and creates the 1.8 V rail.',
     simple: [
-      'Intelligent power-management controller for the board.',
-      'Converts 5V USB safely into exact voltages for chips.'
+      'Power-management chip of the Qualcomm processor.',
+      'Fed from the 5 V bus, it makes the 1.8 V rail (3.3 V comes from separate regulators).'
     ],
     specs: [
       ['Input', '5V_SYS (system 5 V bus)'],
@@ -164,8 +164,8 @@ export const PARTS = {
     cat: 'power', name: 'Power button', ref: 'JBTN1', tag: 'Reboots Linux',
     summary: 'A long press (5 seconds or more) reboots the Linux system on the MPU.',
     simple: [
-      'Hardware control button for power and rebooting.',
-      'Press and hold for 5+ seconds to safely restart Linux.'
+      'Power button: hold it 5 s or more to reboot Linux.',
+      'It does not cut the power — the board starts by itself.'
     ],
     points: [
       'It does not cut power to the board.',
@@ -198,8 +198,8 @@ export const PARTS = {
     cat: 'ui', name: 'RGB LED 2 — Linux status LED', ref: 'D27302', tag: 'Silkscreen “QRB 2”',
     summary: 'A tri-colour LED driven by the Qualcomm processor. By default it shows system status (PANIC, WLAN, BT), but you can also control it.',
     simple: [
-      'Linux status LED showing system boot, Wi-Fi & Bluetooth.',
-      'Gives instant visual feedback on CPU and radio activity.'
+      'Linux status LED: PANIC (red), WLAN (green), BT (blue).',
+      'You can also control it yourself from Linux / Python.'
     ],
     specs: [['Red', 'red:panic → GPIO_39'], ['Green', 'green:wlan → GPIO_40'], ['Blue', 'blue:bt → GPIO_47']],
     points: ['Python (App Lab): Leds.set_led2_color(r, g, b).'],
@@ -232,7 +232,7 @@ export const PARTS = {
     summary: 'A display of 104 blue LEDs (8 rows × 13 columns) driven by the STM32 microcontroller. Use it for icons, status, text or small games.',
     simple: [
       'Built-in display matrix with 104 programmable blue LEDs.',
-      'Displays custom animations, scrolling text, and sensor icons.'
+      'Shows icons, status, data and simple animations.'
     ],
     specs: [
       ['LEDs', '104, monochrome blue'],
@@ -267,7 +267,7 @@ export const PARTS = {
     summary: 'The UNO-style power and analog header: BOOT, IOREF, RESET, 3V3, 5V, GND, GND, VIN and A0–A5. Click any single pin.',
     simple: [
       'Analog input header (14-bit ADC) and board power rails.',
-      'Reads variable analog sensors and supplies 3.3V, 5V & VIN.'
+      'Reads analog sensors (0–3.3 V) and carries 3V3, 5V and the VIN input (7–24 V).'
     ],
     specs: [
       ['ADC', '6 inputs (A0–A5), up to 14-bit (14/12/10/8 selectable)'],
@@ -282,8 +282,8 @@ export const PARTS = {
     cat: 'io', name: 'JSPI header', ref: 'JSPI1 · 2 × 3 pins', tag: '3.3 V SPI',
     summary: 'A dedicated SPI header (MISO, SCK, MOSI) plus RESET, 5 V and GND, in the classic ICSP-style layout.',
     simple: [
-      'Dedicated high-speed 6-pin SPI bus header.',
-      'Connects fast SPI displays, sensors, or external programmer.'
+      '6-pin SPI header (MISO, SCK, MOSI, RESET, 5V, GND).',
+      'Shares the MCU’s SPI2 with D10–D13 — use one or the other.'
     ],
     specs: [['Pin 1', 'MISO (PC2)'], ['Pin 2', '+5V (5V_SYS)'], ['Pin 3', 'SCK (PD1)'], ['Pin 4', 'MOSI (PC3)'], ['Pin 5', 'RESET (MCU_NRST)'], ['Pin 6', 'GND']],
     points: ['Chip-select comes from a GPIO on JDIGITAL or JMISC.', 'It shares the MCU’s SPI2 peripheral with the JDIGITAL SPI pins — they cannot be used as SPI at the same time.'],
@@ -305,7 +305,7 @@ export const PARTS = {
     summary: 'System-control pins of the Qualcomm processor: the Linux debug console (SE4 UART), boot-mode and reset lines.',
     simple: [
       '1.8V system control and Linux debug console header.',
-      'Access serial shell or connect external power/reset keys.'
+      'Linux debug console (1.8 V UART) plus boot and reset lines.'
     ],
     specs: [
       ['Console UART', 'SOC_SE4_TX / SOC_SE4_RX, 115200 bps'],

@@ -1073,8 +1073,8 @@ export const LESSONS = [
       {
         title: 'How it measures distance', view: 'breadboard',
         body: `<ol><li>Your sketch sends a <b>10 µs HIGH pulse</b> to <b>TRIG</b>.</li>
-        <li>The left transducer sends <b>8 cycles of 40 kHz</b> sound.</li>
-        <li>The sound bounces off an object and the right transducer hears the echo.</li>
+        <li>The <b>transmitter</b> (marked <b>T</b>, on the left seen from the front) sends <b>8 cycles of 40 kHz</b> sound.</li>
+        <li>The sound bounces off an object; the <b>receiver</b> (marked <b>R</b>, on the right) hears the echo.</li>
         <li><b>ECHO</b> stays HIGH for the whole <b>round trip</b> time.</li></ol>
         <p class="formula">distance = time × speed of sound ÷ 2</p>
         <p>We divide by 2 because the sound travels <b>there and back</b>. With 340 m/s the datasheet simplifies it to:</p>
@@ -1116,8 +1116,11 @@ export const LESSONS = [
       },
       {
         title: 'Run it & move the obstacle', view: 'sonar', showCode: true, power: true, action: 'run',
-        body: `<p>Use the <b>distance slider</b> (or the quick buttons) below to move the obstacle in front of the sensor. Watch the echo time and the distance in the Serial Monitor.</p>
-        <p class="sim">Simulated: the echo time is µs = distance × 58 (the datasheet formula), rounded down to 100 µs steps like <code>pulseIn()</code> on the UNO Q. The 3D obstacle is drawn at most 15 cm away so it stays in view; the slider value is the real distance.</p>`,
+        body: `<p><b>Drag the obstacle</b> in the 3D view, or use the slider / quick buttons below.</p>
+        <ul><li><b style="color:#4fd6ff">Blue rings</b> = the 40 kHz burst leaving the transmitter <b>T</b>.</li>
+        <li><b style="color:#ffa53a">Orange rings</b> = the echo bouncing back to the receiver <b>R</b>.</li>
+        <li>The timing diagram shows TRIG → burst → <b>ECHO HIGH</b> for the whole round trip, as in the datasheet.</li></ul>
+        <p class="sim">Simulated and slowed down a lot: in reality 40 cm takes only 2.3 ms there and back. The echo time is µs = distance × 58 (datasheet formula), rounded down to 100 µs steps like <code>pulseIn()</code> on the UNO Q. The 3D distance is compressed so 2 cm – 4 m fits on the desk; the label on the obstacle shows the real distance.</p>`,
       },
       {
         title: 'Why real readings vary', view: 'bench',

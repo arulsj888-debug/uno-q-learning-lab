@@ -391,7 +391,9 @@ export class HCSR04 {
       c.fillStyle = '#1f5fa8'; c.fillRect(0, 0, w, h); noise(c, w, h, 8);
       const k = w / W;
       c.fillStyle = '#eef2f6'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = `700 ${Math.round(2.4 * k)}px Arial, Helvetica, sans-serif`; c.fillText('HC-SR04', w / 2, 3.0 * k);
+      c.font = `700 ${Math.round(1.9 * k)}px Arial, Helvetica, sans-serif`; c.fillText('HC-SR04', w / 2, 9.6 * k);
+      c.font = `600 ${Math.round(1.2 * k)}px Arial`; c.fillText('Y1', w / 2, 7.2 * k);
+      c.font = `700 ${Math.round(2.0 * k)}px Arial`; c.fillText('T', 2.6 * k, (H - 2.2) * k); c.fillText('R', (W - 2.6) * k, (H - 2.2) * k);
       c.font = `700 ${Math.round(1.55 * k)}px Arial`;
       [['Vcc', -3.81], ['Trig', -1.27], ['Echo', 1.27], ['Gnd', 3.81]].forEach(([t, x]) => {
         c.save(); c.translate((W / 2 + x) * k, (H - 3.6) * k); c.rotate(-Math.PI / 2); c.fillText(t, 0, 0); c.restore();
@@ -415,8 +417,8 @@ export class HCSR04 {
       face.position.set(x, y0 + H / 2, T / 2 + 11.4); g.add(face);
     }
     // crystal (HC-49) between the transducers
-    const xtal = new THREE.Mesh(new THREE.CapsuleGeometry(1.5, 5, 6, 16), M.steelSatin);
-    xtal.position.set(0, y0 + H / 2 + 0.8, T / 2 + 1.6); g.add(xtal);
+    const xtal = new THREE.Mesh(new THREE.CapsuleGeometry(1.6, 6.5, 6, 16), M.steelSatin);
+    xtal.rotation.z = Math.PI / 2; xtal.position.set(0, y0 + H - 3.4, T / 2 + 1.7); g.add(xtal);
     // 4-pin header on the back, straight pins down into the breadboard
     const hdr = new THREE.Mesh(new THREE.BoxGeometry(10.2, 2.5, 2.5), M.blackPlastic);
     hdr.position.set(0, y0 + 1.25, -T / 2 - 1.25); g.add(hdr);
@@ -426,6 +428,7 @@ export class HCSR04 {
     }
     tagHW(g, 'hcsr04');
     this.beamZ = T / 2 + 12;
+    this.tx = -13; this.rx = 13;            // T (transmitter) left, R (receiver) right, seen from the front
     this.beamY = y0 + H / 2;
   }
 }
@@ -528,8 +531,13 @@ export const HW_INFO = {
     warn: 'Check the flat face before powering up: if +VS and GND are swapped the sensor does not work and can be damaged.',
     src: 'Analog Devices TMP35/TMP36/TMP37 datasheet, Rev. F',
   },
+  obstacle: {
+    name: 'Obstacle', tag: 'Drag it closer or farther',
+    summary: 'A flat object in front of the sensor. Drag it in the 3D view or use the slider; the label shows the real distance.',
+    src: 'Simulation',
+  },
   hcsr04: {
-    name: 'HC-SR04 ultrasonic distance sensor', tag: 'Measures 2 cm – 4 m with sound',
+    name: 'HC-SR04 ultrasonic distance sensor', tag: '2 cm – 4 m',
     summary: 'Sends a short burst of 40 kHz ultrasound (too high for humans to hear) and outputs a pulse whose length equals the time the echo took to come back.',
     points: [
       'Datasheet: 5 V supply, 15 mA, range 2 cm – 4 m, measuring angle 15°, resolution down to 3 mm.',
