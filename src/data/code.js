@@ -218,3 +218,29 @@ void loop() {
   Serial.println(" C");
   delay(1000);
 }`;
+
+// Lesson 13 — HC-SR04 ultrasonic sensor (Elecfreaks datasheet: 10 us trigger, us / 58 = cm, cycle > 60 ms)
+export const ULTRASONIC = `// Measure distance with an HC-SR04 ultrasonic sensor
+int trigPin = D7;   // TRIG: a 3.3 V HIGH is enough (TTL input)
+int echoPin = D8;   // ECHO: 5 V signal -> D8 is 5 V-tolerant
+
+void setup() {
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);   // plain INPUT: no pull-up on a 5 V signal
+  Serial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);    // 10 us trigger pulse
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  unsigned long duration = pulseIn(echoPin, HIGH);  // echo time in us
+  float distanceCm = duration / 58.0;               // datasheet: us / 58 = cm
+
+  Serial.print(distanceCm, 1);
+  Serial.println(" cm");
+  delay(100);                     // datasheet: wait more than 60 ms
+}`;

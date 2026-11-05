@@ -24,6 +24,7 @@ function legs(d) {
     case 'pot': return { [d.id + '.1']: `${d.row}${d.col}`, [d.id + '.W']: `${d.row}${d.col + 2}`, [d.id + '.3']: `${d.row}${d.col + 4}` };
     case 'buzzer': return { [d.id + '.+']: d.plus, [d.id + '.-']: d.minus };
     case 'ldr': return { [d.id + '.1']: d.a, [d.id + '.2']: d.b };
+    case 'hcsr04': return { [d.id + '.VCC']: `${d.row}${d.col}`, [d.id + '.TRIG']: `${d.row}${d.col + 1}`, [d.id + '.ECHO']: `${d.row}${d.col + 2}`, [d.id + '.GND']: `${d.row}${d.col + 3}` };
     case 'tmp36': return { [d.id + '.VS']: `${d.row}${d.col}`, [d.id + '.VO']: `${d.row}${d.col + 1}`, [d.id + '.GND']: `${d.row}${d.col + 2}` };
     default: return {};
   }
@@ -63,6 +64,11 @@ for (const L of LESSONS) {
   const N = nets(all), sigs = [...new Set(all.filter(d => d.type === 'wire').flatMap(d => [d.from, d.to]).filter(e => !isHole(e)).map(sigOf))];
   for (let i = 0; i < sigs.length; i++) for (let j = i + 1; j < sigs.length; j++)
     if (N.same('PIN:' + sigs[i], 'PIN:' + sigs[j])) bad(L, `SHORT: ${sigs[i]} and ${sigs[j]} are connected together`);
+  // 2b. 5 V signals must only reach 5 V-tolerant digital pins (UNO Q datasheet §9.6/9.7)
+  for (const d of all.filter(x => x.type === 'hcsr04')) {
+    for (const bad5 of ['D3', 'A0', 'A1', 'A2', 'A3', 'A4', 'A5', '3V3', 'IOREF', 'AREF'])
+      if (N.same(d.id + '.ECHO', 'PIN:' + bad5)) bad(L, `5 V ECHO of ${d.id} reaches ${bad5}, which is not 5 V-tolerant`);
+  }
   // 3. each I/O works
   for (const [pin, io] of Object.entries(L.io || {})) {
     for (const id of io.needs) if (!byId[id]) bad(L, `io ${pin} needs missing part ${id}`);
@@ -103,6 +109,13 @@ for (const L of LESSONS) {
       if (!N.same(id + '.VO', P)) bad(L, `${pin}: TMP36 VOUT not on ${pin}`);
       if (!N.same(id + '.GND', G)) bad(L, `${pin}: TMP36 GND not on GND`);
     }
+    if (io.kind === 'hcsr04') {
+      const id = io.item;
+      if (!N.same(id + '.VCC', 'PIN:5V')) bad(L, `${pin}: HC-SR04 Vcc not on 5V (datasheet: 5 V supply)`);
+      if (!N.same(id + '.GND', G)) bad(L, `${pin}: HC-SR04 Gnd not on GND`);
+      if (!N.same(id + '.ECHO', P)) bad(L, `${pin}: HC-SR04 Echo not on ${pin}`);
+      if (!N.same(id + '.TRIG', 'PIN:' + io.trig)) bad(L, `${pin}: HC-SR04 Trig not on ${io.trig}`);
+    }
     if (io.kind === 'buzzer') {
       const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));
       if (!r) { bad(L, `${pin}: no series resistor`); continue; }
@@ -134,6 +147,9 @@ for (const L of LESSONS) {
       if (/·\s*−/.test(lab) && !/\.-$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled − but is ${legHoles[h]}`);
       if (/\+VS/.test(lab) && !/\.VS$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled +VS but is ${legHoles[h]}`);
       if (/VOUT/.test(lab) && !/\.VO$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled VOUT but is ${legHoles[h]}`);
+      if (/·\s*VCC/.test(lab) && !/\.VCC$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled VCC but is ${legHoles[h]}`);
+      if (/·\s*TRIG/.test(lab) && !/\.TRIG$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled TRIG but is ${legHoles[h]}`);
+      if (/·\s*ECHO/.test(lab) && !/\.ECHO$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled ECHO but is ${legHoles[h]}`);
       if (/·\s*GND/.test(lab) && !/\.GND$/.test(legHoles[h] || '')) bad(L, `step ${k + 1}: ${h} labelled GND but is ${legHoles[h]}`);
     }
     for (const p of S.pins || []) if (!PINS.has(p)) bad(L, `step ${k + 1}: marker for unknown pin ${p}`);

@@ -24,6 +24,7 @@ const VIEWS = {
   bottom: { t: new THREE.Vector3(0, -1, 0), d: new THREE.Vector3(0, -1, -0.02), dist: 132 },
   bench: { t: new THREE.Vector3(0, 0, 30), d: new THREE.Vector3(-0.28, 0.82, 0.5), dist: 235 },
   breadboard: { t: new THREE.Vector3(4, 2.4, 60), d: new THREE.Vector3(-0.1, 0.86, 0.5), dist: 115 },
+  sonar: { t: new THREE.Vector3(-8, 0, 120), d: new THREE.Vector3(-0.55, 0.62, 0.56), dist: 250 },
 };
 const BOTTOM_PARTS = new Set(['mcu', 'emmc', 'jmisc', 'jmedia']);
 const shortName = n => n.replace(/^(Qualcomm Dragonwing™|STMicroelectronics|Qualcomm) /, '');
@@ -78,7 +79,12 @@ class App {
     this.lamp.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 70, 6)));
     this.lamp.target.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 0, 0)));
     s.add(this.lamp, this.lamp.target);
-    this.lux = 300; this.tempC = 25;
+    this.lux = 300; this.tempC = 25; this.distCm = 40;
+    // obstacle + 15° beam cone in front of the HC-SR04 (Lesson 13)
+    this.obstacle = new THREE.Mesh(new THREE.BoxGeometry(70, 50, 8), new THREE.MeshStandardMaterial({ color: 0xc9b38a, roughness: 0.8 }));
+    this.obstacle.visible = false; this.obstacle.castShadow = true; this.obstacle.receiveShadow = true; s.add(this.obstacle);
+    this.beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 40, 1, true), new THREE.MeshBasicMaterial({ color: 0x35d0ff, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }));
+    this.beam.visible = false; this.beam.raycast = () => {}; s.add(this.beam);
     const mk = (x0, z0, z1, color) => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.08, Math.abs(z1 - z0) + 1.9),
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false }));
@@ -489,7 +495,7 @@ class App {
     this.hideFloat(); this.clearTemp(); this.hideCallout();
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
     if (mode === 'explore') {
-      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0;
+      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.obstacle.visible = false; this.beam.visible = false;
       this.lesson = null;
       this.renderSide();
       this.select(null, { card: false });
@@ -520,7 +526,7 @@ class App {
     this.sim.stop(); this.stopSound(); this.outputsOff();
     this.lesson = L; this.stepIdx = 0; this.inQuiz = false;
     this.board.setMatrix(null);
-    this.lamp.intensity = 0;
+    this.lamp.intensity = 0; this.obstacle.visible = false; this.beam.visible = false;
     if (L.circuit) { this.bench.setDefs(L.circuit); this.bb.group.visible = true; }
     else { this.bench.clear(); this.bench.setDefs([]); this.bb.group.visible = false; this.strips.visible = false; }
     if (L.id === 'l1' && this.usbPlugged) await this.plug(false);
@@ -553,6 +559,7 @@ class App {
     if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on D4</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
     if (w.includes('light')) h += `<div class="io-block"><div class="io-title">Light on the sensor <span class="io-note">(simulated)</span></div><input id="lux" type="range" min="0" max="1000" value="${Math.round(this.luxToSlider(this.lux))}"><div class="io-tools">${[['Dark', 0.01], ['Dim', 10], ['Room light', 300], ['Torch', 2000]].map(([t, v]) => `<button class="lvl" data-lux="${v}">${t}</button>`).join('')}</div><div id="lux-val" class="io-val"></div></div>`;
     if (w.includes('temp')) h += `<div class="io-block"><div class="io-title">Temperature around the TMP36 <span class="io-note">(simulated)</span></div><input id="tempc" type="range" min="-40" max="125" step="0.5" value="${this.tempC}"><div id="temp-val" class="io-val"></div></div>`;
+    if (w.includes('distance')) h += `<div class="io-block"><div class="io-title">Obstacle in front of the sensor <span class="io-note">(simulated)</span></div><input id="dist" type="range" min="2" max="400" step="0.5" value="${this.distCm}"><div class="io-tools">${[5, 20, 40, 100, 250, 400].map(v => `<button class="lvl" data-dist="${v}">${v} cm</button>`).join('')}</div><div id="dist-val" class="io-val"></div></div>`;
     if (w.includes('knob')) h += `<div class="io-block"><div class="io-title">Potentiometer knob</div><input id="knob" type="range" min="0" max="1000" value="${Math.round(this.knobValue() * 1000)}"><div id="knob-val" class="io-val"></div><div class="io-note">or drag the knob in the 3D view</div></div>`;
     if (w.includes('pwm')) h += `<div class="io-block"><div class="io-title">analogWrite(D5, <b id="pwm-v">128</b>)</div><input id="pwm" type="range" min="0" max="255" value="128"></div>`;
     if (w.includes('scope')) h += `<div class="io-block"><div class="io-title">Oscilloscope · ${L.scopePin || 'D5'} <span class="io-note">(simulated)</span></div><canvas id="scope" width="560" height="170"></canvas><div id="scope-info" class="io-val"></div></div>`;
@@ -566,6 +573,8 @@ class App {
     }
     if ($('#knob')) { $('#knob').oninput = e => this.setKnob(+e.target.value / 1000); this.setKnob(this.knobValue()); }
     if ($('#lux')) { $('#lux').oninput = e => this.setLux(this.sliderToLux(+e.target.value)); document.querySelectorAll('[data-lux]').forEach(b => b.onclick = () => this.setLux(+b.dataset.lux)); this.setLux(this.lux); }
+    if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist)); this.setDist(this.distCm); }
+    else { this.obstacle.visible = false; this.beam.visible = false; }
     if ($('#tempc')) { $('#tempc').oninput = e => this.setTemp(+e.target.value); this.setTemp(this.tempC); }
     this.lamp.intensity = w.includes('light') ? this.lampIntensity() : 0;
     if ($('#pwm')) $('#pwm').oninput = e => this.applyManualPwm(+e.target.value);
@@ -782,6 +791,24 @@ class App {
     const lx = this.lux < 1 ? this.lux.toFixed(2) : this.lux < 100 ? this.lux.toFixed(1) : Math.round(this.lux);
     const el = $('#lux-val'); if (el) el.innerHTML = `≈ <b>${lx} lux</b> → LDR ≈ <b>${fmtR}</b> → A0 ≈ <b>${V.toFixed(2)} V</b> → 14-bit ≈ <b>${Math.round(V / VREF * 16383)}</b>`;
   }
+  // ---- HC-SR04 model: datasheet µs = cm × 58; UNO Q pulseIn() resolves 100 µs (Zephyr tick, see Lesson 13)
+  echoUs() { return this.distCm * 58; }
+  pulseInUs() { return Math.floor(this.echoUs() / 100) * 100; }
+  setDist(cm) {
+    this.distCm = Math.min(400, Math.max(2, cm));
+    const sl = $('#dist'); if (sl && document.activeElement !== sl) sl.value = this.distCm;
+    const us = this.bench.get('us1');
+    if (us) {
+      const g = this.bench.items.us1.group, face = g.position.z + us.beamZ, y = g.position.y + us.beamY;
+      const shown = Math.min(this.distCm * 10, 150);                         // draw at most 15 cm away
+      this.obstacle.position.set(g.position.x, y + 14, face + shown + 4); this.obstacle.visible = true;
+      const r = Math.tan(7.5 * Math.PI / 180) * shown;                       // 15° full angle
+      this.beam.scale.set(Math.max(r, 0.1), shown, Math.max(r, 0.1)); this.beam.rotation.set(-Math.PI / 2, 0, 0);
+      this.beam.position.set(g.position.x, y, face + shown / 2); this.beam.visible = true;
+    }
+    const e = this.echoUs(), q = this.pulseInUs(), el = $('#dist-val');
+    if (el) el.innerHTML = `Obstacle <b>${this.distCm.toFixed(1)} cm</b> → ECHO HIGH ≈ <b>${Math.round(e)} µs</b> → pulseIn() on UNO Q ≈ <b>${q} µs</b> → <b>${(q / 58).toFixed(1)} cm</b>`;
+  }
   tmp36Volts() { return Math.min(2.0, Math.max(0.1, 0.5 + this.tempC / 100)); }   // datasheet: 0.5 V at 0 °C, 10 mV/°C
   setTemp(t) {
     this.tempC = t;
@@ -868,6 +895,11 @@ class App {
         return 0.4 + Math.random() * 0.3;         // unconnected input floats
       },
       matrix: vals => this.board.setMatrix(vals),
+      pulse: async (pin) => {
+        const io = this.ioFor(pin);
+        if (io && io.kind === 'hcsr04' && this.wired(io) && this.board.powered) { const us = this.pulseInUs(); await sleep(Math.max(1, us / 1000)); this.setPinLevel(`D8 ECHO: HIGH for ${Math.round(this.echoUs())} µs → pulseIn() = ${us} µs`); return us; }
+        await sleep(2000); return 0;
+      },
       serial: txt => {
         const s = $('#serial');
         const t = ((performance.now() - this.runStart) / 1000).toFixed(3);
@@ -1012,7 +1044,7 @@ class App {
 
 // ------------------------------------------------------------------ tiny C++ highlighter
 const KW = new Set(['void', 'int', 'const', 'float', 'uint8_t', 'uint16_t', 'uint32_t', 'bool', 'byte', 'char', 'for', 'while', 'if', 'else', 'return', 'static', 'unsigned', 'long', 'true', 'false', 'String']);
-const CONST = new Set(['HIGH', 'LOW', 'OUTPUT', 'INPUT', 'INPUT_PULLUP', 'LED_BUILTIN', 'D4', 'D5', 'D9', 'A0', 'LED3_R', 'LED3_G', 'LED3_B']);
+const CONST = new Set(['HIGH', 'LOW', 'OUTPUT', 'INPUT', 'INPUT_PULLUP', 'LED_BUILTIN', 'D4', 'D5', 'D7', 'D8', 'D9', 'A0', 'LED3_R', 'LED3_G', 'LED3_B']);
 function highlight(line) {
   if (/^\s*#include/.test(line)) return `<span class="tk-kw">${esc(line)}</span>`;
   const ci = line.indexOf('//');

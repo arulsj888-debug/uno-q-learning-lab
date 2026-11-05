@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -12,6 +12,8 @@ const SRC = {
   core: { t: 'Arduino Zephyr core for UNO Q (ArduinoCore-zephyr, source code)', u: 'https://github.com/arduino/ArduinoCore-zephyr' },
   ldr: { t: 'GL55 series photoresistor datasheet (GL5528)', u: 'https://www.electrokit.com/upload/quick/5b/ec/0d3b_41036350-tds.pdf' },
   tmp36: { t: 'Analog Devices TMP35/TMP36/TMP37 datasheet, Rev. F', u: 'https://www.analog.com/media/en/technical-documentation/data-sheets/TMP35_36_37.pdf' },
+  hcsr04: { t: 'Elecfreaks HC-SR04 ultrasonic ranging module datasheet', u: 'https://cdn.sparkfun.com/datasheets/Sensors/Proximity/HCSR04.pdf' },
+  prahari: { t: 'Reading HC-SR04 on Arduino UNO Q: pulseIn on Zephyr (published UNO Q readings)', u: 'https://prahari.net/giving-my-robot-its-first-sense-hc-sr04-ultrasonic-on-arduino-uno-q' },
   dhtforum: { t: 'Arduino Forum: “DHT11 and UNO Q”', u: 'https://forum.arduino.cc/t/dht11-and-uno-q/1416409' },
 };
 
@@ -58,6 +60,14 @@ const TMP_PARTS = [
   { id: 'w15', type: 'wire', from: 'a20', to: 'GND3', color: 'black', lift: 15 },
 ];
 const TMP_IDS = TMP_PARTS.map(d => d.id);
+const US_PARTS = [
+  { id: 'us1', type: 'hcsr04', row: 'j', col: 11 },
+  { id: 'w16', type: 'wire', from: '5V', to: 'f11', color: 'red', lift: 10 },
+  { id: 'w17', type: 'wire', from: 'D7', to: 'f12', color: 'yellow', lift: 14 },
+  { id: 'w18', type: 'wire', from: 'D8', to: 'f13', color: 'blue', lift: 18 },
+  { id: 'w19', type: 'wire', from: 'f14', to: 'GND3', color: 'black', lift: 12 },
+];
+const US_IDS = US_PARTS.map(d => d.id);
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
 
 const BLINK_CODE = BLINK;
@@ -1025,12 +1035,119 @@ export const LESSONS = [
     ],
     sources: [SRC.tmp36, SRC.um, SRC.dhtforum],
   },
+
+  // ================================================================== 13
+  {
+    id: 'l13', num: 13, module: 4, title: 'Measure distance with ultrasound (HC-SR04)', level: 'Intermediate', time: '20 min',
+    goal: 'Measure distance with sound, use a 5 V module safely with the 3.3 V UNO Q, and time a pulse with pulseIn().',
+    hardware: ['Arduino UNO Q', 'Breadboard', 'HC-SR04 ultrasonic sensor', '4 × jumper wires'],
+    code: ULTRASONIC, program: 'ultrasonic', widgets: ['distance'],
+    circuit: US_PARTS, io: { D8: { kind: 'hcsr04', item: 'us1', trig: 'D7', needs: US_IDS } },
+    explain: {
+      2: '<b>TRIG</b> on D7. The datasheet asks for a “TTL pulse”; TTL inputs count anything above 2.0 V as HIGH, so the UNO Q’s 3.3 V HIGH is enough.',
+      3: '<b>ECHO</b> on D8. ECHO outputs <b>5 V</b>. D8 (PB4) is a 5 V-tolerant input on the UNO Q (datasheet §9.6).',
+      6: 'D7 drives the trigger.',
+      7: '<b>INPUT</b>, not INPUT_PULLUP: the STM32U585 datasheet says the internal pull-up must be off for a pin to hold more than 4 V.',
+      8: 'Serial output on.',
+      12: 'Start from a clean LOW…',
+      13: '…for 2 µs.',
+      14: 'TRIG HIGH starts a measurement.',
+      15: 'Keep it HIGH for 10 µs (datasheet: “at least 10 µs”).',
+      16: 'TRIG LOW again. The module now sends 8 cycles of 40 kHz ultrasound.',
+      18: '<b>pulseIn(echoPin, HIGH)</b> waits for ECHO to go HIGH and returns how long it stayed HIGH, in microseconds = the time the sound needed to go there and back.',
+      19: 'Datasheet formula: <b>µs ÷ 58 = cm</b>. <code>58.0</code> makes it a decimal division.',
+      21: 'Print with one decimal.',
+      22: 'Finish the line.',
+      23: 'Datasheet: use a measurement cycle of more than 60 ms, so the next trigger does not mix with an old echo.',
+    },
+    steps: [
+      {
+        title: 'What you need', view: 'bench', have: [],
+        body: `<ul><li>an <b>HC-SR04</b> ultrasonic sensor (the blue board with two silver “eyes”)</li>
+        <li><b>4 jumpers</b>: red (5V), yellow (TRIG), blue (ECHO), black (GND)</li></ul>
+        <table class="kv"><tr><th>HC-SR04 datasheet</th><th></th></tr>
+        <tr><td>Supply</td><td>5 V DC, 15 mA</td></tr><tr><td>Range</td><td>2 cm – 4 m</td></tr>
+        <tr><td>Measuring angle</td><td>15°</td></tr><tr><td>Resolution</td><td>down to 3 mm</td></tr>
+        <tr><td>Sound frequency</td><td>40 kHz (ultrasound — you cannot hear it)</td></tr></table>`,
+      },
+      {
+        title: 'How it measures distance', view: 'breadboard',
+        body: `<ol><li>Your sketch sends a <b>10 µs HIGH pulse</b> to <b>TRIG</b>.</li>
+        <li>The left transducer sends <b>8 cycles of 40 kHz</b> sound.</li>
+        <li>The sound bounces off an object and the right transducer hears the echo.</li>
+        <li><b>ECHO</b> stays HIGH for the whole <b>round trip</b> time.</li></ol>
+        <p class="formula">distance = time × speed of sound ÷ 2</p>
+        <p>We divide by 2 because the sound travels <b>there and back</b>. With 340 m/s the datasheet simplifies it to:</p>
+        <p class="formula">cm = µs ÷ 58</p>
+        <p>Example: an echo of 1160 µs → 1160 ÷ 58 = <b>20 cm</b>.</p>`,
+      },
+      {
+        title: 'A 5 V module on a 3.3 V board — is it safe?', view: 'bench', pins: ['5V', 'D7', 'D8', 'D3'],
+        body: `<table class="kv"><tr><th>Pin</th><th>Check</th></tr>
+        <tr><td>VCC</td><td>needs 5 V → UNO Q <b>5V</b> pin (15 mA is tiny)</td></tr>
+        <tr><td>TRIG (input)</td><td>a “TTL” input: HIGH above 2.0 V → <b>3.3 V works</b></td></tr>
+        <tr><td>ECHO (output)</td><td>sends <b>5 V</b> back to the board ⚠</td></tr></table>
+        <p>The UNO Q datasheet (§9.6): <b>most JDIGITAL pins are 5 V-tolerant as inputs</b> — so ECHO may go straight to <b>D8</b>.</p>
+        <p class="warn"><b>Never</b> connect a 5 V signal to <b>D3</b> (only 3.6 V-tolerant) or to <b>A0–A5</b> used as analog inputs. Some online UNO Q tutorials put ECHO on D3 — the datasheet says D3 is not 5 V-tolerant in any mode.</p>
+        <p class="tip">Use <code>pinMode(echoPin, INPUT)</code>, not INPUT_PULLUP: the STM32U585 datasheet says the internal pull-up must be off to sustain more than 4 V on a pin. Not sure about a pin? A voltage divider (e.g. 1 kΩ + 2 kΩ) turns 5 V into 3.3 V and is always safe.</p>`,
+      },
+      {
+        title: 'Step 1 — insert the sensor', view: 'breadboard', power: false, have: ['us1'], holes: ['j11 · VCC', 'j12 · TRIG', 'j13 · ECHO', 'j14 · GND'],
+        body: `<p>Push the 4 pins into <b>j11–j14</b>, with the transducers facing <b>away</b> from the board so nothing blocks the sound.</p>
+        <p>Seen from the front the pins are: <b>Vcc · Trig · Echo · Gnd</b>.</p>`,
+      },
+      {
+        title: 'Step 2 — wire it', view: 'bench', have: US_IDS, pins: ['5V', 'D7', 'D8', 'GND3'],
+        body: `<ul><li>Red: <b>5V</b> → <b>f11</b> (VCC)</li><li>Yellow: <b>D7</b> → <b>f12</b> (TRIG)</li>
+        <li>Blue: <b>D8</b> → <b>f13</b> (ECHO)</li><li>Black: <b>f14</b> → <b>GND</b></li></ul>
+        <p>Holes f–j of one column are connected, so f11 reaches the pin in j11.</p>`,
+      },
+      {
+        title: 'The code', view: 'bench', showCode: true,
+        body: `<p>Trigger → time the echo with <code>pulseIn()</code> → convert with ÷ 58 → print.</p>
+        <p class="tip">Click any line in the code panel to see what it does.</p>`,
+      },
+      {
+        title: 'UNO Q detail: pulseIn() measures in 100 µs steps', view: 'bench', showCode: true,
+        body: `<p>On the UNO Q, the Arduino core measures the pulse with the Zephyr system clock tick (source: <code>wiring_pulse.cpp</code> uses <code>k_uptime_ticks()</code>). At 10 000 ticks per second one step is <b>100 µs</b>:</p>
+        <p class="formula">100 µs ÷ 58 ≈ 1.7 cm per step</p>
+        <p>Readings published from a real UNO Q (44.6, 46.3, 48.0, 137.2, 138.9 cm) are all whole multiples of 1.715 cm — exactly this step. So expect readings to jump in ~1.7 cm steps — fine for obstacle detection.</p>
+        <p class="warn">The third argument of <code>pulseIn(pin, state, timeout)</code> is in <b>microseconds</b> on most Arduino boards, but the current UNO Q core passes it to <code>K_MSEC()</code> (milliseconds). That is why this sketch leaves it out. If nothing prints at all, check the ECHO wire — <code>pulseIn()</code> is still waiting.</p>`,
+      },
+      {
+        title: 'Run it & move the obstacle', view: 'sonar', showCode: true, power: true, action: 'run',
+        body: `<p>Use the <b>distance slider</b> (or the quick buttons) below to move the obstacle in front of the sensor. Watch the echo time and the distance in the Serial Monitor.</p>
+        <p class="sim">Simulated: the echo time is µs = distance × 58 (the datasheet formula), rounded down to 100 µs steps like <code>pulseIn()</code> on the UNO Q. The 3D obstacle is drawn at most 15 cm away so it stays in view; the slider value is the real distance.</p>`,
+      },
+      {
+        title: 'Why real readings vary', view: 'bench',
+        body: `<ul><li><b>Temperature</b>: sound travels at about 331.3 + 0.606 × T m/s — 343 m/s at 20 °C, 349 m/s at 30 °C. The datasheet’s ÷ 58 assumes 340 m/s, so at 30 °C a real 100 cm reads about <b>97 cm</b>.</li>
+        <li><b>Target</b>: the datasheet asks for a flat, smooth object of at least 0.5 m². Soft (cloth, foam) or tilted objects send less sound back.</li>
+        <li><b>Beam</b>: the sensor “sees” in a 15° cone, so a nearby wall or table edge can answer first.</li>
+        <li><b>Range</b>: below 2 cm or above 4 m the readings are not reliable.</li></ul>`,
+      },
+      {
+        title: 'Summary', view: 'bench',
+        body: `<ul><li>Trigger 10 µs → ECHO HIGH time = round trip → <b>cm = µs ÷ 58</b>.</li>
+        <li>VCC to 5V; TRIG works at 3.3 V; <b>5 V ECHO only to a 5 V-tolerant pin</b> (D8 ✓, D3 ✗, A0–A5 ✗), with plain INPUT.</li>
+        <li>On the UNO Q, <code>pulseIn()</code> resolves 100 µs ≈ 1.7 cm, and its timeout argument is treated as milliseconds.</li>
+        <li>Wait > 60 ms between measurements.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'ECHO stays HIGH for 2320 µs. How far is the object?', a: ['23.2 cm', '40 cm', '80 cm', '134 cm'], c: 1, why: 'Datasheet formula: 2320 ÷ 58 = 40 cm.' },
+      { q: 'Why do we divide the travel time by 2?', a: ['The sensor has two transducers', 'The sound goes to the object and back', 'To convert µs to ms', 'Because of the 2 µs LOW pulse'], c: 1, why: 'ECHO measures the round trip; the distance is half of it.' },
+      { q: 'Which UNO Q pin must NEVER receive the 5 V ECHO signal?', a: ['D7', 'D8', 'D3', 'D12'], c: 2, why: 'UNO Q datasheet: D3 (PB0) is a TT-type pin, only 3.6 V-tolerant, in any mode.' },
+      { q: 'Why pinMode(echoPin, INPUT) and not INPUT_PULLUP here?', a: ['INPUT_PULLUP is slower', 'The internal pull-up must be off for the pin to hold more than 4 V', 'pulseIn needs a pull-down', 'No reason'], c: 1, why: 'STM32U585 datasheet: to sustain a voltage higher than 4 V, the internal pull-up/pull-down resistors must be disabled.' },
+    ],
+    sources: [SRC.hcsr04, SRC.ds, SRC.st, SRC.core, SRC.prahari],
+  },
 ];
 
 export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors' };
 
 export const COMING_SOON = [
-  'Ultrasonic distance sensor (HC-SR04)', 'PIR motion sensor',
+  'PIR motion sensor',
   'Servo motor', 'DC motor with a driver', 'Relay module',
   'I²C & Qwiic: Modulino® Thermo (temperature + humidity)', 'I²C displays',
   'Linux side: Python + Bridge', 'Wi-Fi web dashboard', 'Final IoT project',

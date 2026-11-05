@@ -380,6 +380,56 @@ export class TMP36 {
   }
 }
 
+// ---------------------------------------------------------------- HC-SR04 ultrasonic ranging module
+// Elecfreaks HC-SR04 datasheet: 45 × 20 × 15 mm, pins Vcc · Trig · Echo · Gnd (left → right seen from the front).
+// Local frame: transducers face +z, pins point down at x = −3.81 / −1.27 / +1.27 / +3.81 (Vcc … Gnd).
+export class HCSR04 {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const y0 = 3.2, W = 45, H = 20, T = 1.6;               // PCB bottom edge 3.2 mm above the breadboard
+    const front = canvasTex(900, 400, (c, w, h) => {
+      c.fillStyle = '#1f5fa8'; c.fillRect(0, 0, w, h); noise(c, w, h, 8);
+      const k = w / W;
+      c.fillStyle = '#eef2f6'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.font = `700 ${Math.round(2.4 * k)}px Arial, Helvetica, sans-serif`; c.fillText('HC-SR04', w / 2, 3.0 * k);
+      c.font = `700 ${Math.round(1.55 * k)}px Arial`;
+      [['Vcc', -3.81], ['Trig', -1.27], ['Echo', 1.27], ['Gnd', 3.81]].forEach(([t, x]) => {
+        c.save(); c.translate((W / 2 + x) * k, (H - 3.6) * k); c.rotate(-Math.PI / 2); c.fillText(t, 0, 0); c.restore();
+      });
+    });
+    const pcbSide = new THREE.MeshStandardMaterial({ color: 0x1b4f8f, roughness: 0.6 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), [pcbSide, pcbSide, pcbSide, pcbSide, new THREE.MeshStandardMaterial({ map: front, roughness: 0.5 }), pcbSide]);
+    pcb.position.set(0, y0 + H / 2, 0); g.add(pcb);
+    // two Ø16 mm transducers on the front, 26 mm apart (T = transmitter, R = receiver)
+    const mesh = canvasTex(256, 256, (c, w, h) => {
+      c.fillStyle = '#1a1a1a'; c.fillRect(0, 0, w, h);
+      c.strokeStyle = '#4a4a4a'; c.lineWidth = 2;
+      for (let i = 0; i < w; i += 9) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(w, i); c.stroke(); }
+    });
+    for (const x of [-13, 13]) {
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 12, 48, 1, true), M.steelSatin);
+      can.rotation.x = Math.PI / 2; can.position.set(x, y0 + H / 2, T / 2 + 6); g.add(can);
+      const lip = new THREE.Mesh(new THREE.TorusGeometry(7.6, 0.45, 12, 48), M.steelSatin);
+      lip.position.set(x, y0 + H / 2, T / 2 + 12); g.add(lip);
+      const face = new THREE.Mesh(new THREE.CircleGeometry(7.4, 48), new THREE.MeshStandardMaterial({ map: mesh, roughness: 0.9 }));
+      face.position.set(x, y0 + H / 2, T / 2 + 11.4); g.add(face);
+    }
+    // crystal (HC-49) between the transducers
+    const xtal = new THREE.Mesh(new THREE.CapsuleGeometry(1.5, 5, 6, 16), M.steelSatin);
+    xtal.position.set(0, y0 + H / 2 + 0.8, T / 2 + 1.6); g.add(xtal);
+    // 4-pin header on the back, straight pins down into the breadboard
+    const hdr = new THREE.Mesh(new THREE.BoxGeometry(10.2, 2.5, 2.5), M.blackPlastic);
+    hdr.position.set(0, y0 + 1.25, -T / 2 - 1.25); g.add(hdr);
+    for (const x of [-3.81, -1.27, 1.27, 3.81]) {
+      const pin = new THREE.Mesh(new THREE.BoxGeometry(0.64, 9.5, 0.64), M.gold);
+      pin.position.set(x, y0 + 4.75 - 7.5, -T / 2 - 1.25); g.add(pin);
+    }
+    tagHW(g, 'hcsr04');
+    this.beamZ = T / 2 + 12;
+    this.beamY = y0 + H / 2;
+  }
+}
+
 export async function dropIn(obj, from = 30, ms = 700) {
   const y = obj.position.y;
   obj.visible = true;
@@ -477,6 +527,18 @@ export const HW_INFO = {
     ],
     warn: 'Check the flat face before powering up: if +VS and GND are swapped the sensor does not work and can be damaged.',
     src: 'Analog Devices TMP35/TMP36/TMP37 datasheet, Rev. F',
+  },
+  hcsr04: {
+    name: 'HC-SR04 ultrasonic distance sensor', tag: 'Measures 2 cm – 4 m with sound',
+    summary: 'Sends a short burst of 40 kHz ultrasound (too high for humans to hear) and outputs a pulse whose length equals the time the echo took to come back.',
+    points: [
+      'Datasheet: 5 V supply, 15 mA, range 2 cm – 4 m, measuring angle 15°, resolution down to 3 mm.',
+      'Start a measurement with a ≥ 10 µs HIGH pulse on Trig. Echo then stays HIGH for the round-trip time: µs ÷ 58 = cm.',
+      'Wait more than 60 ms between measurements, so an old echo is not mistaken for a new one.',
+      'Works best on flat, hard objects of at least 0.5 m² (datasheet); soft or angled objects reflect less sound.',
+    ],
+    warn: 'Echo outputs 5 V. On the UNO Q connect it only to a 5 V-tolerant digital pin (e.g. D8) — never to D3 or A0–A5.',
+    src: 'Elecfreaks HC-SR04 datasheet · Arduino UNO Q datasheet §9.6',
   },
   jumper: {
     name: 'Jumper wire (male–male)', tag: 'Connection',

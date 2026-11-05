@@ -67,6 +67,8 @@ export class Sim {
         pins[pin] = { mode: 'OUTPUT' };
         H.pwm(pin, Math.min(max, Math.max(0, value)) / max, value);
       },
+      delayMicroseconds: async () => { if (slow) await frame(); },
+      pulseIn: async (pin, state) => { const us = await H.pulse(pin, state); check(); return us; },
       tone: (pin, f, ms) => { pins[pin] = { mode: 'OUTPUT' }; tok.tonePin = pin; H.tone(pin, f, ms); },
       noTone: (pin) => { H.noTone(pin); },
       map: (x, a, b, c, d) => Math.trunc((x - a) * (d - c) / (b - a)) + c,   // Arduino integer map()
@@ -226,6 +228,27 @@ export const PROGRAMS = {
       await rt.at(15); rt.print(temperatureC, 1);
       await rt.at(16); rt.println(' C');
       await rt.at(17); await rt.delay(1000);
+    }
+  },
+
+  async ultrasonic(rt) {
+    await rt.at(2); await rt.at(3);
+    await rt.at(5);
+    await rt.at(6); rt.pinMode('D7', 'OUTPUT');
+    await rt.at(7); rt.pinMode('D8', 'INPUT');
+    await rt.at(8); rt.serialBegin(9600);
+    for (;;) {
+      await rt.at(11);
+      await rt.at(12); rt.digitalWrite('D7', 0);
+      await rt.at(13); await rt.delayMicroseconds(2);
+      await rt.at(14); rt.digitalWrite('D7', 1);
+      await rt.at(15); await rt.delayMicroseconds(10);
+      await rt.at(16); rt.digitalWrite('D7', 0);
+      await rt.at(18); const duration = await rt.pulseIn('D8', 1);
+      await rt.at(19); const distanceCm = duration / 58.0;
+      await rt.at(21); rt.print(distanceCm, 1);
+      await rt.at(22); rt.println(' cm');
+      await rt.at(23); await rt.delay(100);
     }
   },
 

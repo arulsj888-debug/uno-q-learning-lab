@@ -7,7 +7,7 @@ An interactive, realistic 3D model of the **Arduino UNO Q** with clickable parts
 Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, with no install, server or internet connection needed.
 
 - **Explore the board**: drag to rotate 360°, scroll to zoom, right-drag to pan. Click any part or any single header pin to read about it. Use **Top**, **Bottom**, **360°** and **Labels** in the top bar.
-- **Lessons**: twelve lessons in order, each ending with a quiz:
+- **Lessons**: thirteen lessons in order, each ending with a quiz:
   - **Module 1: Getting started**
     1. Meet the Arduino UNO Q (guided tour of every part)
     2. Power the board safely (inputs, voltage rails, boot, limits, power button)
@@ -24,6 +24,7 @@ Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, 
   - **Module 4: Sensors**
     11. Light sensor: an automatic night light (GL5528 photoresistor + 10 kΩ divider, light slider)
     12. Measure temperature with a TMP36 (analog, 10 mV/°C, temperature slider)
+    13. Measure distance with ultrasound (HC-SR04: 5 V-tolerant pin D8, `pulseIn()`, obstacle slider)
 
 Purple notes in the lessons mark behavior that is only **simulated** in the app, such as the shortened boot time.
 
@@ -38,6 +39,7 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
 | Arduino official CAD files (Gerber, drill, STEP) | board artwork, holes, part positions and sizes |
 | Arduino store product photos (ABX00162) | header print, Wi-Fi module label, chip markings |
 | GL55-series photoresistor datasheet | GL5528 values (10–20 kΩ at 10 lux, ≥ 1 MΩ dark, γ 0.6), dimensions |
+| Elecfreaks HC-SR04 datasheet | supply, range, 10 µs trigger, µs ÷ 58 = cm, > 60 ms cycle |
 | Analog Devices TMP35/36/37 datasheet, Rev. F | TMP36 output (0.5 V + 10 mV/°C), supply, accuracy, TO-92 pinout |
 | Arduino Zephyr core source (ArduinoCore-zephyr) | `analogRead` 10-bit default, `analogWrite` 8-bit default and non-PWM behavior, `tone()` behavior |
 
