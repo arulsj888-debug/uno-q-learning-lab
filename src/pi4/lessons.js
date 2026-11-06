@@ -94,6 +94,37 @@ def turn_off():
     led.off()
     return home()`;
 
+export const PI_PANEL = `from flask import Flask, redirect
+from gpiozero import LED
+import board
+import adafruit_sht31d
+
+app = Flask(__name__)
+led = LED(17)
+sensor = adafruit_sht31d.SHT31D(board.I2C())
+
+@app.route("/")
+def home():
+    state = "ON" if led.is_lit else "OFF"
+    return (
+        "<meta http-equiv='refresh' content='5'>"
+        "<h1>Pi control panel</h1>"
+        f"<p>Temperature: {sensor.temperature:0.1f} C</p>"
+        f"<p>Humidity: {sensor.relative_humidity:0.1f} %</p>"
+        f"<p>LED is {state}</p>"
+        "<a href='/on'>Turn on</a> <a href='/off'>Turn off</a>"
+    )
+
+@app.route("/on")
+def turn_on():
+    led.on()
+    return redirect("/")
+
+@app.route("/off")
+def turn_off():
+    led.off()
+    return redirect("/")`;
+
 export const PI_BUTTON_LED = `from gpiozero import LED, Button
 
 led = LED(17)
@@ -132,6 +163,17 @@ export const PI_I2C_PARTS = [
 ];
 const I2C_IDS = PI_I2C_PARTS.map(d => d.id);
 const IO_I2C = { kind: 'i2c', item: 'sen1', needs: I2C_IDS };
+export const PI_PANEL_PARTS = [
+  ...PI_LED_PARTS,
+  { id: 'sen2', type: 'sht31', row: 'g', col: 20 },
+  { id: 'w5', type: 'fwire', from: 'p1', to: 'j20', color: 'red', lift: 30 },
+  { id: 'w6', type: 'fwire', from: 'p6', to: 'j21', color: 'black', lift: 40 },
+  { id: 'w7', type: 'fwire', from: 'p5', to: 'j22', color: 'yellow', lift: 50 },
+  { id: 'w8', type: 'fwire', from: 'p3', to: 'j23', color: 'blue', lift: 60 },
+];
+const PANEL_IDS = PI_PANEL_PARTS.map(d => d.id);
+const IO_PANEL_LED = { kind: 'led', item: 'led1', needs: PANEL_IDS };
+const IO_PANEL_I2C = { kind: 'i2c', item: 'sen2', needs: PANEL_IDS };
 const IO_BTN = { kind: 'button', item: 'btn1', needs: BTN_IDS };
 
 // Practice terminal (Lesson 8). Each meaning is taken from the official Raspberry Pi documentation (see 'src').
@@ -168,7 +210,7 @@ export const TERM_CMDS = [
   { g: 'Python', cmd: 'python3', does: 'Starts Python 3, which comes pre-installed with Raspberry Pi OS.', src: 'Using Python' },
 ];
 
-export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web' };
+export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project' };
 
 export const PI_LESSONS = [
   // ================================================================== P1
@@ -774,8 +816,8 @@ pause()</pre>
         <p>Flask prints a line with the port (default 5000). Stop the server with <b>Ctrl+C</b>.</p>`,
       },
       {
-        title: 'Run it', view: 'pibench', have: LED_IDS, showCode: true, power: true,
-        body: `<p>The <b>phone</b> at the bottom right of the 3D view stands for your phone. Press <b>▶ Run</b> (this starts the server), then <b>tap “Turn on”</b> and <b>“Turn off”</b> on the phone.</p>
+        title: 'Run it', view: 'pibench', have: LED_IDS, showCode: true, power: true, phone: true,
+        body: `<p>The <b>phone</b> appears at the bottom right of the 3D view and stands for your phone. Press <b>▶ Run</b> (this starts the server), then <b>tap “Turn on”</b> and <b>“Turn off”</b> on the phone.</p>
         <ol><li>The tap asks the Pi for <code>/on</code>.</li><li>The matching function runs <code>led.on()</code> — the real LED lights.</li><li>The Pi sends the page back, now saying “LED is ON”.</li></ol>
         <p>Before you press Run the phone shows <b>“can’t reach this page”</b>: no server is running yet.</p>
         <p class="sim">Simulated: no real network is used here.</p>`,
@@ -800,6 +842,97 @@ pause()</pre>
     ],
     sources: [SRC_PI.flask, SRC_PI.usegpio, SRC_PI.gpiozero, SRC_PI.remote, SRC_PI.python],
   },
+  // ================================================================== P11
+  {
+    id: 'p11', num: 11, module: 6, title: 'Final project: a Pi control panel on your phone', level: 'Advanced', time: '35 min',
+    goal: 'Combine everything: an I²C sensor, an LED and a web page — your phone shows the temperature and humidity and switches the LED.',
+    hardware: ['Raspberry Pi 4 (set up)', 'Breadboard', 'Adafruit SHT31-D breakout with header pins', '5 mm red LED + 220 Ω resistor', '6 × female–male jumper wires', 'A phone on the same network'],
+    code: PI_PANEL, file: 'panel.py', program: 'pi_panel', fast: true, widgets: ['piweb', 'pisens'], sdaWire: 'w8',
+    circuit: PI_PANEL_PARTS, io: { p11: IO_PANEL_LED, p3: IO_PANEL_I2C }, led: true,
+    explain: {
+      1: '<b>Flask</b> makes the web page; <b>redirect</b> sends the browser to another address.',
+      2: 'The LED class from GPIO Zero (Lessons 4 and 10).',
+      3: '<b>board</b> knows the Pi’s pins, including SDA and SCL (Lesson 9).',
+      4: 'The driver of the SHT31-D sensor (Lesson 9).',
+      6: 'The web application (Lesson 10).',
+      7: 'The LED on GPIO17 (pin 11).',
+      8: 'The sensor on the I²C bus. If it does not answer, Python stops here with “No I2C device at address: 0x44”.',
+      10: 'The main page: asked for when the browser opens the address.',
+      11: 'The function that builds the page.',
+      12: 'Is the LED on right now? Turn that into the word ON or OFF.',
+      13: 'Everything inside the brackets is the page.',
+      14: 'Standard HTML that tells the browser to <b>reload the page every 5 seconds</b>, so the numbers stay up to date.',
+      15: 'A heading.',
+      16: '<b>sensor.temperature</b> asks the sensor for a new measurement every time the page is built.',
+      17: '<b>sensor.relative_humidity</b>: the humidity.',
+      18: 'The LED state.',
+      19: 'Two links. Tapping one asks the Pi for <b>/on</b> or <b>/off</b>.',
+      22: 'The address <b>/on</b> …',
+      23: '… runs this function.',
+      24: 'LED on.',
+      25: '<b>redirect("/")</b> sends the browser back to the main page. This matters: the page reloads itself every 5 s, and if it stayed on <b>/on</b> it would switch the LED on again and again.',
+      27: 'The address <b>/off</b> …',
+      28: '… runs this function.',
+      29: 'LED off.',
+      30: 'Back to the main page.',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'pibench', have: PANEL_IDS, power: false,
+        body: `<p>A <b>control panel</b> for your Raspberry Pi, shown in the browser of your phone:</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">SHT31-D sensor (I²C)</span><span class="pt in">LED (GPIO17)</span></div><div class="pt-arrow">↕</div><div class="pt-row"><span class="pt">Python + Flask on the Raspberry Pi</span></div><div class="pt-arrow">↕ Wi-Fi</div><div class="pt-row"><span class="pt bus">Phone: temperature, humidity, LED buttons</span></div></div>
+        <table class="kv"><tr><th>Part</th><th>You learned it in</th></tr><tr><td>LED on GPIO17</td><td>Lesson 4</td></tr><tr><td>Sensor on I²C, enabling I²C</td><td>Lesson 9</td></tr><tr><td>Flask web page, <code>--host=0.0.0.0</code></td><td>Lesson 10</td></tr><tr><td>Terminal, <code>hostname -I</code>, safe shutdown</td><td>Lessons 2 and 8</td></tr></table>`,
+      },
+      {
+        title: 'Step 1 — the LED circuit', view: 'pibb', have: LED_IDS, power: false, holes: ['g12 · anode (+)', 'g13 · cathode (−)'],
+        body: `<p>The same circuit as Lesson 4: 220 Ω resistor <b>h8 → h12</b>, LED anode <b>g12</b>, cathode <b>g13</b>. Wires: <b>pin 11 (GPIO17) → j8</b> and <b>pin 9 (GND) → j13</b>.</p>`,
+      },
+      {
+        title: 'Step 2 — the sensor, further along the breadboard', view: 'pibb', have: [...LED_IDS, 'sen2'], power: false, holes: ['g20 · VIN', 'g21 · GND', 'g22 · SCL', 'g23 · SDA'],
+        body: `<p>Push the sensor’s header pins into row <b>g</b>, columns 20 to 26: <b>VIN in g20, GND in g21, SCL in g22, SDA in g23</b>. It sits well away from the LED circuit (columns 8–13), so nothing touches.</p>`,
+      },
+      {
+        title: 'Step 3 — four wires for the sensor', view: 'pibench', have: PANEL_IDS, pins: ['p1', 'p6', 'p5', 'p3'],
+        body: `<ul><li>Red: <b>pin 1 (3V3) → j20</b> (VIN)</li><li>Black: <b>pin 6 (GND) → j21</b></li><li>Yellow: <b>pin 5 (SCL) → j22</b></li><li>Blue: <b>pin 3 (SDA) → j23</b></li></ul>
+        <p class="warn">Power the sensor from <b>3V3 (pin 1)</b>, never from 5V. All GPIO pins, including SDA and SCL, are 3.3 V only.</p>`,
+      },
+      {
+        title: 'Before you run it: checklist', view: 'home', acc: [],
+        body: `<ol><li><b>I²C is on</b> — Control Centre → Interfaces, or <code>sudo raspi-config</code> (Lesson 9).</li><li><b>Libraries</b> — <code>sudo apt install python3-flask</code>, and Adafruit’s sensor library <code>pip3 install adafruit-circuitpython-sht31d</code> (Lesson 9).</li></ol>
+        <p class="tip"><b>One place for all libraries:</b> if you installed Adafruit’s library inside a virtual environment (Lesson 8), install Flask in the same environment with <code>pip install flask</code>, so the program finds both.</p>
+        <p>Then find the IP address with <code>hostname -I</code>.</p>`,
+      },
+      { title: 'The program', view: 'pibench', have: PANEL_IDS, showCode: true, power: true, body: `<p>It is Lessons 9 and 10 in one file. Click every line of <code>panel.py</code>.</p><p class="tip">Compared with Lesson 10, three things are new: the sensor lines, the two numbers on the page, and <code>redirect("/")</code> in the <code>/on</code> and <code>/off</code> routes.</p>` },
+      {
+        title: 'Run it', view: 'pibench', have: PANEL_IDS, showCode: true, power: true, phone: true,
+        body: `<ol><li>Press <b>▶ Run</b>. This starts the server (on a real Pi: <code>flask --app panel run --host=0.0.0.0</code>).</li><li>The <b>phone</b> shows the temperature, humidity and the LED state.</li><li><b>Move the sliders</b> in the panel (the air around the sensor) — within 5 seconds the phone shows the new numbers.</li><li>Tap <b>Turn on</b> / <b>Turn off</b>: the real LED follows.</li></ol>
+        <p>The line <b>[simulated] browser refresh</b> in the Shell shows the page reloading by itself every 5 seconds.</p>
+        <p class="sim">Simulated: no real network, sensor or Wi-Fi is used here.</p>`,
+      },
+      {
+        title: 'What if the sensor wire is loose?', view: 'pibench', have: PANEL_IDS, showCode: true, power: true, phone: true,
+        body: `<p>Stop the program, press <b>“Unplug the SDA wire”</b> and run again. The sensor does not answer, so Python stops at line 8 with <code>ValueError: No I2C device at address: 0x44</code> and <b>no server starts</b>: the phone cannot reach the page. Check the four wires and that I²C is on.</p>`,
+      },
+      {
+        title: 'Safety and good habits', view: 'pibench', have: PANEL_IDS, power: true,
+        body: `<ul><li><b>Keep it on your own network.</b> The page has no password; with <code>--host=0.0.0.0</code> anyone on the network who knows the address can use it.</li><li>No debug mode with <code>--host=0.0.0.0</code>; do not expose it to the Internet.</li><li>The LED resistor (220 Ω) keeps the pin current low; never wire a motor or a lamp straight to a GPIO pin.</li><li>Shut the Pi down properly: <code>sudo poweroff</code>.</li></ul>
+        <p class="tip"><b>Ideas to extend it:</b> switch the LED on automatically above a temperature, add the button from Lesson 5 as a second control, or show a history of readings.</p>`,
+      },
+      {
+        title: 'Summary — you made it!', view: 'pibench', have: PANEL_IDS, power: true,
+        body: `<p>You built a small IoT system on a Raspberry Pi:</p>
+        <ul><li>a digital <b>sensor</b> on I²C and an <b>LED</b> on a GPIO pin,</li><li>a <b>web server</b> that serves a live page and takes commands from a phone,</li><li>and you know the <b>safety rules</b>: 3.3 V only, the right pins, and a closed, private network.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Why do /on and /off end with redirect("/")?', a: ['To make the LED brighter', 'So the self-reloading main page does not switch the LED again and again', 'To start Wi-Fi', 'To install Flask'], c: 1, why: 'After the action the browser returns to the main page; otherwise every 5-second reload would repeat the action.' },
+      { q: 'Which two Pi pins carry the sensor’s data and clock?', a: ['Pins 3 and 5', 'Pins 11 and 9', 'Pins 1 and 6', 'Pins 8 and 10'], c: 0, why: 'SDA = pin 3 (GPIO2), SCL = pin 5 (GPIO3).' },
+      { q: 'The program stops with “No I2C device at address: 0x44”. What do you check first?', a: ['The phone', 'The four sensor wires and that I²C is turned on', 'The LED colour', 'The port number'], c: 1, why: 'Nobody answered at the sensor’s address.' },
+      { q: 'What does --host=0.0.0.0 do?', a: ['Makes the server reachable from other devices on the network', 'Turns on debug mode', 'Powers the sensor', 'Shuts down the Pi'], c: 0, why: 'By default Flask answers only on the Pi itself.' },
+      { q: 'Where do you connect the sensor’s VIN?', a: ['5V', '3V3 (pin 1)', 'GPIO17', 'SDA'], c: 1, why: 'GPIO is 3.3 V only; Adafruit’s Pi wiring uses 3V3.' },
+    ],
+    sources: [SRC_PI.flask, SRC_PI.sht31, SRC_PI.sht31lib, SRC_PI.usegpio, SRC_PI.cfg, SRC_PI.gpio, SRC_PI.remote],
+  },
 ];
 
-export const PI_COMING = ['Buzzer', 'Camera module', 'Final project'];
+export const PI_COMING = ['Buzzer', 'Camera module', 'Buzzer (optional extra)'];

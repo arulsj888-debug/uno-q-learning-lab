@@ -246,7 +246,7 @@ class App {
   async ensurePower() { if (!this.usbPlugged) await this.plug(true); }
 
   outputsOff() {
-    if (this.pw) { this.pw.up = false; this.pw.lit = false; this.pwStage = 'idle'; this.pwRender && this.pwRender(); }
+    if (this.pw) { this.pw.up = false; this.pw.lit = false; delete this.pw.c; delete this.pw.rh; this.pwStage = 'idle'; this.pwRender && this.pwRender(); }
     this.uiq = [];
     this.phone = null;
     this.br = { stage: 'idle', arg: null, led: null };
@@ -817,7 +817,8 @@ class App {
     if ($('#rl-manual')) $('#rl-manual').onclick = () => { if (this.rly && !this.sim.running) this.rly.manual = !this.rly.manual; };
     if ($('#pir-wave')) { $('#pir-wave').onclick = () => this.pirWave(); $('#pir-still').onclick = () => this.pirHoldStill(); }
     this.showRoom(w.includes('pir') && !!this.pirSensor());
-    this.showPhone(w.includes('dash') || w.includes('home') || w.includes('piweb'), w.includes('piweb') ? 'piweb' : w.includes('home') ? 'home' : 'dash');
+    const piwebOn = w.includes('piweb') && L.steps.slice(0, this.stepIdx + 1).some(st => st.phone);   // the phone appears at the step that starts the server
+    this.showPhone(w.includes('dash') || w.includes('home') || piwebOn, w.includes('piweb') ? 'piweb' : w.includes('home') ? 'home' : 'dash');
     if ($('#tempc')) { $('#tempc').oninput = e => this.setTemp(+e.target.value); this.setTemp(this.tempC); }
     this.lamp.intensity = w.includes('light') ? this.lampIntensity() : 0;
     if ($('#pwm')) $('#pwm').oninput = e => this.applyManualPwm(+e.target.value);
@@ -1360,15 +1361,16 @@ class App {
   pwRender() {
     const b = $('#pw-body'); if (!b) return;
     const W = this.pw || { up: false, lit: false };
+    const sens = W.c !== undefined ? `<div class="pw-t">Pi control panel</div><div class="pw-r">Temperature: <b>${W.c.toFixed(1)} °C</b></div><div class="pw-r">Humidity: <b>${W.rh.toFixed(1)} %</b></div>` : '';
     b.innerHTML = W.up
-      ? `<div class="pw-h">LED is <b class="${W.lit ? 'on' : ''}">${W.lit ? 'ON' : 'OFF'}</b></div><a class="pw-a" data-r="on">Turn on</a> <a class="pw-a" data-r="off">Turn off</a>`
+      ? `${sens}<div class="pw-h">LED is <b class="${W.lit ? 'on' : ''}">${W.lit ? 'ON' : 'OFF'}</b></div><a class="pw-a" data-r="on">Turn on</a> <a class="pw-a" data-r="off">Turn off</a>`
       : `<div class="pw-err">This site can’t be reached<small>The Raspberry Pi is not answering. Is the server running?</small></div>`;
     b.querySelectorAll('.pw-a').forEach(a => a.onclick = () => { if (this.sim.running) this.uiq.push(a.dataset.r); });
   }
   piwebTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('piweb')) return;
     const run = this.sim.running, W = this.pw || (this.pw = { up: false, lit: false });
-    if (!run && W.up) { W.up = false; this.pwRender(); }
+    if (!run && W.up) { W.up = false; delete W.c; delete W.rh; this.pwRender(); }
     const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; if (cls !== undefined) e.className = cls; } };
     const st = this.pwStage || 'idle';
     set('#w-ph', run && W.up ? 'page shown' : '—', run && W.up ? 'on' : 'off');
@@ -1421,9 +1423,9 @@ class App {
   }
   pisensTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('pisens')) return;
-    const run = this.sim.running, w = this.bench.get('w4'); if (w) w.group.visible = !this.th.unplug;
+    const run = this.sim.running, w = this.bench.get(L.sdaWire || 'w4'); if (w) w.group.visible = !this.th.unplug;
     const b = $('#th-plug'); if (b) { b.disabled = run; b.textContent = this.th.unplug ? '🔌 Plug the SDA wire back in' : '🔌 Unplug the SDA wire'; b.classList.toggle('on', this.th.unplug); }
-    const n = $('#ps-note'); if (n) { const h = !this.board.powered ? 'USB-C is not plugged in — the Raspberry Pi has no power.' : this.th.unplug ? 'The SDA wire is out: nobody answers at 0x44.' : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : 'The sensor answers at address 0x44; the program reads it every 2 seconds.'; if (n.innerHTML !== h) n.innerHTML = h; }
+    const n = $('#ps-note'); if (n) { const h = !this.board.powered ? 'USB-C is not plugged in — the Raspberry Pi has no power.' : this.th.unplug ? 'The SDA wire is out: nobody answers at 0x44.' : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : (L.sdaWire ? 'The sensor answers at address 0x44; it is read each time the page is built (every 5 seconds).' : 'The sensor answers at address 0x44; the program reads it every 2 seconds.'); if (n.innerHTML !== h) n.innerHTML = h; }
   }
   thermoTick() {
     const io = this.thermoIo(); if (!io) return;
@@ -1734,7 +1736,7 @@ class App {
       },
       bridge: ev => { this.br.stage = ev.stage; if (ev.val && typeof ev.val === 'object') { Object.assign(this.br, { c: ev.val.c, rh: ev.val.rh, hot: ev.val.hot, auto: ev.val.auto, lamp: ev.val.lamp }); if (ev.stage === 'render') this.phone = { c: ev.val.c, rh: ev.val.rh, auto: ev.val.auto, lamp: ev.val.lamp }; } else this.br.arg = ev.val; },
       ui: () => { const q = this.uiq || []; this.uiq = []; return q; },
-      web: ev => { if (!this.pw) this.pw = { up: false, lit: false }; this.pw.up = true; this.pw.lit = !!ev.val.lit; this.pwStage = this.pw.lit ? 'on' : 'off'; this.pwRender(); },
+      web: ev => { if (!this.pw) this.pw = { up: false, lit: false }; this.pw.up = true; this.pw.lit = !!ev.val.lit; if (ev.val.c !== undefined) { this.pw.c = ev.val.c; this.pw.rh = ev.val.rh; } this.pwStage = this.pw.lit ? 'on' : 'off'; this.pwRender(); },
       pixels: arr => { this.pxArr = arr; },
       sensor: () => {
         const io = this.ioFor('p3'), ok = io && io.kind === 'i2c' && this.wired(io) && this.board.powered && !this.th.unplug;

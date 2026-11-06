@@ -554,3 +554,4 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 #phone .pw-h { font-size: 15px; margin-bottom: 10px; } #phone .pw-h b { color: #6a7c8c; } #phone .pw-h b.on { color: #1f9d55; }
 #phone .pw-a { display: inline-block; color: #0b57d0; text-decoration: underline; font-size: 14px; margin-right: 12px; cursor: pointer; padding: 4px 0; }
 #phone .pw-err { font: 13px Arial, sans-serif; color: #444; } #phone .pw-err small { display: block; color: #777; font-size: 11px; margin-top: 4px; }
+#phone .pw-t { font-weight: 700; font-size: 13px; margin-bottom: 6px; } #phone .pw-r { font-size: 13px; margin: 2px 0; }

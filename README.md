@@ -62,6 +62,8 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
     9. Read an I²C sensor (Adafruit SHT31-D on a breadboard, SDA pin 3 / SCL pin 5 / 3V3, enabling I²C, Adafruit library, loose-wire error `No I2C device at address: 0x44`)
   - **Module 5: Web**
     10. A web page served by the Pi (Flask: `@app.route`, `flask --app … run --host=0.0.0.0`, port 5000; a phone mock-up switches the real LED; “can't reach this page” before the server runs; safety rules from the Flask docs)
+  - **Module 6: Final project**
+    11. Final project: a Pi control panel on your phone (SHT31-D sensor + LED + Flask page that refreshes every 5 s; `redirect("/")` so reloads never repeat an action; wiring, checklist, loose-wire error, safety)
 
 ## Works on every screen
 

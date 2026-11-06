@@ -430,6 +430,31 @@ export const PROGRAMS = {
       await rt.delay(120);
     }
   },
+  // Lesson 11 — control panel: Flask page with sensor values + LED links (simulated phone, refresh every 5 s)
+  async pi_panel(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(6);
+    await rt.at(7); rt.pinMode('p11', 'OUTPUT'); rt.digitalWrite('p11', 0);
+    await rt.at(8);
+    if (!rt.sensor().found) { rt.println('ValueError: No I2C device at address: 0x44'); for (;;) await rt.delay(1000); }
+    rt.println('[simulated] server started on port 5000');
+    let lit = false;
+    const page = async () => {
+      await rt.at(10); await rt.at(11); await rt.at(12); await rt.at(13); await rt.at(14); await rt.at(15);
+      await rt.at(16); const r = rt.sensor(); await rt.at(17); await rt.at(18); await rt.at(19); await rt.at(20);
+      rt.web('page', { lit, c: r.c, rh: r.rh });
+    };
+    await page();
+    let t0 = performance.now();
+    for (;;) {
+      for (const evn of rt.uiEvents()) {
+        if (evn === 'on') { rt.println('[simulated] request: GET /on'); await rt.at(22); await rt.at(23); await rt.at(24); lit = true; rt.digitalWrite('p11', 1); await rt.at(25); await page(); t0 = performance.now(); }
+        else if (evn === 'off') { rt.println('[simulated] request: GET /off'); await rt.at(27); await rt.at(28); await rt.at(29); lit = false; rt.digitalWrite('p11', 0); await rt.at(30); await page(); t0 = performance.now(); }
+      }
+      if (performance.now() - t0 > 5000) { t0 = performance.now(); rt.println('[simulated] browser refresh: GET /'); await page(); }
+      await rt.delay(120);
+    }
+  },
   async pi_pwm(rt) {
     rt.serialBegin(9600);
     await rt.at(1); await rt.at(2);
