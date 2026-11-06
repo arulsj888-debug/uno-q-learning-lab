@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE, PIXELS_CODE, BRIDGE_INO, BRIDGE_PY, BRIDGE2_INO, BRIDGE2_PY } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE, PIXELS_CODE, BRIDGE_INO, BRIDGE_PY, BRIDGE2_INO, BRIDGE2_PY, DASH_INO, DASH_PY, DASH_JS } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -27,6 +27,8 @@ const SRC = {
   bridgelib: { t: 'Arduino_RouterBridge library (README, source)', u: 'https://github.com/arduino-libraries/Arduino_RouterBridge' },
   appbricks: { t: 'Arduino App Bricks Python library: arduino.app_utils (Bridge, App)', u: 'https://github.com/arduino/app-bricks-py' },
   bridgeex: { t: 'Arduino App Bricks examples: “Bridge basics” (call a sketch function from Python, send data to Python)', u: 'https://github.com/arduino/app-bricks-examples/tree/main/core-and-foundational/03-bridge-basics' },
+  webui: { t: 'Arduino App Bricks: Web UI brick (README)', u: 'https://github.com/arduino/app-bricks-py/tree/main/src/arduino/app_bricks/web_ui' },
+  webuiex: { t: 'Arduino App Bricks examples: “Web UI basics” (data transmission, button action)', u: 'https://github.com/arduino/app-bricks-examples/tree/main/core-and-foundational/08-web-ui-basics' },
   qwiic: { t: 'SparkFun Qwiic system (connector and cable colour code)', u: 'https://www.sparkfun.com/qwiic' },
   dhtforum: { t: 'Arduino Forum: “DHT11 and UNO Q”', u: 'https://forum.arduino.cc/t/dht11-and-uno-q/1416409' },
 };
@@ -2014,11 +2016,118 @@ export const LESSONS = [
     ],
     sources: [SRC.bridgelib, SRC.appbricks, SRC.bridgeex, SRC.thermo, SRC.modulinolib],
   },
+  // ================================================================== 22
+  {
+    id: 'l22', num: 22, module: 7, title: 'A Wi-Fi dashboard: show the temperature in a web page', level: 'Intermediate', time: '30 min',
+    goal: 'Serve a small web page from the UNO Q with the Web UI brick, and push live Thermo readings to it over Wi-Fi.',
+    hardware: ['Arduino UNO Q (Wi-Fi)', 'Arduino Modulino® Thermo + Qwiic cable (Lesson 18)', 'A phone or computer on the same Wi-Fi network'],
+    code: DASH_INO, code2: DASH_PY, code3: DASH_JS, program: 'dash', fast: true, widgets: ['dash'], noBreadboard: true,
+    circuit: THERMO_PARTS, io: { QWIIC: THERMO_IO_S },
+    explain: {
+      1: 'The Bridge library — to talk to Python.',
+      2: 'The Modulino library — to read the Thermo.',
+      4: 'The Thermo object.',
+      6: 'setup() runs once, on the microcontroller.',
+      7: 'Start the Bridge first.',
+      8: 'Start the Qwiic bus (Wire1).',
+      9: 'Find the Thermo.',
+      12: 'loop() repeats forever.',
+      13: 'Read the temperature (°C) …',
+      14: '… and the humidity (%RH).',
+      15: '<b>Bridge.notify("on_reading", …)</b> pushes both numbers to Python (Lesson 21). The sketch knows nothing about web pages — it only reports readings.',
+      16: 'Wait one second.',
+      101: 'Import <b>App</b> and <b>Bridge</b>.',
+      102: 'Import the <b>WebUI</b> brick: a ready-made small web server.',
+      104: '<b>WebUI()</b> creates the server object. By default it listens on <b>port 7000</b> and serves the files in the app’s <code>assets</code> folder.',
+      106: 'The sketch calls this function through the Bridge (Lesson 21).',
+      107: '<b>ui.send_message("reading", {…})</b> sends a message named <b>"reading"</b> with the two numbers to <b>every browser</b> that has the page open (WebSocket).',
+      109: 'Offer <code>on_reading</code> to the sketch.',
+      111: '<b>App.run()</b> starts everything, including the web server, and keeps running. You do not start the server yourself.',
+      201: 'Create the connection to the board. <code>WebUI</code> is a small helper class from the file <code>libs/arduino.js</code>.',
+      203: 'When a message named <b>"reading"</b> arrives, run this function. <code>data</code> holds the two numbers.',
+      204: 'Show the temperature in the page, with one decimal.',
+      205: 'Show the humidity.',
+      206: 'End of the function. The page now updates by itself — no reload.',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'thermo', have: THERMO_IDS, power: false, labels: [['th1', 'Thermo'], ['board', 'UNO Q']],
+        body: `<p>A <b>live dashboard</b>: the UNO Q measures the temperature and humidity, and a <b>web page on your phone or computer</b> shows them, updating every second.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">Sketch reads the Thermo</span></div><div class="pt-arrow">↓ Bridge.notify</div><div class="pt-row"><span class="pt">Python runs a small web server</span></div><div class="pt-arrow">↓ Wi-Fi</div><div class="pt-row"><span class="pt bus">Browser shows the numbers</span></div></div>
+        <p>You already know the first two arrows (Lessons 20 and 21). The new part is the <b>web server</b> and the <b>web page</b>.</p>`,
+      },
+      {
+        title: 'The three layers', view: 'thermo', have: THERMO_IDS, power: false,
+        body: `<table class="kv"><tr><th>Layer</th><th>Runs on</th><th>Job</th></tr>
+        <tr><td><b>Sketch</b> · <code>sketch.ino</code></td><td>STM32 microcontroller</td><td>read the sensor</td></tr>
+        <tr><td><b>Python</b> · <code>main.py</code></td><td>Linux side</td><td>web server, pass data on</td></tr>
+        <tr><td><b>Web page</b> · <code>assets/</code></td><td>the browser of your phone / computer</td><td>show the numbers</td></tr></table>
+        <p>The UNO Q has <b>Wi-Fi</b>, so your phone or computer, on the <b>same network</b>, can open a page served by the board. The address looks like <code>http://&lt;board-ip&gt;:7000</code> — the board’s IP address and port <b>7000</b> (the Web UI default).</p>`,
+      },
+      {
+        title: 'The Web UI brick', view: 'thermo', have: THERMO_IDS, power: false,
+        body: `<p>In Arduino App Lab, a <b>brick</b> is a ready-made building block. The <b>Web UI</b> brick is a small web server that:</p>
+        <ul><li>serves your <b>HTML, CSS and JavaScript</b> files from the app’s <code>assets</code> folder (it needs an <code>index.html</code>),</li><li>keeps a <b>WebSocket</b> open to each browser, so Python can <b>push</b> new data without the page reloading,</li><li>is started by <code>App.run()</code>.</li></ul>
+        <pre class="tree">my-dashboard/
+├─ app.yaml          bricks: - arduino:web_ui
+├─ python/main.py
+├─ sketch/sketch.ino
+└─ assets/
+    ├─ index.html
+    ├─ app.js
+    └─ libs/ (socket.io.min.js, arduino.js)</pre>
+        <p class="tip">A <b>WebSocket</b> is a connection that stays open. The browser does not have to ask again and again — the server just sends when it has news.</p>`,
+      },
+      { title: 'The sketch (reads and reports)', view: 'thermo', have: THERMO_IDS, showCode: true, power: true, body: `<p>The sketch only reads the Thermo and <b>notifies</b> Python every second. Click each line of <code>sketch.ino</code> (lowest part of the code panel).</p>` },
+      {
+        title: 'Python: the server', view: 'thermo', have: THERMO_IDS, showCode: true, power: true,
+        body: `<p>Python creates the web server with <code>WebUI()</code>. Each time the sketch reports, <code>on_reading</code> forwards the numbers to the browsers with <code>ui.send_message</code>. Click the lines of <code>main.py</code> (top).</p>
+        <p class="tip">Compare with Lesson 21: there Python <i>decided</i>; here Python is a <b>messenger</b> between the sketch and the web page.</p>`,
+      },
+      {
+        title: 'The web page', view: 'thermo', have: THERMO_IDS, showCode: true, power: true,
+        body: `<p>The page has two files. <code>index.html</code> is just the layout:</p>
+        <pre class="tree">&lt;h1&gt;UNO Q dashboard&lt;/h1&gt;
+&lt;p&gt;Temperature: &lt;span id="temp"&gt;--&lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Humidity: &lt;span id="hum"&gt;--&lt;/span&gt;&lt;/p&gt;
+&lt;script src="libs/socket.io.min.js"&gt;&lt;/script&gt;
+&lt;script src="libs/arduino.js"&gt;&lt;/script&gt;
+&lt;script src="app.js"&gt;&lt;/script&gt;</pre>
+        <p>The two <code>libs</code> files are the helpers that the official Arduino examples ship. <code>app.js</code> (middle of the code panel) waits for the <b>"reading"</b> message and writes the numbers into the two <code>&lt;span&gt;</code> places.</p>`,
+      },
+      {
+        title: 'Run it', view: 'thermo', have: THERMO_IDS, showCode: true, power: true, action: 'run',
+        body: `<ol><li>The sketch <b>notifies</b> Python with a reading.</li><li>Python sends a <b>"reading"</b> message to the browser.</li><li>The page updates its numbers.</li></ol>
+        <p>The <b>phone</b> at the bottom right of the 3D view stands for the browser. <b>Try it:</b> move the <b>Temperature</b> or <b>Humidity</b> slider and watch the phone follow.</p>
+        <p class="sim">Simulated: no real network is used here. The phone shows what the page would display.</p>`,
+      },
+      {
+        title: 'Open it on your own phone', view: 'thermo', have: THERMO_IDS, power: true,
+        body: `<ol><li>Run the app in Arduino App Lab on your UNO Q.</li><li>Connect your phone or computer to the <b>same Wi-Fi network</b> as the board.</li><li>In the browser enter <code>http://&lt;board-ip&gt;:7000</code>, with your board’s IP address.</li></ol>
+        <p class="warn"><b>Keep it on your own network.</b> This simple page has no login: anyone on the same network who knows the address can open it. Do not make it reachable from the Internet.</p>`,
+      },
+      {
+        title: 'Summary', view: 'thermo', have: THERMO_IDS, power: true,
+        body: `<ul><li><b>Sketch</b> reads the sensor → <code>Bridge.notify</code> → <b>Python</b> → <code>ui.send_message</code> → <b>browser</b>.</li>
+        <li>The <b>Web UI brick</b> is a web server started by <code>App.run()</code>; it serves the <code>assets</code> folder on port <b>7000</b>.</li>
+        <li>A <b>WebSocket</b> lets the server push new values without reloading the page.</li>
+        <li>The page uses <code>new WebUI()</code> and <code>ui.on_message("name", fn)</code>.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Which part reads the Thermo in this project?', a: ['The web page', 'The sketch on the microcontroller', 'The phone', 'The Wi-Fi chip'], c: 1, why: 'The sensor is on the microcontroller side; the sketch reads it and reports with Bridge.notify.' },
+      { q: 'What starts the Web UI server?', a: ['ui.start()', 'App.run()', 'Opening the page', 'The sketch'], c: 1, why: 'The brick README: the server is started by App.run(); you do not call a start method.' },
+      { q: 'Default port of the Web UI brick?', a: ['80', '8080', '7000', '3000'], c: 2, why: 'Web UI brick README: default port 7000.' },
+      { q: 'Why is a WebSocket useful for a dashboard?', a: ['It makes the page prettier', 'The server can push new values without the page reloading', 'It encrypts the data', 'It replaces Wi-Fi'], c: 1, why: 'A WebSocket stays open, so Python can send each new reading as soon as it has one.' },
+      { q: 'Who can open this simple dashboard?', a: ['Only the board', 'Anyone on the same network who knows the address', 'Nobody', 'Only Arduino staff'], c: 1, why: 'There is no login in this simple page, so keep it on your own network.' },
+    ],
+    sources: [SRC.webui, SRC.webuiex, SRC.bridgelib, SRC.appbricks, SRC.thermo],
+  },
 ];
 
 export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion', 6: 'Module 6 — I²C & Qwiic', 7: 'Module 7 — Linux side & Bridge' };
 
 export const COMING_SOON = [
 
-  'Wi-Fi web dashboard', 'Final IoT project',
+  'Final IoT project',
 ];

@@ -36,6 +36,7 @@ Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, 
   - **Module 7: Linux side & Bridge**
     20. Two brains: Python calls your sketch over the Bridge (MPU + MCU, provide/call/notify, App.run, deadlock warning)
     21. Send sensor readings from the sketch to Python (Bridge.notify, Python decides, Bridge.call back, store-then-decide rule)
+    22. A Wi-Fi dashboard (Web UI brick, WebSocket push, live phone mock-up, three-file code panel)
 
 Purple notes in the lessons mark behavior that is only **simulated** in the app, such as the shortened boot time.
 
@@ -58,6 +59,7 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
 | Arduino Modulino Thermo datasheet (ABX00103) + Arduino_Modulino library | GXHT30C specs, I²C address 0x45, Qwiic/headers, board outline, Thermo_Basic example |
 | Arduino Modulino Pixels datasheet (ABX00109) + Arduino_Modulino source | 8 × LC8822-2020 RGB LEDs, address 0x6C, 33 mA/LED, set/clear/show, brightness 0–100 → 5-bit |
 | Arduino_RouterBridge README + source; app-bricks-py `arduino.app_utils` source; app-bricks-examples “Bridge basics” | Bridge.begin/provide/call/notify, Python Bridge.call timeout and errors, App.run(user_loop), deadlock warning |
+| Arduino App Bricks Web UI brick README + examples “Web UI basics” | WebUI(), port 7000, assets folder, send_message / on_message, App.run starts the server, app.yaml bricks entry |
 | Analog Devices TMP35/36/37 datasheet, Rev. F | TMP36 output (0.5 V + 10 mV/°C), supply, accuracy, TO-92 pinout |
 | Arduino Zephyr core source (ArduinoCore-zephyr) | `analogRead` 10-bit default, `analogWrite` 8-bit default and non-PWM behavior, `tone()` behavior |
 

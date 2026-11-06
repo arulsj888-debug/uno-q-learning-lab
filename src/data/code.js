@@ -513,3 +513,42 @@ def loop():
     time.sleep(1)
 
 App.run(user_loop=loop)`;
+
+
+// Lesson 22 — Wi-Fi dashboard. Python: WebUI brick (README, official example "Data transmission to Web UI"); page: arduino.js WebUI class
+export const DASH_INO = `#include <Arduino_RouterBridge.h>
+#include <Arduino_Modulino.h>
+
+ModulinoThermo thermo;
+
+void setup() {
+  Bridge.begin();
+  Modulino.begin();
+  thermo.begin();
+}
+
+void loop() {
+  float celsius = thermo.getTemperature();
+  float humidity = thermo.getHumidity();
+  Bridge.notify("on_reading", celsius, humidity);
+  delay(1000);
+}`;
+
+export const DASH_PY = `from arduino.app_utils import *
+from arduino.app_bricks.web_ui import WebUI
+
+ui = WebUI()
+
+def on_reading(celsius, humidity):
+    ui.send_message("reading", {"temperature": celsius, "humidity": humidity})
+
+Bridge.provide("on_reading", on_reading)
+
+App.run()`;
+
+export const DASH_JS = `const ui = new WebUI();
+
+ui.on_message('reading', (data) => {
+  document.querySelector('#temp').textContent = data.temperature.toFixed(1) + ' °C';
+  document.querySelector('#hum').textContent = data.humidity.toFixed(1) + ' %RH';
+});`;

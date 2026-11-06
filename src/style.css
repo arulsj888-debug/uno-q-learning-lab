@@ -419,3 +419,14 @@ pre.tree { background: #10161d; border: 1px solid var(--line); border-radius: 8p
 .pirstat.tight .arrow { flex: 0 0 10px; font-size: 11px; display: flex; align-items: center; }
 #code .fhdr { counter-reset: ln; }
 #br-sk { white-space: nowrap; font-size: 10px !important; }
+
+#phone { position: absolute; right: 18px; bottom: 16px; width: 200px; z-index: 5; pointer-events: none; }
+#phone .ph-cap { font-size: 11px; color: #9fb2c4; text-align: center; margin-bottom: 4px; }
+#phone .ph-frame { background: #0b0f14; border: 3px solid #2b3744; border-radius: 18px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+#phone .ph-bar { background: #1b2530; color: #9fb2c4; font: 10px Consolas, monospace; padding: 5px 8px; text-align: center; }
+#phone .ph-body { background: #f4f7fa; padding: 10px; color: #10202e; }
+#phone .ph-title { font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+#phone .ph-card { background: #fff; border: 1px solid #d6dee6; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; }
+#phone .ph-card span { display: block; font-size: 10px; color: #6a7c8c; }
+#phone .ph-card b { font-size: 20px; font-variant-numeric: tabular-nums; }
+#phone .ph-st { font-size: 10px; color: #1f9d55; text-align: right; }

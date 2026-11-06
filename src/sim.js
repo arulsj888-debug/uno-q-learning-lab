@@ -325,6 +325,26 @@ export const PROGRAMS = {
     }
   },
 
+  // Lesson 22 — sketch notifies Python; Python forwards to the browser (Web UI brick); the page shows the numbers.
+  // Python lines 101+, browser JS lines 201+, sketch 1+.
+  async dash(rt) {
+    await rt.at(101); await rt.at(102); await rt.at(104);
+    rt.serialBegin(9600);
+    await rt.at(6); await rt.at(7); await rt.at(8); await rt.at(9);
+    await rt.at(109); await rt.at(111);
+    await rt.at(201); await rt.at(203);
+    for (;;) {
+      await rt.at(12);
+      await rt.at(13); const c = rt.thermo().c;
+      await rt.at(14); const rh = rt.thermo().rh;
+      await rt.at(15); rt.bridge('notify', { c, rh }); await rt.delay(300);
+      await rt.at(106); await rt.at(107); rt.println('[python] sent to browser: ' + c.toFixed(1) + ' C, ' + rh.toFixed(1) + ' %RH'); rt.bridge('ws', { c, rh }); await rt.delay(300);
+      await rt.at(204); rt.bridge('render', { c, rh }); await rt.delay(200);
+      await rt.at(205); await rt.at(206);
+      await rt.at(16); await rt.delay(900);
+    }
+  },
+
   async tmp36(rt) {
     await rt.at(2);
     await rt.at(4);
