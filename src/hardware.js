@@ -160,8 +160,12 @@ export class LED5mm {
     this.lensMat.emissiveIntensity = v * 2.2;
     this.die.material.color.setRGB(v ? 3 : 0.2, v ? 0.6 : 0.2, v ? 0.3 : 0.2);
     this.light.intensity = v * 30;
-    this.halo.material.color.setRGB(v * 1.0, v * 0.22, v * 0.1);
+    if (this.color.r > 0.9 && this.color.g < 0.3) this.halo.material.color.setRGB(v * 1.0, v * 0.22, v * 0.1);
+    else this.halo.material.color.copy(this.color).multiplyScalar(v);
+    this.light.color.copy(this.color);
   }
+  /** a burnt-out LED: dark lens, never lights */
+  setBurnt(b) { this.burnt = b; if (b) { this.set(false); this.lensMat.color.set(0x2a2220); this.lensMat.attenuationColor.set(0x1a1412); } }
 }
 
 // ---------------------------------------------------------------- axial resistor

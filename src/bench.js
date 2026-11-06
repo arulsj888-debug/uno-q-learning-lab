@@ -11,6 +11,8 @@
 import * as THREE from 'three';
 import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
 
+import { resistorBands } from './freebuild/circuit.js';
+
 const HOLE = /^([a-j])(\d{1,2})$/;
 
 export class Bench {
@@ -24,6 +26,8 @@ export class Bench {
   point(ref) {
     const m = HOLE.exec(ref);
     if (m) return this.bb.hole(m[1], +m[2]);
+    const rl = /^r:(top[+-]|bot[+-]):(\d+)$/.exec(ref);
+    if (rl) return this.bb.rail(rl[1], +rl[2]);
     if (ref === 'QWIIC') return this.board.qwiic.pos.clone();
     const mp = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2|QA|QB)$/.exec(ref);
     if (mp && this.items[mp[1]]) return this.items[mp[1]].obj.pin(mp[2]).pos;
@@ -77,7 +81,7 @@ export class Bench {
   create(d) {
     let obj;
     switch (d.type) {
-      case 'resistor': obj = new Resistor(d.bands, this.point(d.a).distanceTo(this.point(d.b)), d.hw || 'resistor'); break;
+      case 'resistor': obj = new Resistor(d.bands || resistorBands(d.ohms || 220),this.point(d.a).distanceTo(this.point(d.b)), d.hw || 'resistor'); break;
       case 'ldr': obj = new LDR(); break;
       case 'tmp36': obj = new TMP36(); break;
       case 'sht31': obj = new SHT31Breakout(); break;
@@ -94,7 +98,7 @@ export class Bench {
       case 'lamp': obj = new MiniLamp(); break;
       case 'servo': obj = new ServoMotor(new THREE.Vector3(d.bx, DESK_Y, d.bz).sub(this.bb.hole(d.row, d.col + 1))); break;
       case 'fwire': { const bp = this.board.pins[d.from]; const p = bp && bp.female ? { pos: bp.female.clone(), dir: new THREE.Vector3(0, 1, 0) } : (([pid, pn]) => this.items[pid].obj.pin(pn))(d.from.split('.')); obj = new FemaleJumper(p.pos, p.dir, this.point(d.to), d.color, { lift: d.lift ?? 30, id: 'jumper' }); break; }
-      case 'led': obj = new LED5mm(d.color); break;
+      case 'led': obj = new LED5mm(d.hex ?? d.color); break;
       case 'button': obj = new PushButton(); break;
       case 'pot': obj = new Potentiometer(); break;
       case 'buzzer': obj = new PiezoBuzzer(); break;
@@ -113,7 +117,7 @@ export class Bench {
       case 'pot': { return { pos: this.bb.hole(d.row, d.col + 2), rotY: 0 }; }
       case 'buzzer': { const p = P(d.plus), m = P(d.minus); return { pos: p.clone().lerp(m, 0.5), rotY: Math.atan2(-(m.z - p.z), m.x - p.x) }; }
       case 'ldr': { const a = P(d.a), b = P(d.b); return { pos: a.clone().lerp(b, 0.5), rotY: Math.atan2(-(b.z - a.z), b.x - a.x) }; }
-      case 'tmp36': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
+      case 'tmp36': return { pos: this.bb.hole(d.row, d.col + 1), rotY: d.flip ? Math.PI : 0 };
       case 'sht31': return { pos: this.bb.hole(d.row, d.col + 3), rotY: 0 };   // 7 pins in columns col … col+6
       case 'pir': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
       case 'servo': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
@@ -140,6 +144,16 @@ export class Bench {
     if (!fromTray) this.scene.add(g);
     if (animate) await moveTo(g, pos, rotY, fromTray ? 900 : 700, !fromTray);
     else { g.position.copy(pos); g.rotation.set(0, rotY, 0); }
+  }
+
+  /** free-build: create, pose and show a part at once (no animation) */
+  place(d) {
+    if (this.items[d.id]) this.remove(d.id);
+    const obj = this.create(d).obj, g = obj.group;
+    this.items[d.id] = { def: d, obj, group: g };
+    this.scene.add(g);
+    if (!(d.type === 'wire' || d.type === 'fwire')) { const { pos, rotY } = this.pose(d); g.position.copy(pos); g.rotation.set(0, rotY, 0); }
+    return obj;
   }
 
   /** make exactly `ids` present; parts listed in `animateIds` are animated in order */

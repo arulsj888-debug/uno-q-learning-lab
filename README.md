@@ -42,6 +42,10 @@ Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, 
 
 Purple notes in the lessons mark behavior that is only **simulated** in the app, such as the shortened boot time.
 
+## Free build mode (both boards)
+
+The **Build** tab (next to Explore and Lessons) is a sandbox: place parts on the breadboard, wire them to the board's real pins, give each pin a job (Output HIGH, Blink, PWM, Tone, Input, Input with pull-up, Analog input) and see whether the circuit works, with the reason when it does not. A small circuit solver (`src/freebuild/circuit.js`, checked by `node tools/check_freebuild.mjs`) decides what happens: LED direction and series resistor, LED burn-out, resistor overheating, floating inputs, pull-ups, a passive buzzer that needs a changing signal, TMP36 connected backwards, 5 V on a 3.3 V pin (Raspberry Pi GPIO, UNO Q D3/A0–A5), pin current limits (Pi 16 mA, STM32U585 20 mA) and short circuits (the power is cut). Parts: resistor, LED (5 colours), push button, potentiometer, passive buzzer, light sensor (LDR), TMP36. Ready-made working and not-working examples are listed in the left column; a voltmeter tool measures any hole or pin. The model is simplified (ideal wires, typical LED voltages); the app says so.
+
 ## Raspberry Pi 4 Model B (new)
 
 - **Explore the board** is ready: a 360° Raspberry Pi 4 at exact size, with every chip, port, LED and all 40 GPIO pins clickable (pin card: physical pin, GPIO number, 3.3 V level, typical use, default pull and ALT0–ALT5 functions from the datasheet).

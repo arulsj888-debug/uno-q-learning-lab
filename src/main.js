@@ -14,6 +14,7 @@ import uqThumb from '../assets/pcb_top_albedo.jpg';
 import piThumb from '../assets/pi4/pi4_top.jpg';
 import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, HandModel } from './hardware.js';
 import { Bench } from './bench.js';
+import { FreeBuild } from './freebuild/build.js';
 import { PARTS as UQ_PARTS, CATEGORIES as UQ_CATEGORIES, BOARD_FACTS as UQ_FACTS } from './data/parts.js';
 import { JDIGITAL, JANALOG, JSPI, JCTL, findPin as uqFindPin } from './data/pins.js';
 import { LESSONS as UQ_LESSONS, COMING_SOON as UQ_SOON, MODULES as UQ_MODULES } from './data/lessons.js';
@@ -109,6 +110,7 @@ class App {
     this.usbPlugged = false;
     this.bb = new Breadboard(new THREE.Vector3(0, DESK_Y + 8.5, IS_PI ? -62 : 68)); this.bb.group.visible = false; s.add(this.bb.group);
     this.bench = new Bench(s, this.board, this.bb);
+    this.fb = new FreeBuild(this, { isPi: IS_PI, pinInfo: findPin });
     this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2, fs: {} };
     if (IS_PI) { this.acc = makePiAccessories(this.board); for (const a of this.acc.all) { a.on = false; s.add(a.group); } Object.assign(HW_INFO, PI_ACC_INFO); }
     this.strips = new THREE.Group(); this.strips.visible = false; s.add(this.strips);
@@ -322,6 +324,7 @@ class App {
     }
   }
   tick(dt = 0.016) {
+    if (this.fb) this.fb.tick();
     this.pirTick(Math.min(dt, 0.1));
     this.servoTick(Math.min(dt, 0.1));
     this.motorTick(Math.min(dt, 0.1));
@@ -664,6 +667,7 @@ class App {
 
   // ------------------------------------------------------------------ sidebar
   renderSide() {
+    if (this.mode === 'build') { this.fb.renderSide(); return; }
     const side = $('#side');
     if (this.mode === 'explore') {
       let h = '';
@@ -694,11 +698,13 @@ class App {
   }
 
   setMode(mode) {
+    if (this.mode === 'build' && mode !== 'build') this.fb.deactivate();
     this.mode = mode;
     $('#app').className = 'mode-' + mode;
     document.querySelectorAll('.modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
     this.hideFloat(); this.clearTemp(); this.hideCallout();
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
+    if (mode === 'build') { this.fb.activate(); return; }
     if (mode === 'explore') {
       this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false); this.showRelay(false); this.showThermo(false); this.showPhone(false);
       this.lesson = null; this.hideAcc();
@@ -1900,6 +1906,7 @@ class App {
 
     const tip = $('#tooltip');
     this.viewer.onHover = (hit, e) => {
+      if (this.mode === 'build') { this.fb.onHover(hit, e); return; }
       const id = hit ? hit.id : null;
       if (id !== this.hovered) {
         this.hovered = id;
@@ -1922,7 +1929,8 @@ class App {
       tip.style.left = (e.clientX - r.left) + 'px'; tip.style.top = (e.clientY - r.top) + 'px'; tip.style.display = 'block';
       this.viewer.renderer.domElement.style.cursor = (id === 'pushbutton' || id === 'pot') && this.mode === 'lessons' ? 'grab' : 'pointer';
     };
-    this.viewer.onPick = hit => {
+    this.viewer.onPick = (hit, e) => {
+      if (this.mode === 'build') { this.fb.onPick(hit, e); return; }
       if (!hit) { if (this.mode === 'explore') this.select(null); return; }
       if (this.mode === 'lessons' && (hit.id === 'pushbutton' || hit.id === 'pot' || hit.id === 'obstacle')) return;
       this.lastHit = hit;

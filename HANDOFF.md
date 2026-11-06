@@ -108,3 +108,5 @@ Whether to (a) put the Pi 4 inside the same site as a second board or (b) make a
 Task: <one line>
 Description: <one short paragraph: what was done today and what comes next>
 ```
+
+- **Free build mode (2026-11-06):** mode `build` (`src/freebuild/`): `circuit.js` = pure MNA solver + explanations (tests: `node tools/check_freebuild.mjs`), `build.js` = `FreeBuild` controller (palette, picking of holes/pins/rails by screen distance, wires, undo, localStorage `fb:<board>`, pin panel, voltmeter), `examples.js`. Hooks in main.js: `this.fb`, setMode, renderSide, viewer onHover/onPick, tick. Bench got `place()`, rail refs `r:top+:5`, LED `hex`. Next: more hardware in free-build (HC-SR04, PIR, servo, relay, motor driver, I²C sensors, Modulino, SHT31, LED matrix).

@@ -1,0 +1,501 @@
+// Free-build mode: place parts on the breadboard, wire them to the board's pins, give the pins a job, and see
+// whether the circuit works, with the reason when it does not. The electrical model is in circuit.js.
+import * as THREE from 'three';
+import { evaluate, terminals, isHoleRef, pinKind, PIN_MODES, LED_TYPES, fmtOhms, nameOf } from './circuit.js';
+import { EXAMPLES } from './examples.js';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+const RAILS = ['top+', 'top-', 'bot-', 'bot+'];
+const OHMS = [10, 100, 220, 330, 470, 1000, 2200, 4700, 10000, 47000, 100000, 1000000];
+const PREFIX = { resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
+const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
+const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
+const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
+
+export class FreeBuild {
+  constructor(app, { isPi, pinInfo }) {
+    this.app = app; this.isPi = isPi; this.boardKind = isPi ? 'pi4' : 'unoq'; this.pinInfo = pinInfo;
+    this.active = false;
+    this.parts = []; this.pinCfg = {}; this.burnt = new Set(); this.damaged = new Set(); this.burnWhy = {};
+    this.env = { lux: 300, tempC: 25, pressed: {}, pot: {} };
+    this.seq = {}; this.undoStack = []; this.tool = null; this.selected = null; this.probe = null; this.probeOn = false;
+    this.opts = { ohms: 220, color: 'red', wire: 'auto', flip: false };
+    this.result = null; this.tripMsg = null; this.lastRun = 0; this.lastHtml = {}; this.soundHz = 0;
+    this.key = 'fb:' + this.boardKind;
+    this.t0 = performance.now();
+  }
+
+  // ------------------------------------------------------------------ life cycle
+  buildPickPoints() {
+    const { bb, board } = this.app; this.pts = [];
+    for (const r of ROWS) for (let c = 1; c <= 30; c++) this.pts.push({ ref: r + c, pos: bb.hole(r, c), kind: 'hole', row: r, col: c });
+    for (const n of RAILS) for (let c = 1; c <= 30; c++) if (c % 6) this.pts.push({ ref: `r:${n}:${c}`, pos: bb.rail(n, c), kind: 'rail', rail: n, col: c });
+    for (const id of Object.keys(board.pins)) if (this.pinInfo(id) && pinKind(this.boardKind, id, this.pinInfo(id)).k !== 'nc') this.pts.push({ ref: id, pos: board.pins[id].pos.clone(), kind: 'pin' });
+    this.byRef = new Map(this.pts.map(p => [p.ref, p]));
+  }
+  setup() {
+    if (this.ready) return; this.ready = true;
+    const app = this.app, scene = app.viewer.scene;
+    this.buildPickPoints();
+    const ring = new THREE.RingGeometry(0.75, 1.15, 24); ring.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false, toneMapped: false, side: THREE.DoubleSide });
+    this.cand = new THREE.InstancedMesh(ring, mat, 420); this.cand.count = 0; this.cand.renderOrder = 12; this.cand.raycast = () => {}; this.cand.frustumCulled = false; scene.add(this.cand);
+    this.cand.setColorAt(0, new THREE.Color(1, 1, 1));
+    this.hover = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0x35d0ff, transparent: true, depthTest: false, toneMapped: false, side: THREE.DoubleSide })); this.hover.scale.setScalar(1.5); this.hover.renderOrder = 13; this.hover.visible = false; this.hover.raycast = () => {}; scene.add(this.hover);
+    const stage = $('#stage');
+    // press the push button / turn the knob directly in the 3D view
+    stage.addEventListener('pointerdown', e => {
+      if (!this.active || e.button !== 0 || this.tool) return;
+      const hit = this.partAt(e); if (!hit) return;
+      const d = this.parts.find(p => p.id === hit);
+      if (d && d.type === 'button') {
+        e.stopPropagation(); app.viewer.controls.enabled = false; this.env.pressed[d.id] = true; this.dirty = true;
+        const up = () => { this.env.pressed[d.id] = false; this.dirty = true; app.viewer.controls.enabled = true; window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointerup', up);
+      } else if (d && d.type === 'pot') {
+        e.stopPropagation(); app.viewer.controls.enabled = false; const x0 = e.clientX, f0 = this.env.pot[d.id] ?? 0.5;
+        const mv = ev => { this.env.pot[d.id] = Math.min(1, Math.max(0, f0 + (ev.clientX - x0) / 200)); this.dirty = true; this.syncControls(); };
+        const up = () => { app.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      }
+    }, true);
+    window.addEventListener('keydown', e => {
+      if (!this.active || /INPUT|SELECT|TEXTAREA/.test((e.target.tagName || ''))) return;
+      if (e.key === 'Escape') { this.cancel(); this.select(null); }
+      else if ((e.key === 'Delete' || e.key === 'Backspace') && this.selected) this.removePart(this.selected);
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); this.undo(); }
+    });
+    const bind = (el, fn) => el.addEventListener('click', e => { if (this.active) fn(e); });
+    bind($('#side'), e => this.sideClick(e)); bind($('#panel'), e => this.panelClick(e));
+    $('#side').addEventListener('change', e => { if (this.active) this.sideChange(e); });
+    $('#panel').addEventListener('change', e => { if (this.active) this.panelChange(e); });
+    $('#panel').addEventListener('input', e => { if (this.active) this.panelInput(e); });
+  }
+
+  activate() {
+    const app = this.app; this.setup(); this.active = true;
+    if (!app._legend0) app._legend0 = $('#legend').textContent;
+    app.sim.stop(); app.stopSound(); app.lamp.intensity = 0; app.hideSonar(); app.showRoom(false); app.showMotor(false); app.showRelay(false); app.showPhone(false);
+    app.lesson = null; app.hideAcc(); app.board.setMatrix(null); app.outputsOff();
+    app.bench.clear(); app.bench.setDefs([]); app.bb.group.visible = true; app.strips.visible = false;
+    app.setOutline([]); app.refreshPickTargets();
+    this.load();
+    this.rebuild3D();
+    app.view(this.isPi ? 'pibench' : 'bench');
+    this.renderSide(); this.renderPanel(); this.setHint();
+  }
+  deactivate() {
+    if (!this.active) return; this.active = false;
+    const app = this.app; this.cancel(); app.stopSound(); this.soundHz = 0;
+    this.clearProbe(); this.hover.visible = false; this.cand.count = 0;
+    app.bench.clear(); app.bb.group.visible = false; app.setOutline([]); app.refreshPickTargets();
+    $('#legend').textContent = app._legend0 || $('#legend').textContent;
+  }
+
+  // ------------------------------------------------------------------ saving, undo
+  snap() { return JSON.stringify({ parts: this.parts, pinCfg: this.pinCfg, burnt: [...this.burnt], damaged: [...this.damaged], seq: this.seq, burnWhy: this.burnWhy }); }
+  restore(s) { const o = JSON.parse(s); this.parts = o.parts; this.pinCfg = o.pinCfg; this.burnt = new Set(o.burnt); this.damaged = new Set(o.damaged); this.seq = o.seq || {}; this.burnWhy = o.burnWhy || {}; }
+  save() { try { localStorage.setItem(this.key, this.snap()); } catch (e) { /* private mode */ } }
+  load() { try { const s = localStorage.getItem(this.key); if (s) this.restore(s); } catch (e) { /* ignore */ } this.undoStack = []; }
+  commit() { this.undoStack.push(this.pre); if (this.undoStack.length > 60) this.undoStack.shift(); this.save(); this.dirty = true; this.renderPanel(); }
+  mutate(fn) { this.pre = this.snap(); fn(); this.commit(); }
+  undo() { const s = this.undoStack.pop(); if (!s) return; this.restore(s); this.save(); this.selected = null; this.rebuild3D(); this.dirty = true; this.renderPanel(); }
+
+  rebuild3D() {
+    const b = this.app.bench; b.clear();
+    for (const d of this.parts.filter(p => p.type !== 'wire' && p.type !== 'fwire')) this.place3D(d);
+    for (const d of this.parts.filter(p => p.type === 'wire' || p.type === 'fwire')) this.place3D(d);
+    this.app.refreshPickTargets();
+  }
+  place3D(d) {
+    const obj = this.app.bench.place(d);
+    if (d.type === 'led' && this.burnt.has(d.id) && obj.setBurnt) obj.setBurnt(true);
+    if (d.type === 'pot' && obj.set) obj.set(this.env.pot[d.id] ?? 0.5);
+  }
+
+  // ------------------------------------------------------------------ occupied holes
+  occupied() {
+    const m = new Map();
+    for (const d of this.parts) for (const [, ref] of terminals(d)) m.set(ref, d.id);
+    return m;
+  }
+
+  // ------------------------------------------------------------------ placing parts
+  begin(type) {
+    this.cancel(); this.probeOn = false; this.tool = { type, step: 0, first: null };
+    this.updateCandidates(); this.setHint(); this.renderSide();
+  }
+  cancel() { this.tool = null; this.cand && (this.cand.count = 0); this.hover && (this.hover.visible = false); this.setHint(); this.renderSide && this.renderSide(); }
+  free(ref) { return !this.occ.has(ref); }
+  partOptions(type) { return { ohms: this.opts.ohms, color: this.opts.color, flip: this.opts.flip }; }
+  /** refs a single-click part would use when its first hole is `ref`, or null if impossible */
+  footprint(type, ref) {
+    const p = this.byRef.get(ref); if (!p || p.kind !== 'hole') return null;
+    const { row, col } = p, at = (r, c) => `${r}${c}`;
+    if (type === 'button') { if (col > 28) return null; return { def: { type, col }, refs: [at('e', col), at('e', col + 2), at('f', col), at('f', col + 2)] }; }
+    if (type === 'pot') { if (col > 26) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 2), at(row, col + 4)] }; }
+    if (type === 'tmp36') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
+    return null;
+  }
+  second(type, first) {
+    const f = this.byRef.get(first); if (!f) return [];
+    const out = [];
+    for (const p of this.pts) {
+      if (p.ref === first || !this.free(p.ref)) continue;
+      if (type === 'wire') { if (f.kind === 'pin' && p.kind === 'pin') continue; out.push(p.ref); continue; }
+      if (p.kind !== 'hole') continue;
+      const dx = Math.abs(p.pos.x - f.pos.x), dz = Math.abs(p.pos.z - f.pos.z), dist = Math.hypot(dx, dz);
+      if (type === 'resistor') { if (dist >= 7.4 && dist <= 26) out.push(p.ref); }
+      else if (type === 'led' || type === 'ldr') { if (p.row === f.row && Math.abs(p.col - f.col) === 1) out.push(p.ref); }
+      else if (type === 'buzzer') { if (p.row === f.row && Math.abs(p.col - f.col) === 3) out.push(p.ref); }
+    }
+    return out;
+  }
+  firstOk(type, ref) {
+    const p = this.byRef.get(ref); if (!p || !this.free(ref)) return false;
+    if (type === 'wire') return true;
+    return p.kind === 'hole';
+  }
+  updateCandidates() {
+    const T = this.tool; if (!T) { this.cand.count = 0; return; }
+    this.occ = this.occupied();
+    let refs = [], bad = [];
+    if (T.step === 1 && T.type !== 'wire') refs = this.second(T.type, T.first);
+    this.setMarks(refs, bad);
+  }
+  setMarks(good, bad) {
+    const m = new THREE.Matrix4(), col = new THREE.Color(), list = [...good.map(r => [r, 0x46d37e]), ...bad.map(r => [r, 0xff6b5b])].slice(0, 420);
+    list.forEach(([ref, c], i) => { const p = this.byRef.get(ref); m.makeTranslation(p.pos.x, p.pos.y + 0.35, p.pos.z); this.cand.setMatrixAt(i, m); this.cand.setColorAt(i, col.set(c)); });
+    this.cand.count = list.length; this.cand.instanceMatrix.needsUpdate = true; if (this.cand.instanceColor) this.cand.instanceColor.needsUpdate = true;
+  }
+  click(ref) {
+    const T = this.tool; if (!T) return; this.occ = this.occupied();
+    if (T.type === 'button' || T.type === 'pot' || T.type === 'tmp36') {
+      const fp = this.footprint(T.type, ref);
+      if (!fp) return this.toast('That part does not fit there (it needs more holes to the right).');
+      if (fp.refs.some(r => !this.free(r))) return this.toast('One of the holes is already used.');
+      this.mutate(() => this.add({ ...fp.def, id: this.nextId(T.type) }));
+      this.cancel(); this.toast(`Placed. Choose the part again to place another.`); return;
+    }
+    if (T.step === 0) {
+      if (!this.firstOk(T.type, ref)) return this.toast(this.free(ref) ? 'Click a breadboard hole for the first leg.' : 'That hole or pin is already used.');
+      const cands = this.second(T.type, ref); if (!cands.length) return this.toast(T.type === 'wire' ? 'A wire needs a second free end.' : 'The second leg has no free hole within reach there.');
+      T.first = ref; T.step = 1; this.updateCandidates(); this.setHint(); return;
+    }
+    if (!this.second(T.type, T.first).includes(ref)) return this.toast(T.type === 'led' ? 'The LED has only 2.54 mm between its legs: click a green hole next to the first one.' : 'Click one of the green holes.');
+    const a = T.first; let def;
+    if (T.type === 'resistor') def = { type: 'resistor', a, b: ref, ohms: this.opts.ohms };
+    else if (T.type === 'led') def = { type: 'led', anode: a, cathode: ref, color: this.opts.color, hex: LED_TYPES[this.opts.color].hex };
+    else if (T.type === 'ldr') def = { type: 'ldr', a, b: ref };
+    else if (T.type === 'buzzer') def = { type: 'buzzer', plus: a, minus: ref };
+    else if (T.type === 'wire') def = this.wireDef(a, ref);
+    def.id = this.nextId(def.type);
+    this.mutate(() => this.add(def));
+    this.tool = { type: T.type, step: 0, first: null }; this.updateCandidates(); this.setHint();
+  }
+  wireDef(a, b) {
+    const pa = this.byRef.get(a), pb = this.byRef.get(b);
+    let from = a, to = b; if (pb.kind === 'pin') { from = b; to = a; }
+    const pin = pa.kind === 'pin' ? a : pb.kind === 'pin' ? b : null;
+    let color = this.opts.wire;
+    if (color === 'auto') { const k = pin ? pinKind(this.boardKind, pin, this.pinInfo(pin)).k : null; color = k === 'gnd' ? 'black' : k === '5v' ? 'red' : k === '3v3' ? 'orange' : 'yellow'; }
+    const dist = pa.pos.distanceTo(pb.pos);
+    const type = pin && this.isPi ? 'fwire' : 'wire';
+    return { type, from, to, color, lift: Math.min(46, 14 + dist * 0.22 + (pin ? 8 : 0)) };
+  }
+  nextId(type) { const p = PREFIX[type]; this.seq[p] = (this.seq[p] || 0) + 1; return p + this.seq[p]; }
+  add(d) { this.parts.push(d); this.place3D(d); this.app.refreshPickTargets(); this.occ = this.occupied(); }
+  removePart(id) {
+    this.mutate(() => { this.parts = this.parts.filter(p => p.id !== id); this.burnt.delete(id); delete this.burnWhy[id]; delete this.env.pressed[id]; this.app.bench.remove(id); });
+    if (this.selected === id) this.select(null); this.app.refreshPickTargets();
+  }
+  select(id) { this.selected = id; const it = id && this.app.bench.items[id]; this.app.setOutline(it ? [it.group] : []); this.renderPanel(); }
+
+  // ------------------------------------------------------------------ picking
+  nearest(e, maxPx = 11) {
+    const v = this.app.viewer, rect = v.renderer.domElement.getBoundingClientRect(), cam = v.camera, p = new THREE.Vector3();
+    let best = null, bd = maxPx;
+    const T = this.tool;
+    for (const q of this.pts) {
+      p.copy(q.pos).project(cam); if (p.z > 1) continue;
+      const d = Math.hypot((p.x * 0.5 + 0.5) * rect.width + rect.left - e.clientX, (-p.y * 0.5 + 0.5) * rect.height + rect.top - e.clientY) - (q.kind === 'pin' ? 3 : 0);
+      if (d < bd) { bd = d; best = q; }
+    }
+    return best;
+  }
+  partAt(e) {
+    const v = this.app.viewer; v.setPointer(e); v.raycaster.setFromCamera(v.pointer, v.camera);
+    const groups = Object.values(this.app.bench.items).map(i => i.group);
+    const hits = v.raycaster.intersectObjects(groups, true);
+    for (const h of hits) { let o = h.object; while (o) { const it = Object.entries(this.app.bench.items).find(([, i]) => i.group === o); if (it) return it[0]; o = o.parent; } }
+    return null;
+  }
+  onHover(hit, e) {
+    if (!this.active || !e) { this.hover && (this.hover.visible = false); return; }
+    const T = this.tool, q = this.nearest(e);
+    $('#stage').style.cursor = T ? 'crosshair' : (this.partAt(e) ? 'pointer' : '');
+    if (!q || (!T && !this.probeOn)) { this.hover.visible = false; if (T) this.previewFoot(null); return; }
+    this.hover.position.set(q.pos.x, q.pos.y + 0.45, q.pos.z); this.hover.visible = true;
+    this.hover.material.color.set(T ? (this.hoverOk(q.ref) ? 0x46d37e : 0xff6b5b) : 0x35d0ff);
+    if (T) this.previewFoot(q.ref);
+    $('#legend').textContent = this.pointName(q);
+  }
+  hoverOk(ref) {
+    const T = this.tool; this.occ = this.occupied();
+    if (['button', 'pot', 'tmp36'].includes(T.type)) { const fp = this.footprint(T.type, ref); return !!fp && fp.refs.every(r => this.free(r)); }
+    if (T.step === 0) return this.firstOk(T.type, ref) && this.second(T.type, ref).length > 0;
+    return this.second(T.type, T.first).includes(ref);
+  }
+  previewFoot(ref) {
+    const T = this.tool; if (!T) return;
+    if (['button', 'pot', 'tmp36'].includes(T.type)) { const fp = ref && this.footprint(T.type, ref); this.occ = this.occupied(); if (fp) this.setMarks(fp.refs.filter(r => this.free(r)), fp.refs.filter(r => !this.free(r))); else this.cand.count = 0; }
+  }
+  pointName(q) {
+    if (q.kind === 'hole') return `Hole ${q.ref} (column ${q.col}, row ${q.row})`;
+    if (q.kind === 'rail') return `Power rail ${q.rail.replace('top', 'top ').replace('bot', 'bottom ')} (the whole rail is connected)`;
+    const k = pinKind(this.boardKind, q.ref, this.pinInfo(q.ref)); return `Board pin ${k.name}${this.isPi ? ` (physical pin ${this.pinInfo(q.ref).pin})` : ''}`;
+  }
+  onPick(hit, e) {
+    if (!this.active || !e) return;
+    const q = this.nearest(e);
+    if (this.tool) { if (q) this.click(q.ref); return; }
+    if (this.probeOn) { if (q) this.setProbe(q); return; }
+    const id = this.partAt(e); this.select(id);
+  }
+  setProbe(q) {
+    this.clearProbe(); this.probe = { q, el: this.app.label('', q.pos.clone().add(new THREE.Vector3(0, 6, 0)), 'tag3d') };
+    this.updateProbe();
+  }
+  clearProbe() { if (this.probe) { this.app.viewer.scene.remove(this.probe.el); this.probe = null; } }
+  updateProbe() {
+    if (!this.probe || !this.result) return; const { q } = this.probe;
+    const v = this.result.nodeV(q.ref), fl = this.result.isFloating(q.ref);
+    this.probe.el.element.innerHTML = `<b>${this.powered() ? (fl ? 'floating' : v.toFixed(2) + ' V') : '0 V (no power)'}</b>`;
+  }
+
+  // ------------------------------------------------------------------ simulation loop
+  powered() { return this.app.usbPlugged; }
+  tick() {
+    if (!this.active) return;
+    const now = performance.now();
+    const animated = Object.values(this.pinCfg).some(c => ['blink', 'pwm', 'tone'].includes(c.mode));
+    if (!this.dirty && now - this.lastRun < (animated ? 90 : 400)) return;
+    this.lastRun = now; this.dirty = false;
+    let res = evaluate({ boardKind: this.boardKind, pinInfo: this.pinInfo, parts: this.parts, pinCfg: this.pinCfg, powered: this.powered(), burnt: this.burnt, damaged: this.damaged, burnWhy: this.burnWhy, env: this.env, t: (now - this.t0) / 1000 });
+    if (res.tripped) { this.tripMsg = res.notes[0].text; this.app.plug(false); res = evaluate({ boardKind: this.boardKind, pinInfo: this.pinInfo, parts: this.parts, pinCfg: this.pinCfg, powered: false, burnt: this.burnt, damaged: this.damaged, burnWhy: this.burnWhy, env: this.env, t: 0 }); this.renderSide(); this.renderPanel(); }
+    if (res.newBurn.size || res.newDamage.size) {
+      this.pre = this.snap(); for (const id of res.newBurn) { this.burnt.add(id); const n = res.notes.find(x => x.id === id && x.lvl === 'bad'); if (n) this.burnWhy[id] = n.text; } for (const id of res.newDamage) this.damaged.add(id);
+      this.commit(); for (const id of res.newBurn) { const it = this.app.bench.items[id]; if (it && it.obj.setBurnt) it.obj.setBurnt(true); } this.dirty = true;
+      this.app.toast && this.app.toast(res.newBurn.size ? 'A part burnt out! Read the explanation on the right.' : 'A pin was damaged! Read the explanation on the right.');
+    }
+    this.result = res; this.apply(res); this.updateProbe(); this.liveText(res);
+  }
+  apply(res) {
+    const b = this.app.bench; let buzz = null;
+    for (const d of this.parts) {
+      const it = b.items[d.id], R = res.parts[d.id]; if (!it) continue;
+      if (d.type === 'led') it.obj.set(!!R && R.level > 0.02 && !this.burnt.has(d.id), R ? Math.max(0.15, R.level) : 0);
+      else if (d.type === 'button') it.obj.setPressed(!!this.env.pressed[d.id]);
+      else if (d.type === 'pot') it.obj.set(this.env.pot[d.id] ?? 0.5);
+      else if (d.type === 'buzzer') { const on = !!R && R.loud > 0.05; it.obj.vibrate(on); if (on) buzz = true; }
+    }
+    // sound: the passive buzzer follows the pin that is in tone mode
+    const tonePin = Object.entries(this.pinCfg).find(([id, c]) => c.mode === 'tone' && !this.damaged.has(id));
+    const hz = buzz && tonePin && this.powered() ? Math.round(tonePin[1].freq || 440) : 0;
+    if (hz !== this.soundHz) { this.soundHz = hz; if (hz) this.app.playTone(hz); else this.app.stopSound(); }
+  }
+
+  // ------------------------------------------------------------------ text for the learner
+  setHint() {
+    const T = this.tool, h = $('#fb-hint'); let t;
+    if (!T) t = this.probeOn ? 'Voltmeter: click any hole or board pin to measure the voltage there.' : 'Pick a part or a wire on the left. Click a placed part to select it. Hold the mouse on a push button to press it; drag a knob to turn it.';
+    else if (T.type === 'wire') t = T.step ? 'Click the other end of the wire (green = free).' : 'Click where the wire starts: a board pin, a breadboard hole or a power rail.';
+    else if (['button', 'pot', 'tmp36'].includes(T.type)) t = { button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
+    else t = T.step ? { led: 'Click the neighbouring hole for the SHORT leg (cathode, −). The first hole is the long leg (anode, +).', buzzer: 'Click the hole 3 columns away for the − leg. The first hole is +.', resistor: 'Click the hole for the other leg (a resistor has no polarity).', ldr: 'Click the neighbouring hole for the other leg.' }[T.type] : { led: 'Click the hole for the LONG leg (anode, +).', buzzer: 'Click the hole for the + leg.', resistor: 'Click the hole for one leg.', ldr: 'Click the hole for one leg.' }[T.type];
+    if (h) h.textContent = t;
+    if (this.active) $('#legend').textContent = t;
+  }
+  toast(t) { this.app.toast ? this.app.toast(t) : 0; }
+  codeFor(id) {
+    const k = pinKind(this.boardKind, id, this.pinInfo(id)), c = this.pinCfg[id] || { mode: 'in' }, duty = c.duty ?? 0.5, f = Math.round(c.freq || 440);
+    if (this.isPi) {
+      const n = k.gpio;
+      return ({
+        out1: `from gpiozero import LED\nled = LED(${n})\nled.on()`, out0: `from gpiozero import LED\nled = LED(${n})\nled.off()`,
+        blink: `from gpiozero import LED\nled = LED(${n})\nled.blink(on_time=0.5, off_time=0.5)`,
+        pwm: `from gpiozero import PWMLED\nled = PWMLED(${n})\nled.value = ${duty.toFixed(2)}   # 0 … 1`,
+        tone: `from gpiozero import TonalBuzzer\nb = TonalBuzzer(${n})\nb.play(${f})   # Hz`,
+        in: `from gpiozero import DigitalInputDevice\npin = DigitalInputDevice(${n}, pull_up=None, active_state=True)\nprint(pin.value)`,
+        up: `from gpiozero import Button\nbutton = Button(${n})   # internal pull-up\nprint(button.is_pressed)`,
+        down: `from gpiozero import Button\nbutton = Button(${n}, pull_up=False)   # internal pull-down\nprint(button.is_pressed)`,
+      })[c.mode] || '';
+    }
+    return ({
+      out1: `pinMode(${id}, OUTPUT);\ndigitalWrite(${id}, HIGH);`, out0: `pinMode(${id}, OUTPUT);\ndigitalWrite(${id}, LOW);`,
+      blink: `pinMode(${id}, OUTPUT);\n// in loop():\ndigitalWrite(${id}, HIGH); delay(500);\ndigitalWrite(${id}, LOW);  delay(500);`,
+      pwm: `pinMode(${id}, OUTPUT);\nanalogWrite(${id}, ${Math.round(duty * 255)});   // 0 … 255`, tone: `tone(${id}, ${f});   // Hz`,
+      in: `pinMode(${id}, INPUT);\nint v = digitalRead(${id});`, up: `pinMode(${id}, INPUT_PULLUP);\nint v = digitalRead(${id});   // pressed = LOW`,
+      analog: `int v = analogRead(${id});   // 0 … 1023 (10-bit default)`,
+    })[c.mode] || '';
+  }
+  modesFor(k) {
+    const m = ['out0', 'out1', 'blink']; if (k.pwm) m.push('pwm'); m.push('tone', 'in', 'up'); if (this.isPi) m.push('down'); if (k.analog) m.push('analog'); return m;
+  }
+  usedPins() {
+    const seen = new Map();
+    for (const d of this.parts) if (d.type === 'wire' || d.type === 'fwire') for (const ref of [d.from, d.to]) if (!isHoleRef(ref)) seen.set(ref, pinKind(this.boardKind, ref, this.pinInfo(ref)));
+    return seen;
+  }
+
+  // ------------------------------------------------------------------ left column
+  renderSide() {
+    if (!this.active) return;
+    const T = this.tool, on = t => (T && T.type === t ? ' on' : '');
+    const ohmOpts = OHMS.map(o => `<option value="${o}"${o === this.opts.ohms ? ' selected' : ''}>${fmtOhms(o)}</option>`).join('');
+    const ledOpts = Object.entries(LED_TYPES).map(([k, v]) => `<option value="${k}"${k === this.opts.color ? ' selected' : ''}>${v.name}</option>`).join('');
+    const sw = ['auto', ...WIRE_COLORS].map(c => `<button class="fb-sw${this.opts.wire === c ? ' on' : ''}" data-wcolor="${c}" title="${c === 'auto' ? 'Automatic colour (red 5 V, orange 3.3 V, black GND)' : c}" style="${c === 'auto' ? '' : `background:${WIRE_HEX[c]}`}">${c === 'auto' ? 'auto' : ''}</button>`).join('');
+    const wireName = this.isPi ? 'Jumper wire (female–male for the pins)' : 'Jumper wire (male–male)';
+    $('#side').innerHTML = `<div class="fb-side">
+      <div class="fb-box"><b>Free build</b><div id="fb-hint" class="fb-hint"></div></div>
+      <h3>Power</h3>
+      <button class="fb-btn big${this.powered() ? ' on' : ''}" data-act="power">${this.powered() ? '🔌 Unplug the power' : '🔌 Plug in the power'}</button>
+      <div class="fb-small">${this.isPi ? 'The Raspberry Pi is already running its operating system.' : 'The UNO Q is powered over USB-C.'} Wire first, then plug in: that is the safe order.</div>
+      <h3>Parts</h3>
+      <div class="fb-row"><button class="fb-btn${on('resistor')}" data-tool="resistor">Resistor</button><select data-opt="ohms">${ohmOpts}</select></div>
+      <div class="fb-row"><button class="fb-btn${on('led')}" data-tool="led">LED</button><select data-opt="color">${ledOpts}</select></div>
+      <div class="fb-row"><button class="fb-btn${on('button')}" data-tool="button">Push button</button></div>
+      <div class="fb-row"><button class="fb-btn${on('pot')}" data-tool="pot">Potentiometer 10 kΩ</button></div>
+      <div class="fb-row"><button class="fb-btn${on('buzzer')}" data-tool="buzzer">Passive buzzer</button></div>
+      <div class="fb-row"><button class="fb-btn${on('ldr')}" data-tool="ldr">Light sensor (LDR)</button></div>
+      <div class="fb-row"><button class="fb-btn${on('tmp36')}" data-tool="tmp36">TMP36 temperature</button><label class="fb-chk"><input type="checkbox" data-opt="flip"${this.opts.flip ? ' checked' : ''}> turn round</label></div>
+      <h3>Wires</h3>
+      <button class="fb-btn${on('wire')}" data-tool="wire">${wireName}</button>
+      <div class="fb-sws">${sw}</div>
+      <h3>Tools</h3>
+      <div class="fb-row2"><button class="fb-btn${this.probeOn ? ' on' : ''}" data-act="probe">🔎 Voltmeter</button><button class="fb-btn" data-act="undo">↶ Undo</button></div>
+      <div class="fb-row2"><button class="fb-btn" data-act="replace">♻ Replace broken parts</button><button class="fb-btn danger" data-act="clear">🗑 Clear all</button></div>
+      <div class="fb-row2"><button class="fb-btn" data-act="view1">View: board</button><button class="fb-btn" data-act="view2">View: breadboard</button></div>
+      <h3>Examples</h3>
+      ${EXAMPLES(this.boardKind).map((x, i) => `<button class="fb-btn ex" data-ex="${i}">${esc(x.title)}</button>`).join('')}
+    </div>`;
+    this.setHint();
+  }
+  sideClick(e) {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.tool) { this.tool && this.tool.type === b.dataset.tool ? this.cancel() : this.begin(b.dataset.tool); return; }
+    if (b.dataset.wcolor) { this.opts.wire = b.dataset.wcolor; this.renderSide(); return; }
+    if (b.dataset.ex !== undefined) { this.loadExample(+b.dataset.ex); return; }
+    const a = b.dataset.act;
+    if (a === 'power') { this.tripMsg = null; this.app.plug(!this.app.usbPlugged).then(() => { this.dirty = true; this.renderSide(); this.renderPanel(); }); }
+    else if (a === 'probe') { this.cancel(); this.probeOn = !this.probeOn; if (!this.probeOn) this.clearProbe(); this.renderSide(); this.setHint(); }
+    else if (a === 'undo') this.undo();
+    else if (a === 'clear') { if (!this.parts.length || confirm('Remove every part and wire?')) this.mutate(() => { this.parts = []; this.pinCfg = {}; this.burnt.clear(); this.damaged.clear(); this.burnWhy = {}; this.seq = {}; this.rebuild3D(); this.select(null); }); }
+    else if (a === 'replace') this.mutate(() => { for (const id of this.burnt) { const it = this.app.bench.items[id]; if (it && it.obj.setBurnt) { this.place3D(this.parts.find(p => p.id === id)); } } this.burnt.clear(); this.damaged.clear(); this.burnWhy = {}; this.rebuild3D(); this.tripMsg = null; });
+    else if (a === 'view1') this.app.view(this.isPi ? 'pibench' : 'bench');
+    else if (a === 'view2') this.app.view(this.isPi ? 'pibb' : 'breadboard');
+  }
+  sideChange(e) {
+    const t = e.target, o = t.dataset.opt; if (!o) return;
+    this.opts[o] = o === 'ohms' ? +t.value : o === 'flip' ? t.checked : t.value;
+  }
+  loadExample(i) {
+    const ex = EXAMPLES(this.boardKind)[i]; this.cancel();
+    this.mutate(() => { this.parts = ex.parts.map(p => ({ ...p, ...(p.type === 'led' ? { hex: LED_TYPES[p.color || 'red'].hex } : {}) })); this.pinCfg = JSON.parse(JSON.stringify(ex.pins || {})); this.burnt.clear(); this.damaged.clear(); this.burnWhy = {}; this.env.pot = {}; this.seq = {}; for (const p of this.parts) { const m = /^([a-z]+)(\d+)$/.exec(p.id); if (m) this.seq[m[1]] = Math.max(this.seq[m[1]] || 0, +m[2]); } this.rebuild3D(); });
+    this.select(null); this.tripMsg = null; this.exNote = ex.note; this.renderPanel();
+    if (!this.powered()) this.app.plug(true).then(() => { this.dirty = true; this.renderSide(); });
+    this.app.view(this.isPi ? 'pibb' : 'breadboard');
+  }
+
+  // ------------------------------------------------------------------ right column
+  renderPanel() {
+    if (!this.active) return;
+    const pins = this.usedPins(), sel = this.parts.find(p => p.id === this.selected);
+    let h = `<div class="card fb-card"><div class="lesson-head">Free build · ${this.isPi ? 'Raspberry Pi 4' : 'Arduino UNO Q'}</div><h2>Build it. Break it. Fix it.</h2>`;
+    if (this.exNote) h += `<div class="fb-note ok"><span class="ic">✎</span><span>${this.exNote}</span></div>`;
+    if (this.tripMsg) h += `<div class="fb-note bad"><span class="ic">⚡</span><span>${esc(this.tripMsg)} The power was cut. Fix the circuit, then plug the power in again.</span></div>`;
+    h += `<div id="fb-status"></div>`;
+    if (!this.parts.length) h += `<p>Place parts on the breadboard, connect them with wires to the board's pins, give every pin a job, and the app tells you whether it works, and if not, why. It follows real rules: LEDs need resistors and the right direction, a button input needs a pull-up, a passive buzzer needs a tone, and ${this.isPi ? '5 V on a GPIO pin damages the Raspberry Pi' : '5 V on D3 or the analog pins damages the UNO Q'}.</p><p class="tip">New here? Try an <b>example</b> on the left, then change it and watch what happens.</p>`;
+    if (pins.size) {
+      h += `<h3>Pins</h3><div class="fb-pins">`;
+      for (const [id, k] of pins) {
+        const cfg = this.pinCfg[id] || {}, mode = cfg.mode || '';
+        if (k.k === 'gpio') {
+          h += `<div class="fb-pin" data-pin="${id}"><div class="fb-pinh"><b>${esc(k.name)}</b>${this.isPi ? `<small>pin ${this.pinInfo(id).pin}</small>` : ''}<span class="fb-pv" data-pv="${id}"></span></div>
+            <select data-pinmode="${id}">${mode ? '' : '<option value="" selected>— choose what this pin does —</option>'}${this.modesFor(k).map(m => `<option value="${m}"${m === mode ? ' selected' : ''}>${PIN_MODES[m]}</option>`).join('')}</select>`;
+          if (mode === 'pwm') h += `<label class="fb-sl">Duty <input type="range" min="0" max="100" value="${Math.round((cfg.duty ?? 0.5) * 100)}" data-pinduty="${id}"><b>${Math.round((cfg.duty ?? 0.5) * 100)} %</b></label>`;
+          if (mode === 'tone') { const lo = this.isPi ? 220 : 100, hi = this.isPi ? 880 : 2000; h += `<label class="fb-sl">Frequency <input type="range" min="${lo}" max="${hi}" value="${Math.round(cfg.freq || 440)}" data-pinfreq="${id}"><b>${Math.round(cfg.freq || 440)} Hz</b></label>`; }
+          h += `<div class="fb-pr" data-pr="${id}"></div>${mode ? `<details><summary>Code for this pin</summary><pre>${esc(this.codeFor(id))}</pre></details>` : ''}</div>`;
+        } else h += `<div class="fb-pin sup"><div class="fb-pinh"><b>${esc(k.name)}</b><small>${{ '5v': '5 V supply', '3v3': '3.3 V supply', gnd: 'ground (0 V)', nc: 'not modelled' }[k.k]}</small><span class="fb-pv" data-pv="${id}"></span></div></div>`;
+      }
+      h += `</div>`;
+    }
+    if (sel) h += this.selectedHtml(sel);
+    const hasLdr = this.parts.some(p => p.type === 'ldr'), hasT = this.parts.some(p => p.type === 'tmp36');
+    if (hasLdr || hasT) {
+      h += `<h3>The room (simulated)</h3>`;
+      if (hasLdr) h += `<div class="fb-env">Light <input type="range" min="0" max="1000" value="${Math.round(250 * Math.log10(Math.max(this.env.lux, 0.1) / 0.1))}" data-env="lux"><b data-envv="lux"></b><div class="fb-chips">${Object.entries(LUX).map(([k, v]) => `<button class="lvl" data-lux="${v}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>`;
+      if (hasT) h += `<div class="fb-env">Temperature <input type="range" min="-20" max="100" value="${this.env.tempC}" data-env="tempC"><b data-envv="tempC"></b></div>`;
+    }
+    h += `<h3>What the circuit does</h3><div id="fb-notes"></div>
+      <p class="sim">Simplified model: wires have no resistance, LED voltages are typical values, and the board's pin drivers use simulation values. Limits come from the datasheets: ${this.isPi ? 'Raspberry Pi GPIO is 3.3 V only, 16 mA per pin' : 'STM32U585 pins: 20 mA absolute maximum, D3 and A0–A5 are 3.3 V only'}.</p></div>`;
+    $('#panel').innerHTML = h; this.lastHtml = {}; this.syncControls(); if (this.result) this.liveText(this.result);
+  }
+  selectedHtml(d) {
+    let h = `<h3>Selected: ${esc(nameOf(d))}</h3><div class="fb-sel">`;
+    if (d.type === 'resistor') h += `<label>Value <select data-selohms>${OHMS.map(o => `<option value="${o}"${o === d.ohms ? ' selected' : ''}>${fmtOhms(o)}</option>`).join('')}</select></label>`;
+    if (d.type === 'led') h += `<label>Colour <select data-selcolor>${Object.entries(LED_TYPES).map(([k, v]) => `<option value="${k}"${k === (d.color || 'red') ? ' selected' : ''}>${v.name}</option>`).join('')}</select></label>`;
+    if (d.type === 'pot') h += `<label>Knob <input type="range" min="0" max="100" value="${Math.round((this.env.pot[d.id] ?? 0.5) * 100)}" data-selpot><b data-selpotv></b></label><small>Turn the knob from end A to end B: the wiper voltage follows.</small>`;
+    if (d.type === 'button') h += `<button class="hold" data-selpress>Hold to press</button>`;
+    h += `<div class="fb-pr" data-partmsg="${d.id}"></div><button class="fb-btn danger" data-del="${d.id}">Delete (Del)</button></div>`;
+    return h;
+  }
+  syncControls() {
+    const set = (sel, txt) => { const el = $(sel); if (el) el.textContent = txt; };
+    set('[data-envv="lux"]', this.env.lux < 1 ? '< 1 lux' : Math.round(this.env.lux) + ' lux'); set('[data-envv="tempC"]', this.env.tempC + ' °C');
+    if (this.selected) set('[data-selpotv]', Math.round((this.env.pot[this.selected] ?? 0.5) * 100) + ' %');
+  }
+  panelClick(e) {
+    const t = e.target;
+    if (t.dataset.del) return this.removePart(t.dataset.del);
+    if (t.dataset.lux) { this.env.lux = +t.dataset.lux; this.dirty = true; this.renderPanel(); }
+  }
+  panelChange(e) {
+    const t = e.target;
+    if (t.dataset.pinmode) { const id = t.dataset.pinmode; this.mutate(() => { const c = this.pinCfg[id] = { ...(this.pinCfg[id] || {}), mode: t.value }; if (t.value === 'pwm' && c.duty === undefined) c.duty = 0.5; if (t.value === 'tone' && !c.freq) c.freq = 440; }); }
+    else if (t.dataset.selohms) { const d = this.parts.find(p => p.id === this.selected); this.mutate(() => { d.ohms = +t.value; this.burnt.delete(d.id); this.place3D(d); }); this.app.setOutline([this.app.bench.items[d.id].group]); }
+    else if (t.dataset.selcolor) { const d = this.parts.find(p => p.id === this.selected); this.mutate(() => { d.color = t.value; d.hex = LED_TYPES[t.value].hex; this.place3D(d); }); this.app.setOutline([this.app.bench.items[d.id].group]); }
+  }
+  panelInput(e) {
+    const t = e.target;
+    if (t.dataset.pinduty) { (this.pinCfg[t.dataset.pinduty] ||= {}).duty = +t.value / 100; t.nextElementSibling.textContent = t.value + ' %'; this.dirty = true; this.save(); }
+    else if (t.dataset.pinfreq) { (this.pinCfg[t.dataset.pinfreq] ||= {}).freq = +t.value; t.nextElementSibling.textContent = t.value + ' Hz'; this.dirty = true; this.save(); }
+    else if (t.dataset.env === 'lux') { this.env.lux = 0.1 * Math.pow(10, +t.value / 250); this.dirty = true; this.syncControls(); }
+    else if (t.dataset.env === 'tempC') { this.env.tempC = +t.value; this.dirty = true; this.syncControls(); }
+    else if (t.dataset.selpot !== undefined) { this.env.pot[this.selected] = +t.value / 100; this.dirty = true; this.syncControls(); }
+  }
+  /** update the live numbers without rebuilding the panel */
+  liveText(res) {
+    const put = (key, html, el) => { if (this.lastHtml[key] !== html) { this.lastHtml[key] = html; el.innerHTML = html; } };
+    const pw = this.powered();
+    const status = $('#fb-status'); if (status) put('status', `<div class="fb-pill ${pw ? 'on' : ''}">${pw ? '● Power on' : '○ Power off'}</div>`, status);
+    for (const el of document.querySelectorAll('[data-pv]')) { const id = el.dataset.pv, o = res.pins[id]; put('pv' + id, o && pw ? `${o.V.toFixed(2)} V` : '', el); }
+    for (const el of document.querySelectorAll('[data-pr]')) {
+      const id = el.dataset.pr, o = res.pins[id], cfg = this.pinCfg[id] || {}; let t = '';
+      if (o && pw) {
+        if (o.status === 'bad') t = `<span class="bad">${esc(o.msg || '')}</span>`;
+        else if (cfg.mode === 'analog' && o.read !== undefined) t = o.read === 'floating' ? '<span class="warn">Reads: random (nothing connected)</span>' : `ADC value <b>${o.adc}</b> (0 … 1023) = ${o.V.toFixed(2)} V`;
+        else if (o.read !== undefined) t = o.read === 'floating' ? '<span class="warn">Reads: random (floating)</span>' : o.read === 'undefined' ? '<span class="warn">Reads: undefined (between LOW and HIGH)</span>' : `Reads: <b>${o.read ? 'HIGH' : 'LOW'}</b>`;
+        else if (o.msg) t = esc(o.msg);
+      }
+      put('pr' + id, t, el);
+    }
+    for (const el of document.querySelectorAll('[data-partmsg]')) { const R = res.parts[el.dataset.partmsg]; put('pm' + el.dataset.partmsg, R && R.msg ? `<span class="${R.status === 'bad' ? 'bad' : R.status === 'warn' ? 'warn' : ''}">${esc(R.msg)}</span>` : '', el); }
+    const notes = $('#fb-notes');
+    if (notes) {
+      const order = { bad: 0, warn: 1, ok: 2, info: 3 }, seen = new Set(), list = [...res.notes].filter(n => { if (seen.has(n.text)) return false; seen.add(n.text); return true; }).sort((a, b) => order[a.lvl] - order[b.lvl]);
+      put('notes', list.length ? list.map(n => `<div class="fb-note ${n.lvl}"><span class="ic">${{ bad: '✖', warn: '⚠', ok: '✔', info: 'ℹ' }[n.lvl]}</span><span>${esc(n.text)}</span></div>`).join('') : '<div class="fb-note info"><span class="ic">ℹ</span><span>Nothing placed yet.</span></div>', notes);
+    }
+  }
+}
