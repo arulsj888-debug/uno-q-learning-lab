@@ -1410,7 +1410,7 @@ export const HW_INFO = {
   },
   buzzer: {
     name: 'Passive piezo buzzer', tag: 'Sound',
-    summary: 'A piezo disc that clicks once for every change of voltage. Fed with a square wave from tone(), it produces a note of that frequency.',
+    summary: 'Its piezo disc bends a tiny bit with every change of voltage. Fed with a fast square wave (Arduino tone() or GPIO Zero TonalBuzzer), the disc vibrates that many times per second: the vibration in the air is the sound, and the switching frequency is the pitch.',
     points: [
       '“Passive” means it has no built-in oscillator — you must give it a signal. (An “active” buzzer beeps by itself when you apply DC.)',
       'The + leg is marked on the top; in this circuit it faces the resistor and the pin.',
