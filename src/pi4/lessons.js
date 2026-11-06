@@ -248,7 +248,7 @@ export const PI_LESSONS = [
       },
       {
         title: 'Power and the two LEDs', focus: ['usbc', 'ledpwr', 'ledact'],
-        body: `<ul><li><b>USB-C</b> is only for power: <b>5 V, 3 A</b> (the official 15 W supply).</li><li><b>Red PWR LED</b>: on = the 5 V supply is stable; off or flickering = undervoltage (supply too weak).</li>
+        body: `<ul><li><b>USB-C</b> is the <b>power input</b>: <b>5 V, 3 A</b> (the official 15 W supply). It cannot be used to connect a monitor.</li><li><b>Red PWR LED</b>: on = the 5 V supply is stable; off or flickering = undervoltage (supply too weak).</li>
         <li><b>Green ACT LED</b>: flashes when the microSD card is used.</li></ul>
         <p class="tip">There is <b>no power button</b>: the Raspberry Pi 4 starts as soon as power is connected.</p>`,
       },
@@ -582,7 +582,7 @@ button.when_released = led.off</pre>
       {
         title: 'The same circuit', view: 'pibench', have: PI_LED_PARTS.map(d => d.id), pins: ['p11', 'p9'],
         body: `<p>No new wiring: LED and 220 Ω resistor on <b>GPIO17 (pin 11)</b>, ground on <b>pin 9</b>, exactly as in Lesson 4. Only the program changes.</p>
-        <p class="sim">The Raspberry Pi 4 datasheet lists two hardware PWM channels (PWM0 / PWM1, e.g. on GPIO12 and GPIO13). GPIO Zero’s <code>PWMLED</code> works on any GPIO pin you give it.</p>`,
+        <p class="sim">The Raspberry Pi 4 datasheet lists up to two PWM channels (PWM0 and PWM1) on the GPIO pins — for example on GPIO12 and GPIO13.</p>`,
       },
       { title: 'The program', view: 'pibench', showCode: true, power: true, body: `<p>The official “LED with variable brightness” example. Click any line to read about it.</p>` },
       {
@@ -826,7 +826,7 @@ pause()</pre>
         title: 'Safety: keep it on your network', view: 'pibench', have: LED_IDS, power: true,
         body: `<p class="warn"><b>Anyone on your network who knows the address can open this page.</b> It has no password. With <code>--host=0.0.0.0</code> Flask listens on all the Pi’s addresses (Flask documentation: do this only if you trust the users on your network).</p>
         <ul><li>Never use Flask’s <b>debug mode</b> together with <code>--host=0.0.0.0</code>: the debugger lets people run Python code on your computer.</li><li>Do not expose this page to the Internet.</li><li>Flask’s built-in server is for testing and learning, not for real production use.</li></ul>
-        <p>One more thing: our links change the LED when they are opened, which is simple but not how professional sites do it. Anything that opens the link — even a browser pre-loading a page — would switch the LED.</p>`,
+        <p>One more thing: our links change the LED when they are opened, which is simple but not how professional sites do it. Anything that opens the link would switch the LED.</p>`,
       },
       {
         title: 'Summary', view: 'pibench', have: LED_IDS, power: true,

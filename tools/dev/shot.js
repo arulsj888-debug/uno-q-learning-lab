@@ -18,7 +18,7 @@ const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
   const logs = [];
   page.on('console', m => logs.push(`[${m.type()}] ${m.text()}`));
   page.on('pageerror', e => logs.push(`[pageerror] ${e.message}\n${e.stack || ''}`));
-  await page.goto('file:///' + path.resolve(html).replace(/\\/g, '/'), { waitUntil: 'load', timeout: 120000 });
+  await page.goto('file:///' + path.resolve(html).replace(/\\/g, '/') + (process.env.Q || ''), { waitUntil: 'load', timeout: 120000 });
   await new Promise(r => setTimeout(r, 6000));
   const shot = async (name) => { await page.screenshot({ path: path.join(outdir, name + '.png') }); console.log('shot', name); };
   const ev = (code) => page.evaluate(code);
@@ -472,6 +472,175 @@ const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
       await ev(`app.goStep(6)`); await wait(5000); await shot(tag + '_3_lesson');
       await ev(`document.querySelector('#run').click()`); await wait(4500); await shot(tag + '_4_run');
       await ev(`document.querySelector('#mtabs [data-tab=code]') && getComputedStyle(document.querySelector('#mtabs')).display !== 'none' && document.querySelector('#mtabs [data-tab=code]').click()`); await wait(800); await shot(tag + '_5_code');
+    },
+    async pi4() {
+      const cam = async (t, p) => { await ev(`(()=>{const v=app.viewer; v.controls.target.set(${t}); v.camera.position.set(${p}); v.controls.update();})()`); await wait(1200); };
+      await shot('pi_0_start');
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(400);
+      await shot('pi_1_home');
+      await ev(`app.view('top', 0)`); await wait(1200); await shot('pi_2_top');
+      await cam('20,0,0', '160,60,10'); await shot('pi_3_ports');
+      await cam('0,0,0', '-60,70,110'); await shot('pi_4_front');
+      await cam('-10,2,-25', '-30,45,25'); await shot('pi_5_gpio_close');
+      await ev(`app.view('bottom', 0)`); await wait(1200); await shot('pi_6_bottom');
+      await cam('0,0,0', '-120,40,-90'); await shot('pi_7_back');
+    },
+    async pi4click() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      const proj = async (expr) => ev(`(()=>{const c=(${expr}).clone(); c.project(app.viewer.camera); const r=document.querySelector('#stage').getBoundingClientRect(); return [(c.x+1)/2*r.width+r.left,(1-c.y)/2*r.height+r.top];})()`);
+      for (const [id, side] of [['soc', 0], ['usb3', 0], ['gpio', 0], ['sdcard', 1]]) {
+        await ev(`app.view('${side ? 'bottom' : 'home'}', 0)`); await wait(900);
+        const [x, y] = await proj(`app.board.partCenter('${id}').center`);
+        await page.mouse.click(x, y); await wait(1600);
+        const t = await ev(`(document.querySelector('#panel h2')||{}).textContent + ' | callout: ' + document.querySelector('#callout-title').textContent`);
+        console.log('click', id, '->', t); await shot('pc_' + id);
+      }
+      await ev(`app.view('home', 0); app.select(null)`); await wait(900);
+      await ev(`app.focus('gpio')`); await wait(1500);
+      const [x, y] = await proj(`app.board.pins.p11.pos`);
+      await page.mouse.click(x, y); await wait(1500);
+      console.log('pin11 ->', await ev(`document.querySelector('#panel h2').textContent`));
+      await shot('pc_pin11');
+      await ev(`document.querySelector('#v-labels').click()`); await ev(`app.view('home', 0)`); await wait(1200); await shot('pc_labels');
+      await ev(`document.querySelector('#v-labels').click()`);
+      await ev(`app.setMode('lessons')`); await wait(800); await shot('pc_lessons');
+    },
+    async chooser() { await shot('ch_0'); },
+    async pil() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      await ev(`app.setMode('lessons')`); await wait(800); await shot('L0_home');
+      await ev(`app.startLesson('p1')`); await wait(2500); await ev(`app.goStep(1)`); await wait(2500); await shot('L1_soc');
+      await ev(`app.startLesson('p2')`); await wait(1500);
+      for (let i = 1; i <= 5; i++) { await ev(`app.goStep(${i})`); await wait(i >= 2 ? 3500 : 1500); }
+      await shot('L2_ports'); await ev(`app.goStep(2)`); await wait(2500); await shot('L2_sd');
+      await ev(`app.goStep(3)`); await wait(3000); await shot('L2_hdmi');
+      await ev(`app.goStep(5)`); await wait(5000); await shot('L2_power');
+      await ev(`app.startLesson('p3')`); await wait(1500); await ev(`app.goStep(2)`); await wait(2500); await shot('L3_numbers');
+      await ev(`app.startLesson('p4')`); await wait(1500);
+      for (let i = 1; i <= 3; i++) { await ev(`app.goStep(${i})`); await wait(5000); }
+      await shot('L4_wired');
+      await ev(`app.goStep(5)`); await wait(3200); await shot('L4_run');
+      await ev(`app.view('pibb', 0)`); await wait(1500); await shot('L4_bbclose');
+      await ev(`app.startLesson('p5')`); await wait(1500);
+      for (let i = 1; i <= 2; i++) { await ev(`app.goStep(${i})`); await wait(5000); }
+      await ev(`app.goStep(4)`); await wait(2500); await shot('L5_run_rel');
+      await ev(`app.pressButton(true)`); await wait(2600); await shot('L5_run_pressed'); await ev(`app.pressButton(false)`);
+      await ev(`app.startLesson('p6')`); await wait(2000); await ev(`app.goStep(1)`); await wait(2500);
+      await ev(`app.pressButton(true)`); await wait(1200); await shot('L6_pressed'); await ev(`app.pressButton(false)`); await wait(1200); await shot('L6_released');
+    },
+    async homebtn() {
+      const tag = process.env.TAG || 'x';
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(400);
+      await shot(tag + '_bar');
+      const r = await ev(`(()=>{const b=document.querySelector('#home-btn').getBoundingClientRect(); return [b.x+b.width/2, b.y+b.height/2, getComputedStyle(document.querySelector('#home-btn')).display];})()`);
+      console.log('home button at', r);
+      await page.mouse.click(r[0], r[1]); await wait(800);
+      console.log('chooser open after click:', await ev(`document.querySelector('#chooser').classList.contains('on')`));
+      await shot(tag + '_home');
+    },
+    async p7() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      await ev(`app.setMode('lessons'); app.startLesson('p7')`); await wait(1500);
+      for (let i = 1; i <= 3; i++) { await ev(`app.goStep(${i})`); await wait(i == 1 ? 5500 : 1500); }
+      await ev(`app.goStep(3)`); await wait(3500); await shot('p7_half');
+      await wait(2000); await shot('p7_full');
+    },
+    async p8() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      await ev(`app.setMode('lessons'); app.startLesson('p8'); app.goStep(2)`); await wait(6000);
+      const run = async c => { await page.click('.term-in'); await page.keyboard.type(c); await page.keyboard.press('Enter'); await wait(350); };
+      for (const c of ['mkdir shared', 'ls', 'cd shared', 'touch notes.txt', 'cp notes.txt backup.txt', 'ls -la', 'rm backup.txt', 'cat notes.txt', 'cat nothing.txt', 'mkdir /bad', 'cd ~', 'hostname -I', 'ping raspberrypi.local', 'df -h', 'uname -r', 'ssh arul@192.168.1.131']) await run(c);
+      await wait(800);
+      console.log(await ev(`JSON.stringify(app.pios.fs)`), '| cwd', await ev(`app.pios.cwd`));
+      console.log(await ev(`app.pios.lines.map(l => l.prompt ? '$ ' + l.text : (l.segs ? l.segs.map(s=>s.t).join('') : l.text)).join(' | ')`));
+      await shot('p8_files');
+      console.log('chips:', await ev(`document.querySelectorAll('.term-chip[data-c]').length`), 'groups:', await ev(`[...document.querySelectorAll('.term-grp')].map(g=>g.textContent).join(',')`));
+    },
+    async p9() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      await ev(`app.setMode('lessons'); app.startLesson('p9')`); await wait(1500);
+      await ev(`app.goStep(1)`); await wait(3500); await shot('p9_sensor');
+      await ev(`app.goStep(4)`); await wait(3500); await ev(`app.goStep(5)`); await wait(7000); await shot('p9_wired');
+      await ev(`app.view('pibb', 0)`); await wait(1500); await shot('p9_close');
+      await ev(`app.goStep(8)`); await wait(5000);
+      await ev(`app.th.t = 27.5; app.th.h = 61`); await wait(3600); await shot('p9_run');
+      console.log('shell:', await ev(`document.querySelector('#serial').innerText.replace(/\s+/g,' ').slice(0,200)`));
+      await ev(`document.querySelector('#stop').click()`); await wait(400);
+      await ev(`document.querySelector('#th-plug').click()`); await wait(400);
+      await ev(`document.querySelector('#run').click()`); await wait(2200); await shot('p9_error');
+      console.log('shell2:', await ev(`document.querySelector('#serial').innerText`));
+    },
+    async sht() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      await ev(`app.setMode('lessons'); app.startLesson('p9'); app.goStep(3)`); await wait(4000);
+      const cam = async (t, p, n) => { await ev(`(()=>{const v=app.viewer; v.controls.target.set(${t}); v.camera.position.set(${p}); v.controls.update();})()`); await wait(1500); await shot(n); };
+      const c = await ev(`(()=>{const p=app.bench.items.sen1.group.position; return [p.x,p.y,p.z];})()`);
+      await cam(`${c[0]},${c[1]+4},${c[2]-7}`, `${c[0]-6},${c[1]+50},${c[2]+30}`, 'sht_a');
+      await cam(`${c[0]},${c[1]+4},${c[2]-7}`, `${c[0]},${c[1]+62},${c[2]-5}`, 'sht_top');
+      await cam(`${c[0]},${c[1]+4},${c[2]-7}`, `${c[0]+40},${c[1]+22},${c[2]+20}`, 'sht_b');
+    },
+    async p10() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      await ev(`app.setMode('lessons'); app.startLesson('p10'); app.goStep(5)`); await wait(8000);
+      const txt = () => ev(`document.querySelector('#pw-body').innerText`);
+      await shot('p10_before'); console.log('before:', JSON.stringify(await txt()));
+      await ev(`document.querySelector('#run').click()`); await wait(2500);
+      console.log('after run:', JSON.stringify(await txt()));
+      await page.click('#pw-body .pw-a[data-r=on]'); await wait(2500); await shot('p10_on');
+      console.log('after on:', JSON.stringify(await txt()), 'LED pin glow:', await ev(`document.querySelector('#pinlevel').innerText`));
+      await page.click('#pw-body .pw-a[data-r=off]'); await wait(2500); await shot('p10_off');
+      console.log('after off:', JSON.stringify(await txt()), await ev(`document.querySelector('#pinlevel').innerText`));
+      console.log(JSON.stringify(await ev(`document.querySelector('#serial').innerText`)));
+    },
+    async p11() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      const has = () => ev(`!!document.querySelector('#phone')`);
+      await ev(`app.setMode('lessons'); app.startLesson('p10'); app.goStep(4)`); await wait(3500);
+      console.log('L10 step5 (start server) phone:', await has());
+      await ev(`app.goStep(5)`); await wait(2500); console.log('L10 step6 (run it) phone:', await has());
+      await ev(`app.goStep(3)`); await wait(2500); console.log('L10 back to step4 phone:', await has());
+      await ev(`app.startLesson('p11'); app.goStep(3)`); await wait(9000); await shot('p11_wired');
+      await ev(`app.view('pibb', 0)`); await wait(1500); await shot('p11_bb');
+      await ev(`app.goStep(6)`); await wait(7000);
+      await ev(`document.querySelector('#run').click()`); await wait(2500);
+      const txt = () => ev(`document.querySelector('#pw-body').innerText`);
+      console.log('page:', JSON.stringify(await txt()));
+      await ev(`app.th.t = 29.5; app.th.h = 70`); await wait(6500);
+      console.log('after slider + refresh:', JSON.stringify(await txt()));
+      await page.click('#pw-body .pw-a[data-r=on]'); await wait(2500); await shot('p11_on');
+      console.log('after on:', JSON.stringify(await txt()), await ev(`document.querySelector('#pinlevel').innerText`));
+      await ev(`document.querySelector('#stop').click()`); await wait(400);
+      await ev(`document.querySelector('#th-plug').click()`); await wait(400);
+      await ev(`document.querySelector('#run').click()`); await wait(2500); await shot('p11_err');
+      console.log('err shell:', JSON.stringify(await ev(`document.querySelector('#serial').innerText`)), '| page:', JSON.stringify(await txt()));
+    },
+    async walk() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      const ids = JSON.parse(process.env.IDS);
+      const bad = [];
+      for (const id of ids) {
+        const n = await ev(`(()=>{ app.setMode('lessons'); app.startLesson('${id}'); return app.lesson.steps.length; })()`);
+        await wait(1200);
+        for (let i = 0; i < n; i++) {
+          try {
+            const r = await Promise.race([ev(`(async()=>{ await app.goStep(${i}); return 'ok'; })()`), new Promise(res => setTimeout(() => res('TIMEOUT'), 25000))]);
+            if (r !== 'ok') bad.push(id + ' step ' + (i + 1) + ': ' + r);
+            const t = await ev(`document.querySelector('#panel .step-title') ? document.querySelector('#panel .step-title').textContent.length : 0`);
+            if (!t) bad.push(id + ' step ' + (i + 1) + ': empty panel');
+            if (i === 4 || i === n - 1) await wait(900);
+          } catch (e) { bad.push(id + ' step ' + (i + 1) + ': ' + e.message.slice(0, 120)); }
+        }
+        try { await ev(`app.sim.stop(); app.outputsOff()`); await ev(`app.showQuiz ? 0 : 0`); } catch (e) {}
+        console.log('walked', id, n, 'steps');
+      }
+      console.log('PROBLEMS:', JSON.stringify(bad));
+    },
+    async piphone() {
+      await ev(`document.querySelector('#chooser').classList.remove('on')`); await wait(300);
+      await ev(`app.setMode('lessons'); app.startLesson('p8'); app.goStep(2)`); await wait(6000); await shot('ph_p8');
+      await ev(`app.startLesson('p11'); app.goStep(6)`); await wait(8000);
+      await ev(`document.querySelector('#run').click()`); await wait(3500); await shot('ph_p11');
+      await ev(`document.querySelector('#mtabs [data-tab=code]').click()`); await wait(900); await shot('ph_p11_code');
     },
   };
   try { await scripts[scriptName](); } catch (e) { logs.push('[script] ' + e.message); }
