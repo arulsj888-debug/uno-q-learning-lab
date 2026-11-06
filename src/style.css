@@ -546,3 +546,5 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 .term-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .term-chip { background: #131b23; border: 1px solid #2a3846; color: #9fe8f0; border-radius: 6px; padding: 3px 8px; font: 11.5px Consolas, monospace; }
 .term-chip:hover { border-color: var(--teal); }
+.term-grp { flex-basis: 100%; font: 700 10.5px/1 'Segoe UI', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #6c7a88; margin: 6px 0 -1px; }
+.term-chips { max-height: 230px; overflow-y: auto; }

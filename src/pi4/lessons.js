@@ -10,6 +10,8 @@ export const SRC_PI = {
   power: { t: 'Raspberry Pi documentation — Power supply', u: 'https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#power-supply' },
   leds: { t: 'Raspberry Pi documentation — LED warning flash codes', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#led-warning-flash-codes' },
   bcm: { t: 'Raspberry Pi documentation — BCM2711', u: 'https://www.raspberrypi.com/documentation/computers/processors.html#bcm2711' },
+  remote: { t: 'Raspberry Pi documentation — Remote access (find your IP address, SSH)', u: 'https://www.raspberrypi.com/documentation/computers/remote-access.html' },
+  kernel: { t: 'Raspberry Pi documentation — Linux kernel (check your kernel)', u: 'https://www.raspberrypi.com/documentation/computers/linux_kernel.html' },
   osupdate: { t: 'Raspberry Pi documentation — Update Raspberry Pi OS', u: 'https://www.raspberrypi.com/documentation/computers/os.html#update-software' },
   users: { t: 'Raspberry Pi documentation — Manage users', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#users' },
   thermal: { t: 'Raspberry Pi documentation — Frequency management and thermal control', u: 'https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#frequency-management-and-thermal-control' },
@@ -89,19 +91,35 @@ const IO_BTN = { kind: 'button', item: 'btn1', needs: BTN_IDS };
 // Practice terminal (Lesson 8). Each meaning is taken from the official Raspberry Pi documentation (see 'src').
 // The docs do not print the exact output of these commands, so the practice terminal explains instead of inventing output.
 export const TERM_CMDS = [
-  { cmd: 'sudo poweroff', does: 'Shuts the Raspberry Pi down safely. When the green ACT LED shows a series of short flashes, it is safe to unplug the power.', src: 'Getting started — Shutdown options' },
-  { cmd: 'sudo reboot', does: 'Restarts the Raspberry Pi.', src: 'Getting started — Shutdown options' },
-  { cmd: 'sudo apt update', does: 'Refreshes the list of available software packages (it does not install anything yet).', src: 'Updating Raspberry Pi OS' },
-  { cmd: 'sudo apt full-upgrade', does: 'Downloads and installs the newest versions of your installed packages. Raspberry Pi recommends full-upgrade instead of the standard upgrade.', src: 'Updating Raspberry Pi OS' },
-  { cmd: 'sudo raspi-config', does: 'Opens the Raspberry Pi configuration tool (text menus) — Wi-Fi, interfaces such as I²C, boot options and more.', src: 'Getting started — Configuration' },
-  { cmd: 'vcgencmd measure_temp', does: 'Shows the current temperature of the processor. Raspberry Pi says this command gives an accurate, instantaneous reading because it asks the GPU directly.', src: 'Frequency management and thermal control' },
-  { cmd: 'pinout', does: 'Prints a map of the GPIO pins of your board: physical pin numbers, GPIO numbers and functions (from the GPIO Zero library).', src: 'GPIO — pinout map' },
-  { cmd: 'ls -l /home', does: 'Lists the user accounts: every user has a folder inside /home.', src: 'Users' },
-  { cmd: 'cd /home/<username>', does: 'Changes into your own folder (replace <username> with your user name). cd means “change directory”.', src: 'Users' },
-  { cmd: 'ls -la', does: 'Lists the files in the current folder, including hidden ones (names starting with a dot), with details.', src: 'Users' },
-  { cmd: 'groups', does: 'Shows which groups your user belongs to (for example the gpio group that allows GPIO access).', src: 'Users; GPIO — permissions' },
-  { cmd: 'passwd', does: 'Changes your password.', src: 'Users' },
-  { cmd: 'python3', does: 'Starts Python 3, which comes pre-installed with Raspberry Pi OS.', src: 'Using Python' },
+  // ---- system
+  { g: 'System', cmd: 'sudo poweroff', does: 'Shuts the Raspberry Pi down safely. When the green ACT LED shows a series of short flashes, it is safe to unplug the power.', src: 'Getting started — Shutdown options' },
+  { g: 'System', cmd: 'sudo reboot', does: 'Restarts the Raspberry Pi.', src: 'Getting started — Shutdown options' },
+  { g: 'System', cmd: 'sudo apt update', does: 'Refreshes the list of available software packages (it does not install anything yet).', src: 'Updating Raspberry Pi OS' },
+  { g: 'System', cmd: 'sudo apt full-upgrade', does: 'Downloads and installs the newest versions of your installed packages. Raspberry Pi recommends full-upgrade instead of the standard upgrade.', src: 'Updating Raspberry Pi OS' },
+  { g: 'System', cmd: 'sudo raspi-config', does: 'Opens the Raspberry Pi configuration tool (text menus) — Wi-Fi, interfaces such as I²C, boot options and more.', src: 'Getting started — Configuration' },
+  { g: 'System', cmd: 'vcgencmd measure_temp', does: 'Shows the current temperature of the processor. Raspberry Pi says this command gives an accurate, instantaneous reading because it asks the GPU directly.', src: 'Frequency management and thermal control' },
+  { g: 'System', cmd: 'df -h', does: 'Shows how much disk space is free on the microSD card. Raspberry Pi suggests checking this before a big update.', src: 'Updating Raspberry Pi OS' },
+  { g: 'System', cmd: 'uname -r', does: 'Shows the version of the Linux kernel your Raspberry Pi is running.', src: 'Linux kernel — check your kernel' },
+  { g: 'System', cmd: 'pinout', does: 'Prints a map of the GPIO pins of your board: physical pin numbers, GPIO numbers and functions (from the GPIO Zero library).', src: 'GPIO — pinout map' },
+  // ---- files and folders
+  { g: 'Files and folders', cmd: 'ls', does: 'Lists the files and folders in the current folder.', src: 'External storage; Users' },
+  { g: 'Files and folders', cmd: 'ls -la', does: 'Lists the files in the current folder, including hidden ones (names starting with a dot), with details.', src: 'Users' },
+  { g: 'Files and folders', cmd: 'mkdir shared', does: 'Makes a new folder (here called shared) in the current folder. mkdir = “make directory”.', src: 'Samba — sharing a folder', re: /^mkdir \S+$/ },
+  { g: 'Files and folders', cmd: 'cd shared', does: 'Goes into a folder. cd = “change directory”. cd ~ goes back to your home folder; cd /home/<username> also works.', src: 'Users; Samba', re: /^cd \S+$/ },
+  { g: 'Files and folders', cmd: 'cd ~', does: 'Goes back to your home folder (the ~ symbol means “my home folder”).', src: 'Samba — sharing a folder' },
+  { g: 'Files and folders', cmd: 'touch notes.txt', does: 'Creates an empty file (here called notes.txt).', src: 'SSH — enable SSH', re: /^touch \S+$/ },
+  { g: 'Files and folders', cmd: 'cp notes.txt backup.txt', does: 'Copies a file: the first name is the original, the second is the copy.', src: 'Building a kernel (backup copy)', re: /^cp \S+ \S+$/ },
+  { g: 'Files and folders', cmd: 'cat notes.txt', does: 'Prints the contents of a file on the screen. An empty file prints nothing.', src: 'NFS (checking /etc/group)', re: /^cat \S+$/ },
+  { g: 'Files and folders', cmd: 'rm backup.txt', does: 'Deletes a file. There is no recycle bin — a deleted file cannot be brought back. Be careful.', src: 'Network boot (removing files)', re: /^rm \S+$/ },
+  { g: 'Files and folders', cmd: 'sudo nano /boot/firmware/config.txt', does: 'Opens the text editor nano on a settings file. Save with Ctrl+O, exit with Ctrl+X. config.txt holds Raspberry Pi boot settings — only change it when a guide tells you to.', src: 'Configuration — interfaces' },
+  { g: 'Files and folders', cmd: 'ls -l /home', does: 'Lists the user accounts: every user has a folder inside /home.', src: 'Users' },
+  { g: 'Files and folders', cmd: 'groups', does: 'Shows which groups your user belongs to (for example the gpio group that allows GPIO access).', src: 'Users; GPIO — permissions' },
+  { g: 'Files and folders', cmd: 'passwd', does: 'Changes your password.', src: 'Users' },
+  // ---- network
+  { g: 'Network', cmd: 'hostname -I', does: 'Prints your Raspberry Pi’s local IP address. You need it to connect from another computer.', src: 'Remote access — find your IP address' },
+  { g: 'Network', cmd: 'ping raspberrypi.local', does: 'Checks that a computer on your network answers. The default hostname of a fresh Raspberry Pi OS is raspberrypi, so raspberrypi.local reaches it (if you changed the hostname, use the new one). Press Ctrl+C to stop.', src: 'Remote access — find your IP address', re: /^ping \S+$/ },
+  { g: 'Network', cmd: 'ssh user@192.168.1.131', does: 'Run on ANOTHER computer: logs in to your Raspberry Pi remotely (replace user and the IP address with yours). Needs SSH enabled on the Pi; at the first connection you must type yes at a security warning.', src: 'Remote access — SSH', re: /^ssh \S+@\S+$/ },
+  { g: 'Python', cmd: 'python3', does: 'Starts Python 3, which comes pre-installed with Raspberry Pi OS.', src: 'Using Python' },
 ];
 
 export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi' };
@@ -535,6 +553,19 @@ pause()</pre>
         <p class="sim">Exact outputs differ on your Raspberry Pi (versions, names, numbers). The temperature shown here is made up.</p>`,
       },
       {
+        title: 'Files and folders — build something', view: 'pidesk',
+        body: `<p>Try this little exercise in order. <b>Watch the monitor</b>: what you create really appears.</p>
+        <ol><li><code>mkdir shared</code> — make a folder</li><li><code>ls</code> — the folder is listed</li><li><code>cd shared</code> — go inside (the prompt now shows <code>~/shared</code>)</li><li><code>touch notes.txt</code> — create an empty file</li><li><code>cp notes.txt backup.txt</code> — copy it</li><li><code>ls -la</code> — both files are there</li><li><code>rm backup.txt</code> — delete the copy</li><li><code>cd ~</code> — back home</li></ol>
+        <p class="warn"><b>rm cannot be undone.</b> There is no recycle bin, so check the name before you press Enter.</p>
+        <p class="sim">The folders and files exist only in this practice Terminal.</p>`,
+      },
+      {
+        title: 'Find your Pi on the network', view: 'pidesk',
+        body: `<p>Later lessons (and remote access) need your Raspberry Pi’s <b>IP address</b>:</p>
+        <ul><li><code>hostname -I</code> — prints your local IP address. (On the desktop you can also hover the mouse over the network icon.)</li><li><code>ping raspberrypi.local</code> — checks that it answers. A fresh Raspberry Pi OS is called <b>raspberrypi</b>; if you chose another hostname in Imager, use that.</li><li><code>ssh user@ip-address</code> — typed on <b>another computer</b> to log in to the Pi remotely (SSH must be enabled).</li></ul>
+        <p class="sim">The IP address shown in the practice terminal is the example address from the official documentation.</p>`,
+      },
+      {
         title: 'Keep the software up to date', view: 'pidesk',
         body: `<p>Raspberry Pi’s documentation gives two commands, in this order:</p>
         <ol><li><code>sudo apt update</code> — refresh the list of available software.</li><li><code>sudo apt full-upgrade</code> — install the newest versions.</li></ol>
@@ -547,7 +578,7 @@ pause()</pre>
       },
       {
         title: 'Summary', view: 'pidesk',
-        body: `<ul><li>The Terminal takes typed commands; the <b>$</b> is the prompt, not typed.</li><li><code>sudo</code> = run as administrator (asks for your password) — read before you press Enter.</li><li>Useful: <code>sudo poweroff</code>, <code>sudo reboot</code>, <code>sudo apt update</code>, <code>sudo apt full-upgrade</code>, <code>vcgencmd measure_temp</code>, <code>pinout</code>, <code>ls -la</code>, <code>cd</code>, <code>groups</code>.</li><li>Python 3 is pre-installed; use <code>apt</code> or a virtual environment for extra libraries.</li></ul>`,
+        body: `<ul><li>The Terminal takes typed commands; the <b>$</b> is the prompt, not typed.</li><li><code>sudo</code> = run as administrator (asks for your password) — read before you press Enter.</li><li>System: <code>sudo poweroff</code>, <code>sudo reboot</code>, <code>sudo apt update</code>, <code>sudo apt full-upgrade</code>, <code>vcgencmd measure_temp</code>, <code>df -h</code>, <code>uname -r</code>, <code>pinout</code>.</li><li>Files: <code>ls</code>, <code>cd</code>, <code>mkdir</code>, <code>touch</code>, <code>cp</code>, <code>cat</code>, <code>rm</code> (no undo!), <code>sudo nano</code>.</li><li>Network: <code>hostname -I</code>, <code>ping</code>, <code>ssh</code>.</li><li>Python 3 is pre-installed; use <code>apt</code> or a virtual environment for extra libraries.</li></ul>`,
       },
     ],
     quiz: [
@@ -555,9 +586,12 @@ pause()</pre>
       { q: 'What does sudo do?', a: ['Deletes files', 'Runs the command as the superuser (administrator)', 'Starts Python', 'Opens the desktop'], c: 1, why: 'sudo = superuser do; it asks for your password.' },
       { q: 'Which command gives an accurate reading of the processor temperature?', a: ['pinout', 'groups', 'vcgencmd measure_temp', 'sudo reboot'], c: 2, why: 'Raspberry Pi: vcgencmd communicates with the GPU directly and gives an accurate, instantaneous reading.' },
       { q: 'Which two commands update the software, in order?', a: ['sudo reboot, then sudo poweroff', 'sudo apt update, then sudo apt full-upgrade', 'passwd, then groups', 'ls -la, then cd'], c: 1, why: 'First refresh the package list, then install the newest versions.' },
+      { q: 'Which command creates a new folder?', a: ['touch', 'mkdir', 'cat', 'cp'], c: 1, why: 'mkdir = make directory (folder); touch creates an empty file.' },
+      { q: 'Which command prints your Raspberry Pi’s local IP address?', a: ['hostname -I', 'uname -r', 'df -h', 'pinout'], c: 0, why: 'hostname -I outputs the local IP address (Remote access documentation).' },
+      { q: 'Why be careful with rm?', a: ['It restarts the Pi', 'A deleted file cannot be brought back (no recycle bin)', 'It needs 5 V', 'It deletes the monitor'], c: 1, why: 'rm deletes permanently.' },
       { q: 'What tells you it is safe to unplug the power after sudo poweroff?', a: ['The PWR LED turns blue', 'The green ACT LED shows a series of short flashes', 'The monitor turns on', 'Nothing'], c: 1, why: 'Raspberry Pi: the green activity LED briefly displays a series of short flashes when it is safe to remove the power cable.' },
     ],
-    sources: [SRC_PI.setup, SRC_PI.osupdate, SRC_PI.users, SRC_PI.thermal, SRC_PI.gpio, SRC_PI.python, SRC_PI.leds],
+    sources: [SRC_PI.setup, SRC_PI.osupdate, SRC_PI.users, SRC_PI.thermal, SRC_PI.gpio, SRC_PI.python, SRC_PI.leds, SRC_PI.remote, SRC_PI.kernel],
   },
 ];
 

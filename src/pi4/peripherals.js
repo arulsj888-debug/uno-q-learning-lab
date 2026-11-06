@@ -98,7 +98,7 @@ export class Monitor {
   set(on) { this.group.visible = on; }
   connect(on) { this.set(on); }
   draw(st) {
-    const key = JSON.stringify([st.mode, st.lines.length, st.lines[st.lines.length - 1], st.cwd, st.cur]);
+    const key = JSON.stringify([st.mode, st.lines.length, st.lines[st.lines.length - 1], st.cwd, st.cur]);   // redraw only when something changed
     if (key === this.key) return; this.key = key;
     const c = this.ctx, w = 1280, h = 720;
     c.fillStyle = '#000'; c.fillRect(0, 0, w, h);
@@ -123,6 +123,7 @@ export class Monitor {
     const all = [];
     for (const L of st.lines) {
       if (L.prompt) all.push({ prompt: true, cwd: L.cwd, text: L.text });
+      else if (L.segs) all.push({ segs: L.segs });
       else { const t = L.text, max = 96; if (!t.length) all.push({ text: '', c: L.c }); for (let i = 0; i < t.length; i += max) all.push({ text: t.slice(i, i + max), c: L.c }); }
     }
     if (st.mode === 'on') all.push({ prompt: true, cwd: st.cwd, text: st.cur || '', live: true });
@@ -136,7 +137,8 @@ export class Monitor {
         c.fillStyle = '#e6edf3'; c.fillText(d, x, y); x += c.measureText(d).width;
         c.fillText(L.text, x, y); x += c.measureText(L.text).width;
         if (L.live) { c.fillStyle = '#e6edf3'; c.fillRect(x + 2, y - 17, 11, 21); }
-      } else { c.fillStyle = L.c || '#d6dbe0'; c.fillText(L.text, x, y); }
+      } else if (L.segs) { for (const sg of L.segs) { c.fillStyle = sg.c || '#d6dbe0'; c.fillText(sg.t, x, y); x += c.measureText(sg.t).width; } }
+      else { c.fillStyle = L.c || '#d6dbe0'; c.fillText(L.text, x, y); }
     });
     this.tex.needsUpdate = true;
   }

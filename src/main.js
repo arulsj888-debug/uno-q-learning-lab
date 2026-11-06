@@ -108,7 +108,7 @@ class App {
     this.usbPlugged = false;
     this.bb = new Breadboard(new THREE.Vector3(0, DESK_Y + 8.5, IS_PI ? -62 : 68)); this.bb.group.visible = false; s.add(this.bb.group);
     this.bench = new Bench(s, this.board, this.bb);
-    this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2 };
+    this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2, fs: {} };
     if (IS_PI) { this.acc = makePiAccessories(this.board); for (const a of this.acc.all) { a.on = false; s.add(a.group); } Object.assign(HW_INFO, PI_ACC_INFO); }
     this.strips = new THREE.Group(); this.strips.visible = false; s.add(this.strips);
     // desk lamp over the light sensor (Lesson 11): brightness follows the simulated light level
@@ -842,6 +842,42 @@ class App {
 
   // ---- Pi lesson 8: Terminal on the 3D monitor. Results are simulated; the board reacts (LEDs) ----
   async actFlicker(ms) { const t0 = performance.now(); while (performance.now() - t0 < ms) { this.board.setLed('act', Math.random() < 0.5); await sleep(70 + Math.random() * 110); } this.board.setLed('act', false); }
+  // tiny in-memory file system of the practice Terminal: ls, ls -la, cd, mkdir, touch, cp, cat, rm
+  piFs(q, P, add) {
+    const parts = q.split(' '), c0 = parts[0], args = parts.slice(1);
+    const here = P.cwd, key = n => (here === '~' ? '~' : here) + '/' + n;
+    const kids = d => Object.keys(P.fs).filter(k => k.startsWith(d + '/') && !k.slice(d.length + 1).includes('/')).map(k => k.slice(d.length + 1)).sort();
+    const ok = n => /^[\w.\-]+$/.test(n) && n !== '.' && n !== '..';
+    if (c0 === 'ls' && (!args.length || args[0] === '-la')) {
+      const names = kids(here), long = args[0] === '-la';
+      if (!long) { if (names.length) P.lines.push({ segs: names.flatMap((n, i) => [{ t: n, c: P.fs[key(n)] === 'dir' ? '#79b8ff' : '#d6dbe0' }, { t: i < names.length - 1 ? '  ' : '' }]) }); return true; }
+      add('drwxr-xr-x user user 4096  .'); add('drwxr-xr-x root root 4096  ..');
+      for (const n of names) P.lines.push({ segs: [{ t: P.fs[key(n)] === 'dir' ? 'drwxr-xr-x user user 4096  ' : '-rw-r--r-- user user    0  ', c: '#d6dbe0' }, { t: n, c: P.fs[key(n)] === 'dir' ? '#79b8ff' : '#d6dbe0' }] });
+      add('(simulated listing — permissions and sizes are examples)', '#8fa3b5'); return true;
+    }
+    if (c0 === 'cd' && args.length === 1) {
+      const t = args[0];
+      if (t === '~' || t === '/home/user') P.cwd = '~';
+      else if (t === '..') { if (here !== '~') P.cwd = here.slice(0, here.lastIndexOf('/')); }
+      else if (/^\/home\/\S+$/.test(t)) add(`bash: cd: ${t}: No such file or directory`, '#ff9b8e');
+      else if (P.fs[key(t)] === 'dir') P.cwd = key(t);
+      else if (P.fs[key(t)]) add(`bash: cd: ${t}: Not a directory`, '#ff9b8e');
+      else add(`bash: cd: ${t}: No such file or directory`, '#ff9b8e');
+      return true;
+    }
+    if (c0 === 'mkdir' && args.length === 1) { if (!ok(args[0])) add(`mkdir: invalid name '${args[0]}'`, '#ff9b8e'); else if (P.fs[key(args[0])]) add(`mkdir: cannot create directory '${args[0]}': File exists`, '#ff9b8e'); else P.fs[key(args[0])] = 'dir'; return true; }
+    if (c0 === 'touch' && args.length === 1) { if (!ok(args[0])) add(`touch: invalid name '${args[0]}'`, '#ff9b8e'); else if (!P.fs[key(args[0])]) P.fs[key(args[0])] = 'file'; return true; }
+    if (c0 === 'cp' && args.length === 2) {
+      if (!P.fs[key(args[0])]) add(`cp: cannot stat '${args[0]}': No such file or directory`, '#ff9b8e');
+      else if (P.fs[key(args[0])] === 'dir') add(`cp: -r not specified; omitting directory '${args[0]}'`, '#ff9b8e');
+      else if (!ok(args[1])) add(`cp: invalid name '${args[1]}'`, '#ff9b8e');
+      else P.fs[key(args[1])] = 'file';
+      return true;
+    }
+    if (c0 === 'cat' && args.length === 1) { const t = P.fs[key(args[0])]; if (!t) add(`cat: ${args[0]}: No such file or directory`, '#ff9b8e'); else if (t === 'dir') add(`cat: ${args[0]}: Is a directory`, '#ff9b8e'); return true; }
+    if (c0 === 'rm' && args.length === 1) { const t = P.fs[key(args[0])]; if (!t) add(`rm: cannot remove '${args[0]}': No such file or directory`, '#ff9b8e'); else if (t === 'dir') add(`rm: cannot remove '${args[0]}': Is a directory`, '#ff9b8e'); else delete P.fs[key(args[0])]; return true; }
+    return false;
+  }
   async piCmd(raw) {
     const P = this.pios; if (!P || P.busy || P.mode !== 'on' || !this.board.powered) return;
     const q = raw.trim().replace(/\s+/g, ' '); if (!q) return;
@@ -869,11 +905,19 @@ class App {
         this.board.setPowerLed(false); P.mode = 'off';
       }
       else if (lc === 'ls -l /home') { add('total 4'); add('drwx------ 3 user user 4096 example output  user', '#d6dbe0'); }
-      else if (/^cd \/home\/\S+$/.test(lc)) { if (q.split('/')[2] === 'user') P.cwd = '~'; else add(`bash: cd: ${q.slice(3)}: No such file or directory`, '#ff9b8e'); }
-      else if (lc === 'ls -la') { add('total 8'); add('drwx------ user user  .'); add('drwxr-xr-x root root  ..'); add('-rw-r--r-- user user  .bashrc   (example output)', '#8fa3b5'); }
       else if (lc === 'groups') add('user ... gpio ...   (list shortened)');
       else if (lc === 'passwd') { add('Changing password for user.'); add('Current password: (simulated)', '#8fa3b5'); }
       else if (lc === 'python3') { add('Python 3 — version depends on your system. (simulated; type exit() to leave)', '#8fa3b5'); }
+      else if (lc === 'df -h') { add('Filesystem      Size  Used Avail Use% Mounted on'); add('/dev/root        29G  5.1G   22G  19% /   (example numbers)', '#8fa3b5'); }
+      else if (lc === 'uname -r') add('6.x.x-v8   (example — your kernel version differs)');
+      else if (lc === 'hostname -i' && q.includes('-I')) add('192.168.1.131   (example address from the documentation)');
+      else if (/^ping \S+$/.test(lc)) {
+        if (lc === 'ping raspberrypi.local') { add('PING raspberrypi.local (192.168.1.131): 56 data bytes'); await sleep(500); add('64 bytes from 192.168.1.131: icmp_seq=0 ttl=255 time=2.618 ms'); add('(press Ctrl+C to stop)  — example output from the documentation', '#8fa3b5'); }
+        else add(`ping: ${q.split(' ')[1]}: Name or service not known`, '#ff9b8e');
+      }
+      else if (/^ssh \S+@\S+$/.test(lc)) add('ssh runs on ANOTHER computer to log in to your Pi — not here on the Pi itself.', '#8fa3b5');
+      else if (lc === 'sudo nano /boot/firmware/config.txt') { add('[sudo] password for user: (simulated)', '#8fa3b5'); add('Opens the nano text editor. Ctrl+O saves, Ctrl+X exits. (not simulated further)', '#8fa3b5'); }
+      else if (this.piFs(q, P, add)) { /* handled by the file-system commands */ }
       else add(`${q.split(' ')[0]}: this is not one of the practice commands`, '#ff9b8e');
     } finally { P.busy = false; }
   }
@@ -883,7 +927,7 @@ class App {
     const norm = c => c.trim().replace(/\s+/g, ' ').toLowerCase();
     const run = raw => {
       const q = norm(raw); if (!q) return;
-      const hit = TERM_CMDS.find(c => norm(c.cmd) === q || (c.cmd.includes('<username>') && /^cd \/home\/\S+$/.test(q)));
+      const hit = TERM_CMDS.find(c => norm(c.cmd) === q) || TERM_CMDS.find(c => c.re && c.re.test(q));
       out.querySelector('.term-hint')?.remove();
       const line = document.createElement('div'); line.className = 'term-line';
       line.innerHTML = `<div><span class="term-ps">$</span> <b>${esc(raw.trim())}</b></div>` + (hit
@@ -892,8 +936,9 @@ class App {
       out.appendChild(line); out.scrollTop = out.scrollHeight;
       this.piCmd(raw);
     };
-    chips.innerHTML = `<button class="term-chip term-power" style="display:none">⏻ Plug the power in again</button>` + TERM_CMDS.map(c => `<button class="term-chip" data-c="${esc(c.cmd)}">${esc(c.cmd)}</button>`).join('');
-    chips.querySelectorAll('.term-chip[data-c]').forEach(b => b.onclick = () => run(b.dataset.c.replace('<username>', 'user')));
+    const groups = [...new Set(TERM_CMDS.map(c => c.g))];
+    chips.innerHTML = `<button class="term-chip term-power" style="display:none">⏻ Plug the power in again</button>` + groups.map(g => `<div class="term-grp">${esc(g)}</div>` + TERM_CMDS.filter(c => c.g === g).map(c => `<button class="term-chip" data-c="${esc(c.cmd)}">${esc(c.cmd)}</button>`).join('')).join('');
+    chips.querySelectorAll('.term-chip[data-c]').forEach(b => b.onclick = () => run(b.dataset.c));
     const pw = chips.querySelector('.term-power');
     pw.onclick = () => { this.board.setPowerLed(true); this.pios.lines = []; this.pios.cwd = '~'; this.pios.mode = 'boot'; this.bootAnimation(6000); };
     clearInterval(this.termTimer); this.termTimer = setInterval(() => { if (!document.body.contains(pw)) { clearInterval(this.termTimer); return; } pw.style.display = this.pios.mode === 'off' ? '' : 'none'; }, 250);
@@ -901,7 +946,7 @@ class App {
     inp.oninput = () => { this.pios.cur = inp.value; };
     inp.onkeydown = e => { if (e.key === 'Enter') { run(inp.value); inp.value = ''; this.pios.cur = ''; } e.stopPropagation(); };
   }
-  hideAcc() { if (this.acc) for (const a of this.acc.all) { a.set(false); a.on = false; } this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2 }; this.bootToken = this.bootToken; }
+  hideAcc() { if (this.acc) for (const a of this.acc.all) { a.set(false); a.on = false; } this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2, fs: {} }; this.bootToken = this.bootToken; }
   async applyAcc(i, prev, alive) {
     const L = this.lesson; let list = null;
     for (let k = 0; k <= i; k++) if (L.steps[k].acc) list = L.steps[k].acc;
