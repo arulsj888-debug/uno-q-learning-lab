@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f1216">
 <title>Arduino UNO Q · 3D Learning Lab</title>
+<script>window.__BOARD = new URLSearchParams(location.search).get('board') === 'pi4' ? 'pi4' : 'unoq'; if (window.__BOARD === 'pi4') document.title = 'Raspberry Pi 4 · 3D Learning Lab';</script>
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -81,6 +82,15 @@
     </div>
     <div id="legend">Drag to rotate · Scroll to zoom · Right-drag to pan · Click any part</div>
     <div id="loading"><div class="spin"></div><p>Building the UNO Q…</p></div>
+    <script>
+      // show the chosen board's name at once (the 3D app needs a few seconds to start)
+      if (!new URLSearchParams(location.search).get('board')) document.querySelector('#loading p').textContent = 'Loading the 3D Learning Lab…';
+      if (window.__BOARD === 'pi4') {
+        document.querySelector('#loading p').textContent = 'Building the Raspberry Pi 4…';
+        document.querySelector('.brand b').textContent = 'Raspberry Pi 4';
+        document.querySelector('.brand .logo').style.display = 'none';
+      }
+    </script>
   </main>
 
   <aside id="panel"></aside>
