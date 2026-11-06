@@ -41,6 +41,7 @@ export class Sim {
     // Arduino Print::print(float, digits): fixed number of decimals (default 2)
     const fmt = (v, digits) => (typeof v === 'number' && digits !== undefined ? v.toFixed(digits) : String(v));
     const slow = opts.slow !== false;
+    const pxBuf = Array.from({ length: 8 }, () => [0, 0, 0, 0]);
     const rt = {
       at: async (n) => { check(); H.line(n); if (slow) await frame(); check(); },
       delay: (ms) => new Promise((res, rej) => {
@@ -69,6 +70,9 @@ export class Sim {
       },
       delayMicroseconds: async () => { if (slow) await frame(); },
       thermo: () => (H.thermo ? H.thermo() : { found: false }),
+      pxSet: (i, rgb, br) => { if (i < 8) pxBuf[i] = [rgb[0], rgb[1], rgb[2], Math.trunc(br * 31 / 100) / 31]; },   // library: map(brightness, 0, 100, 0, 0x1F)
+      pxClear: (i) => { if (i < 8) pxBuf[i] = [0, 0, 0, 0]; },
+      pxShow: () => { if (H.pixels) H.pixels(pxBuf.map(x => x.slice())); },
       pulseIn: async (pin, state) => { const us = await H.pulse(pin, state); check(); return us; },
       servoAttach: (pin) => { pins[pin] = { mode: 'OUTPUT' }; H.servo(pin, null); },
       // Servo library (Zephyr): map(angle, 0, 180, 544, 2400) µs, stored in 4 µs timer ticks
@@ -236,6 +240,37 @@ export const PROGRAMS = {
       await rt.at(20); rt.print(humidity, 1);
       await rt.at(21); rt.println(' %RH');
       await rt.at(22); await rt.delay(1000);
+    }
+  },
+
+  async pixels(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4);
+    await rt.at(7); rt.serialBegin(9600);
+    await rt.at(8);
+    await rt.at(9); const st = rt.thermo(), ok = st.found && st.pixels;
+    if (!ok) {
+      await rt.at(10); rt.println('Module not found - check the Qwiic cables');
+      await rt.at(11); for (;;) await rt.delay(1000);
+    }
+    for (;;) {
+      await rt.at(15);
+      await rt.at(16); const celsius = rt.thermo().c;
+      await rt.at(17); const lit = Math.min(8, Math.max(0, Math.trunc((celsius - 15.0) / 2.0)));
+      await rt.at(19); let color = [0, 255, 0];
+      await rt.at(20); if (celsius < 20) color = [0, 0, 255];
+      await rt.at(21); if (celsius > 28) color = [255, 0, 0];
+      await rt.at(23);
+      for (let i = 0; i < 8; i++) {
+        await rt.at(24);
+        if (i < lit) rt.pxSet(i, color, 25);
+        else { await rt.at(25); rt.pxClear(i); }
+      }
+      await rt.at(27); rt.pxShow();
+      await rt.at(29); rt.print(celsius, 1);
+      await rt.at(30); rt.print(' C -> ');
+      await rt.at(31); rt.print(lit);
+      await rt.at(32); rt.println(' LEDs');
+      await rt.at(33); await rt.delay(500);
     }
   },
 

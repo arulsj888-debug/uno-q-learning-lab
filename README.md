@@ -32,6 +32,7 @@ Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, 
     17. Switch a lamp with a relay module (low-level trigger, see-through relay, safe 3.3 V use)
   - **Module 6: I²C & Qwiic**
     18. Temperature & humidity with the Arduino Modulino® Thermo (Qwiic cable, I²C basics, Wire1, 3.3 V only)
+    19. A colour thermometer with the Modulino® Pixels (daisy-chained Qwiic modules, addresses 0x45 / 0x6C, set/clear/show)
 
 Purple notes in the lessons mark behavior that is only **simulated** in the app, such as the shortened boot time.
 
@@ -52,6 +53,7 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
 | TI L293x datasheet (SLRS008D) + Adafruit #711 motor spec | L293D pinout, 600 mA/1.2 A, VIH 2.3 V, VCC1/VCC2, function tables, clamp diodes; 130 motor currents |
 | Handsontec 1-channel relay module guide | relay pinout COM/NO/NC, active-low trigger, DC 30 V / AC 250 V 10 A contacts, optocoupler schematic, 3.3 V note |
 | Arduino Modulino Thermo datasheet (ABX00103) + Arduino_Modulino library | GXHT30C specs, I²C address 0x45, Qwiic/headers, board outline, Thermo_Basic example |
+| Arduino Modulino Pixels datasheet (ABX00109) + Arduino_Modulino source | 8 × LC8822-2020 RGB LEDs, address 0x6C, 33 mA/LED, set/clear/show, brightness 0–100 → 5-bit |
 | Analog Devices TMP35/36/37 datasheet, Rev. F | TMP36 output (0.5 V + 10 mV/°C), supply, accuracy, TO-92 pinout |
 | Arduino Zephyr core source (ArduinoCore-zephyr) | `analogRead` 10-bit default, `analogWrite` 8-bit default and non-PWM behavior, `tone()` behavior |
 

@@ -45,7 +45,7 @@ function nets(defs, pressed = false) {
     if (isWire(d)) { u(node(d.from), node(d.to)); continue; }
     for (const [leg, h] of Object.entries(legs(d))) u(leg, colNet(h));
     if (d.type === 'l293d') { for (const k of [5, 12, 13]) u(d.id + '.p4', d.id + '.p' + k); }   // TI block diagram: pins 4, 5, 12, 13 = one ground
-    if (d.type === 'thermo') u(d.id + '.QA', d.id + '.QB');   // datasheet: the two Qwiic connectors are wired in parallel
+    if (d.type === 'thermo' || d.type === 'pixels') u(d.id + '.QA', d.id + '.QB');   // datasheet: the two Qwiic connectors are wired in parallel
     if (d.type === 'relay') u(d.id + '.COM', d.id + (pressed ? '.NO' : '.NC'));   // contact position: energised (pressed) = COM–NO
     if (d.type === 'button') { u(d.id + '.1', d.id + '.2'); u(d.id + '.3', d.id + '.4'); if (pressed) u(d.id + '.1', d.id + '.3'); }
   }
@@ -62,7 +62,7 @@ for (const L of LESSONS) {
     const ends = isWire(d) ? [d.from, d.to] : Object.values(legs(d));
     for (const e of ends) {
       if (isHole(e)) { const [, , c] = HOLE.exec(e); if (+c < 1 || +c > 30) bad(L, `${d.id}: hole ${e} out of range`); (used[e] ??= []).push(d.id); }
-      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
+      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo', 'pixels'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
       else if (!PINS.has(e)) bad(L, `${d.id}: unknown header pin ${e}`);
     }
   }
@@ -173,7 +173,15 @@ for (const L of LESSONS) {
       }
       if (!N.same(th + '.QA', P) || !N.same(th + '.QB', P)) bad(L, `thermo: module is not on the UNO Q Qwiic bus`);
       for (const p of ['5V', '3V3', 'VIN', 'IOREF', 'GND', 'D4', 'D5']) if (N.same(th + '.QA', 'PIN:' + p)) bad(L, `thermo: Qwiic bus is connected to ${p} — Qwiic is its own 3.3 V I²C bus`);
-      if (all.some(d => d.id !== io.cable && isWire(d) && [d.from, d.to].some(e => e.startsWith(th + '.')))) bad(L, `thermo: extra wire on the module besides the Qwiic cable`);
+      const cabs = [io.cable, io.cable2].filter(Boolean);
+      if (all.some(d => !cabs.includes(d.id) && isWire(d) && [d.from, d.to].some(e => e.startsWith(th + '.') || (io.pix && e.startsWith(io.pix + '.'))))) bad(L, `thermo: extra wire on a module besides the Qwiic cables`);
+      if (io.pix) {
+        const c2 = byId[io.cable2];
+        if (!c2 || c2.type !== 'qwiic') bad(L, `pixels: no Qwiic cable ${io.cable2}`);
+        else if (!(c2.from.startsWith(th + '.') && c2.to.startsWith(io.pix + '.'))) bad(L, `pixels: cable 2 does not join ${th} to ${io.pix}`);
+        if (!N.same(io.pix + '.QA', P)) bad(L, `pixels: module is not on the UNO Q Qwiic bus`);
+        if (cab && c2 && cab.to === c2.from) bad(L, `pixels: both cables use the same Thermo connector`);
+      }
     }
     if (io.kind === 'buzzer') {
       const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));

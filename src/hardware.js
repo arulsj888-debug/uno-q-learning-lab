@@ -1197,6 +1197,99 @@ export class QwiicCable {
   }
 }
 
+// ---------------------------------------------------------------- Arduino Modulino Pixels (ABX00109)
+// Datasheet: 41 × 25.36 mm, 1.6 mm, 8 × LC8822-2020 RGB LEDs, STM32C011F4, Qwiic connectors at both short edges,
+// 1×4 header (GND, 3V3, SDA, SCL), 1×10 header (GND, GND, 3V3, RESET, SWCLK, SWDIO, TX1, RX1, D0, C0), 4 mounting holes Ø3.2 (16 × 32 mm).
+// Layout measured from the datasheet pinout drawing (picture-up = +x, picture-right = +z). Same local frame as ModulinoThermo.
+export class ModulinoPixels {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const L = 41, Wd = 25.36, T = 1.6, k = 24, top = T;
+    const rr = (s, w, h, r) => { s.moveTo(-w / 2 + r, -h / 2); s.lineTo(w / 2 - r, -h / 2); s.absarc(w / 2 - r, -h / 2 + r, r, -Math.PI / 2, 0); s.lineTo(w / 2, h / 2 - r); s.absarc(w / 2 - r, h / 2 - r, r, 0, Math.PI / 2); s.lineTo(-w / 2 + r, h / 2); s.absarc(-w / 2 + r, h / 2 - r, r, Math.PI / 2, Math.PI); s.lineTo(-w / 2, -h / 2 + r); s.absarc(-w / 2 + r, -h / 2 + r, r, Math.PI, Math.PI * 1.5); };
+    const shape = new THREE.Shape(); rr(shape, L, Wd, 3.2);
+    const circ = (x, z, r) => { const p = new THREE.Path(); p.absarc(x, -z, r, 0, Math.PI * 2, true); shape.holes.push(p); };
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) circ(sx * 16, sz * 8, 1.6);
+    this.hdr4 = [['GND', 3.81], ['3V3', 1.27], ['SDA', -1.27], ['SCL', -3.81]];
+    const names10 = ['GND', 'GND', '3V3', 'RESET', 'SWCLK', 'SWDIO', 'TX1', 'RX1', 'D0', 'C0'];
+    this.hdr10 = names10.map((n, i) => [n, 11.43 - i * 2.54]);
+    for (const [, x] of this.hdr4) circ(x, 11.4, 0.5);
+    for (const [, x] of this.hdr10) circ(x, -11.4, 0.5);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false, curveSegments: 24 });
+    geo.rotateX(-Math.PI / 2);
+    const mask = new THREE.MeshPhysicalMaterial({ color: 0x1b2f63, roughness: 0.42, clearcoat: 0.4, clearcoatRoughness: 0.35 });
+    g.add(sub(new THREE.Mesh(geo, mask), 'px:pcb'));
+    const tex = canvasTex(Math.round(Wd * k), Math.round(L * k), (c, w, h) => {
+      const X = z => (z + Wd / 2) * k, Y = x => (L / 2 - x) * k;
+      c.clearRect(0, 0, w, h);
+      const ring = (x, z, ro, ri) => { c.fillStyle = '#d9b25f'; c.beginPath(); c.arc(X(z), Y(x), ro * k, 0, 7); c.arc(X(z), Y(x), ri * k, 0, 7, true); c.fill('evenodd'); };
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) ring(sx * 16, sz * 8, 2.8, 1.6);
+      for (const [, x] of this.hdr4) ring(x, 11.4, 0.95, 0.5);
+      for (const [, x] of this.hdr10) ring(x, -11.4, 0.95, 0.5);
+      c.fillStyle = '#f2f2ee'; c.textBaseline = 'middle'; c.font = `700 ${Math.round(1.15 * k)}px Arial, Helvetica, sans-serif`;
+      c.textAlign = 'right'; for (const [n, x] of this.hdr4) c.fillText(n, X(11.4 - 1.3), Y(x));
+      c.font = `700 ${Math.round(0.95 * k)}px Arial, Helvetica, sans-serif`;
+      c.textAlign = 'left'; for (const [n, x] of this.hdr10) c.fillText(n, X(-11.4 + 1.2), Y(x));
+      // LED symbol
+      c.strokeStyle = '#f2f2ee'; c.lineWidth = 0.28 * k; c.lineCap = 'round';
+      c.beginPath(); c.arc(X(-7.5), Y(15.2), 2.0 * k, Math.PI, 0); c.lineTo(X(-5.5), Y(12.8)); c.lineTo(X(-9.5), Y(12.8)); c.closePath(); c.stroke();
+    });
+    const qv = new THREE.BufferGeometry();
+    qv.setAttribute('position', new THREE.Float32BufferAttribute([-L / 2, 0, -Wd / 2, L / 2, 0, -Wd / 2, L / 2, 0, Wd / 2, -L / 2, 0, Wd / 2], 3));
+    qv.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
+    qv.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0, 1, 1, 1, 1, 0], 2));
+    qv.setIndex([0, 2, 1, 0, 3, 2]);
+    const over = new THREE.Mesh(qv, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    over.position.y = T + 0.02; over.raycast = () => {}; g.add(over);
+
+    const frontTex = canvasTex(256, 128, (c, w, h) => {
+      c.fillStyle = '#efede4'; c.fillRect(0, 0, w, h); c.fillStyle = '#1a1a1a'; c.fillRect(22, 30, w - 44, h - 52);
+      c.fillStyle = '#d6aa52'; for (let i = 0; i < 4; i++) c.fillRect(54 + i * 44, 52, 10, 30);
+    });
+    const fMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.6 });
+    for (const sx of [1, -1]) {
+      const mats = [M.whiteNylon, M.whiteNylon, M.whiteNylon, M.whiteNylon, M.whiteNylon, M.whiteNylon]; mats[sx > 0 ? 0 : 1] = fMat;
+      const b = new THREE.Mesh(new RoundedBoxGeometry(4.25, 2.9, 6.0, 2, 0.15), mats); b.position.set(sx * 18.2, top + 1.45, 0); g.add(sub(b, 'th:qwiic'));
+      for (const sz of [-1, 1]) { const t = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.35, 1.5), M.tin); t.position.set(sx * 16.4, top + 0.17, sz * 3.5); g.add(sub(t, 'th:qwiic')); }
+    }
+    this.pinPos = { QA: { p: new THREE.Vector3(-18.2 - 2.125, top + 1.45, 0), d: new THREE.Vector3(-1, 0, 0) }, QB: { p: new THREE.Vector3(18.2 + 2.125, top + 1.45, 0), d: new THREE.Vector3(1, 0, 0) } };
+
+    // eight LC8822-2020 RGB LEDs (2.0 × 2.0 mm), one every 3.3 mm along the centre line, each with its small SMD neighbours
+    this.leds = [];
+    for (let i = 0; i < 8; i++) {
+      const x = 11.6 - i * 3.3;
+      const pkg = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.7, 2.0), new THREE.MeshStandardMaterial({ color: 0xc9c9c4, roughness: 0.5 })); pkg.position.set(x, top + 0.35, 0); g.add(sub(pkg, 'px:led'));
+      const lens = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 1.5), new THREE.MeshBasicMaterial({ color: 0x4a4636, toneMapped: false })); lens.position.set(x, top + 0.74, 0); g.add(sub(lens, 'px:led'));
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+      halo.scale.set(8, 8, 1); halo.position.set(x, top + 1.4, 0); halo.raycast = () => {}; g.add(halo);
+      this.leds.push({ lens, halo });
+      const d = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 1.6), new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.5 })); d.position.set(x, top + 0.25, 2.2); g.add(sub(d, 'px:smd'));
+      const r = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.4, 1.0), new THREE.MeshStandardMaterial({ color: 0x8c7660, roughness: 0.5 })); r.position.set(x, top + 0.2, -2.1); g.add(sub(r, 'px:smd'));
+    }
+    // STM32C011F4 microcontroller (small black package, bottom-right of the drawing)
+    const mcu = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.8, 3.0), new THREE.MeshStandardMaterial({ color: 0x0d0d0e, roughness: 0.5 })); mcu.position.set(-10.4, top + 0.4, 9.2); g.add(sub(mcu, 'px:mcu'));
+    const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 10), new THREE.MeshStandardMaterial({ color: 0x8a8a8a })); dot.position.set(-9.2, top + 0.82, 8.1); g.add(sub(dot, 'px:mcu'));
+    tagHW(g, 'pixels');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+    this.setColors(null);
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    const q = this.group.getWorldQuaternion(new THREE.Quaternion());
+    return { pos: this.group.localToWorld(this.pinPos[name].p.clone()), dir: this.pinPos[name].d.clone().applyQuaternion(q) };
+  }
+  /** colors: array of 8 entries [r, g, b, level 0..1] (level = global brightness) or null for all off */
+  setColors(colors) {
+    this.leds.forEach((l, i) => {
+      const c = colors && colors[i];
+      if (!c || c[3] <= 0 || (c[0] + c[1] + c[2]) === 0) { l.lens.material.color.set(0x4a4636); l.halo.material.color.set(0x000000); return; }
+      const k = 0.35 + 0.65 * c[3];                      // shown brighter than linear so a low setting is still visible
+      l.lens.material.color.setRGB(Math.min(1, 0.15 + c[0] / 255 * k), Math.min(1, 0.15 + c[1] / 255 * k), Math.min(1, 0.15 + c[2] / 255 * k));
+      l.halo.material.color.setRGB(c[0] / 255 * k * 0.9, c[1] / 255 * k * 0.9, c[2] / 255 * k * 0.9);
+    });
+  }
+}
+
 export const HW_INFO = {
   usbcable: {
     name: 'USB-C® cable', tag: 'Power + data',
@@ -1416,6 +1509,11 @@ export const HW_INFO = {
   'th:r': { name: 'Resistors and capacitors', tag: 'Supporting parts', summary: 'Pull-up resistors for the ADDR and nRST pins and the I²C lines, plus decoupling capacitors (4.7 µF and 100 nF) next to the sensor.', src: 'Modulino Thermo datasheet §4.3, §4.5' },
   'thermo': { name: 'Arduino Modulino® Thermo', tag: 'ABX00103 · Qwiic', summary: 'A small board with a temperature and humidity sensor. Plug it into the UNO Q with one Qwiic cable — no breadboard and no loose wires.', points: ['Powered by 3.3 V from the Qwiic cable; there is no voltage regulator on the module.', 'Headers J4 (GND, 3V3, SDA, SCL) and J3 (GND, 3V3, ADDR, nRST, ALERT) are for direct wiring; they are not used here.'], warn: 'Never connect it to 5 V.', src: 'Modulino Thermo datasheet' },
   'qwiiccable': { name: 'Qwiic cable', tag: '4 wires · 3.3 V I²C', summary: 'A 4-wire cable with a small polarised plug at each end. It carries power and the two I²C signals, so this one cable is the whole wiring.', points: ['Standard Qwiic colours: black = GND, red = 3.3 V, blue = SDA (data), yellow = SCL (clock).', 'The plug only fits one way round, so the wires cannot be swapped.'], src: 'SparkFun Qwiic system · Modulino Thermo datasheet §4.4' },
+  'px:pcb': { name: 'Modulino Pixels circuit board', tag: '41 × 25.36 mm · 1.6 mm thick', summary: 'Same size and mounting holes (Ø3.2 mm, 16 × 32 mm) as every Modulino node, so they can be stacked or screwed side by side.', src: 'Modulino Pixels datasheet §7.4' },
+  'px:led': { name: 'RGB LED (LC8822-2020)', tag: '1 of 8 · full colour', summary: 'Each LED holds a red, a green and a blue light and can show any mix. The eight are controlled one by one.', points: ['Datasheet: up to 33 mA per LED at full brightness (8 LEDs = 264 mA).'], src: 'Modulino Pixels datasheet §2, §4.1' },
+  'px:mcu': { name: 'STM32C011F4 microcontroller', tag: 'The module’s own brain', summary: 'It listens on the I²C bus (address 0x6C) and drives the eight LEDs, so the UNO Q only has to send short commands.', src: 'Modulino Pixels datasheet §7, §7.5' },
+  'px:smd': { name: 'Small SMD parts', tag: 'Supporting parts', summary: 'Tiny parts next to each LED that belong to its supply and signal circuit.', src: 'Modulino Pixels datasheet (pinout drawing)' },
+  'pixels': { name: 'Arduino Modulino® Pixels', tag: 'ABX00109 · Qwiic', summary: 'A strip of eight RGB LEDs controlled over I²C. Plug it into the Qwiic bus and it shows colours, bars or status lights.', points: ['Powered by 3.3 V through Qwiic. Default I²C address 0x6C.', 'The 1×10 header (LED & MCU signals) and 1×4 header are for direct wiring and are not used here.'], warn: '3.3 V only — never 5 V.', src: 'Modulino Pixels datasheet' },
   obstacle: {
     name: 'Obstacle', tag: 'Drag it closer or farther',
     summary: 'A flat object in front of the sensor. Drag it in the 3D view or use the slider; the label shows the real distance.',

@@ -27,6 +27,8 @@ const VIEWS = {
   relay: { t: new THREE.Vector3(88, 0, -12), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 395 },
   thermo: { t: new THREE.Vector3(62, 0, 6), d: new THREE.Vector3(-0.08, 0.92, 0.38), dist: 215 },
   thermoclose: { t: new THREE.Vector3(100, -4, 6), d: new THREE.Vector3(-0.06, 0.93, 0.36), dist: 62 },
+  thermo2: { t: new THREE.Vector3(95, 0, 6), d: new THREE.Vector3(-0.08, 0.92, 0.38), dist: 270 },
+  pixclose: { t: new THREE.Vector3(170, -4, 6), d: new THREE.Vector3(-0.06, 0.93, 0.36), dist: 62 },
   motor: { t: new THREE.Vector3(0, 0, 90), d: new THREE.Vector3(-0.06, 0.9, 0.43), dist: 285 },
   drvclose: { t: new THREE.Vector3(0, 3, 71), d: new THREE.Vector3(-0.22, 0.86, 0.46), dist: 78 },
   sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
@@ -212,6 +214,7 @@ class App {
   async ensurePower() { if (!this.usbPlugged) await this.plug(true); }
 
   outputsOff() {
+    this.pxArr = null;
     if (this.rly) { this.rly.mode = 'INPUT'; this.rly.level = null; }
     for (const it of Object.values(this.bench.items)) {
       if (it.def.type === 'led') it.obj.set(false);
@@ -686,7 +689,7 @@ class App {
         <div id="ps-note" class="io-note"></div>`;
     if (w.includes('thermo')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated — you decide)</span></div>
         <div class="throw"><label>Temperature</label><input id="th-t" type="range" min="-10" max="60" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div>
-        <div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
+        ${w.includes('pixels') ? '' : `<div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div>`}</div>
         <div class="io-block pirstat"><div><span>Module power</span><b id="th-pwr">—</b></div><div class="arrow">→</div><div><span>I²C address</span><b id="th-bus">—</b></div><div class="arrow">→</div><div><span>Sketch gets</span><b id="th-out">—</b></div></div>
         <div class="io-tools"><button id="th-plug" class="hold small">🔌 Unplug the Qwiic cable</button></div><div id="th-note" class="io-note"></div>`;
     if (w.includes('relay')) h += `<div class="io-block pirstat"><div><span>D4 → IN</span><b id="rl-pin">—</b></div><div class="arrow">→</div><div><span>Relay</span><b id="rl-rel">—</b></div><div class="arrow">→</div><div><span>Lamp</span><b id="rl-lamp">—</b></div></div>
@@ -716,7 +719,7 @@ class App {
     if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); $('#dist').onchange = e => this.setDist(+e.target.value, true); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist, true)); this.setDist(this.distCm); }
     else this.hideSonar();
     this.refreshPickTargets();
-    if ($('#th-t')) { $('#th-t').oninput = e => this.setThermo({ t: +e.target.value }); $('#th-h').oninput = e => this.setThermo({ h: +e.target.value }); $('#th-plug').onclick = () => { if (!this.sim.running) this.th.unplug = !this.th.unplug; }; this.setThermo({}); }
+    if ($('#th-t')) { $('#th-t').oninput = e => this.setThermo({ t: +e.target.value }); if ($('#th-h')) $('#th-h').oninput = e => this.setThermo({ h: +e.target.value }); $('#th-plug').onclick = () => { if (!this.sim.running) this.th.unplug = !this.th.unplug; }; this.setThermo({}); }
     if ($('#rl-manual')) $('#rl-manual').onclick = () => { if (this.rly && !this.sim.running) this.rly.manual = !this.rly.manual; };
     if ($('#pir-wave')) { $('#pir-wave').onclick = () => this.pirWave(); $('#pir-still').onclick = () => this.pirHoldStill(); }
     this.showRoom(w.includes('pir') && !!this.pirSensor());
@@ -1085,11 +1088,14 @@ class App {
   // ---- Lesson 15: SG90 servo ------------------------------------------------------------------------
   // ---- Lesson 18: Modulino Thermo over Qwiic ------------------------------------------------------------
   thermoIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'thermo'); }
-  thermoOk() { const io = this.thermoIo(); return !!io && this.wired(io) && !this.th.unplug && this.board.powered; }
+  cabOk(id) { const io = this.thermoIo(); return !!this.bench.items[id] && !(this.th.unplug && (io.unplug || io.cable) === id); }
+  thermoOk() { const io = this.thermoIo(); return !!io && this.wired(io) && this.board.powered && this.cabOk(io.cable); }
+  pixelsOk() { const io = this.thermoIo(); return !!io && !!io.pix && this.thermoOk() && this.cabOk(io.cable2); }
   showThermo(on) {
     this.th.unplug = false; this.th.last = null;
     const m = this.bench.get('th1'); if (m) m.setPower(false);
-    const c = this.bench.get('cab1'); if (c) c.group.visible = true;
+    for (const id of ['cab1', 'cab2']) { const c = this.bench.get(id); if (c) c.group.visible = true; }
+    this.pxArr = null; const px = this.bench.get('pix1'); if (px) px.setColors(null);
   }
   setThermo(v) {
     Object.assign(this.th, v);
@@ -1099,16 +1105,23 @@ class App {
   }
   thermoTick() {
     const io = this.thermoIo(); if (!io) return;
-    const ok = this.thermoOk(), m = this.bench.get('th1'), c = this.bench.get('cab1');
-    if (m) m.setPower(ok);
-    if (c) c.group.visible = !this.th.unplug;
+    const ok = this.thermoOk(), m = this.bench.get('th1');
+    if (m) m.setPower(this.board.powered && !!this.bench.items.cab1 && this.cabOk(io.cable));
+    for (const id of ['cab1', 'cab2']) { const c = this.bench.get(id); if (c) c.group.visible = this.cabOk(id); }
+    const px = this.bench.get('pix1'), pOk = this.pixelsOk();
+    if (px) px.setColors(this.sim.running && pOk ? this.pxArr : null);
     const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; e.className = cls; } };
     const run = this.sim.running, bad = this.th.t < 5 || this.th.t > 60 || this.th.h < 20 || this.th.h > 80;
-    set('#th-pwr', ok ? '3.3 V' : this.th.unplug ? 'no cable' : 'off', ok ? 'on' : 'off');
-    set('#th-bus', ok ? '0x45 answers' : 'no answer', ok ? 'on' : 'off');
-    set('#th-out', !run ? '—' : !ok ? 'not found' : (this.th.last || '…'), run && ok ? 'on' : 'off');
-    const btn = $('#th-plug'); if (btn) { btn.disabled = run; btn.textContent = this.th.unplug ? '🔌 Plug the Qwiic cable back in' : '🔌 Unplug the Qwiic cable'; btn.classList.toggle('on', this.th.unplug); }
-    set('#th-note', !this.board.powered ? 'USB-C is not plugged in — the module has no power.' : this.th.unplug ? 'The cable is out: nobody answers, so <b>thermo.begin()</b> will return false.' : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : bad ? 'Outside the datasheet’s recommended range (5…60 °C, 20…80 %RH).' : 'The sketch reads the module once per second.', 'io-note');
+    set('#th-pwr', ok ? '3.3 V' : !this.board.powered ? 'off' : 'no cable', ok ? 'on' : 'off');
+    set('#th-bus', io.pix ? (pOk ? '0x45 + 0x6C' : ok ? '0x45 only' : 'no answer') : ok ? '0x45 answers' : 'no answer', ok ? 'on' : 'off');
+    if (io.pix) {
+      const a = this.pxArr || [], n = a.filter(x => x[3] > 0 && x[0] + x[1] + x[2] > 0).length, f = a.find(x => x[3] > 0 && x[0] + x[1] + x[2] > 0);
+      const nm = !f ? '' : f[2] ? 'blue' : f[0] ? 'red' : 'green';
+      set('#th-out', !run ? '—' : !pOk ? 'not found' : n ? `${n} of 8 LEDs · ${nm}` : '0 of 8 LEDs', run && pOk ? 'on' : 'off');
+    } else set('#th-out', !run ? '—' : !ok ? 'not found' : (this.th.last || '…'), run && ok ? 'on' : 'off');
+    const cn = io.pix ? 'cable 2' : 'the Qwiic cable';
+    const btn = $('#th-plug'); if (btn) { btn.disabled = run; btn.textContent = this.th.unplug ? `🔌 Plug ${cn} back in` : `🔌 Unplug ${cn}`; btn.classList.toggle('on', this.th.unplug); }
+    set('#th-note', !this.board.powered ? 'USB-C is not plugged in — the module has no power.' : this.th.unplug ? (io.pix ? 'Cable 2 is out: nobody answers at 0x6C, so <b>leds.begin()</b> will return false.' : 'The cable is out: nobody answers, so <b>thermo.begin()</b> will return false.') : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : bad ? 'Outside the datasheet’s recommended range (5…60 °C, 20…80 %RH).' : 'The sketch reads the module once per second.', 'io-note');
   }
   // ---- Lesson 17: relay module + lamp ---------------------------------------------------------------
   relayIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'relay'); }
@@ -1374,10 +1387,11 @@ class App {
       thermo: () => {
         const ok = this.thermoOk();
         if (!ok) return { found: false };
-        const c = this.th.t + (Math.random() - 0.5) * 0.1, rh = Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3));
+        const jit = this.thermoIo().pix ? 0 : 1, c = this.th.t + (Math.random() - 0.5) * 0.1 * jit, rh = Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3));
         this.th.last = `${c.toFixed(1)} °C · ${rh.toFixed(1)} %RH`;
-        return { found: true, c, rh };
+        return { found: true, pixels: this.pixelsOk(), c, rh };
       },
+      pixels: arr => { this.pxArr = arr; },
       mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {
         const io = this.ioFor(pin);

@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE, PIXELS_CODE } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -23,6 +23,7 @@ const SRC = {
   relaymod: { t: 'Handsontec: 1-channel 5 V optical-isolated relay module (user guide)', u: 'https://handsontec.com/dataspecs/module/Relay%20Module/1Ch-relay%20Opto.pdf' },
   thermo: { t: 'Arduino Modulino® Thermo datasheet (ABX00103)', u: 'https://docs.arduino.cc/hardware/modulino-thermo' },
   modulinolib: { t: 'Arduino_Modulino library (source and Thermo_Basic example)', u: 'https://github.com/arduino-libraries/Arduino_Modulino' },
+  pixels: { t: 'Arduino Modulino® Pixels datasheet (ABX00109)', u: 'https://docs.arduino.cc/hardware/modulino-pixels' },
   qwiic: { t: 'SparkFun Qwiic system (connector and cable colour code)', u: 'https://www.sparkfun.com/qwiic' },
   dhtforum: { t: 'Arduino Forum: “DHT11 and UNO Q”', u: 'https://forum.arduino.cc/t/dht11-and-uno-q/1416409' },
 };
@@ -129,6 +130,13 @@ const THERMO_PARTS = [
 ];
 const THERMO_IDS = THERMO_PARTS.map(d => d.id);
 const THERMO_IO = { kind: 'thermo', item: 'th1', cable: 'cab1', needs: THERMO_IDS };
+const PIXELS_PARTS = [
+  ...THERMO_PARTS,
+  { id: 'pix1', type: 'pixels', x: 170, z: 6 },
+  { id: 'cab2', type: 'qwiic', from: 'th1.QB', to: 'pix1.QA', lift: 3 },
+];
+const PIXELS_IDS = PIXELS_PARTS.map(d => d.id);
+const PIXELS_IO = { kind: 'thermo', item: 'th1', cable: 'cab1', pix: 'pix1', cable2: 'cab2', unplug: 'cab2', needs: PIXELS_IDS };
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
 
 const BLINK_CODE = BLINK;
@@ -1689,11 +1697,113 @@ export const LESSONS = [
     ],
     sources: [SRC.thermo, SRC.modulinolib, SRC.ds, SRC.qwiic],
   },
+  // ================================================================== 19
+  {
+    id: 'l19', num: 19, module: 6, title: 'A colour thermometer with Modulino® Pixels', level: 'Intermediate', time: '25 min',
+    goal: 'Chain a second Qwiic module (eight RGB LEDs) after the Thermo and show the temperature as a bar of coloured lights.',
+    hardware: ['Arduino UNO Q', 'Arduino Modulino® Thermo (from Lesson 18)', 'Arduino Modulino® Pixels (ABX00109)', '2 × Qwiic cable', 'Arduino_Modulino library'],
+    code: PIXELS_CODE, program: 'pixels', fast: true, widgets: ['thermo', 'pixels'], noBreadboard: true,
+    circuit: PIXELS_PARTS, io: { QWIIC: PIXELS_IO },
+    explain: {
+      1: 'The same <b>Arduino_Modulino</b> library controls every Modulino module.',
+      3: 'One object for the Thermo (the temperature source) …',
+      4: '… and one for the Pixels (the eight LEDs).',
+      7: 'Serial output on.',
+      8: 'Start the Qwiic bus (<b>Wire1</b> on the UNO Q). One call serves all modules on the bus.',
+      9: '<b>begin()</b> looks for each module by its I²C address (Thermo 0x45, Pixels 0x6C). If one is missing it returns false.',
+      10: 'Tell the user what to check.',
+      11: 'Stop here on purpose.',
+      16: 'Read the temperature in °C.',
+      17: 'Work out how many LEDs to light: one LED for every 2 °C above 15 °C. <code>constrain(…, 0, 8)</code> keeps the answer between 0 and 8 because there are only 8 LEDs. The <code>(int)</code> drops the decimals.',
+      19: 'Start with green …',
+      20: '… below 20 °C use blue (cool) …',
+      21: '… above 28 °C use red (warm).',
+      23: 'Go through all 8 LEDs, number 0 to 7.',
+      24: 'LEDs below <b>lit</b> get the colour. <code>set(index, colour, brightness)</code>: brightness runs 0–100; 25 is gentle.',
+      25: 'All the others are cleared (off).',
+      27: '<b>show()</b> sends everything to the module. Until you call it, nothing changes on the LEDs.',
+      29: 'Print the temperature …',
+      30: '… an arrow …',
+      31: '… how many LEDs are lit …',
+      32: '… and end the line.',
+      33: 'Wait half a second, then measure again.',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'thermo2', have: PIXELS_IDS, power: false, labels: [['th1', 'Thermo'], ['pix1', 'Pixels'], ['board', 'UNO Q']],
+        body: `<p>A thermometer made of light: the <b>Thermo</b> measures, the <b>Pixels</b> show the result with up to <b>8 lit LEDs</b> and a colour.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">UNO Q</span></div><div class="pt-arrow">↓ Qwiic cable 1</div><div class="pt-row"><span class="pt">Modulino Thermo</span></div><div class="pt-arrow">↓ Qwiic cable 2 (daisy chain)</div><div class="pt-row"><span class="pt bus">Modulino Pixels</span></div></div>
+        <p>Both modules share the <b>same two data wires</b>. The UNO Q asks the Thermo for the temperature, then tells the Pixels what to show.</p>`,
+      },
+      {
+        title: 'Meet the Pixels: click every part', view: 'pixclose', have: ['th1', 'pix1'], power: false,
+        body: `<p><b>Click each part</b> of the Pixels board:</p>
+        <ul><li>The <b>8 RGB LEDs</b> in a row — each has a red, a green and a blue light inside (LC8822-2020).</li>
+        <li>The small black chip: an <b>STM32C011F4 microcontroller</b>. It listens on I²C and drives the LEDs for you.</li>
+        <li>The two <b>Qwiic connectors</b> and the rows of holes (headers — not used today).</li></ul>
+        <p class="tip">The LEDs are off now: the module has no power yet.</p>`,
+      },
+      {
+        title: 'Two modules, one bus: addresses', view: 'thermo2', have: PIXELS_IDS, power: false,
+        body: `<p>Every device on an I²C bus needs its <b>own address</b>:</p>
+        <table class="kv"><tr><th>Module</th><th>I²C address</th></tr><tr><td>Modulino Thermo (V0.5+)</td><td><b>0x45</b></td></tr><tr><td>Modulino Pixels</td><td><b>0x6C</b></td></tr></table>
+        <p>The addresses are different, so the UNO Q can talk to each one without mix-ups. Two <i>identical</i> modules would share an address and clash — the library comes with an <b>AddressChanger</b> example for that case (datasheet).</p>
+        <p class="tip">The second Qwiic connector on each module exists for exactly this: plug the next module into it.</p>`,
+      },
+      {
+        title: 'Step 1 — place the modules', view: 'thermo2', have: ['th1', 'pix1'], power: false, labels: [['th1', 'Thermo'], ['pix1', 'Pixels']],
+        body: `<p>Put the Thermo and the Pixels on the desk in a row, with the UNO Q at the start. Nothing is connected yet.</p>`,
+      },
+      {
+        title: 'Step 2 — cable 1: UNO Q → Thermo', view: 'thermo2', have: ['th1', 'pix1', 'cab1'], power: true, labels: [['cab1', 'Cable 1']],
+        body: `<p>Plug a Qwiic cable into the UNO Q’s Qwiic connector and into <b>one</b> Qwiic connector of the Thermo. Its green LED lights.</p>`,
+      },
+      {
+        title: 'Step 3 — cable 2: Thermo → Pixels', view: 'thermo2', have: PIXELS_IDS, power: true, labels: [['cab2', 'Cable 2']],
+        body: `<p>Plug a second cable into the Thermo’s <b>free</b> Qwiic connector and into either Qwiic connector of the Pixels.</p>
+        <p>The Pixels gets its 3.3 V power through the chain too. <b>Everything stays 3.3 V</b> — never connect Qwiic modules to 5 V.</p>
+        <p class="tip">Click a cable or a plug to see what it carries.</p>`,
+      },
+      {
+        title: 'Colour and brightness', view: 'pixclose', have: PIXELS_IDS, power: true,
+        body: `<p>Each LED mixes <b>red, green and blue</b> light. In the library a colour is <code>ModulinoColor(red, green, blue)</code> with each part from <b>0</b> to <b>255</b>. Ready-made colours: <code>RED</code>, <code>GREEN</code>, <code>BLUE</code>, <code>VIOLET</code>, <code>WHITE</code>.</p>
+        <table class="kv"><tr><th>Command</th><th>What it does</th></tr><tr><td><code>set(i, colour, brightness)</code></td><td>prepares LED <b>i</b> (0–7); brightness 0–100</td></tr><tr><td><code>clear(i)</code></td><td>prepares LED <b>i</b> to be off</td></tr><tr><td><code>show()</code></td><td><b>sends</b> all prepared values to the module</td></tr></table>
+        <p class="warn"><b>Keep the brightness low.</b> The datasheet says each LED can draw up to 33 mA — 264 mA for all eight at full brightness. The sketch uses 25.</p>`,
+      },
+      { title: 'The code', view: 'thermo2', showCode: true, power: true, body: `<p>Two objects, <code>thermo</code> and <code>leds</code>, on one bus. Read the temperature, turn it into a number of LEDs and a colour, then <code>show()</code>. Click any line in the code panel.</p>` },
+      {
+        title: 'Run it', view: 'thermo2', showCode: true, power: true, action: 'run',
+        body: `<ol><li>Every half second the sketch reads the temperature.</li><li>One LED lights for every 2 °C above 15 °C: <b>3 LEDs</b> at 22.5 °C.</li><li>Colour: <b>blue</b> below 20 °C, <b>green</b> 20–28 °C, <b>red</b> above 28 °C.</li></ol>
+        <p><b>Try it:</b> drag the <b>Temperature</b> slider from cold to hot and watch the bar grow and change colour.</p>
+        <p class="sim">Simulated (the temperature is held steady so the bar does not flicker at a threshold). The LED glow is drawn a little brighter than the real thing so a low brightness is still easy to see.</p>`,
+      },
+      {
+        title: 'What if cable 2 is out?', view: 'thermo2', showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Unplug cable 2”</b>, then run again.</p>
+        <p>The Thermo still answers, but nobody answers at the Pixels’ address, so <code>leds.begin()</code> returns false and the sketch prints the message and stops. One cable fault shows up as a clear message.</p>`,
+      },
+      {
+        title: 'Summary', view: 'thermo2', have: PIXELS_IDS, power: true,
+        body: `<ul><li>Qwiic modules <b>daisy-chain</b>: many modules share one I²C bus (SDA + SCL) if their <b>addresses differ</b> (Thermo 0x45, Pixels 0x6C).</li>
+        <li><code>Modulino.begin()</code> starts the bus once; each module object has its own <code>begin()</code>.</li>
+        <li>For the Pixels: <code>set()</code> / <code>clear()</code> prepare, <code>show()</code> sends. Colour = red, green, blue 0–255; brightness 0–100.</li>
+        <li>Everything is <b>3.3 V</b>; keep LED brightness modest.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Why can the Thermo and the Pixels share the same two I²C wires?', a: ['They use different voltages', 'Each has its own address (0x45 and 0x6C)', 'The UNO Q has two Qwiic buses', 'They take turns by magic'], c: 1, why: 'I²C devices are told apart by their address.' },
+      { q: 'What does leds.show() do?', a: ['Prints to the Serial monitor', 'Sends the prepared LED values to the module', 'Turns the module’s power on', 'Reads the temperature'], c: 1, why: 'set() and clear() only prepare the values in memory; show() sends them.' },
+      { q: 'How is the colour of an LED defined in the library?', a: ['By a name only', 'Red, green and blue amounts, each 0–255', 'By a frequency in Hz', 'Hue 0–360 only'], c: 1, why: 'ModulinoColor(red, green, blue), each from 0 to 255.' },
+      { q: 'Why keep the LED brightness low?', a: ['High brightness breaks the I²C bus', 'Each LED can draw up to 33 mA, 264 mA for all eight', 'The Pixels need 5 V at high brightness', 'There is no reason'], c: 1, why: 'Datasheet: up to 33 mA per RGB LED at full brightness × 8 LEDs.' },
+      { q: 'In our sketch the temperature is 24 °C. How many LEDs light up?', a: ['2', '4', '8', '24'], c: 1, why: '(24 − 15) / 2 = 4.5, and (int) drops the decimals → 4.' },
+    ],
+    sources: [SRC.pixels, SRC.modulinolib, SRC.thermo, SRC.qwiic],
+  },
 ];
 
 export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion', 6: 'Module 6 — I²C & Qwiic' };
 
 export const COMING_SOON = [
-  'I²C display (Modulino® Pixels / Qwiic display)',
+
   'Linux side: Python + Bridge', 'Wi-Fi web dashboard', 'Final IoT project',
 ];

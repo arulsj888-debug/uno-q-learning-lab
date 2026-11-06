@@ -387,3 +387,40 @@ void loop() {
   Serial.println(" %RH");
   delay(1000);
 }`;
+
+
+// Lesson 19 — Modulino Pixels as a colour thermometer (Arduino_Modulino: ModulinoPixels set/clear/show, colours RED/GREEN/BLUE)
+export const PIXELS_CODE = `#include <Arduino_Modulino.h>
+
+ModulinoThermo thermo;
+ModulinoPixels leds;
+
+void setup() {
+  Serial.begin(9600);
+  Modulino.begin();
+  if (!thermo.begin() || !leds.begin()) {
+    Serial.println("Module not found - check the Qwiic cables");
+    while (1);
+  }
+}
+
+void loop() {
+  float celsius = thermo.getTemperature();
+  int lit = constrain((int)((celsius - 15.0) / 2.0), 0, 8);   // 1 LED per 2 C above 15 C
+
+  ModulinoColor color = GREEN;
+  if (celsius < 20) color = BLUE;
+  if (celsius > 28) color = RED;
+
+  for (int i = 0; i < 8; i++) {
+    if (i < lit) leds.set(i, color, 25);
+    else leds.clear(i);
+  }
+  leds.show();
+
+  Serial.print(celsius, 1);
+  Serial.print(" C -> ");
+  Serial.print(lit);
+  Serial.println(" LEDs");
+  delay(500);
+}`;
