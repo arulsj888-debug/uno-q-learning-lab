@@ -69,6 +69,7 @@ export class Sim {
         H.pwm(pin, Math.min(max, Math.max(0, value)) / max, value);
       },
       delayMicroseconds: async () => { if (slow) await frame(); },
+      bridge: (stage, val) => { if (H.bridge) H.bridge({ stage, val }); },
       thermo: () => (H.thermo ? H.thermo() : { found: false }),
       pxSet: (i, rgb, br) => { if (i < 8) pxBuf[i] = [rgb[0], rgb[1], rgb[2], Math.trunc(br * 31 / 100) / 31]; },   // library: map(brightness, 0, 100, 0, 0x1F)
       pxClear: (i) => { if (i < 8) pxBuf[i] = [0, 0, 0, 0]; },
@@ -271,6 +272,26 @@ export const PROGRAMS = {
       await rt.at(31); rt.print(lit);
       await rt.at(32); rt.println(' LEDs');
       await rt.at(33); await rt.delay(500);
+    }
+  },
+
+  // Lesson 20 — Python main.py (line numbers 101+) and sketch.ino (1+) on one timeline
+  async bridge(rt) {
+    await rt.at(101); await rt.at(102); await rt.at(104);
+    rt.serialBegin(9600);
+    await rt.at(9); await rt.at(10); rt.pinMode('LED_BUILTIN', 'OUTPUT');
+    await rt.at(11); rt.digitalWrite('LED_BUILTIN', 1);
+    await rt.at(12); await rt.at(13);
+    await rt.at(106); await rt.at(113);
+    let ledOn = false;
+    for (;;) {
+      await rt.at(107); await rt.at(108); ledOn = !ledOn;
+      await rt.at(109); rt.bridge('call', ledOn); await rt.delay(350);
+      await rt.at(4); rt.bridge('run', ledOn); await rt.delay(250);
+      await rt.at(5); rt.digitalWrite('LED_BUILTIN', ledOn ? 0 : 1); await rt.delay(250);
+      await rt.at(6); rt.bridge('reply', ledOn); await rt.delay(350);
+      await rt.at(110); rt.println('[python] LED is ' + (ledOn ? 'ON' : 'OFF'));
+      await rt.at(111); rt.bridge('idle', ledOn); await rt.delay(1000);
     }
   },
 

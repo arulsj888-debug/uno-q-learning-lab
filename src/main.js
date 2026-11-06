@@ -86,7 +86,7 @@ class App {
     this.lamp.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 70, 6)));
     this.lamp.target.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 0, 0)));
     s.add(this.lamp, this.lamp.target);
-    this.lux = 300; this.tempC = 25; this.distCm = 40; this.th = { t: 22.5, h: 45, unplug: false, last: null };
+    this.lux = 300; this.tempC = 25; this.distCm = 40; this.th = { t: 22.5, h: 45, unplug: false, last: null }; this.br = { stage: 'idle', arg: null, led: null };
     // ---- Lesson 13 scene, all at true scale (1 unit = 1 mm) -------------------------------------------
     // obstacle: a corrugated cardboard box standing on the desk (flat, hard face — what the datasheet asks for)
     {
@@ -214,6 +214,7 @@ class App {
   async ensurePower() { if (!this.usbPlugged) await this.plug(true); }
 
   outputsOff() {
+    this.br = { stage: 'idle', arg: null, led: null };
     this.pxArr = null;
     if (this.rly) { this.rly.mode = 'INPUT'; this.rly.level = null; }
     for (const it of Object.values(this.bench.items)) {
@@ -284,7 +285,7 @@ class App {
     this.servoTick(Math.min(dt, 0.1));
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
-    this.thermoTick();
+    this.thermoTick(); this.bridgeTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -665,7 +666,7 @@ class App {
     setTimeout(() => this.viewer.resize(), 320);
     if (!has) return;
     this.blinkDelay = 1000; $('#speed').value = 1000; $('#speed-val').textContent = '1000 ms';
-    if (L.code) this.renderCode(L.code, L.explain);
+    if (L.code) this.renderCode(L.code, L.explain, L.code2);
     $('#serial').innerHTML = '';
     $('#slider-wrap').classList.remove('on');
     this.setPinLevel('');
@@ -687,6 +688,7 @@ class App {
         <div class="io-tools"><button id="pir-wave" class="hold">👋 Wave hand</button><button id="pir-still" class="lvl">✋ Hold hand still</button></div></div>
         <div class="io-block pirstat"><div><span>Sensor</span><b id="ps-sensor">—</b></div><div class="arrow">→</div><div><span>OUT → D2</span><b id="ps-out">—</b></div><div class="arrow">→</div><div><span>Alarm LED (D5)</span><b id="ps-led">—</b></div></div>
         <div id="ps-note" class="io-note"></div>`;
+    if (w.includes('bridge')) h += `<div class="io-block pirstat tight"><div><span>Python · main.py</span><b id="br-py">—</b></div><div class="arrow">→</div><div><span>Bridge (router · UART)</span><b id="br-rt">—</b></div><div class="arrow">→</div><div><span>Sketch · set_led()</span><b id="br-sk">—</b></div><div class="arrow">→</div><div><span>RGB LED 3</span><b id="br-led">—</b></div></div><div id="br-note" class="io-note"></div>`;
     if (w.includes('thermo')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated — you decide)</span></div>
         <div class="throw"><label>Temperature</label><input id="th-t" type="range" min="-10" max="60" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div>
         ${w.includes('pixels') ? '' : `<div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div>`}</div>
@@ -732,14 +734,16 @@ class App {
     if (w.includes('editor')) this.bindEditor();
   }
 
-  renderCode(code, explain) {
+  renderCode(code, explain, code2) {
     this.codeText = code;
-    const lines = code.split('\n');
-    $('#code').innerHTML = lines.map((l, i) => `<span class="ln" data-n="${i + 1}">${highlight(l) || ' '}</span>`).join('');
+    // optional second file (the Python program of the Bridge lesson): lines are numbered 101+ so one panel can show both
+    const L1 = code.split('\n'), L2 = code2 ? code2.split('\n') : null;
+    const row = (l, n) => `<span class="ln" data-n="${n}" data-ln="${n > 100 ? n - 100 : n}">${highlight(l) || ' '}</span>`;
+    $('#code').innerHTML = (L2 ? '<span class="fhdr">python/main.py — runs on the Linux side</span>' + L2.map((l, i) => row(l, 101 + i)).join('') + '<span class="fhdr">sketch/sketch.ino — runs on the microcontroller</span>' : '') + L1.map((l, i) => row(l, i + 1)).join('');
     $('#code').querySelectorAll('.ln').forEach(el => el.onclick = () => {
       $('#code').querySelectorAll('.ln.sel').forEach(x => x.classList.remove('sel'));
       el.classList.add('sel');
-      const n = +el.dataset.n, t = lines[n - 1].trim();
+      const n = +el.dataset.n, lines = n > 100 ? L2 : L1, t = lines[(n > 100 ? n - 100 : n) - 1].trim();
       $('#explain').innerHTML = (explain && explain[n]) || (t.startsWith('//') ? 'A <b>comment</b>: notes for humans. The compiler ignores everything after <code>//</code>.' : t === '}' || t === '};' ? 'Closing brace: ends the block that started with <code>{</code>.' : t === '' ? 'An empty line (only for readability).' : /^[\d,\s]+,?$/.test(t) ? 'One row of the picture: 13 values, one per LED (left → right).' : 'Click another line.');
     });
     $('#explain').innerHTML = 'Click a line to see what it does.';
@@ -1086,6 +1090,18 @@ class App {
     this.pirFan.position.set(L.x, DESK_Y + 2, L.z); this.pirFan.scale.set(r, r, 1);
   }
   // ---- Lesson 15: SG90 servo ------------------------------------------------------------------------
+  // ---- Lesson 20: Python <-> sketch over the Bridge ----------------------------------------------------
+  bridgeTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('bridge') || !$('#br-py')) return;
+    const B = this.br, run = this.sim.running, a = B.arg === null ? '' : (B.arg ? 'True' : 'False');
+    const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; e.className = cls; } };
+    const st = run ? B.stage : 'idle';
+    set('#br-py', st === 'call' ? `call(“set_led”, ${a})` : st === 'run' ? 'waiting…' : st === 'reply' ? `result = ${a}` : '—', st === 'call' || st === 'reply' ? 'on' : 'off');
+    set('#br-rt', st === 'call' ? 'request →' : st === 'run' ? 'delivered' : st === 'reply' ? '← answer' : '—', st === 'idle' ? 'off' : 'on');
+    set('#br-sk', st === 'run' ? `set_led(${B.arg ? 'true' : 'false'})` : st === 'reply' ? 'returned' : '—', st === 'run' ? 'on' : 'off');
+    set('#br-led', run && B.led !== null ? (B.led ? 'ON' : 'OFF') : '—', run && B.led ? 'on' : 'off');
+    set('#br-note', !this.board.powered ? 'USB-C is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>.' : st === 'call' ? 'Python asks: <b>Bridge.call</b> sends a request to the sketch and waits.' : st === 'run' ? 'The sketch runs <b>set_led</b> and sets the pin (LOW = LED on).' : st === 'reply' ? 'The sketch’s return value travels back to Python.' : 'Python waits one second, then flips the value again.', 'io-note');
+  }
   // ---- Lesson 18: Modulino Thermo over Qwiic ------------------------------------------------------------
   thermoIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'thermo'); }
   cabOk(id) { const io = this.thermoIo(); return !!this.bench.items[id] && !(this.th.unplug && (io.unplug || io.cable) === id); }
@@ -1391,6 +1407,7 @@ class App {
         this.th.last = `${c.toFixed(1)} °C · ${rh.toFixed(1)} %RH`;
         return { found: true, pixels: this.pixelsOk(), c, rh };
       },
+      bridge: ev => { this.br.stage = ev.stage; this.br.arg = ev.val; },
       pixels: arr => { this.pxArr = arr; },
       mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {
@@ -1415,6 +1432,7 @@ class App {
   onDigital(pin, level) {
     if (pin === 'LED_BUILTIN') {
       const on = level === 0;               // active-low RGB LED
+      this.br.led = on;
       if (this.board.powered) this.board.setLed('rgb3', on ? 1 : 0, 0, 0);
       this.setPinLevel(`LED_BUILTIN (LED3_R): <span class="${level ? 'hi' : 'lo'}">${level ? 'HIGH · 3.3 V' : 'LOW · 0 V'}</span> → <span class="${on ? 'led-on' : 'led-off'}">LED ${on ? 'ON' : 'OFF'}</span>`);
       return;

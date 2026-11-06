@@ -424,3 +424,39 @@ void loop() {
   Serial.println(" LEDs");
   delay(500);
 }`;
+
+
+// Lesson 20 — Python (Linux side) calls a sketch function over the Bridge.
+// Sketch API: Arduino_RouterBridge README (Bridge.begin / provide). Python API: arduino.app_utils (Bridge.call, App.run(user_loop=...)).
+export const BRIDGE_INO = `#include <Arduino_RouterBridge.h>
+
+// Python calls this function. LED_BUILTIN is active-low: LOW = on.
+bool set_led(bool on) {
+  digitalWrite(LED_BUILTIN, on ? LOW : HIGH);
+  return on;
+}
+
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);   // start with the LED off
+  Bridge.begin();
+  Bridge.provide("set_led", set_led);
+}
+
+void loop() {
+  // nothing to do: set_led runs when Python calls it
+}`;
+
+export const BRIDGE_PY = `from arduino.app_utils import *
+import time
+
+led_on = False
+
+def loop():
+    global led_on
+    led_on = not led_on
+    Bridge.call("set_led", led_on)
+    print("LED is", "ON" if led_on else "OFF")
+    time.sleep(1)
+
+App.run(user_loop=loop)`;

@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE, PIXELS_CODE } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE, PIXELS_CODE, BRIDGE_INO, BRIDGE_PY } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -24,6 +24,9 @@ const SRC = {
   thermo: { t: 'Arduino Modulino® Thermo datasheet (ABX00103)', u: 'https://docs.arduino.cc/hardware/modulino-thermo' },
   modulinolib: { t: 'Arduino_Modulino library (source and Thermo_Basic example)', u: 'https://github.com/arduino-libraries/Arduino_Modulino' },
   pixels: { t: 'Arduino Modulino® Pixels datasheet (ABX00109)', u: 'https://docs.arduino.cc/hardware/modulino-pixels' },
+  bridgelib: { t: 'Arduino_RouterBridge library (README, source)', u: 'https://github.com/arduino-libraries/Arduino_RouterBridge' },
+  appbricks: { t: 'Arduino App Bricks Python library: arduino.app_utils (Bridge, App)', u: 'https://github.com/arduino/app-bricks-py' },
+  bridgeex: { t: 'Arduino App Bricks examples: “Bridge basics” (call a sketch function from Python, send data to Python)', u: 'https://github.com/arduino/app-bricks-examples/tree/main/core-and-foundational/03-bridge-basics' },
   qwiic: { t: 'SparkFun Qwiic system (connector and cable colour code)', u: 'https://www.sparkfun.com/qwiic' },
   dhtforum: { t: 'Arduino Forum: “DHT11 and UNO Q”', u: 'https://forum.arduino.cc/t/dht11-and-uno-q/1416409' },
 };
@@ -1799,11 +1802,130 @@ export const LESSONS = [
     ],
     sources: [SRC.pixels, SRC.modulinolib, SRC.thermo, SRC.qwiic],
   },
+  // ================================================================== 20
+  {
+    id: 'l20', num: 20, module: 7, title: 'Two brains: Python calls your sketch over the Bridge', level: 'Intermediate', time: '25 min',
+    goal: 'Understand the two processors of the UNO Q and make a Python program on the Linux side switch an LED that your sketch controls.',
+    hardware: ['Arduino UNO Q', 'USB-C cable (Arduino App Lab)'],
+    code: BRIDGE_INO, code2: BRIDGE_PY, program: 'bridge', fast: true, widgets: ['bridge'],
+    explain: {
+      1: 'Adds the <b>Arduino_RouterBridge</b> library: it gives the sketch the <b>Bridge</b> object.',
+      3: 'A comment: Python will call this function.',
+      4: 'A normal function that takes a true/false value. Python will run it <i>remotely</i>.',
+      5: 'Set the LED pin. <code>LED_BUILTIN</code> is <b>active-low</b> (Lesson 3): LOW = on, HIGH = off. So <code>on ? LOW : HIGH</code>.',
+      6: 'Send the same value back to the caller. Python receives it as the result of <code>Bridge.call</code>.',
+      9: 'setup() runs once, on the <b>microcontroller</b>.',
+      10: 'The LED pin is an output.',
+      11: 'Start with the LED off (HIGH).',
+      12: '<b>Bridge.begin()</b> starts the link to the Linux side. The Bridge must be started before you use it.',
+      13: '<b>Bridge.provide("set_led", set_led)</b> publishes our function under the name <b>"set_led"</b>. That name is what Python uses to call it.',
+      16: 'loop() has nothing to do: <code>set_led</code> runs whenever Python calls it.',
+      101: 'Import everything the app needs: <b>App</b> and <b>Bridge</b> come from <code>arduino.app_utils</code>.',
+      102: 'Python’s time library, for <code>sleep</code>.',
+      104: 'A variable that remembers whether the LED is on. It lives in Python only — the sketch cannot see it.',
+      106: 'Our loop function. <b>App.run</b> will call it again and again.',
+      107: '<code>global</code> lets the function change the variable defined outside it.',
+      108: 'Flip the value: on becomes off, off becomes on.',
+      109: '<b>Bridge.call("set_led", led_on)</b>: call the sketch function named <b>"set_led"</b>, hand over <code>led_on</code>, and <b>wait</b> for the answer.',
+      110: 'Print what we asked for.',
+      111: 'Wait one second.',
+      113: '<b>App.run(user_loop=loop)</b> starts the app and calls <code>loop</code> over and over, until the app is stopped.',
+    },
+    steps: [
+      {
+        title: 'One board, two brains', focus: 'soc',
+        body: `<p>The UNO Q has <b>two processors</b>. Click each one:</p>
+        <ul><li><b>Qualcomm QRB2210</b> (MPU) — runs <b>Linux</b> (Debian) and your <b>Python</b> programs. Top side of the board.</li>
+        <li><b>STM32U585</b> (MCU) — runs your Arduino <b>sketch</b> in real time and controls the pins. Bottom side.</li></ul>
+        <p>So far, every lesson used the MCU only. Now we use <b>both</b> together.</p>`,
+      },
+      {
+        title: 'The microcontroller side', focus: 'mcu', side: 'bottom',
+        body: `<p>The <b>STM32U585</b> is the chip that drives the header pins, the LED matrix and RGB LED 3. Your sketches (<code>sketch.ino</code>) run here, on the Arduino core over Zephyr OS.</p>
+        <p class="tip">Click the chip to read more. It is on the <b>bottom</b> side of the board, so the camera turned over.</p>`,
+      },
+      {
+        title: 'Who runs what?', view: 'top',
+        body: `<table class="kv"><tr><th></th><th>Linux side (MPU)</th><th>Sketch side (MCU)</th></tr>
+        <tr><td>Chip</td><td>Qualcomm QRB2210</td><td>STM32U585</td></tr><tr><td>Runs</td><td>Debian Linux, <b>Python</b></td><td><b>Arduino sketch</b> (C++)</td></tr>
+        <tr><td>Good at</td><td>apps, networking, AI, web pages</td><td>pins, sensors, real-time timing</td></tr><tr><td>File</td><td><code>python/main.py</code></td><td><code>sketch/sketch.ino</code></td></tr></table>
+        <p>They are <b>separate programs on separate chips</b>. They <b>cannot share variables</b>. When one needs the other, it must send a <b>message</b>. That is the job of the <b>Bridge</b>.</p>`,
+      },
+      {
+        title: 'How the Bridge works', view: 'top',
+        body: `<p>The Bridge is a <b>remote procedure call</b> (RPC) link: one side runs a function that <i>lives on the other side</i>.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">Python (Linux)</span></div><div class="pt-arrow">↕ a background service, <b>arduino-router</b>, passes messages over a serial (UART) link</div><div class="pt-row"><span class="pt bus">Sketch (MCU)</span></div></div>
+        <table class="kv"><tr><th>Word</th><th>Meaning</th></tr>
+        <tr><td><b>provide</b></td><td>“I offer a function under this <b>name</b>.” Used by the side that owns the function.</td></tr>
+        <tr><td><b>call</b></td><td>“Run that function and <b>give me the result</b>.” The caller waits.</td></tr>
+        <tr><td><b>notify</b></td><td>“Run it, I don’t need an answer.” Does not wait.</td></tr></table>
+        <p>Both directions work: Python can call the sketch, and the sketch can call Python.</p>`,
+      },
+      {
+        title: 'An App has two parts', view: 'top',
+        body: `<p>In Arduino App Lab, one <b>App</b> holds both programs:</p>
+        <pre class="tree">my-app/
+├─ app.yaml        (name, icon, description)
+├─ python/
+│   └─ main.py     ← runs on Linux
+└─ sketch/
+    └─ sketch.ino  ← runs on the MCU</pre>
+        <p>Today’s goal: <b>Python switches the built-in LED on and off, once a second</b>. Python decides <i>when</i>; the sketch does the <i>pin work</i>.</p>`,
+      },
+      {
+        title: 'The sketch (MCU side)', view: 'top', focus: 'rgb3', showCode: true,
+        body: `<p>The sketch is tiny: it <b>provides</b> one function, <code>set_led</code>. Click each line of <code>sketch.ino</code> (lower part of the code panel).</p>
+        <p class="tip">The LED is <b>LED_BUILTIN</b>, the red segment of RGB LED 3 — <b>active-low</b>, as in Lesson 3.</p>`,
+      },
+      {
+        title: 'The Python program (Linux side)', view: 'top', focus: 'rgb3', showCode: true,
+        body: `<p>The Python program flips a variable and <b>calls</b> <code>set_led</code> every second. Click each line of <code>main.py</code> (upper part of the code panel).</p>
+        <p class="tip">Python needs no <code>pinMode</code> or <code>digitalWrite</code>: the pin work stays in the sketch.</p>`,
+      },
+      {
+        title: 'Run it', view: 'top', focus: 'rgb3', showCode: true, power: true, action: 'run',
+        body: `<ol><li>Python flips <code>led_on</code> and calls <code>Bridge.call("set_led", …)</code>.</li><li>The message crosses the Bridge; the sketch runs <code>set_led</code> and sets the pin.</li><li>The answer travels back; Python prints it.</li></ol>
+        <p>Watch the four boxes in the panel, the highlighted lines in <b>both</b> files and <b>RGB LED 3</b> on the board.</p>
+        <p class="sim">The Bridge exchange is simulated here, step by step. On a real board it takes only a very short time.</p>`,
+      },
+      {
+        title: 'call or notify?', view: 'top',
+        body: `<p><b>call</b> waits for a result, <b>notify</b> does not:</p>
+        <table class="kv"><tr><th></th><th>Python</th><th>Sketch</th></tr>
+        <tr><td>call</td><td><code>result = Bridge.call("name", a, b)</code></td><td><code>Bridge.call("name", a, b).result(res)</code></td></tr>
+        <tr><td>notify</td><td><code>Bridge.notify("name", a)</code></td><td><code>Bridge.notify("name", a)</code></td></tr>
+        <tr><td>offer</td><td><code>Bridge.provide("name", fn)</code></td><td><code>Bridge.provide("name", fn)</code></td></tr></table>
+        <p>Use <b>notify</b> to push a reading (“here is a new value”) and <b>call</b> when you need an answer or want to be sure it ran. The official example “Send data to Python” has the sketch notify Python once a second with a counter.</p>`,
+      },
+      {
+        title: 'Things that go wrong', view: 'top',
+        body: `<ul><li><p class="warn" style="margin:0"><b>Deadlock:</b> never call <code>Bridge.call</code> from inside a function that the other side has called. Python raises an error; in the sketch it may block the link.</p></li>
+        <li><b>Wrong name:</b> calling a name nobody provided makes Python raise an error (a <code>ValueError</code>).</li>
+        <li><b>No answer in time:</b> <code>Bridge.call</code> in Python waits at most <b>10 seconds</b> by default, then raises a <code>TimeoutError</code>.</li>
+        <li><b>Forgot <code>Bridge.begin()</code></b> in <code>setup()</code>: the sketch never joins the Bridge.</li></ul>`,
+      },
+      {
+        title: 'Summary', view: 'top',
+        body: `<ul><li>The UNO Q = <b>Linux MPU</b> (Python) + <b>STM32 MCU</b> (sketch). They share no variables.</li>
+        <li>The <b>Bridge</b> lets one side <b>call</b> a function that the other side <b>provides</b>; <b>notify</b> sends without waiting.</li>
+        <li>Python: <code>from arduino.app_utils import *</code>, <code>Bridge.call/provide/notify</code>, <code>App.run(user_loop=…)</code>.</li>
+        <li>Sketch: <code>#include &lt;Arduino_RouterBridge.h&gt;</code>, <code>Bridge.begin()</code>, <code>Bridge.provide(…)</code>.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Where does python/main.py run?', a: ['On the STM32 microcontroller', 'On the Linux side (Qualcomm QRB2210)', 'On your computer only', 'Inside the LED'], c: 1, why: 'Python programs run on the MPU under Linux; sketches run on the STM32.' },
+      { q: 'Why can’t the sketch simply read the Python variable led_on?', a: ['Python variables are secret', 'The two programs run on different chips and share no memory — they must send messages', 'The variable is too big', 'It can, with volatile'], c: 1, why: 'The Bridge is how data and function calls cross between the two sides.' },
+      { q: 'Which Bridge function waits for a result?', a: ['notify', 'provide', 'call', 'begin'], c: 2, why: 'call waits for the answer; notify just sends.' },
+      { q: 'Python sends True to set_led. What level does the sketch write to LED_BUILTIN?', a: ['HIGH (LED off)', 'LOW (LED on)', 'PWM 50 %', 'It stays unchanged'], c: 1, why: 'LED_BUILTIN is active-low: on ? LOW : HIGH.' },
+      { q: 'What must you NOT do inside a function that the other side called?', a: ['Print a message', 'Return a value', 'Call Bridge.call again', 'Change a local variable'], c: 2, why: 'A call from inside a callback can deadlock the link between the processors.' },
+    ],
+    sources: [SRC.bridgelib, SRC.appbricks, SRC.bridgeex, SRC.ds],
+  },
 ];
 
-export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion', 6: 'Module 6 — I²C & Qwiic' };
+export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion', 6: 'Module 6 — I²C & Qwiic', 7: 'Module 7 — Linux side & Bridge' };
 
 export const COMING_SOON = [
 
-  'Linux side: Python + Bridge', 'Wi-Fi web dashboard', 'Final IoT project',
+  'Wi-Fi web dashboard', 'Final IoT project',
 ];
