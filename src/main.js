@@ -326,7 +326,7 @@ class App {
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
     if (this.acc && this.acc.monitor.group.visible) this.acc.monitor.draw({ ...this.pios, mode: this.board.powered ? this.pios.mode : 'off' });
-    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick();
+    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -775,6 +775,7 @@ class App {
         <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="h-sk">—</b></div><div class="arrow">→</div><div><span>Python · decides</span><b id="h-py">—</b></div><div class="arrow">→</div><div><span>Relay → Lamp</span><b id="h-rl">—</b></div></div><div id="h-note" class="io-note"></div>`;
     if (w.includes('dash')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div><div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
         <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="d-sk">—</b></div><div class="arrow">→</div><div><span>Python · Web UI</span><b id="d-py">—</b></div><div class="arrow">→</div><div><span>Browser</span><b id="d-br">—</b></div></div><div id="d-note" class="io-note"></div>`;
+    if (w.includes('pikeys')) h += `<div class="io-block"><div class="io-title">Keys — click to play <span class="io-note">(GPIO17)</span></div><div class="pkeys">${[['C4', 60], ['D4', 62], ['E4', 64], ['F4', 65], ['G4', 67], ['A4', 69], ['B4', 71]].map(([n, m]) => `<button class="pkey" data-hz="${(440 * Math.pow(2, (m - 69) / 12)).toFixed(3)}" data-n="${n}">${n}</button>`).join('')}</div><div id="pk-note" class="io-note"></div></div>`;
     if (w.includes('piweb')) h += `<div class="io-block pirstat tight"><div><span>Phone browser</span><b id="w-ph">—</b></div><div class="arrow">→</div><div><span>Flask on the Pi</span><b id="w-fl">—</b></div><div class="arrow">→</div><div><span>LED on GPIO17</span><b id="w-led">—</b></div></div><div id="w-note" class="io-note"></div>`;
     if (w.includes('pisens')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="-10" max="60" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div><div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
         <div class="io-tools"><button id="th-plug" class="hold small">🔌 Unplug the SDA wire</button></div><div id="ps-note" class="io-note"></div>`;
@@ -814,6 +815,7 @@ class App {
     else this.hideSonar();
     this.refreshPickTargets();
     if ($('#th-t')) { $('#th-t').oninput = e => this.setThermo({ t: +e.target.value }); if ($('#th-h')) $('#th-h').oninput = e => this.setThermo({ h: +e.target.value }); if ($('#th-plug')) $('#th-plug').onclick = () => { if (!this.sim.running) this.th.unplug = !this.th.unplug; }; this.setThermo({}); }
+    document.querySelectorAll('.pkey').forEach(b => b.onclick = () => { if (!this.board.powered) return; this.onTone('p11', +b.dataset.hz, 400); });
     if ($('#rl-manual')) $('#rl-manual').onclick = () => { if (this.rly && !this.sim.running) this.rly.manual = !this.rly.manual; };
     if ($('#pir-wave')) { $('#pir-wave').onclick = () => this.pirWave(); $('#pir-still').onclick = () => this.pirHoldStill(); }
     this.showRoom(w.includes('pir') && !!this.pirSensor());
@@ -1367,6 +1369,12 @@ class App {
       : `<div class="pw-err">This site can’t be reached<small>The Raspberry Pi is not answering. Is the server running?</small></div>`;
     b.querySelectorAll('.pw-a').forEach(a => a.onclick = () => { if (this.sim.running) this.uiq.push(a.dataset.r); });
   }
+  pikeysTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('pikeys')) return;
+    const f = this.toneState && this.toneState.f;
+    document.querySelectorAll('.pkey').forEach(b => b.classList.toggle('on', !!f && Math.abs(+b.dataset.hz - f) < 0.05));
+    const n = $('#pk-note'); if (n) { const k = f && [...document.querySelectorAll('.pkey')].find(b => Math.abs(+b.dataset.hz - f) < 0.05); const h = !this.board.powered ? 'USB-C is not plugged in — the Raspberry Pi has no power.' : k ? `Playing <b>${k.dataset.n}</b> · ${(+k.dataset.hz).toFixed(1)} Hz` : 'Silent. Press <b>▶ Run</b> or click a key.'; if (n.innerHTML !== h) n.innerHTML = h; }
+  }
   piwebTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('piweb')) return;
     const run = this.sim.running, W = this.pw || (this.pw = { up: false, lit: false });
@@ -1796,14 +1804,14 @@ class App {
     const tok = this.toneState = ok ? { pin, f, item: io.item } : null;
     if (ok) this.playTone(f, ms);
     if (this.scope && this.lesson.scopePin === pin) this.scope.set({ type: 'square', freq: f });
-    this.setPinLevel(`${pin}: tone <span class="hi">${f} Hz</span> square wave${ms ? ` for ${ms} ms` : ''}`);
+    this.setPinLevel(`${pinName(pin)}: tone <span class="hi">${+Number(f).toFixed(1)} Hz</span> square wave${ms ? ` for ${ms} ms` : ''}`);
     if (ms) setTimeout(() => { if (this.toneState === tok) this.onNoTone(pin, true); }, ms);
   }
   onNoTone(pin, ended) {
     this.toneState = null; this.stopSound();
     const io = this.ioFor(pin); const bz = io && this.bench.get(io.item); if (bz && bz.vibrate) bz.vibrate(false);
     if (this.scope && this.lesson && this.lesson.scopePin === pin) this.scope.set({ type: 'dc', level: 0 });
-    this.setPinLevel(`${pin}: <span class="lo">LOW · 0 V</span> (${ended ? 'note finished' : 'noTone()'})`);
+    this.setPinLevel(`${pinName(pin)}: <span class="lo">LOW · 0 V</span> (${ended ? 'note finished' : IS_PI ? 'stop()' : 'noTone()'})`);
   }
 
   applyManualPwm(v) {

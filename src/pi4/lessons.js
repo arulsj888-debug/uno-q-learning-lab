@@ -19,6 +19,7 @@ export const SRC_PI = {
   sht31: { t: 'Adafruit SHT31-D Temperature & Humidity Sensor Breakout (product page and guide)', u: 'https://learn.adafruit.com/adafruit-sht31-d-temperature-and-humidity-sensor-breakout' },
   sht31lib: { t: 'Adafruit CircuitPython SHT31D library (README, example, source)', u: 'https://github.com/adafruit/Adafruit_CircuitPython_SHT31D' },
   flask: { t: 'Flask documentation — Quickstart (minimal app, flask run, externally visible server)', u: 'https://flask.palletsprojects.com/en/stable/quickstart/' },
+  tonal: { t: 'GPIO Zero documentation — Buzzer and TonalBuzzer (API and source)', u: 'https://gpiozero.readthedocs.io/en/stable/api_output.html#tonalbuzzer' },
   usegpio: { t: 'Raspberry Pi documentation — Use GPIO from Python', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-gpio-from-python' },
   python: { t: 'Raspberry Pi documentation — Use Python on a Raspberry Pi', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-python-on-a-raspberry-pi' },
   gpiozero: { t: 'GPIO Zero documentation (recipes, LED, Button, pin numbering)', u: 'https://gpiozero.readthedocs.io/' },
@@ -125,6 +126,19 @@ def turn_off():
     led.off()
     return redirect("/")`;
 
+export const PI_TONE = `from gpiozero import TonalBuzzer
+from time import sleep
+
+buzzer = TonalBuzzer(17)
+
+notes = ["C4", "D4", "E4", "F4", "G4", "A4", "B4"]
+
+for note in notes:
+    buzzer.play(note)
+    sleep(0.4)
+
+buzzer.stop()`;
+
 export const PI_BUTTON_LED = `from gpiozero import LED, Button
 
 led = LED(17)
@@ -174,6 +188,14 @@ export const PI_PANEL_PARTS = [
 const PANEL_IDS = PI_PANEL_PARTS.map(d => d.id);
 const IO_PANEL_LED = { kind: 'led', item: 'led1', needs: PANEL_IDS };
 const IO_PANEL_I2C = { kind: 'i2c', item: 'sen2', needs: PANEL_IDS };
+export const PI_BUZ_PARTS = [
+  { id: 'r1', type: 'resistor', a: 'h8', b: 'h12' },
+  { id: 'bz1', type: 'buzzer', plus: 'g12', minus: 'g15' },
+  { id: 'w1', type: 'fwire', from: 'p11', to: 'j8', color: 'orange', lift: 26 },
+  { id: 'w2', type: 'fwire', from: 'p9', to: 'j15', color: 'black', lift: 36 },
+];
+const BUZ_IDS = PI_BUZ_PARTS.map(d => d.id);
+const IO_BUZ = { kind: 'buzzer', item: 'bz1', needs: BUZ_IDS };
 const IO_BTN = { kind: 'button', item: 'btn1', needs: BTN_IDS };
 
 // Practice terminal (Lesson 8). Each meaning is taken from the official Raspberry Pi documentation (see 'src').
@@ -210,7 +232,7 @@ export const TERM_CMDS = [
   { g: 'Python', cmd: 'python3', does: 'Starts Python 3, which comes pre-installed with Raspberry Pi OS.', src: 'Using Python' },
 ];
 
-export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project' };
+export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project', 7: 'Module 7 — Extra: sound' };
 
 export const PI_LESSONS = [
   // ================================================================== P1
@@ -932,6 +954,72 @@ pause()</pre>
       { q: 'Where do you connect the sensor’s VIN?', a: ['5V', '3V3 (pin 1)', 'GPIO17', 'SDA'], c: 1, why: 'GPIO is 3.3 V only; Adafruit’s Pi wiring uses 3V3.' },
     ],
     sources: [SRC_PI.flask, SRC_PI.sht31, SRC_PI.sht31lib, SRC_PI.usegpio, SRC_PI.cfg, SRC_PI.gpio, SRC_PI.remote],
+  },
+  // ================================================================== P12
+  {
+    id: 'p12', num: 12, module: 7, title: 'Make music with a buzzer', level: 'Beginner', time: '20 min',
+    goal: 'Wire a passive piezo buzzer to GPIO17 and play the notes of a scale with TonalBuzzer.',
+    hardware: ['Raspberry Pi 4 (set up)', 'Breadboard', 'Passive piezo buzzer', '220 Ω resistor', '2 × female–male jumper wires'],
+    code: PI_TONE, file: 'scale.py', program: 'pi_tone', fast: true, widgets: ['pikeys'],
+    circuit: PI_BUZ_PARTS, io: { p11: IO_BUZ },
+    explain: {
+      1: '<b>TonalBuzzer</b>: a GPIO Zero class that plays <b>musical notes</b> on a passive buzzer.',
+      2: 'The <b>sleep</b> function.',
+      4: '<b>TonalBuzzer(17)</b>: the buzzer is on GPIO17 (pin 11). It uses PWM on that pin: the pin pulses at the frequency of the note.',
+      6: 'A list of note names: C, D, E, F, G, A, B in <b>octave 4</b> — the C major scale. The number is the octave. <b>A4 is 440 Hz</b> (concert A).',
+      8: 'Take one note after the other.',
+      9: '<b>buzzer.play(note)</b>: sets the pulse frequency to the note’s frequency (50 % duty cycle). The note keeps sounding until you change it or stop it.',
+      10: 'Let the note sound for 0.4 seconds.',
+      12: '<b>buzzer.stop()</b>: silence.',
+    },
+    steps: [
+      {
+        title: 'Sound from a pin', view: 'pibench', have: BUZ_IDS, power: false,
+        body: `<p>A <b>passive piezo buzzer</b> makes a sound when the voltage across it <b>changes quickly</b>. A GPIO pin can do that: switch between 3.3 V and 0 V, many times per second. <b>The speed of the switching is the pitch</b>:</p>
+        <table class="kv"><tr><th>Switching speed</th><th>You hear</th></tr><tr><td>440 times per second (440 Hz)</td><td>the note <b>A4</b> (concert A)</td></tr><tr><td>a higher frequency</td><td>a higher note</td></tr></table>
+        <p>GPIO Zero has two buzzer classes: <code>Buzzer</code> only switches on and off (one fixed sound — its documentation says it cannot play different tones), and <code>TonalBuzzer</code> <b>plays notes</b>. We use <code>TonalBuzzer</code>.</p>`,
+      },
+      {
+        title: 'The parts', view: 'pibb', have: ['bz1'], power: false,
+        body: `<p><b>Click the buzzer</b> in the 3D view. It has two legs: <b>+</b> (marked on the top) and <b>−</b>.</p>
+        <p><b>Why a 220 Ω resistor?</b> In the worst case (a short circuit) it limits the current to 3.3 V ÷ 220 Ω = <b>15 mA</b>, just under the <b>16 mA</b> that one GPIO pin may supply. Never connect a loudspeaker or a motor directly to a GPIO pin.</p>`,
+      },
+      {
+        title: 'Step 1 — resistor and buzzer', view: 'pibb', have: ['r1', 'bz1'], power: false, holes: ['h8', 'h12', 'g12 · +', 'g15 · −'],
+        body: `<ul><li><b>220 Ω resistor</b> from <b>h8</b> to <b>h12</b>.</li><li><b>Buzzer</b>: <b>+</b> leg in <b>g12</b>, <b>−</b> leg in <b>g15</b>.</li></ul>
+        <p>The resistor and the + leg meet in column 12, because holes f–j of one column are connected.</p>`,
+      },
+      {
+        title: 'Step 2 — two wires', view: 'pibench', have: BUZ_IDS, pins: ['p11', 'p9'],
+        body: `<ul><li>Orange: <b>pin 11 (GPIO17) → j8</b></li><li>Black: <b>pin 9 (GND) → j15</b></li></ul>
+        <p class="path">GPIO17 → resistor → buzzer + … buzzer − → GND</p>`,
+      },
+      {
+        title: 'Notes and frequencies', view: 'pibench', have: BUZ_IDS,
+        body: `<p>A note is a frequency. The documentation defines <b>A4 = 440 Hz</b> (MIDI note 69); every <b>semitone</b> step multiplies the frequency by 2<sup>1/12</sup>. The notes of our scale:</p>
+        <table class="kv"><tr><th>Note</th><th>C4</th><th>D4</th><th>E4</th><th>F4</th><th>G4</th><th>A4</th><th>B4</th></tr><tr><td>Hz</td><td>261.6</td><td>293.7</td><td>329.6</td><td>349.2</td><td>392.0</td><td>440.0</td><td>493.9</td></tr></table>
+        <p class="tip">By default <code>TonalBuzzer</code> covers one octave above and below A4 (A3 to A5). Playing a note outside that range raises an error.</p>`,
+      },
+      { title: 'The program', view: 'pibench', have: BUZ_IDS, showCode: true, power: true, body: `<p>Click any line. The program plays the seven notes one after the other, 0.4 s each, then stops.</p><p class="tip">This is our example, built from GPIO Zero’s documented calls: <code>play()</code> and <code>stop()</code>, and note names such as “A4”.</p>` },
+      {
+        title: 'Run it — and play yourself', view: 'pibench', have: BUZ_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b> (turn <b>sound on</b> in the top bar of the app if you cannot hear it): the keys in the panel light up one by one, the buzzer on the breadboard <b>vibrates</b>, and the pin panel shows the frequency.</p>
+        <p><b>Then click the keys</b> yourself to play any note.</p>
+        <p class="sim">The sound is made by your browser as a square wave. A real piezo sounds different, and more quietly.</p>`,
+      },
+      {
+        title: 'Summary', view: 'pibench', have: BUZ_IDS, power: true,
+        body: `<ul><li>A passive piezo makes sound when the pin <b>switches quickly</b>; the switching frequency is the pitch.</li><li><code>TonalBuzzer(17)</code>, <code>play("A4")</code>, <code>stop()</code>; A4 = 440 Hz.</li><li>Always a resistor: 220 Ω → at most 15 mA (limit 16 mA per pin).</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'What sets the pitch of the note?', a: ['The resistor value', 'How fast the pin switches between 3.3 V and 0 V', 'The colour of the wire', 'The length of sleep()'], c: 1, why: 'The switching frequency is the pitch.' },
+      { q: 'Frequency of the note A4?', a: ['44 Hz', '440 Hz', '4400 Hz', '261.6 Hz'], c: 1, why: 'Concert A is 440 Hz (MIDI note 69).' },
+      { q: 'Which GPIO Zero class plays different notes?', a: ['Buzzer', 'TonalBuzzer', 'LED', 'Button'], c: 1, why: 'Buzzer only switches on and off; TonalBuzzer plays tones.' },
+      { q: 'What does buzzer.stop() do?', a: ['Plays the next note', 'Silences the buzzer', 'Shuts down the Pi', 'Doubles the volume'], c: 1, why: 'stop() turns the buzzer off.' },
+      { q: 'Worst-case current through 220 Ω at 3.3 V?', a: ['1.5 mA', '15 mA', '150 mA', '1.5 A'], c: 1, why: '3.3 V / 220 Ω = 0.015 A = 15 mA.' },
+    ],
+    sources: [SRC_PI.tonal, SRC_PI.gpiozero, SRC_PI.gpio, SRC_PI.ds],
   },
 ];
 

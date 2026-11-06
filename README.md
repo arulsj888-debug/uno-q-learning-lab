@@ -64,6 +64,8 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
     10. A web page served by the Pi (Flask: `@app.route`, `flask --app … run --host=0.0.0.0`, port 5000; a phone mock-up switches the real LED; “can't reach this page” before the server runs; safety rules from the Flask docs)
   - **Module 6: Final project**
     11. Final project: a Pi control panel on your phone (SHT31-D sensor + LED + Flask page that refreshes every 5 s; `redirect("/")` so reloads never repeat an action; wiring, checklist, loose-wire error, safety)
+  - **Module 7: Extra — sound**
+    12. Make music with a buzzer (passive piezo on GPIO17 with a 220 Ω resistor; GPIO Zero `TonalBuzzer`, note frequencies from A4 = 440 Hz; clickable piano keys; vibrating 3D buzzer)
 
 ## Works on every screen
 

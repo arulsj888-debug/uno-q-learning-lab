@@ -83,6 +83,8 @@ export class Sim {
       servoWrite: (pin, angle) => { const a = Math.min(180, Math.max(0, angle)); const us = Math.floor((Math.trunc(a * (2400 - 544) / 180) + 544) / 4) * 4; H.servo(pin, us, a); },
       tone: (pin, f, ms) => { pins[pin] = { mode: 'OUTPUT' }; tok.tonePin = pin; H.tone(pin, f, ms); },
       noTone: (pin) => { H.noTone(pin); },
+      playHz: (pin, hz) => { pins[pin] = { mode: 'OUTPUT' }; tok.tonePin = pin; H.tone(pin, hz, 0); },     // GPIO Zero TonalBuzzer.play(): PWM at the note's frequency, 50 % duty
+      stopHz: (pin) => { H.noTone(pin); },                                                          // TonalBuzzer.stop()
       pwmValue: (pin, v) => { pins[pin] = { mode: 'OUTPUT' }; H.pwm(pin, v, v); },   // GPIO Zero PWMLED.value, 0..1
       map: (x, a, b, c, d) => Math.trunc((x - a) * (d - c) / (b - a)) + c,   // Arduino integer map()
       serialBegin: () => { serialOn = true; },
@@ -453,6 +455,20 @@ export const PROGRAMS = {
       }
       if (performance.now() - t0 > 5000) { t0 = performance.now(); rt.println('[simulated] browser refresh: GET /'); await page(); }
       await rt.delay(120);
+    }
+  },
+  async pi_tone(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4); await rt.at(6);
+    const hz = m => 440 * Math.pow(2, (m - 69) / 12);                    // A4 = 440 Hz = MIDI note 69, equal temperament
+    const notes = [['C4', 60], ['D4', 62], ['E4', 64], ['F4', 65], ['G4', 67], ['A4', 69], ['B4', 71]];
+    for (;;) {
+      for (const [name, m] of notes) {
+        await rt.at(8); await rt.at(9); rt.playHz('p11', hz(m)); rt.println(`play ${name}  ${hz(m).toFixed(1)} Hz`);
+        await rt.at(10); await rt.delay(400);
+      }
+      await rt.at(12); rt.stopHz('p11'); rt.println('stop');
+      await rt.delay(1500);
     }
   },
   async pi_pwm(rt) {
