@@ -527,3 +527,9 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 .ch-card .ch-img { display: block; aspect-ratio: 85 / 56; border-radius: 8px; background: #0b0f14; overflow: hidden; }
 .ch-card .ch-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ch-card b { font-size: 16px; } .ch-card small { color: var(--muted); }
+
+/* ---------------- Home button (opens the board chooser) */
+#home-btn { flex: none; display: inline-flex; align-items: center; gap: 2px; background: var(--panel2); border: 1px solid var(--teal); color: #dffbfd; border-radius: 8px; padding: 6px 12px; font-weight: 600; font-size: 13px; }
+#home-btn:hover { background: rgba(0,168,181,.22); }
+@media (max-width: 900px), (max-height: 520px) { #home-btn { padding: 6px 9px; } #home-btn .ht { display: none; } }
+@media (max-width: 900px), (max-height: 520px) { .modes .xl { display: none; } .modes button { white-space: nowrap; } }

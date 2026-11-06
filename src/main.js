@@ -631,7 +631,9 @@ class App {
       const go = b => { if (b === BOARD) { ch.classList.remove('on'); history.replaceState(null, '', '?board=' + b); } else location.search = '?board=' + b; };
       cards.forEach(c => c.onclick = () => go(c.dataset.board));
       if (!new URLSearchParams(location.search).get('board')) ch.classList.add('on');
-      $('#switch-board').onclick = () => ch.classList.add('on');
+      const home = () => { ch.classList.add('on'); document.body.dataset.menu = ''; };
+      $('#home-btn').onclick = home;
+      document.querySelector('.brand').onclick = home; document.querySelector('.brand').style.cursor = 'pointer'; document.querySelector('.brand').title = 'Home — choose a board';
       $('#chooser-close').onclick = () => ch.classList.remove('on');
     }
   }

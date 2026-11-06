@@ -16,8 +16,9 @@
       <svg viewBox="0 0 64 30" class="logo" aria-hidden="true"><ellipse cx="17" cy="15" rx="13.5" ry="12" fill="none" stroke="currentColor" stroke-width="4"/><ellipse cx="47" cy="15" rx="13.5" ry="12" fill="none" stroke="currentColor" stroke-width="4"/><rect x="11" y="13.2" width="12" height="3.6" fill="currentColor"/><rect x="41" y="13.2" width="12" height="3.6" fill="currentColor"/><rect x="45.2" y="9" width="3.6" height="12" fill="currentColor"/></svg>
       <div><b>Arduino UNO Q</b><span>3D Learning Lab</span></div>
     </div>
+    <button id="home-btn" title="Home — choose a board"><span class="hi">🏠</span><span class="ht"> Home</span></button>
     <nav class="modes">
-      <button data-mode="explore" class="on">Explore the board</button>
+      <button data-mode="explore" class="on">Explore<span class="xl"> the board</span></button>
       <button data-mode="lessons">Lessons</button>
     </nav>
     <div class="tools">
@@ -26,18 +27,17 @@
       <button id="v-bottom" title="Turn the board over">Bottom</button>
       <button id="v-rotate" class="tgl" title="Rotate 360° automatically">⟳ 360°</button>
       <button id="v-labels" class="tgl" title="Show part names">Labels</button>
-      <button id="switch-board" title="Choose another board">⇄ Board</button>
     </div>
   </header>
 
   <div id="chooser" role="dialog" aria-label="Choose a board">
     <div class="ch-box">
       <button id="chooser-close" class="ch-x" title="Close" aria-label="Close">×</button>
-      <h2>Choose a board to learn</h2>
+      <h2>🏠 Home — choose a board to learn</h2>
       <p>Realistic 3D boards — click every part, then learn step by step.</p>
       <div class="ch-cards">
         <button class="ch-card" data-board="unoq"><span class="ch-img"></span><b>Arduino UNO Q</b><small>Microcontroller + Linux · 23 lessons</small></button>
-        <button class="ch-card" data-board="pi4"><span class="ch-img"></span><b>Raspberry Pi 4 Model B</b><small>Linux computer · explore the board · lessons coming</small></button>
+        <button class="ch-card" data-board="pi4"><span class="ch-img"></span><b>Raspberry Pi 4 Model B</b><small>Linux computer + Python · 6 lessons, more coming</small></button>
       </div>
     </div>
   </div>
