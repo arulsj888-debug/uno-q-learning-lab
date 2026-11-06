@@ -606,3 +606,9 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 .fb-note.ok { border-color: rgba(70,211,126,.45); background: rgba(70,211,126,.08); } .fb-note.ok .ic { color: var(--ok); }
 .fb-note.info .ic { color: var(--accent); }
 .tag3d b { font-family: Consolas, monospace; }
+
+.fb-guide { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; font-size: 12.5px; }
+.fb-guide b { display: block; margin-bottom: 4px; }
+.fb-gi { display: flex; gap: 6px; line-height: 1.4; padding: 2px 0; }
+.fb-gi .ic { flex: none; width: 14px; text-align: center; }
+.fb-gi.ok { color: var(--ok); } .fb-gi.bad { color: #ffd0a0; } .fb-gi.bad .ic { color: var(--warn); }

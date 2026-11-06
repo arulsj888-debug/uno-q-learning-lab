@@ -475,10 +475,10 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('resistor')}" data-tool="resistor">Resistor</button><select data-opt="ohms">${ohmOpts}</select></div>
       <div class="fb-row"><button class="fb-btn${on('led')}" data-tool="led">LED</button><select data-opt="color">${ledOpts}</select></div>
       <div class="fb-row"><button class="fb-btn${on('button')}" data-tool="button">Push button</button></div>
-      <div class="fb-row"><button class="fb-btn${on('pot')}" data-tool="pot">Potentiometer 10 kΩ</button></div>
+      <div class="fb-row"><button class="fb-btn${on('pot')}" data-tool="pot">Potentiometer 10 kΩ${this.isPi ? ' (no ADC on Pi)' : ''}</button></div>
       <div class="fb-row"><button class="fb-btn${on('buzzer')}" data-tool="buzzer">Passive buzzer</button></div>
       <div class="fb-row"><button class="fb-btn${on('ldr')}" data-tool="ldr">Light sensor (LDR)</button></div>
-      <div class="fb-row"><button class="fb-btn${on('tmp36')}" data-tool="tmp36">TMP36 temperature</button><label class="fb-chk"><input type="checkbox" data-opt="flip"${this.opts.flip ? ' checked' : ''}> turn round</label></div>
+      <div class="fb-row"><button class="fb-btn${on('tmp36')}" data-tool="tmp36">TMP36 temperature${this.isPi ? ' (no ADC on Pi)' : ''}</button><label class="fb-chk"><input type="checkbox" data-opt="flip"${this.opts.flip ? ' checked' : ''}> turn round</label></div>
       <h3>Modules</h3>
       <div class="fb-row"><button class="fb-btn${on('hcsr04')}" data-tool="hcsr04">HC-SR04 distance sensor</button></div>
       <div class="fb-row"><button class="fb-btn" data-tool="pir">PIR motion sensor HC-SR501</button></div>
@@ -584,7 +584,7 @@ export class FreeBuild {
       if (hasSht) h += `<div class="fb-env">Humidity <input type="range" min="0" max="100" value="${this.env.hum}" data-env="hum"><b data-envv="hum"></b></div>`;
       if (hasT || hasSht) h += `<div class="fb-env">Temperature <input type="range" min="-20" max="100" value="${this.env.tempC}" data-env="tempC"><b data-envv="tempC"></b></div>`;
     }
-    h += `<h3>What the circuit does</h3><div id="fb-notes"></div>
+    h += `<h3>Wiring checklist</h3><div id="fb-guide"></div><h3>What the circuit does</h3><div id="fb-notes"></div>
       <p class="sim">Simplified model: wires have no resistance, LED voltages are typical values, and the board's pin drivers use simulation values. Limits come from the datasheets: ${this.isPi ? 'Raspberry Pi GPIO is 3.3 V only, 16 mA per pin' : 'STM32U585 pins: 20 mA absolute maximum, D3 and A0–A5 are 3.3 V only'}.</p></div>`;
     $('#panel').innerHTML = h; this.lastHtml = {}; this.syncControls(); if (this.result) this.liveText(this.result);
   }
@@ -645,6 +645,11 @@ export class FreeBuild {
       put('pr' + id, t, el);
     }
     for (const el of document.querySelectorAll('[data-partmsg]')) { const R = res.parts[el.dataset.partmsg]; put('pm' + el.dataset.partmsg, R && R.msg ? `<span class="${R.status === 'bad' ? 'bad' : R.status === 'warn' ? 'warn' : ''}">${esc(R.msg)}</span>` : '', el); }
+    const guide = $('#fb-guide');
+    if (guide) {
+      const gs = Object.values(res.guides || {});
+      put('guide', gs.length ? gs.map(g => `<div class="fb-guide"><b>${esc(g.label)}</b>${g.items.map(i => `<div class="fb-gi ${i.ok ? 'ok' : 'bad'}"><span class="ic">${i.ok ? '✔' : '→'}</span><span>${esc(i.text)}</span></div>`).join('')}</div>`).join('') : '<div class="fb-small" style="margin:0">Place a sensor, module or part: this list shows which pin each leg should go to, and what it is connected to now.</div>', guide);
+    }
     const notes = $('#fb-notes');
     if (notes) {
       const order = { bad: 0, warn: 1, ok: 2, info: 3 }, seen = new Set(), list = [...(this.isPi ? this.piNotes(pw) : []), ...res.notes].filter(n => { if (seen.has(n.text)) return false; seen.add(n.text); return true; }).sort((a, b) => order[a.lvl] - order[b.lvl]);

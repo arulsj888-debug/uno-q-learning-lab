@@ -514,6 +514,42 @@ export function evaluate(model) {
   }
   if (powered) for (const [id, k] of usedPins) if (k.k === 'gpio' && !(pinCfg[id] && pinCfg[id].mode) && !damaged.has(id)) note('info', `${k.name} is an input by default. Choose what the pin should do (Output HIGH, Blink, ...) in the Pins list.`, id);
   if (powered && parts.length && !notes.some(x => x.lvl === 'bad' || x.lvl === 'warn' || x.lvl === 'ok')) note('info', 'Nothing is wrong, but nothing is happening yet: add a part, wire it to a pin and give the pin a job.');
+  // ---- wiring checklist: for every part, which board pin each leg should go to, and what it is connected to now
+  {
+    const pi = boardKind === 'pi4';
+    const name = { '5v': pi ? '5V (pin 2 or 4)' : '5V', '3v3': pi ? '3V3 (pin 1 or 17)' : '3V3', gnd: pi ? 'GND (for example pin 6)' : 'GND', gpio: 'a signal pin' };
+    const reachPins = (d, term) => {
+      const start = find(T(d, term)), seen = new Set([start]), q = [start], out = [];
+      while (q.length) {
+        const x = q.pop(); let stop = false;
+        for (const [id, k] of usedPins) if (find(nodeOfRef(id)) === x) { out.push(id); if (['5v', '3v3', 'gnd'].includes(k.k)) stop = true; }
+        if (!stop) for (const y of resAdj.get(x) || []) if (!seen.has(y)) { seen.add(y); q.push(y); }
+      }
+      return out;
+    };
+    const item = (d, term, kinds, what, tip = '', okFn) => {
+      const ids = reachPins(d, term), have = ids.map(id => usedPins.get(id).name);
+      const good = ids.filter(id => kinds.includes(usedPins.get(id).k) && (!okFn || okFn(usedPins.get(id), id)));
+      if (good.length && good.length === ids.length) return { ok: true, text: `${term}: ${what}` };
+      if (ids.length) return { ok: false, text: `${term} is on ${have.join(', ')}, but it should go to ${what}${tip ? '. ' + tip : ''}.` };
+      return { ok: false, text: `${term} is not connected to a board pin yet. It should go to ${what}${tip ? '. ' + tip : ''}.` };
+    };
+    const sig = pi ? 'a GPIO pin' : 'a digital pin (for example D7)';
+    const SPEC = {
+      led: d => [item(d, 'anode', ['gpio', '3v3', '5v'], pi ? 'a GPIO pin (through a resistor)' : 'a pin (through a resistor)'), item(d, 'cathode', ['gnd'], name.gnd)],
+      buzzer: d => [item(d, 'plus', ['gpio'], sig), item(d, 'minus', ['gnd'], name.gnd)],
+      pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], pi ? 'a GPIO pin' : 'an analog pin A0–A5', pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
+      tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], pi ? 'a GPIO pin' : 'an analog pin A0–A5', pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
+      hcsr04: d => [item(d, 'VCC', ['5v'], name['5v'], 'The HC-SR04 is made for 5 V'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'TRIG', ['gpio'], sig), item(d, 'ECHO', ['gpio'], pi ? 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider' : 'D8 (a 5 V-tolerant pin)', pi ? 'Its 5 V echo would damage the pin directly' : 'Not D3 or A0–A5: they are 3.3 V only', (k, id) => !pi ? !k.v3 : true)],
+      pir: d => [item(d, 'VCC', ['5v'], name['5v']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], sig)],
+      servo: d => [item(d, 'GND', ['gnd'], name.gnd + ' (brown wire, first pin)'), item(d, 'V', ['5v'], name['5v'] + ' (red wire, middle pin)'), item(d, 'SIG', ['gpio'], sig + ' (orange wire)')],
+      sht31: d => [item(d, 'VIN', ['3v3'], name['3v3'], pi ? 'On a Raspberry Pi use 3.3 V, not 5 V' : ''), item(d, 'GND', ['gnd'], name.gnd), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda')],
+      relay: d => [item(d, 'DCP', ['5v'], name['5v']), item(d, 'DCN', ['gnd'], name.gnd), item(d, 'IN', ['gpio'], sig, 'Pulling IN LOW switches it on')],
+      l293d: d => [item(d, 'p16', ['5v'], name['5v'] + ' (pin 16, logic supply)'), item(d, 'p4', ['gnd'], name.gnd + ' (one of the GND pins 4, 5, 12, 13)'), item(d, 'p1', ['gpio'], sig + ' (pin 1, enable)'), item(d, 'p2', ['gpio'], sig + ' (pin 2, input 1)'), item(d, 'p7', ['gpio'], sig + ' (pin 7, input 2)')],
+    };
+    result.guides = {};
+    for (const d of parts) if (SPEC[d.type]) result.guides[d.id] = { label: nameOf(d), items: SPEC[d.type](d) };
+  }
   result.srcMax = srcMax;
   return result;
 }
