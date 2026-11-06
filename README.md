@@ -37,6 +37,8 @@ Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, 
     20. Two brains: Python calls your sketch over the Bridge (MPU + MCU, provide/call/notify, App.run, deadlock warning)
     21. Send sensor readings from the sketch to Python (Bridge.notify, Python decides, Bridge.call back, store-then-decide rule)
     22. A Wi-Fi dashboard (Web UI brick, WebSocket push, live phone mock-up, three-file code panel)
+  - **Module 8: Final project**
+    23. Final project: a smart room controller (Thermo + relay + lamp, Python decides Auto/Manual, web page with working buttons)
 
 Purple notes in the lessons mark behavior that is only **simulated** in the app, such as the shortened boot time.
 

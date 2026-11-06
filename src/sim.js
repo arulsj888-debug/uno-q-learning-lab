@@ -69,6 +69,7 @@ export class Sim {
         H.pwm(pin, Math.min(max, Math.max(0, value)) / max, value);
       },
       delayMicroseconds: async () => { if (slow) await frame(); },
+      uiEvents: () => (H.ui ? H.ui() : []),
       bridge: (stage, val) => { if (H.bridge) H.bridge({ stage, val }); },
       thermo: () => (H.thermo ? H.thermo() : { found: false }),
       pxSet: (i, rgb, br) => { if (i < 8) pxBuf[i] = [rgb[0], rgb[1], rgb[2], Math.trunc(br * 31 / 100) / 31]; },   // library: map(brightness, 0, 100, 0, 0x1F)
@@ -342,6 +343,44 @@ export const PROGRAMS = {
       await rt.at(204); rt.bridge('render', { c, rh }); await rt.delay(200);
       await rt.at(205); await rt.at(206);
       await rt.at(16); await rt.delay(900);
+    }
+  },
+
+  // Lesson 23 — final project. Python 101+, browser JS 201+, sketch 1+.
+  async home(rt) {
+    await rt.at(101); await rt.at(102); await rt.at(103); await rt.at(105);
+    await rt.at(107); await rt.at(108); await rt.at(109); await rt.at(110);
+    rt.serialBegin(9600);
+    await rt.at(17); await rt.at(18); rt.pinMode('D4', 'INPUT');
+    await rt.at(19); await rt.at(20); await rt.at(21); await rt.at(22);
+    await rt.at(126); await rt.at(127); await rt.at(128); await rt.at(140);
+    await rt.at(201);
+    let auto = true, lampOn = false, want = false, latest = null;
+    for (;;) {
+      // buttons tapped on the phone: browser -> Python (handlers only flip flags)
+      for (const evn of rt.uiEvents()) {
+        if (evn === 'toggle_mode') { await rt.at(209); await rt.at(117); await rt.at(118); await rt.at(119); auto = !auto; rt.bridge('click', { auto, lamp: lampOn }); await rt.delay(150); }
+        else { await rt.at(210); await rt.at(121); await rt.at(122); await rt.at(123); if (!auto) { await rt.at(124); want = !lampOn; } rt.bridge('click', { auto, lamp: lampOn }); await rt.delay(150); }
+      }
+      await rt.at(25);
+      await rt.at(26); const c = rt.thermo().c;
+      await rt.at(27); const rh = rt.thermo().rh;
+      await rt.at(28); rt.bridge('notify', { c, rh, auto, lamp: lampOn }); await rt.delay(120);
+      await rt.at(112); await rt.at(113); await rt.at(114); latest = [c, rh];
+      await rt.at(115); rt.bridge('render', { c, rh, auto, lamp: lampOn }); await rt.delay(150);
+      await rt.at(203); await rt.at(204); await rt.at(205); await rt.at(206); await rt.at(207);
+      await rt.at(130); await rt.at(131); await rt.at(132);
+      if (auto) { await rt.at(133); await rt.at(134); want = latest[0] > 28; }
+      await rt.at(135);
+      if (want !== lampOn) {
+        await rt.at(136); lampOn = want;
+        await rt.at(137); rt.bridge('call', { c, rh, auto, lamp: lampOn }); await rt.delay(250);
+        await rt.at(7);
+        if (lampOn) { await rt.at(8); await rt.at(9); rt.pinMode('D4', 'OUTPUT'); await rt.at(10); rt.digitalWrite('D4', 0); }
+        else { await rt.at(11); await rt.at(12); rt.pinMode('D4', 'INPUT'); }
+        await rt.at(14); rt.bridge('reply', { c, rh, auto, lamp: lampOn }); await rt.delay(250);
+      }
+      await rt.at(138); await rt.at(29); await rt.delay(400);
     }
   },
 

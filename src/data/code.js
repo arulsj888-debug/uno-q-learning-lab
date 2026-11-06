@@ -552,3 +552,88 @@ ui.on_message('reading', (data) => {
   document.querySelector('#temp').textContent = data.temperature.toFixed(1) + ' °C';
   document.querySelector('#hum').textContent = data.humidity.toFixed(1) + ' %RH';
 });`;
+
+
+// Lesson 23 — final project: Thermo + relay + Python decisions + web page with buttons
+export const HOME_INO = `#include <Arduino_RouterBridge.h>
+#include <Arduino_Modulino.h>
+
+ModulinoThermo thermo;
+int relayPin = D4;
+
+bool set_lamp(bool on) {
+  if (on) {
+    pinMode(relayPin, OUTPUT);
+    digitalWrite(relayPin, LOW);    // low-level trigger: LOW = relay ON
+  } else {
+    pinMode(relayPin, INPUT);       // let go of the pin: relay OFF
+  }
+  return on;
+}
+
+void setup() {
+  pinMode(relayPin, INPUT);         // start with the relay OFF
+  Bridge.begin();
+  Bridge.provide("set_lamp", set_lamp);
+  Modulino.begin();
+  thermo.begin();
+}
+
+void loop() {
+  float celsius = thermo.getTemperature();
+  float humidity = thermo.getHumidity();
+  Bridge.notify("on_reading", celsius, humidity);
+  delay(500);
+}`;
+
+export const HOME_PY = `from arduino.app_utils import *
+from arduino.app_bricks.web_ui import WebUI
+import time
+
+ui = WebUI()
+
+latest = None
+auto = True
+lamp_on = False
+want_lamp = False
+
+def on_reading(celsius, humidity):
+    global latest
+    latest = (celsius, humidity)
+    ui.send_message("reading", {"temperature": celsius, "humidity": humidity, "auto": auto, "lamp": lamp_on})
+
+def on_toggle_mode(sid, data):
+    global auto
+    auto = not auto
+
+def on_toggle_lamp(sid, data):
+    global want_lamp
+    if not auto:
+        want_lamp = not lamp_on
+
+Bridge.provide("on_reading", on_reading)
+ui.on_message("toggle_mode", on_toggle_mode)
+ui.on_message("toggle_lamp", on_toggle_lamp)
+
+def loop():
+    global lamp_on, want_lamp
+    if latest is not None:
+        if auto:
+            want_lamp = latest[0] > 28
+        if want_lamp != lamp_on:
+            lamp_on = want_lamp
+            Bridge.call("set_lamp", lamp_on)
+    time.sleep(0.5)
+
+App.run(user_loop=loop)`;
+
+export const HOME_JS = `const ui = new WebUI();
+
+ui.on_message('reading', (d) => {
+  document.querySelector('#temp').textContent = d.temperature.toFixed(1) + ' °C';
+  document.querySelector('#lamp').textContent = d.lamp ? 'ON' : 'OFF';
+  document.querySelector('#mode').textContent = d.auto ? 'Auto' : 'Manual';
+});
+
+document.querySelector('#mode-btn').onclick = () => ui.send_message('toggle_mode');
+document.querySelector('#lamp-btn').onclick = () => ui.send_message('toggle_lamp');`;

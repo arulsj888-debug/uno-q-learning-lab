@@ -29,6 +29,7 @@ const VIEWS = {
   thermoclose: { t: new THREE.Vector3(100, -4, 6), d: new THREE.Vector3(-0.06, 0.93, 0.36), dist: 62 },
   thermo2: { t: new THREE.Vector3(95, 0, 6), d: new THREE.Vector3(-0.08, 0.92, 0.38), dist: 270 },
   pixclose: { t: new THREE.Vector3(170, -4, 6), d: new THREE.Vector3(-0.06, 0.93, 0.36), dist: 62 },
+  smart: { t: new THREE.Vector3(95, 0, 8), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 430 },
   motor: { t: new THREE.Vector3(0, 0, 90), d: new THREE.Vector3(-0.06, 0.9, 0.43), dist: 285 },
   drvclose: { t: new THREE.Vector3(0, 3, 71), d: new THREE.Vector3(-0.22, 0.86, 0.46), dist: 78 },
   sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
@@ -86,7 +87,7 @@ class App {
     this.lamp.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 70, 6)));
     this.lamp.target.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 0, 0)));
     s.add(this.lamp, this.lamp.target);
-    this.lux = 300; this.tempC = 25; this.distCm = 40; this.th = { t: 22.5, h: 45, unplug: false, last: null }; this.br = { stage: 'idle', arg: null, led: null };
+    this.lux = 300; this.tempC = 25; this.distCm = 40; this.th = { t: 22.5, h: 45, unplug: false, last: null }; this.uiq = []; this.br = { stage: 'idle', arg: null, led: null }; this.uiq = [];
     // ---- Lesson 13 scene, all at true scale (1 unit = 1 mm) -------------------------------------------
     // obstacle: a corrugated cardboard box standing on the desk (flat, hard face — what the datasheet asks for)
     {
@@ -214,6 +215,7 @@ class App {
   async ensurePower() { if (!this.usbPlugged) await this.plug(true); }
 
   outputsOff() {
+    this.uiq = [];
     this.phone = null;
     this.br = { stage: 'idle', arg: null, led: null };
     this.pxArr = null;
@@ -286,7 +288,7 @@ class App {
     this.servoTick(Math.min(dt, 0.1));
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
-    this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick();
+    this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -606,7 +608,7 @@ class App {
         h += `<button class="lesson-card ${this.lesson && this.lesson.id === L.id ? 'on' : ''} ${done ? 'done' : ''}" data-lesson="${L.id}">
           <span class="num">${done ? '✓' : L.num}</span><b>${L.title}</b><p>${L.goal}</p><div class="meta">${L.level} · ${L.time}${done ? ' · completed' : ''}</div></button>`;
       }
-      h += '<h3>Coming next (stage 3)</h3>' + COMING_SOON.map(s => `<div class="soon">${s}</div>`).join('');
+      if (COMING_SOON.length) h += '<h3>Coming next (stage 3)</h3>' + COMING_SOON.map(s => `<div class="soon">${s}</div>`).join('');
       side.innerHTML = h;
       side.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => this.startLesson(b.dataset.lesson));
       const on = side.querySelector('.lesson-card.on'); if (on) on.scrollIntoView({ block: 'nearest' });
@@ -689,6 +691,8 @@ class App {
         <div class="io-tools"><button id="pir-wave" class="hold">👋 Wave hand</button><button id="pir-still" class="lvl">✋ Hold hand still</button></div></div>
         <div class="io-block pirstat"><div><span>Sensor</span><b id="ps-sensor">—</b></div><div class="arrow">→</div><div><span>OUT → D2</span><b id="ps-out">—</b></div><div class="arrow">→</div><div><span>Alarm LED (D5)</span><b id="ps-led">—</b></div></div>
         <div id="ps-note" class="io-note"></div>`;
+    if (w.includes('home')) h += `<div class="io-block"><div class="io-title">The room <span class="io-note">(simulated — you decide)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div></div>
+        <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="h-sk">—</b></div><div class="arrow">→</div><div><span>Python · decides</span><b id="h-py">—</b></div><div class="arrow">→</div><div><span>Relay → Lamp</span><b id="h-rl">—</b></div></div><div id="h-note" class="io-note"></div>`;
     if (w.includes('dash')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div><div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
         <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="d-sk">—</b></div><div class="arrow">→</div><div><span>Python · Web UI</span><b id="d-py">—</b></div><div class="arrow">→</div><div><span>Browser</span><b id="d-br">—</b></div></div><div id="d-note" class="io-note"></div>`;
     if (w.includes('bridge2')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div></div>
@@ -730,7 +734,7 @@ class App {
     if ($('#rl-manual')) $('#rl-manual').onclick = () => { if (this.rly && !this.sim.running) this.rly.manual = !this.rly.manual; };
     if ($('#pir-wave')) { $('#pir-wave').onclick = () => this.pirWave(); $('#pir-still').onclick = () => this.pirHoldStill(); }
     this.showRoom(w.includes('pir') && !!this.pirSensor());
-    this.showPhone(w.includes('dash'));
+    this.showPhone(w.includes('dash') || w.includes('home'), w.includes('home') ? 'home' : 'dash');
     if ($('#tempc')) { $('#tempc').oninput = e => this.setTemp(+e.target.value); this.setTemp(this.tempC); }
     this.lamp.intensity = w.includes('light') ? this.lampIntensity() : 0;
     if ($('#pwm')) $('#pwm').oninput = e => this.applyManualPwm(+e.target.value);
@@ -804,7 +808,7 @@ class App {
       if ($('#dist')) this.setDist(this.distCm, S.view === 'sonar');
       this.showRoom(!!(L.widgets && L.widgets.includes('pir')) && !!this.pirSensor());
       this.showMotor(!!(L.widgets && L.widgets.includes('motor')) && !!this.bench.get('mot1'));
-      this.showRelay(!!(L.widgets && L.widgets.includes('relay')) && !!this.bench.get('rel1'));
+      this.showRelay(!!((L.widgets && L.widgets.includes('relay')) || L.relay3d) && !!this.bench.get('rel1'));
       { const rm = this.bench.get('rel1'); if (rm) rm.setCutaway(!!S.cutaway); }
       if (S.view === 'room') this.frameRoom();
       if (S.view === 'relayclose') this.view('relayclose');
@@ -1122,11 +1126,20 @@ class App {
     set('#b2-note', !this.board.powered ? 'USB-C is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>, then move the temperature slider.' : st === 'notify' ? 'The sketch <b>notifies</b> Python with the new reading (no waiting).' : st === 'stored' ? 'Python’s <b>on_reading</b> function stores the numbers.' : st === 'decided' ? 'Python decides: above 28 °C is “hot”.' : st === 'call' ? 'The state changed, so Python <b>calls</b> set_led.' : st === 'reply' ? 'The sketch switched the LED and answered.' : 'Nothing changed, so Python sends nothing to the sketch.', 'io-note');
   }
   // ---- Lesson 22: the browser (phone) showing the dashboard ----------------------------------------------
-  showPhone(on) {
+  showPhone(on, kind = 'dash') {
     let p = $('#phone');
     if (!on) { if (p) p.remove(); return; }
-    if (p) return;
-    p = document.createElement('div'); p.id = 'phone';
+    if (p && p.dataset.kind === kind) return;
+    if (p) p.remove();
+    p = document.createElement('div'); p.id = 'phone'; p.dataset.kind = kind;
+    if (kind === 'home') {
+      p.classList.add('live');
+      p.innerHTML = `<div class="ph-cap">Your phone (tap the buttons)</div><div class="ph-frame"><div class="ph-bar">http://&lt;board-ip&gt;:7000</div><div class="ph-body"><div class="ph-title">Smart room</div><div class="ph-card"><span>Temperature</span><b id="ph-t">--</b></div><div class="ph-card"><span>Lamp</span><b id="ph-l">--</b></div><button class="ph-btn" id="ph-mode">Mode: --</button><button class="ph-btn" id="ph-lamp">Lamp: switch</button><div class="ph-st" id="ph-s">waiting for data…</div></div></div>`;
+      $('#stage').appendChild(p);
+      $('#ph-mode').onclick = () => { if (this.sim.running) this.uiq.push('toggle_mode'); };
+      $('#ph-lamp').onclick = () => { if (this.sim.running) this.uiq.push('toggle_lamp'); };
+      return;
+    }
     p.innerHTML = `<div class="ph-cap">Your phone / computer</div><div class="ph-frame"><div class="ph-bar">http://&lt;board-ip&gt;:7000</div><div class="ph-body"><div class="ph-title">UNO Q dashboard</div><div class="ph-card"><span>Temperature</span><b id="ph-t">--</b></div><div class="ph-card"><span>Humidity</span><b id="ph-h">--</b></div><div class="ph-st" id="ph-s">waiting for data…</div></div></div>`;
     $('#stage').appendChild(p);
   }
@@ -1141,6 +1154,20 @@ class App {
     set('#d-py', st === 'ws' || st === 'render' ? 'send_message("reading")' : st === 'notify' ? 'on_reading()' : '—', ['ws', 'render', 'notify'].includes(st) ? 'on' : 'off');
     set('#d-br', P ? `shows ${P.c.toFixed(1)} °C` : '—', P ? 'on' : 'off');
     set('#d-note', !this.board.powered ? 'USB-C is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : st === 'notify' ? 'The sketch <b>notifies</b> Python.' : st === 'ws' ? 'Python <b>pushes</b> a “reading” message to the browser over the WebSocket.' : st === 'render' ? 'The page’s JavaScript writes the numbers into the page.' : 'Waiting for the next reading (once a second).', 'io-note');
+  }
+  homeTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('home')) return;
+    const run = this.sim.running, B = this.br, P = this.phone, st = run ? B.stage : 'idle', R = this.rly || {};
+    const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; if (cls !== undefined) e.className = cls; } };
+    set('#ph-t', P ? P.c.toFixed(1) + ' °C' : '--'); set('#ph-l', P ? (P.lamp ? 'ON' : 'OFF') : '--'); set('#ph-s', P ? '● live' : 'waiting for data…');
+    set('#ph-mode', P ? `Mode: ${P.auto ? 'Auto' : 'Manual'} (tap)` : 'Mode: --');
+    const lb = $('#ph-lamp'); if (lb) { lb.disabled = !P || P.auto; lb.textContent = P && !P.auto ? `Lamp: ${P.lamp ? 'ON' : 'OFF'} (tap)` : 'Lamp: Auto mode'; }
+    const c = B.c === undefined ? '' : B.c.toFixed(1) + ' °C';
+    const relayOn = run && R.mode === 'OUTPUT' && R.level === 0;
+    set('#h-sk', run && c ? `reads ${c}` : '—', run && c ? 'on' : 'off');
+    set('#h-py', run && B.auto !== undefined ? `${B.auto ? 'Auto' : 'Manual'} · lamp ${B.lamp ? 'wanted' : 'off'}` : '—', run ? 'on' : 'off');
+    set('#h-rl', run ? (relayOn ? 'Relay ON · lamp ON' : 'Relay OFF · lamp OFF') : '—', relayOn ? 'on' : 'off');
+    set('#h-note', !this.board.powered ? 'USB-C is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>. Then move the slider and tap the phone buttons.' : st === 'click' ? 'A button tap travelled <b>browser → Python</b> (the handler only flips a flag).' : st === 'call' ? 'The loop <b>calls</b> set_lamp because the wish changed.' : st === 'reply' ? 'The sketch switched the relay.' : st === 'render' ? 'The page shows the newest state.' : 'Reading, deciding, showing — twice a second.', 'io-note');
   }
   // ---- Lesson 18: Modulino Thermo over Qwiic ------------------------------------------------------------
   thermoIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'thermo'); }
@@ -1447,7 +1474,8 @@ class App {
         this.th.last = `${c.toFixed(1)} °C · ${rh.toFixed(1)} %RH`;
         return { found: true, pixels: this.pixelsOk(), c, rh };
       },
-      bridge: ev => { this.br.stage = ev.stage; if (ev.val && typeof ev.val === 'object') { Object.assign(this.br, { c: ev.val.c, rh: ev.val.rh, hot: ev.val.hot }); if (ev.stage === 'render') this.phone = { c: ev.val.c, rh: ev.val.rh }; } else this.br.arg = ev.val; },
+      bridge: ev => { this.br.stage = ev.stage; if (ev.val && typeof ev.val === 'object') { Object.assign(this.br, { c: ev.val.c, rh: ev.val.rh, hot: ev.val.hot, auto: ev.val.auto, lamp: ev.val.lamp }); if (ev.stage === 'render') this.phone = { c: ev.val.c, rh: ev.val.rh, auto: ev.val.auto, lamp: ev.val.lamp }; } else this.br.arg = ev.val; },
+      ui: () => { const q = this.uiq || []; this.uiq = []; return q; },
       pixels: arr => { this.pxArr = arr; },
       mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {

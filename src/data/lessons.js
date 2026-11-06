@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE, PIXELS_CODE, BRIDGE_INO, BRIDGE_PY, BRIDGE2_INO, BRIDGE2_PY, DASH_INO, DASH_PY, DASH_JS } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE, PIXELS_CODE, BRIDGE_INO, BRIDGE_PY, BRIDGE2_INO, BRIDGE2_PY, DASH_INO, DASH_PY, DASH_JS, HOME_INO, HOME_PY, HOME_JS } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -143,6 +143,14 @@ const PIXELS_PARTS = [
 ];
 const PIXELS_IDS = PIXELS_PARTS.map(d => d.id);
 const PIXELS_IO = { kind: 'thermo', item: 'th1', cable: 'cab1', pix: 'pix1', cable2: 'cab2', unplug: 'cab2', needs: PIXELS_IDS };
+const HOME_PARTS = [
+  { id: 'th1', type: 'thermo', x: 100, z: 52 },
+  { id: 'cab1', type: 'qwiic', from: 'QWIIC', to: 'th1.QA', lift: 4 },
+  ...RELAY_PARTS,
+];
+const HOME_IDS = HOME_PARTS.map(d => d.id);
+const THERMO_IO_S2 = { kind: 'thermo', item: 'th1', cable: 'cab1', steady: true, needs: HOME_IDS };
+const HOME_RELAY_IO = { ...RELAY_IO, needs: HOME_IDS };
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
 
 const BLINK_CODE = BLINK;
@@ -2123,11 +2131,150 @@ export const LESSONS = [
     ],
     sources: [SRC.webui, SRC.webuiex, SRC.bridgelib, SRC.appbricks, SRC.thermo],
   },
+  // ================================================================== 23
+  {
+    id: 'l23', num: 23, module: 8, title: 'Final project: a smart room controller', level: 'Advanced', time: '40 min',
+    goal: 'Combine everything: a sensor, two programs, a relay and a web page. The room temperature switches a lamp (a stand-in for a fan) automatically, and you can switch it by hand from your phone.',
+    hardware: ['Arduino UNO Q (Wi-Fi)', 'Arduino Modulino® Thermo + Qwiic cable', '1-channel 5 V relay module (low-level trigger)', '4 × AA battery holder (≈ 6 V) and small lamp (E10, 6 V)', '6 × wires', 'A phone or computer on the same Wi-Fi'],
+    code: HOME_INO, code2: HOME_PY, code3: HOME_JS, program: 'home', fast: true, widgets: ['home'], relay3d: true, noBreadboard: true,
+    circuit: HOME_PARTS, io: { QWIIC: THERMO_IO_S2, D4: HOME_RELAY_IO },
+    explain: {
+      1: 'Bridge library: talk to Python.',
+      2: 'Modulino library: read the Thermo.',
+      4: 'The Thermo object.',
+      5: 'The relay input is connected to <b>D4</b> (Lesson 17).',
+      7: 'Python calls this function to switch the lamp.',
+      8: 'Switch on …',
+      9: '… D4 becomes an output …',
+      10: '… and goes <b>LOW</b>: this relay module is <b>low-level triggered</b> — LOW = relay ON (Lesson 17).',
+      11: 'Switch off …',
+      12: '… by <b>letting go</b> of the pin (INPUT). We do not write HIGH, because a 3.3 V HIGH may leave the 5 V relay input partly on (Lesson 17).',
+      14: 'Answer Python with the new state.',
+      17: 'setup() runs once, on the microcontroller.',
+      18: 'Start with the relay OFF.',
+      19: 'Start the Bridge first.',
+      20: 'Offer <b>set_lamp</b> to Python.',
+      21: 'Start the Qwiic bus (Wire1).',
+      22: 'Find the Thermo.',
+      25: 'loop() repeats forever.',
+      26: 'Read the temperature …',
+      27: '… and the humidity.',
+      28: '<b>Bridge.notify</b>: report both numbers to Python (Lesson 21). The sketch makes <b>no decisions</b>.',
+      29: 'Wait a second.',
+      101: 'Import App and Bridge.',
+      102: 'Import the Web UI brick (Lesson 22).',
+      103: 'For <code>time.sleep</code>.',
+      105: 'The web server.',
+      107: 'The newest reading.',
+      108: '<b>Auto</b> mode on: Python decides by temperature. Off = <b>Manual</b>: you decide.',
+      109: 'Is the lamp on right now?',
+      110: 'Does somebody (the rule or you) want the lamp on?',
+      112: 'The sketch calls this with each reading (Lesson 21).',
+      113: 'We will change <code>latest</code>.',
+      114: 'Store the reading.',
+      115: 'Send everything the page needs to every browser: the numbers, the mode and the lamp state.',
+      117: 'The page’s <b>Auto/Manual</b> button arrives here.',
+      118: 'We will change <code>auto</code>.',
+      119: 'Flip Auto ↔ Manual.',
+      121: 'The page’s <b>Lamp</b> button arrives here.',
+      122: 'We will change <code>want_lamp</code>.',
+      123: 'The lamp button only works in Manual mode.',
+      124: 'Ask for the opposite of the current state.',
+      126: 'Offer <code>on_reading</code> to the sketch.',
+      127: 'The button message <b>"toggle_mode"</b> runs <code>on_toggle_mode</code>.',
+      128: 'The button message <b>"toggle_lamp"</b> runs <code>on_toggle_lamp</code>.',
+      130: 'The loop: the <b>one place that decides</b> and acts.',
+      131: 'We will change two variables.',
+      132: 'Wait until the first reading has arrived.',
+      133: 'In Auto mode …',
+      134: '… the rule: above <b>28 °C</b> we want the lamp on.',
+      135: 'Only when the wish differs from the real state …',
+      136: '… remember the new state …',
+      137: '… and <b>Bridge.call</b> the sketch (only on change; in the loop, never inside a called function).',
+      138: 'Half a second pause.',
+      140: 'Start the app (and the web server).',
+      201: 'Connection to the board (Lesson 22).',
+      203: 'When a “reading” arrives …',
+      204: '… show the temperature …',
+      205: '… the lamp state …',
+      206: '… and the mode.',
+      207: 'End of the function.',
+      209: 'Clicking the mode button sends the message <b>"toggle_mode"</b> to Python.',
+      210: 'Clicking the lamp button sends <b>"toggle_lamp"</b>.',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'smart', have: HOME_IDS, power: false, labels: [['th1', 'Thermo'], ['rel1', 'Relay'], ['lamp1', 'Lamp'], ['board', 'UNO Q']],
+        body: `<p>The <b>final project</b> puts together what you learned:</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">Thermo measures the room</span></div><div class="pt-arrow">↓ sketch → Bridge → Python</div><div class="pt-row"><span class="pt">Python decides: above 28 °C?</span></div><div class="pt-arrow">↓ Bridge.call → relay</div><div class="pt-row"><span class="pt bus">Lamp (stand-in for a fan) on / off</span></div></div>
+        <p>A web page on your phone shows everything and has <b>two buttons</b>: <b>Auto / Manual</b> and <b>Lamp</b>.</p>`,
+      },
+      {
+        title: 'The map of what you already know', view: 'smart', have: HOME_IDS, power: false,
+        body: `<table class="kv"><tr><th>Part of the project</th><th>You learned it in</th></tr>
+        <tr><td>Relay switching a lamp on its own battery</td><td>Lesson 17</td></tr><tr><td>Thermo over Qwiic, <code>Wire1</code>, 3.3 V</td><td>Lesson 18</td></tr>
+        <tr><td>Python ↔ sketch with the Bridge</td><td>Lesson 20</td></tr><tr><td>Sketch notifies, Python stores then decides</td><td>Lesson 21</td></tr>
+        <tr><td>Web page with the Web UI brick</td><td>Lesson 22</td></tr></table>
+        <p>New today: <b>buttons in the web page</b> that send messages <b>to Python</b>, and putting it all in one design.</p>`,
+      },
+      {
+        title: 'Place the parts', view: 'smart', have: ['th1', 'rel1', 'bat2', 'lamp1'], power: false, labels: [['th1', 'Thermo'], ['rel1', 'Relay'], ['bat2', 'Battery'], ['lamp1', 'Lamp']],
+        body: `<p>Put the Thermo, the relay module, the battery holder and the lamp on the desk. Nothing is connected yet.</p>`,
+      },
+      {
+        title: 'Wire the Thermo (Qwiic)', view: 'smart', have: ['th1', 'cab1', 'rel1', 'bat2', 'lamp1'], power: true, labels: [['cab1', 'Qwiic cable']],
+        body: `<p>One <b>Qwiic cable</b> from the UNO Q to the Thermo — nothing else (Lesson 18). The green LED lights.</p>`,
+      },
+      {
+        title: 'Wire the relay and the lamp', view: 'smart', have: HOME_IDS, power: true, pins: ['5V', 'GND3', 'D4'],
+        body: `<ul><li><b>Control side</b> (as in Lesson 17): <b>5V → DC+</b>, <b>GND → DC−</b>, <b>D4 → IN</b></li>
+        <li><b>Lamp side</b> (its own battery): battery <b>+ → COM</b>, <b>NO → lamp</b>, lamp → battery <b>−</b></li></ul>
+        <p class="warn"><b>Safety:</b> keep the lamp circuit on its <b>6 V battery</b>. Never wire mains voltage without proper training and an enclosure (Lesson 17).</p>`,
+      },
+      { title: 'The sketch: sensor and relay', view: 'smart', have: HOME_IDS, showCode: true, power: true, body: `<p>The sketch owns the <b>hardware</b>: it reads the Thermo and drives the relay. It makes <b>no decisions</b>. Click each line of <code>sketch.ino</code> (lowest part of the code panel).</p>` },
+      {
+        title: 'Python: the brain', view: 'smart', have: HOME_IDS, showCode: true, power: true,
+        body: `<p>Python owns the <b>decisions</b> and the <b>web server</b>. Click the lines of <code>main.py</code> (top).</p>
+        <ul><li>Functions the other side calls only <b>store</b> a value (<code>on_reading</code>) or <b>flip a flag</b> (<code>on_toggle_mode</code>, <code>on_toggle_lamp</code>).</li><li>The <b>loop</b> is the one place that decides and calls <code>set_lamp</code> — and only when something changed.</li></ul>`,
+      },
+      { title: 'The web page', view: 'smart', have: HOME_IDS, showCode: true, power: true, body: `<p>The page shows the temperature, the lamp and the mode, and its two buttons send messages to Python with <code>ui.send_message</code>. Click the lines of <code>app.js</code> (middle of the code panel).</p>` },
+      {
+        title: 'Run it: Auto mode', view: 'smart', have: HOME_IDS, showCode: true, power: true, action: 'run',
+        body: `<ol><li>Press <b>▶ Run</b>. The phone appears at the bottom right (Mode: <b>Auto</b>).</li><li>Drag the <b>Temperature</b> slider <b>above 28 °C</b>: Python decides “hot”, calls <code>set_lamp</code>, the relay <b>clicks</b> and the <b>lamp lights</b>.</li><li>Drag it back down: the relay clicks off.</li></ol>
+        <p class="sim">Simulated. Sound: turn it on in the top bar to hear the relay click.</p>`,
+      },
+      {
+        title: 'Run it: Manual mode', view: 'smart', have: HOME_IDS, showCode: true, power: true, action: 'run',
+        body: `<ol><li>On the <b>phone</b>, tap <b>Mode: Auto</b> to switch to <b>Manual</b>.</li><li>Now the <b>Lamp</b> button works: tap it to switch the lamp, whatever the temperature.</li><li>Switch back to Auto and the temperature rule takes over again.</li></ol>
+        <p>Follow the message: <b>button → Python (<code>on_toggle_lamp</code>) → loop → <code>Bridge.call</code> → sketch → relay → lamp.</b></p>`,
+      },
+      {
+        title: 'Why it is built this way', view: 'smart', have: HOME_IDS, power: true,
+        body: `<ul><li><b>Each job has one owner.</b> Sketch = pins and sensors. Python = decisions and the web. Page = display and buttons.</li>
+        <li><b>Store first, act in the loop.</b> No <code>Bridge.call</code> inside a function the other side called (Lesson 20).</li>
+        <li><b>Call only on change.</b> The lamp command is sent once per change, not every half second.</li>
+        <li><b>Safe by default.</b> The relay starts OFF; the load has its own battery; the page stays on your own network.</li></ul>
+        <p class="tip"><b>Ideas to extend it:</b> a second threshold, the Pixels as a status bar (Lesson 19), a motion sensor, a history chart on the page.</p>`,
+      },
+      {
+        title: 'Summary — you made it!', view: 'smart', have: HOME_IDS, power: true,
+        body: `<p>You built a real IoT system, from the pins up:</p>
+        <ul><li>a <b>sensor</b> on I²C and a <b>relay</b> switching a separate circuit,</li><li>two programs on <b>two processors</b> talking over the <b>Bridge</b>,</li><li>a <b>web server</b> and a page with <b>live data and buttons</b>.</li></ul>
+        <p>Every part was explained from its datasheet or official source — you can now design your own projects with the same pattern.</p>`,
+      },
+    ],
+    quiz: [
+      { q: 'Which part decides whether the lamp should be on?', a: ['The sensor', 'The relay', 'The Python loop', 'The phone'], c: 2, why: 'The Python loop compares the wish with the real state and calls set_lamp when it changes.' },
+      { q: 'What does the sketch do in this project?', a: ['Decides about the temperature rule', 'Reads the Thermo, drives the relay and reports readings', 'Serves the web page', 'Stores history'], c: 1, why: 'The sketch owns the hardware only: sensor, relay pin, notify.' },
+      { q: 'How is the relay switched ON by the sketch?', a: ['digitalWrite(HIGH)', 'pinMode(OUTPUT) and digitalWrite(LOW)', 'analogWrite(255)', 'Bridge.notify'], c: 1, why: 'The module is low-level triggered: LOW = relay ON (Lesson 17).' },
+      { q: 'You tap the Lamp button in Manual mode. What is the first thing that happens in Python?', a: ['Bridge.call runs inside the button handler', 'The handler only sets want_lamp; the loop then calls set_lamp', 'The sketch is restarted', 'Nothing'], c: 1, why: 'Handlers only flip a flag. The loop calls the sketch, avoiding a call inside a called function.' },
+      { q: 'Why does the loop call set_lamp only when want_lamp != lamp_on?', a: ['To save messages and avoid repeating the same command', 'Because the relay breaks otherwise', 'Because Python is slow', 'It does not matter'], c: 0, why: 'One command per change is enough.' },
+      { q: 'Which voltage does the lamp circuit use here?', a: ['Mains 230 V', 'The UNO Q 3.3 V pin', 'Its own ≈ 6 V battery', '12 V from USB'], c: 2, why: 'The load has its own battery and stays separate from the UNO Q.' },
+    ],
+    sources: [SRC.relaymod, SRC.thermo, SRC.modulinolib, SRC.bridgelib, SRC.appbricks, SRC.webui, SRC.webuiex, SRC.ds],
+  },
 ];
 
-export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion', 6: 'Module 6 — I²C & Qwiic', 7: 'Module 7 — Linux side & Bridge' };
+export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion', 6: 'Module 6 — I²C & Qwiic', 7: 'Module 7 — Linux side & Bridge', 8: 'Module 8 — Final project' };
 
-export const COMING_SOON = [
-
-  'Final IoT project',
-];
+export const COMING_SOON = [];

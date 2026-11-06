@@ -430,3 +430,7 @@ pre.tree { background: #10161d; border: 1px solid var(--line); border-radius: 8p
 #phone .ph-card span { display: block; font-size: 10px; color: #6a7c8c; }
 #phone .ph-card b { font-size: 20px; font-variant-numeric: tabular-nums; }
 #phone .ph-st { font-size: 10px; color: #1f9d55; text-align: right; }
+
+#phone.live { pointer-events: auto; }
+#phone .ph-btn { display: block; width: 100%; margin: 4px 0; padding: 7px 8px; border: 0; border-radius: 8px; background: #0f8f84; color: #fff; font: 600 12px Arial, sans-serif; cursor: pointer; }
+#phone .ph-btn:disabled { background: #b8c4cf; cursor: default; }
