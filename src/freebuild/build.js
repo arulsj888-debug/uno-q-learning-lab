@@ -21,7 +21,7 @@ export class FreeBuild {
     this.app = app; this.isPi = isPi; this.boardKind = isPi ? 'pi4' : 'unoq'; this.pinInfo = pinInfo;
     this.active = false;
     this.parts = []; this.pinCfg = {}; this.burnt = new Set(); this.damaged = new Set(); this.burnWhy = {};
-    this.env = { lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
+    this.env = { lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: true, touched: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
     this.seq = {}; this.undoStack = []; this.tool = null; this.selected = null; this.probe = null; this.probeOn = false;
     this.opts = { ohms: 220, color: 'red', wire: 'auto', flip: false };
     this.result = null; this.tripMsg = null; this.lastRun = 0; this.lastHtml = {}; this.soundHz = 0;
@@ -103,7 +103,7 @@ export class FreeBuild {
   /** what the Raspberry Pi does with this setup: [{lvl, text}] */
   piNotes(powered) {
     const p = this.pi, out = [], n = (lvl, text) => out.push({ lvl, text });
-    if (!powered) return out;
+    if (!powered || !p.touched) return out;   // the setup notes only appear once you start changing the setup
     if (!p.sd) n('bad', 'No microSD card: the Raspberry Pi has no operating system to start from, so the screen stays black. Insert a card with Raspberry Pi OS (the slot is on the underside, label facing away from the board).');
     else n('ok', 'The microSD card holds Raspberry Pi OS: the Raspberry Pi starts.');
     if (p.sd) {
@@ -132,7 +132,7 @@ export class FreeBuild {
 
   // ------------------------------------------------------------------ saving, undo
   snap() { return JSON.stringify({ parts: this.parts, pinCfg: this.pinCfg, burnt: [...this.burnt], damaged: [...this.damaged], seq: this.seq, burnWhy: this.burnWhy, pi: this.pi }); }
-  restore(s) { const o = JSON.parse(s); this.parts = o.parts; this.pinCfg = o.pinCfg; this.burnt = new Set(o.burnt); this.damaged = new Set(o.damaged); this.seq = o.seq || {}; this.burnWhy = o.burnWhy || {}; this.pi = o.pi || this.pi; }
+  restore(s) { const o = JSON.parse(s); this.parts = o.parts; this.pinCfg = o.pinCfg; this.burnt = new Set(o.burnt); this.damaged = new Set(o.damaged); this.seq = o.seq || {}; this.burnWhy = o.burnWhy || {}; if (o.pi) { this.pi = o.pi; if (!this.pi.touched) this.pi.sd = true; } }
   save() { try { localStorage.setItem(this.key, this.snap()); } catch (e) { /* private mode */ } }
   load() { try { const s = localStorage.getItem(this.key); if (s) this.restore(s); } catch (e) { /* ignore */ } this.undoStack = []; }
   commit() { this.undoStack.push(this.pre); if (this.undoStack.length > 60) this.undoStack.shift(); this.save(); this.dirty = true; this.renderPanel(); }
@@ -512,7 +512,7 @@ export class FreeBuild {
   }
   piToggle(k, v) {
     const was = this.powered(), before = JSON.stringify(this.pi);
-    this.pre = this.snap(); this.pi[k] = v;
+    this.pre = this.snap(); this.pi[k] = v; this.pi.touched = true;
     if (was && (k === 'sd' || (k === 'cam'))) this.piWarn = k === 'sd' ? 'The microSD card was inserted or removed with the power on. Shut the Raspberry Pi down first, or the card can be corrupted.' : 'The camera cable was connected or removed with the power on. Shut the Raspberry Pi down and unplug it first.';
     if (!was) this.piWarn = '';
     this.commit(); this.applyPi(k === 'cam' && v === 'plugged'); this.renderSide(); this.dirty = true;
