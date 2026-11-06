@@ -2,7 +2,7 @@
 import { evaluate, resistorBands } from '../src/freebuild/circuit.js';
 let fail = 0;
 const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
-const uno = id => ({ D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const uno = id => ({ D7: { id: 'D7' }, D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
 const pi = id => ({ p11: { gpio: 17 }, p3: { gpio: 2 }, p6: { label: 'GND', gpio: null }, p9: { label: 'GND', gpio: null }, p1: { label: '3V3', gpio: null }, p2: { label: '5V', gpio: null }, p12: { gpio: 18 } }[id]);
 const env = { lux: 300, tempC: 25, pressed: {}, pot: {} };
 const base = o => ({ boardKind: 'unoq', pinInfo: uno, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
@@ -43,6 +43,29 @@ parts = [{ id: 't1', type: 'tmp36', row: 'e', col: 10 }, W('w1', '3V3', 'a10'), 
 r = evaluate(base({ parts, pinCfg: { A0: { mode: 'analog' } }, env: { ...env, tempC: 30 } })); console.log(r.pins.A0); ok(Math.abs(r.pins.A0.V - 0.8) < 0.02, 'TMP36 at 30 C = 0.80 V');
 parts = [{ id: 't1', type: 'tmp36', row: 'e', col: 10 }, W('w1', 'GND2', 'a10'), W('w3', '3V3', 'a12')];
 r = evaluate(base({ parts })); ok(r.parts.t1.status === 'bad', 'TMP36 backwards is flagged');
+// ---- modules
+const hc = { id: 'us1', type: 'hcsr04', row: 'j', col: 11 };
+let hparts = [hc, W('w1', '5V', 'i11', 'red'), W('w2', 'D7', 'i12', 'yellow'), W('w3', 'D8', 'i13', 'blue'), W('w4', 'GND2', 'i14', 'black')];
+r = evaluate(base({ parts: hparts, pinCfg: { D7: { mode: 'pulse' }, D8: { mode: 'in' } }, env: { ...env, dist: 40 } }));
+ok(r.parts.us1.status === 'ok' && r.pins.D8.echo.us === 2320 && !r.newDamage.size, 'HC-SR04 on 5 V with echo on a 5 V-tolerant UNO Q pin works (40 cm = 2320 us)');
+r = evaluate(base({ parts: hparts.map(p => p.id === 'w3' ? W('w3', 'D3', 'i13', 'blue') : p), pinCfg: { D7: { mode: 'pulse' }, D3: { mode: 'in' } } }));
+ok(r.newDamage.has('D3'), 'HC-SR04 echo (5 V) on D3 damages it');
+r = evaluate(base({ parts: hparts, pinCfg: { D8: { mode: 'in' } } })); ok(r.parts.us1.status === 'warn' && /Trigger pulses/.test(r.parts.us1.msg), 'HC-SR04 without trigger pulses is flagged');
+r = evaluate(base({ parts: hparts.map(p => p.id === 'w1' ? W('w1', '3V3', 'i11', 'orange') : p), pinCfg: { D7: { mode: 'pulse' }, D8: { mode: 'in' } } })); ok(r.parts.us1.status === 'off', 'HC-SR04 on 3.3 V does not work');
+r = evaluate({ boardKind: 'pi4', pinInfo: id => ({ p2: { label: '5V', gpio: null }, p11: { gpio: 17 }, p13: { gpio: 27 }, p9: { label: 'GND', gpio: null }, p14: { label: 'GND', gpio: null } }[id]), powered: true, env, t: 0,
+  parts: [{ id: 'us1', type: 'hcsr04', row: 'j', col: 11 }, W('w1', 'p2', 'i11', 'red'), W('w2', 'p11', 'i12', 'yellow'), { id: 'r1', type: 'resistor', a: 'h13', b: 'h17', ohms: 1000 }, { id: 'r2', type: 'resistor', a: 'g17', b: 'g21', ohms: 2200 }, W('w3', 'p13', 'i17', 'blue'), W('w4', 'p9', 'i14', 'black'), W('w5', 'p14', 'i21', 'black')], pinCfg: { p11: { mode: 'pulse' }, p13: { mode: 'in' } } });
+ok(r.parts.us1.status === 'ok' && !r.newDamage.size && r.pins.p13.V > 3.2 && r.pins.p13.V < 3.6, 'HC-SR04 with a 1k/2.2k divider is safe for a Pi GPIO pin');
+r = evaluate({ boardKind: 'pi4', pinInfo: id => ({ p2: { label: '5V', gpio: null }, p11: { gpio: 17 }, p13: { gpio: 27 }, p9: { label: 'GND', gpio: null } }[id]), powered: true, env, t: 0,
+  parts: [{ id: 'us1', type: 'hcsr04', row: 'j', col: 11 }, W('w1', 'p2', 'i11', 'red'), W('w2', 'p11', 'i12', 'yellow'), W('w3', 'p13', 'i13', 'blue'), W('w4', 'p9', 'i14', 'black')], pinCfg: { p11: { mode: 'pulse' }, p13: { mode: 'in' } } });
+ok(r.newDamage.has('p13'), 'HC-SR04 echo straight into a Pi GPIO pin damages it');
+const pirParts = [{ id: 'pir1', type: 'pir' }, W('w1', '5V', 'pir1.VCC', 'red'), W('w2', 'D2', 'pir1.OUT', 'yellow'), W('w3', 'GND2', 'pir1.GND', 'black')];
+r = evaluate(base({ parts: pirParts, pinCfg: { D2: { mode: 'in' } }, env: { ...env, motion: true } })); ok(r.pins.D2.read === 1 && r.parts.pir1.status === 'ok', 'PIR motion -> OUT HIGH');
+r = evaluate(base({ parts: pirParts, pinCfg: { D2: { mode: 'in' } }, env: { ...env, motion: false } })); ok(r.pins.D2.read === 0, 'PIR no motion -> LOW');
+const sv = { id: 'sv1', type: 'servo', row: 'j', col: 11 };
+const svParts = [sv, W('w1', 'GND2', 'i11', 'black'), W('w2', '5V', 'i12', 'red'), W('w3', 'D5', 'i13', 'orange')];
+r = evaluate(base({ parts: svParts, pinCfg: { D5: { mode: 'servo', angle: 45 } } })); ok(r.parts.sv1.angle === 45 && r.parts.sv1.status === 'ok', 'servo moves with pulses and 5 V');
+r = evaluate(base({ parts: svParts, pinCfg: { D5: { mode: 'out1' } } })); ok(/Servo angle/.test(r.notes.map(n => n.text).join()), 'servo without pulses is explained');
+r = evaluate(base({ parts: svParts.map(p => p.id === 'w2' ? W('w2', '3V3', 'i12', 'orange') : p), pinCfg: { D5: { mode: 'servo' } } })); ok(r.parts.sv1.status === 'off', 'servo on 3.3 V does not move');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

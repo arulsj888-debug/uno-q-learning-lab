@@ -25,6 +25,8 @@ export function nodeOfRef(ref) {
   return 'pin:' + ref;
 }
 export const isHoleRef = ref => HOLE_RE.test(ref) || RAIL_RE.test(ref);
+/** a pin of a module standing on the desk, e.g. "pir1.VCC" */
+export const isModRef = ref => /^[a-z]+\d+\.[A-Z]+$/.test(ref);
 
 /** terminals of a placed part: [[terminalName, holeRef], ...] */
 export function terminals(d) {
@@ -36,6 +38,9 @@ export function terminals(d) {
     case 'button': return [['e1', `e${c}`], ['e2', `e${c + 2}`], ['f1', `f${c}`], ['f2', `f${c + 2}`]];
     case 'pot': return [['A', `${row}${c}`], ['W', `${row}${c + 2}`], ['B', `${row}${c + 4}`]];
     case 'tmp36': return d.flip ? [['VS', `${row}${c + 2}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c}`]] : [['VS', `${row}${c}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c + 2}`]];
+    case 'hcsr04': return [['VCC', `${row}${c}`], ['TRIG', `${row}${c + 1}`], ['ECHO', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
+    case 'servo': return [['GND', `${row}${c}`], ['V', `${row}${c + 1}`], ['SIG', `${row}${c + 2}`]];
+    case 'pir': return [['VCC', `${d.id}.VCC`], ['OUT', `${d.id}.OUT`], ['GND', `${d.id}.GND`]];
     case 'wire': case 'fwire': return [['from', d.from], ['to', d.to]];
     default: return [];
   }
@@ -69,6 +74,9 @@ export function solveDC(n, elems, temp = 25) {
       else if (e.t === 'T') {   // TMP36 output: 0.5 V + 10 mV/degC when supplied with at least 2.7 V
         const vs = v[e.vs] - v[e.gnd], ramp = Math.min(1, Math.max(0, (vs - 2.4) / 0.3));
         const out = ramp * Math.min(2.0, Math.max(0.1, 0.5 + 0.01 * temp)), g = 1 / 50;
+        G(e.out, e.gnd, g); I(e.out, out * g); I(e.gnd, -out * g);
+      } else if (e.t === 'M') {   // module output: voltage out = fn(supply voltage), measured against the module's own GND
+        const out = e.fn(v[e.vs] - v[e.gnd]), g = 1 / (e.r || 100);
         G(e.out, e.gnd, g); I(e.out, out * g); I(e.gnd, -out * g);
       } else if (e.t === 'D') {
         const old = dv.has(e) ? dv.get(e) : 0, ex = Math.exp(Math.min(old, 6) / NVT);
@@ -114,9 +122,10 @@ export function pinKind(boardKind, id, info) {
 
 export const PIN_MODES = {
   out0: 'Output LOW', out1: 'Output HIGH', blink: 'Blink (1 Hz)', pwm: 'PWM (duty cycle)', tone: 'Tone (frequency)',
+  servo: 'Servo angle (50 Hz pulses)', pulse: 'Trigger pulses (HC-SR04)',
   in: 'Input (no pull resistor)', up: 'Input with pull-up', down: 'Input with pull-down', analog: 'Analog input (ADC)',
 };
-const OUTPUT_MODES = ['out0', 'out1', 'blink', 'pwm', 'tone'];
+const OUTPUT_MODES = ['out0', 'out1', 'blink', 'pwm', 'tone', 'servo', 'pulse'];
 
 // ------------------------------------------------------------------ the whole circuit
 /**
@@ -144,13 +153,13 @@ export function evaluate(model) {
   const nodeOf = ref => nid(nodeOfRef(ref));
 
   const usedPins = new Map();
-  for (const d of parts) if (d.type === 'wire' || d.type === 'fwire') for (const ref of [d.from, d.to]) if (!isHoleRef(ref)) usedPins.set(ref, pinKind(boardKind, ref, pinInfo(ref)));
+  for (const d of parts) if (d.type === 'wire' || d.type === 'fwire') for (const ref of [d.from, d.to]) if (!isHoleRef(ref) && !isModRef(ref)) usedPins.set(ref, pinKind(boardKind, ref, pinInfo(ref)));
   for (const [id] of usedPins) nodeOf(id);
   for (const d of parts) for (const [, ref] of terminals(d)) nodeOf(ref);
   const n = ids.size;
 
   const gpioIds = [...usedPins].filter(([, k]) => k.k === 'gpio').map(([id]) => id);
-  const hasFast = gpioIds.some(id => ['tone', 'pwm'].includes((pinCfg[id] || {}).mode));
+  const hasFast = gpioIds.some(id => ['tone', 'pwm', 'servo', 'pulse'].includes((pinCfg[id] || {}).mode));
   const N = hasFast ? 10 : 1;
   const result = { parts: {}, pins: {}, notes, newBurn, newDamage, tripped: false };
   const sums = {};
@@ -165,6 +174,8 @@ export function evaluate(model) {
         case 'blink': return Math.floor(t * 2) % 2 === 0 ? 1 : 0;
         case 'pwm': return (step + 0.5) / N < (cfg.duty ?? 0.5) ? 1 : 0;
         case 'tone': return step % 2;
+        case 'servo': return (step + 0.5) / N < 0.08 ? 1 : 0;
+        case 'pulse': return step === 0 ? 1 : 0;
         default: return 0;
       }
     };
@@ -195,6 +206,14 @@ export function evaluate(model) {
       else if (d.type === 'button') { const down = !!(env.pressed || {})[d.id]; if (down) elems.push({ t: 'R', a: nid(T(d, 'e1')), b: nid(T(d, 'f1')), g: 20 }); pe[d.id] = { down }; }
       else if (d.type === 'pot') { const f = (env.pot || {})[d.id] ?? 0.5, r1 = Math.max(1, f * 10000), r2 = Math.max(1, (1 - f) * 10000); const A = nid(T(d, 'A')), W = nid(T(d, 'W')), B = nid(T(d, 'B')); elems.push({ t: 'R', a: A, b: W, g: 1 / r1 }, { t: 'R', a: W, b: B, g: 1 / r2 }); pe[d.id] = { W }; }
       else if (d.type === 'buzzer') pe[d.id] = { a: nodeOf(d.plus), b: nodeOf(d.minus) };
+      else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo') {
+        const vn = nid(T(d, d.type === 'servo' ? 'V' : 'VCC')), gn = nid(T(d, 'GND'));
+        const load = { pir: 100000, hcsr04: 330, servo: 100 }[d.type];
+        if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / load });
+        if (d.type === 'pir' && !dead) elems.push({ t: 'M', out: nid(T(d, 'OUT')), vs: vn, gnd: gn, r: 100, fn: vs => (vs >= 4.5 && env.motion ? 3.3 : 0) });
+        if (d.type === 'hcsr04' && !dead) elems.push({ t: 'M', out: nid(T(d, 'ECHO')), vs: vn, gnd: gn, r: 100, fn: vs => (vs >= 4.5 ? Math.min(vs, 5.5) : 0) });
+        pe[d.id] = { vn, gn };
+      }
       else if (d.type === 'tmp36') { const vs = nid(T(d, 'VS')), out = nid(T(d, 'OUT')), g = nid(T(d, 'GND')); elems.push({ t: 'R', a: vs, b: g, g: 1 / 66000 }, { t: 'T', vs, out, gnd: g }); pe[d.id] = { vs, out, g }; }
     }
     const { v } = solveDC(n, elems, env.tempC ?? 25);
@@ -212,11 +231,12 @@ export function evaluate(model) {
       else if (d.type === 'led') { const V = v[q.a] - v[q.b], I = burnt.has(d.id) ? 0 : q.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'Imax', I, 'max'); }
       else if (d.type === 'buzzer') { const V = v[q.a] - v[q.b]; acc(d.id, 'Vmax', V, 'max'); acc(d.id, 'Vmin', V, 'min'); acc(d.id, 'V', V); }
       else if (d.type === 'pot') acc(d.id, 'Vw', v[q.W]);
+      else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'tmp36') { acc(d.id, 'Vs', v[q.vs] - v[q.g]); acc(d.id, 'Vout', v[q.out] - v[q.g]); }
     }
     if (step === N - 1) {   // floating nets: no conducting path to any source
       const adj = new Map(); const link = (a, b) => { (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a); };
-      for (const e of elems) { if (e.t === 'R' || e.t === 'D') link(e.a, e.b); else if (e.t === 'S') link(e.a, 0); else if (e.t === 'T') { link(e.out, e.gnd); link(e.vs, e.gnd); } }
+      for (const e of elems) { if (e.t === 'R' || e.t === 'D') link(e.a, e.b); else if (e.t === 'S') link(e.a, 0); else if (e.t === 'T' || e.t === 'M') { link(e.out, e.gnd); link(e.vs, e.gnd); } }
       const seen = new Set([0]), q = [0]; while (q.length) { const x = q.pop(); for (const y of adj.get(x) || []) if (!seen.has(y)) { seen.add(y); q.push(y); } }
       floating = new Set(); for (let i = 1; i < n; i++) if (!seen.has(i)) floating.add(i);
     }
@@ -232,6 +252,19 @@ export function evaluate(model) {
 
   if (!powered) note('info', 'The board has no power. Press “Plug in power” to see the circuit work.');
 
+  const netPins = new Map();
+  for (const [id, k] of usedPins) if (k.k === 'gpio') { const key = find(nodeOfRef(id)); (netPins.get(key) || netPins.set(key, []).get(key)).push(id); }
+  const supplyNets = new Set([...usedPins].filter(([, k]) => ['gnd', '5v', '3v3'].includes(k.k)).map(([id]) => find(nodeOfRef(id))));
+  const resAdj = new Map();
+  for (const d of parts) if (d.type === 'resistor' && !burnt.has(d.id)) { const x = find(T(d, 'a')), y = find(T(d, 'b')); (resAdj.get(x) || resAdj.set(x, []).get(x)).push(y); (resAdj.get(y) || resAdj.set(y, []).get(y)).push(x); }
+  /** board pins reached from a module pin directly or through series resistors (for example a voltage divider) */
+  const gpioOn = (d, name) => {
+    const start = find(T(d, name)), seen = new Set([start]), q = [start], out = [];
+    while (q.length) { const x = q.pop(); for (const id of netPins.get(x) || []) out.push(id); for (const y of resAdj.get(x) || []) if (!seen.has(y) && !supplyNets.has(y)) { seen.add(y); q.push(y); } }
+    return out;
+  };
+  const modeOf = id => (pinCfg[id] || {}).mode || 'in';
+  const INPUT_MODES = ['in', 'up', 'down', 'analog'];
   const burn = (id, why) => { newBurn.add(id); note('bad', why, id); };
   for (const d of parts) {
     const s = sums[d.id] || {}, R = result.parts[d.id] = { id: d.id, type: d.type, status: 'ok', ...s };
@@ -280,6 +313,34 @@ export function evaluate(model) {
     } else if (d.type === 'ldr') {
       if (dangling(d, 'a') || dangling(d, 'b')) { R.status = 'warn'; note('warn', `${label}: one leg is not connected to anything.`, d.id); }
       R.msg = `${(LDR_OHMS(env.lux) / 1000).toFixed(1)} kΩ at ${env.lux < 1 ? 'under 1' : Math.round(env.lux)} lux`;
+    } else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo') {
+      const vs = s.Vs ?? 0, dn = terminals(d).map(x => x[0]).filter(x => dangling(d, x));
+      const needs = { pir: 'the PIR sensor needs 4.5 V … 20 V: connect VCC to 5 V', hcsr04: 'the HC-SR04 is made for 5 V: connect VCC to 5 V', servo: 'an SG90 servo needs 4.8 V … 6 V: connect the red wire (middle pin) to 5 V' }[d.type];
+      if (!powered) R.status = 'off';
+      else if (vs < -0.5) { R.status = 'bad'; R.msg = 'Connected backwards.'; note('bad', `${label} is connected backwards (supply and GND swapped). A real module can be destroyed this way.`, d.id); }
+      else if (vs < 4.5) { R.status = 'off'; R.msg = `Only ${Math.max(0, vs).toFixed(1)} V`; note('bad', `${label} gets only ${Math.max(0, vs).toFixed(1)} V, but ${needs}.`, d.id); }
+      else if (d.type === 'pir') {
+        const out = gpioOn(d, 'OUT'); R.motion = !!env.motion;
+        R.msg = env.motion ? 'Motion detected: OUT is HIGH (3.3 V).' : 'No motion: OUT is LOW.';
+        if (!out.length) { R.status = 'warn'; note('warn', `${label}: OUT is not connected to a board pin, so no program can read it.`, d.id); }
+        else if (out.some(id => !INPUT_MODES.includes(modeOf(id)))) { R.status = 'warn'; note('warn', `${label}: OUT is wired to a pin that is an output. Set that pin to an input.`, d.id); }
+        else note('ok', `${label}: ${R.msg}`, d.id);
+      } else if (d.type === 'hcsr04') {
+        const trig = gpioOn(d, 'TRIG'), echo = gpioOn(d, 'ECHO'), cm = Math.min(400, Math.max(2, env.dist ?? 40)), us = Math.round(cm * 58);
+        let bad = null;
+        if (!trig.length) bad = 'TRIG is not connected to a board pin, so nothing starts a measurement';
+        else if (!trig.some(id => modeOf(id) === 'pulse')) bad = 'TRIG is wired, but its pin does not send trigger pulses. Set that pin to “Trigger pulses”';
+        else if (!echo.length) bad = 'ECHO is not connected to a board pin, so the result never arrives';
+        else if (echo.some(id => !INPUT_MODES.includes(modeOf(id)))) bad = 'the pin on ECHO must be an input';
+        if (bad) { R.status = 'warn'; R.msg = bad + '.'; note('bad', `${label}: ${bad}.`, d.id); }
+        else { R.msg = `Echo pulse ${us} µs = ${cm.toFixed(0)} cm (58 µs per cm).`; for (const id of echo) (result.pins[id] ||= { I: 0, Imax: 0, V: 0 }).echo = { us, cm }; note('ok', `${label} measures ${cm.toFixed(0)} cm: the echo pulse lasts ${us} µs.`, d.id); }
+      } else {
+        const sig = gpioOn(d, 'SIG'), sp = sig.find(id => modeOf(id) === 'servo');
+        if (!sig.length) { R.status = 'warn'; R.msg = 'Signal wire not connected.'; note('bad', `${label} does not move: its signal wire (orange, third pin) is not connected to a board pin.`, d.id); }
+        else if (!sp) { R.status = 'warn'; R.msg = 'No servo pulses.'; note('bad', `${label} does not move: its signal wire needs 50 Hz pulses. Set the pin to “Servo angle”.`, d.id); }
+        else { R.angle = (pinCfg[sp] || {}).angle ?? 90; R.msg = `Horn at ${Math.round(R.angle)}°.`; note('ok', `${label}: powered with ${vs.toFixed(1)} V and receiving pulses: the horn turns to ${Math.round(R.angle)}°.`, d.id); }
+      }
+      if (powered && dn.length && vs >= 4.5) { const v2 = R.status === 'ok' ? 'warn' : R.status; R.status = v2; note('warn', `${label}: pin ${dn.join(', ')} is not connected to anything.`, d.id); }
     } else if (d.type === 'tmp36') {
       const vs = s.Vs ?? 0;
       if (powered && vs < -0.5) { R.status = 'bad'; R.msg = 'Connected backwards.'; note('bad', `${label} is connected backwards (+VS and GND swapped). With the flat face toward you and the legs down, the pins are +VS, VOUT, GND from left to right. A real TMP36 would get hot and could be damaged.`, d.id); }
@@ -320,7 +381,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }

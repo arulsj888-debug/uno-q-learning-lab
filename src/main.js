@@ -51,6 +51,8 @@ const VIEWS = {
   thermo2: { t: new THREE.Vector3(95, 0, 6), d: new THREE.Vector3(-0.08, 0.92, 0.38), dist: 270 },
   pixclose: { t: new THREE.Vector3(170, -4, 6), d: new THREE.Vector3(-0.06, 0.93, 0.36), dist: 62 },
   smart: { t: new THREE.Vector3(95, 0, 8), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 430 },
+  bigq: { t: new THREE.Vector3(30, 0, 36), d: new THREE.Vector3(-0.2, 0.85, 0.5), dist: 330 },
+  bigpi: { t: new THREE.Vector3(24, 0, -46), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 340 },
   pibench: { t: new THREE.Vector3(-4, 0, -30), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 235 },
   pibb: { t: new THREE.Vector3(-6, 2, -57), d: new THREE.Vector3(-0.08, 0.88, 0.47), dist: 118 },
   picam: { t: new THREE.Vector3(-34, 8, 14), d: new THREE.Vector3(-0.12, 0.8, 0.6), dist: 230 },
