@@ -35,6 +35,7 @@ Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, 
     19. A colour thermometer with the Modulino® Pixels (daisy-chained Qwiic modules, addresses 0x45 / 0x6C, set/clear/show)
   - **Module 7: Linux side & Bridge**
     20. Two brains: Python calls your sketch over the Bridge (MPU + MCU, provide/call/notify, App.run, deadlock warning)
+    21. Send sensor readings from the sketch to Python (Bridge.notify, Python decides, Bridge.call back, store-then-decide rule)
 
 Purple notes in the lessons mark behavior that is only **simulated** in the app, such as the shortened boot time.
 

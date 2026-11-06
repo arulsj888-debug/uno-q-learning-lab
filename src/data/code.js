@@ -460,3 +460,56 @@ def loop():
     time.sleep(1)
 
 App.run(user_loop=loop)`;
+
+
+// Lesson 21 — the sketch reads the Thermo and notifies Python; Python decides and calls set_led (official pattern: example "Send data to Python")
+export const BRIDGE2_INO = `#include <Arduino_RouterBridge.h>
+#include <Arduino_Modulino.h>
+
+ModulinoThermo thermo;
+
+bool set_led(bool on) {
+  digitalWrite(LED_BUILTIN, on ? LOW : HIGH);   // active-low: LOW = on
+  return on;
+}
+
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+  Bridge.begin();
+  Bridge.provide("set_led", set_led);
+  Modulino.begin();
+  thermo.begin();
+}
+
+void loop() {
+  float celsius = thermo.getTemperature();
+  float humidity = thermo.getHumidity();
+  Bridge.notify("on_reading", celsius, humidity);
+  delay(1000);
+}`;
+
+export const BRIDGE2_PY = `from arduino.app_utils import *
+import time
+
+latest = None
+led_on = False
+
+def on_reading(celsius, humidity):
+    global latest
+    latest = (celsius, humidity)
+
+Bridge.provide("on_reading", on_reading)
+
+def loop():
+    global led_on
+    if latest is not None:
+        celsius, humidity = latest
+        print(f"Temperature {celsius:.1f} C, humidity {humidity:.1f} %RH")
+        hot = celsius > 28
+        if hot != led_on:
+            led_on = hot
+            Bridge.call("set_led", led_on)
+    time.sleep(1)
+
+App.run(user_loop=loop)`;

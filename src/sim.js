@@ -295,6 +295,36 @@ export const PROGRAMS = {
     }
   },
 
+  // Lesson 21 — sketch notifies Python with the Thermo reading; Python stores, decides (> 28 C) and calls set_led when the state changes
+  async bridge2(rt) {
+    await rt.at(101); await rt.at(102); await rt.at(104); await rt.at(105);
+    rt.serialBegin(9600);
+    await rt.at(11); await rt.at(12); rt.pinMode('LED_BUILTIN', 'OUTPUT');
+    await rt.at(13); rt.digitalWrite('LED_BUILTIN', 1);
+    await rt.at(14); await rt.at(15); await rt.at(16); await rt.at(17);
+    await rt.at(111); await rt.at(113); await rt.at(124);
+    let ledOn = false;
+    for (;;) {
+      await rt.at(20);
+      await rt.at(21); const c = rt.thermo().c;
+      await rt.at(22); const rh = rt.thermo().rh;
+      await rt.at(23); rt.bridge('notify', { c, rh }); await rt.delay(300);
+      await rt.at(107); await rt.at(108); await rt.at(109); rt.bridge('stored', { c, rh }); await rt.delay(250);
+      await rt.at(113); await rt.at(114); await rt.at(115); await rt.at(116);
+      await rt.at(117); rt.println('[python] Temperature ' + c.toFixed(1) + ' C, humidity ' + rh.toFixed(1) + ' %RH');
+      const hot = c > 28;
+      await rt.at(118); rt.bridge('decided', { c, rh, hot }); await rt.delay(300);
+      await rt.at(119);
+      if (hot !== ledOn) {
+        await rt.at(120); ledOn = hot;
+        await rt.at(121); rt.bridge('call', { c, rh, hot }); await rt.delay(300);
+        await rt.at(6); await rt.at(7); rt.digitalWrite('LED_BUILTIN', ledOn ? 0 : 1); await rt.delay(200);
+        rt.bridge('reply', { c, rh, hot }); await rt.delay(250);
+      }
+      await rt.at(122); await rt.at(24); await rt.delay(900);
+    }
+  },
+
   async tmp36(rt) {
     await rt.at(2);
     await rt.at(4);

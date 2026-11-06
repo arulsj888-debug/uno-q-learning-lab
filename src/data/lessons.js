@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE, PIXELS_CODE, BRIDGE_INO, BRIDGE_PY } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE, PIXELS_CODE, BRIDGE_INO, BRIDGE_PY, BRIDGE2_INO, BRIDGE2_PY } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -133,6 +133,7 @@ const THERMO_PARTS = [
 ];
 const THERMO_IDS = THERMO_PARTS.map(d => d.id);
 const THERMO_IO = { kind: 'thermo', item: 'th1', cable: 'cab1', needs: THERMO_IDS };
+const THERMO_IO_S = { ...THERMO_IO, steady: true };   // simulated reading without jitter
 const PIXELS_PARTS = [
   ...THERMO_PARTS,
   { id: 'pix1', type: 'pixels', x: 170, z: 6 },
@@ -1920,6 +1921,98 @@ export const LESSONS = [
       { q: 'What must you NOT do inside a function that the other side called?', a: ['Print a message', 'Return a value', 'Call Bridge.call again', 'Change a local variable'], c: 2, why: 'A call from inside a callback can deadlock the link between the processors.' },
     ],
     sources: [SRC.bridgelib, SRC.appbricks, SRC.bridgeex, SRC.ds],
+  },
+  // ================================================================== 21
+  {
+    id: 'l21', num: 21, module: 7, title: 'Send sensor readings from the sketch to Python', level: 'Intermediate', time: '25 min',
+    goal: 'Let the sketch read a sensor and push the values to Python with Bridge.notify, and let Python decide and answer with Bridge.call.',
+    hardware: ['Arduino UNO Q', 'Arduino Modulino® Thermo + Qwiic cable (Lesson 18)', 'Arduino_Modulino library'],
+    code: BRIDGE2_INO, code2: BRIDGE2_PY, program: 'bridge2', fast: true, widgets: ['bridge2'], noBreadboard: true,
+    circuit: THERMO_PARTS, io: { QWIIC: THERMO_IO_S },
+    explain: {
+      1: 'The Bridge library (to talk to Python) …',
+      2: '… and the Modulino library (to read the Thermo), as in Lesson 18.',
+      4: 'The Thermo object.',
+      6: 'The same function as in Lesson 20: Python can call it to switch the LED.',
+      7: 'LED_BUILTIN is active-low: LOW = on.',
+      11: 'setup() runs once, on the microcontroller.',
+      14: 'Start the Bridge first.',
+      15: 'Offer <b>set_led</b> to Python.',
+      16: 'Start the Qwiic bus (<b>Wire1</b>).',
+      17: 'Find the Thermo on the bus.',
+      20: 'loop() repeats forever.',
+      21: 'Read the temperature (°C) …',
+      22: '… and the humidity (%RH).',
+      23: '<b>Bridge.notify("on_reading", celsius, humidity)</b> pushes both numbers to the Python function named <b>"on_reading"</b>. <b>notify</b> does not wait for an answer.',
+      24: 'Wait one second, then measure again.',
+      101: 'Import <b>App</b> and <b>Bridge</b>.',
+      102: 'For <code>time.sleep</code>.',
+      104: 'The newest reading from the sketch. It starts empty (<code>None</code>).',
+      105: 'Remembers whether we have switched the LED on.',
+      107: 'The sketch calls this function through the Bridge. The values arrive as arguments.',
+      108: '<code>global</code> lets the function change the variable outside it.',
+      109: '<b>Only store the reading</b> — nothing else. A function called by the other side must be quick and must not call <code>Bridge.call</code>.',
+      111: '<b>Bridge.provide("on_reading", on_reading)</b>: publish the function under the name the sketch uses.',
+      113: 'Our loop function: <b>App.run</b> calls it again and again.',
+      114: 'We will change <code>led_on</code>.',
+      115: 'Do nothing until the first reading has arrived.',
+      116: 'Take the two numbers out of <code>latest</code>.',
+      117: 'Show them (one decimal).',
+      118: 'The decision, made in <b>Python</b>: hot means above 28 °C.',
+      119: 'Only when the answer <b>changed</b> do we bother the sketch.',
+      120: 'Remember the new state.',
+      121: '<b>Bridge.call("set_led", led_on)</b>: ask the sketch to switch the LED. This is in the loop, <b>not</b> inside the on_reading function — that is allowed.',
+      122: 'Wait one second.',
+      124: 'Start the app; <code>loop</code> runs over and over.',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'thermo', have: THERMO_IDS, power: false, labels: [['th1', 'Thermo'], ['board', 'UNO Q']],
+        body: `<p>In Lesson 20 Python <b>sent</b> a command to the sketch. Now the data flows the other way too:</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">Sketch reads the Thermo (it owns the sensor)</span></div><div class="pt-arrow">↓ <b>notify</b>: “here is a new reading”</div><div class="pt-row"><span class="pt">Python decides: too hot?</span></div><div class="pt-arrow">↓ <b>call</b>: “switch the LED”</div><div class="pt-row"><span class="pt bus">Sketch switches RGB LED 3</span></div></div>
+        <p>Same wiring as Lesson 18: one Qwiic cable from the UNO Q to the Thermo.</p>`,
+      },
+      {
+        title: 'Why does the data go through the sketch?', view: 'thermo', have: THERMO_IDS, power: false,
+        body: `<p>The sensor is connected to the <b>microcontroller side</b> (the Qwiic connector belongs to the STM32). Python runs on the other chip, so it <b>cannot read the sensor itself</b>.</p>
+        <table class="kv"><tr><th>Job</th><th>Who does it</th></tr><tr><td>Read the sensor, drive the LED</td><td><b>sketch</b> (real-time, close to the pins)</td></tr><tr><td>Decide, log, show on a web page</td><td><b>Python</b> (a full computer)</td></tr></table>
+        <p>The sketch <b>pushes</b> each reading to Python with <code>Bridge.notify</code>. It uses <b>notify</b> (not call) because it does not need an answer — it just reports.</p>`,
+      },
+      { title: 'The sketch (MCU side)', view: 'thermo', have: THERMO_IDS, showCode: true, power: true, body: `<p>The sketch has two jobs: read the Thermo and <b>notify</b> Python once a second, and offer <code>set_led</code>. Click each line of <code>sketch.ino</code> (lower part of the code panel).</p>` },
+      {
+        title: 'The Python program (Linux side)', view: 'thermo', have: THERMO_IDS, showCode: true, power: true,
+        body: `<p>Python <b>provides</b> a function named <code>on_reading</code>, and runs a loop that decides. Click each line of <code>main.py</code> (upper part).</p>
+        <p class="tip"><b>Why store first, decide later?</b> The function the sketch calls (<code>on_reading</code>) only <b>stores</b> the numbers. The decision and the <code>Bridge.call</code> happen in the <b>loop</b>. A call made <i>inside</i> a function that the other side called can block the link (Lesson 20).</p>`,
+      },
+      {
+        title: 'Run it', view: 'thermo', have: THERMO_IDS, showCode: true, power: true, action: 'run',
+        body: `<ol><li>The sketch reads the Thermo and <b>notifies</b> Python.</li><li>Python stores the reading, prints it and checks: above 28 °C?</li><li>When the answer <b>changes</b>, Python <b>calls</b> <code>set_led</code> and the sketch switches RGB LED 3.</li></ol>
+        <p><b>Try it:</b> drag the <b>Temperature</b> slider above 28 °C — the LED turns on — and back below — it turns off.</p>
+        <p class="sim">Simulated. The message exchange is shown step by step; on a real board it is very fast.</p>`,
+      },
+      {
+        title: 'Good habits', view: 'thermo', have: THERMO_IDS, power: true,
+        body: `<ul><li><b>Names and arguments must match.</b> The sketch notifies <code>"on_reading"</code> with <b>two numbers</b>; the Python function is named <code>on_reading</code> and takes <b>two arguments</b>.</li>
+        <li><b>Keep called functions short.</b> Python runs functions the sketch calls one after another on a separate thread, so a slow one delays the next.</li>
+        <li><b>Only call when something changed</b> (here: when hot ↔ not hot). Sending the same command every second wastes messages.</li>
+        <li><b>notify</b> for reports, <b>call</b> when you need a result or confirmation.</li></ul>`,
+      },
+      {
+        title: 'Summary', view: 'thermo', have: THERMO_IDS, power: true,
+        body: `<ul><li>The <b>sketch</b> owns the pins and sensors; <b>Python</b> owns decisions, networking and displays.</li>
+        <li>Sketch → Python: <code>Bridge.notify("name", values…)</code>; Python receives it in a function registered with <code>Bridge.provide("name", fn)</code>.</li>
+        <li>Python → sketch: <code>Bridge.call("name", …)</code> from the loop.</li>
+        <li>A function called by the other side should only store or act quickly — no nested <code>Bridge.call</code>.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Why does the sketch read the Thermo instead of Python?', a: ['Python cannot do maths', 'The sensor is wired to the microcontroller side; Python runs on the other chip', 'Python is too slow for I²C', 'The Thermo only works with C++'], c: 1, why: 'The Qwiic connector belongs to the STM32, so the sketch reads it and reports to Python.' },
+      { q: 'Which Bridge function does the sketch use to push readings to Python without waiting?', a: ['Bridge.begin', 'Bridge.notify', 'Bridge.provide', 'Bridge.result'], c: 1, why: 'notify sends and does not wait for an answer.' },
+      { q: 'What does the Python function on_reading do in our program?', a: ['It switches the LED', 'It only stores the numbers', 'It calls Bridge.call', 'It restarts the sketch'], c: 1, why: 'A function called by the other side only stores the values; the loop decides.' },
+      { q: 'When is Bridge.call("set_led", …) sent to the sketch?', a: ['Every second', 'Only when hot / not hot changes', 'Only at start', 'Never'], c: 1, why: 'The code compares hot with led_on and calls only when they differ.' },
+      { q: 'The sketch sends "on_reading". What must Python use?', a: ['Any name', 'A provided function with exactly that name', 'A variable called reading', 'Nothing'], c: 1, why: 'Bridge.provide("on_reading", fn) publishes the function under the name the sketch notifies.' },
+    ],
+    sources: [SRC.bridgelib, SRC.appbricks, SRC.bridgeex, SRC.thermo, SRC.modulinolib],
   },
 ];
 

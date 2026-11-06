@@ -285,7 +285,7 @@ class App {
     this.servoTick(Math.min(dt, 0.1));
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
-    this.thermoTick(); this.bridgeTick();
+    this.thermoTick(); this.bridgeTick(); this.bridge2Tick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -688,6 +688,8 @@ class App {
         <div class="io-tools"><button id="pir-wave" class="hold">👋 Wave hand</button><button id="pir-still" class="lvl">✋ Hold hand still</button></div></div>
         <div class="io-block pirstat"><div><span>Sensor</span><b id="ps-sensor">—</b></div><div class="arrow">→</div><div><span>OUT → D2</span><b id="ps-out">—</b></div><div class="arrow">→</div><div><span>Alarm LED (D5)</span><b id="ps-led">—</b></div></div>
         <div id="ps-note" class="io-note"></div>`;
+    if (w.includes('bridge2')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div></div>
+        <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="b2-sk">—</b></div><div class="arrow">→</div><div><span>Bridge</span><b id="b2-br">—</b></div><div class="arrow">→</div><div><span>Python · decides</span><b id="b2-py">—</b></div><div class="arrow">→</div><div><span>RGB LED 3</span><b id="b2-led">—</b></div></div><div id="b2-note" class="io-note"></div>`;
     if (w.includes('bridge')) h += `<div class="io-block pirstat tight"><div><span>Python · main.py</span><b id="br-py">—</b></div><div class="arrow">→</div><div><span>Bridge (router · UART)</span><b id="br-rt">—</b></div><div class="arrow">→</div><div><span>Sketch · set_led()</span><b id="br-sk">—</b></div><div class="arrow">→</div><div><span>RGB LED 3</span><b id="br-led">—</b></div></div><div id="br-note" class="io-note"></div>`;
     if (w.includes('thermo')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated — you decide)</span></div>
         <div class="throw"><label>Temperature</label><input id="th-t" type="range" min="-10" max="60" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div>
@@ -721,7 +723,7 @@ class App {
     if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); $('#dist').onchange = e => this.setDist(+e.target.value, true); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist, true)); this.setDist(this.distCm); }
     else this.hideSonar();
     this.refreshPickTargets();
-    if ($('#th-t')) { $('#th-t').oninput = e => this.setThermo({ t: +e.target.value }); if ($('#th-h')) $('#th-h').oninput = e => this.setThermo({ h: +e.target.value }); $('#th-plug').onclick = () => { if (!this.sim.running) this.th.unplug = !this.th.unplug; }; this.setThermo({}); }
+    if ($('#th-t')) { $('#th-t').oninput = e => this.setThermo({ t: +e.target.value }); if ($('#th-h')) $('#th-h').oninput = e => this.setThermo({ h: +e.target.value }); if ($('#th-plug')) $('#th-plug').onclick = () => { if (!this.sim.running) this.th.unplug = !this.th.unplug; }; this.setThermo({}); }
     if ($('#rl-manual')) $('#rl-manual').onclick = () => { if (this.rly && !this.sim.running) this.rly.manual = !this.rly.manual; };
     if ($('#pir-wave')) { $('#pir-wave').onclick = () => this.pirWave(); $('#pir-still').onclick = () => this.pirHoldStill(); }
     this.showRoom(w.includes('pir') && !!this.pirSensor());
@@ -1102,6 +1104,17 @@ class App {
     set('#br-led', run && B.led !== null ? (B.led ? 'ON' : 'OFF') : '—', run && B.led ? 'on' : 'off');
     set('#br-note', !this.board.powered ? 'USB-C is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>.' : st === 'call' ? 'Python asks: <b>Bridge.call</b> sends a request to the sketch and waits.' : st === 'run' ? 'The sketch runs <b>set_led</b> and sets the pin (LOW = LED on).' : st === 'reply' ? 'The sketch’s return value travels back to Python.' : 'Python waits one second, then flips the value again.', 'io-note');
   }
+  bridge2Tick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('bridge2') || !$('#b2-sk')) return;
+    const B = this.br, run = this.sim.running, ok = this.thermoOk(), st = run ? B.stage : 'idle';
+    const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; e.className = cls; } };
+    const c = B.c === undefined ? '' : B.c.toFixed(1) + ' °C';
+    set('#b2-sk', run && ok && c ? c : '—', run && ok && c ? 'on' : 'off');
+    set('#b2-br', st === 'notify' ? 'notify →' : st === 'stored' ? 'delivered' : st === 'call' ? '← call' : st === 'reply' ? '← result' : '—', ['notify', 'stored', 'call', 'reply'].includes(st) ? 'on' : 'off');
+    set('#b2-py', st === 'stored' ? `stored ${c}` : st === 'decided' ? (B.hot ? 'HOT &gt; 28 °C' : 'OK ≤ 28 °C') : st === 'call' || st === 'reply' ? 'call set_led' : '—', st === 'decided' && B.hot ? 'on' : st === 'idle' ? 'off' : 'on');
+    set('#b2-led', run && B.led !== null ? (B.led ? 'ON' : 'OFF') : '—', run && B.led ? 'on' : 'off');
+    set('#b2-note', !this.board.powered ? 'USB-C is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>, then move the temperature slider.' : st === 'notify' ? 'The sketch <b>notifies</b> Python with the new reading (no waiting).' : st === 'stored' ? 'Python’s <b>on_reading</b> function stores the numbers.' : st === 'decided' ? 'Python decides: above 28 °C is “hot”.' : st === 'call' ? 'The state changed, so Python <b>calls</b> set_led.' : st === 'reply' ? 'The sketch switched the LED and answered.' : 'Nothing changed, so Python sends nothing to the sketch.', 'io-note');
+  }
   // ---- Lesson 18: Modulino Thermo over Qwiic ------------------------------------------------------------
   thermoIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'thermo'); }
   cabOk(id) { const io = this.thermoIo(); return !!this.bench.items[id] && !(this.th.unplug && (io.unplug || io.cable) === id); }
@@ -1403,11 +1416,11 @@ class App {
       thermo: () => {
         const ok = this.thermoOk();
         if (!ok) return { found: false };
-        const jit = this.thermoIo().pix ? 0 : 1, c = this.th.t + (Math.random() - 0.5) * 0.1 * jit, rh = Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3));
+        const jit = this.thermoIo().pix || this.thermoIo().steady ? 0 : 1, c = this.th.t + (Math.random() - 0.5) * 0.1 * jit, rh = Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3));
         this.th.last = `${c.toFixed(1)} °C · ${rh.toFixed(1)} %RH`;
         return { found: true, pixels: this.pixelsOk(), c, rh };
       },
-      bridge: ev => { this.br.stage = ev.stage; this.br.arg = ev.val; },
+      bridge: ev => { this.br.stage = ev.stage; if (ev.val && typeof ev.val === 'object') Object.assign(this.br, { c: ev.val.c, hot: ev.val.hot }); else this.br.arg = ev.val; },
       pixels: arr => { this.pxArr = arr; },
       mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {
