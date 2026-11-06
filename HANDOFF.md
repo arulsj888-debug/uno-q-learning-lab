@@ -1,0 +1,110 @@
+# HANDOFF — read this first (for any new Claude session or developer)
+
+This file lets a **new** Claude Code session (or a person) continue the project without the old chat.
+Project: **Arduino UNO Q 3D Learning Lab** — a browser app (Three.js) that teaches the UNO Q from zero to a final project.
+Owner: Arul (arul.vendhan@petalautomations.com). Language: **English only**.
+
+Repo: https://github.com/arulsj888-debug/uno-q-learning-lab (branch `main`). Vercel auto-deploys on every push to `main` (build `npm run build`, output `dist`).
+
+## 1. State right now
+
+- **Done:** 23 lessons in 8 modules (see `README.md`), responsive layout for phones, tablets and laptops.
+- Everything is committed and pushed. Last big pieces: Lesson 23 (final project), responsive update.
+- **Next planned work: a Raspberry Pi 4 version** (see section 7). Nothing of it exists yet.
+- Not done / known gaps: nothing was tested on real hardware; no final read-through of all lesson texts; English only.
+
+## 2. The owner's hard rules (never break these)
+
+1. **No wrong information.** Every spec, pin, voltage, API name and number must be verified from a **primary source** (datasheet, official docs, library source code) before it goes into a lesson. If a source is silent, say so or leave it out. Cite sources at the end of each lesson (`sources: [...]`).
+2. **Original, realistic look.** Boards and parts must look like the real thing (real colours, real layout, real markings), built from official CAD/photos. No dummy pictures, no toy look. Correct real-world size.
+3. **Visuals must agree with the data.** Example of a past mistake: header labels were mirrored, so a "GND" wire looked like it went to "RESET". Always close-up screenshot-check every label, pin and wire after building.
+4. **Simple, close-up, cause → effect demos.** No big zoomed-out scenes, no confusing extras. When something turns on/off, show clearly why. Explain why each part is there.
+5. **Every part clickable** with a short info box with a pointer line (like Explore mode), never a big card that blocks the board.
+6. **Teaching order:** from basics to advanced, one idea per lesson, every lesson ends with a quiz and a Sources list.
+7. After each lesson/feature: **commit and push** (the owner asks "push this into git"). The owner also likes a short daily summary: *task (one line)* + *description (one short paragraph, including what comes next)*.
+8. Be honest about what is simulated vs. verified. Purple "sim" notes in lessons mark simulated behaviour.
+
+## 3. Architecture (single-page app, no framework)
+
+| Path | What it is |
+|---|---|
+| `src/main.js` | The `App` class: modes (Explore / Lessons), lesson player (`startLesson`, `goStep`, `doAction`), dock widgets (`renderIO`), simulator hooks (`setupSim`), per-lesson logic blocks (`relayTick`, `thermoTick`, `bridgeTick`, `dashTick`, `homeTick` …), camera presets `VIEWS`, `bindResponsive`. |
+| `src/board.js` | The 3D UNO Q board from textures + `assets/board_data.json`. |
+| `src/hardware.js` | All 3D parts (LED, resistor, breadboard, sensors, relay, Modulino boards, Qwiic cable …) **and** the click-info texts `HW_INFO`. Parts expose `pin(name) → {pos, dir}` and tag sub-parts with `userData.hw`. |
+| `src/bench.js` | Builds a lesson circuit from plain data (`{id, type, …}`): placing parts, wires, leads, cables. |
+| `src/sim.js` | Sketch/Python simulator: each program (`PROGRAMS.name`) is an async function that calls `rt.at(lineNumber)`; line numbers must match the listing in `src/data/code.js`. Python lines are `101+`, browser JS `201+`, sketch `1+`. |
+| `src/data/lessons.js` | `SRC` (source table), circuits (`*_PARTS`, `*_IO`), the `LESSONS` array, `MODULES`. |
+| `src/data/code.js` | All code listings. `src/data/parts.js` / `pins.js` = board part and pin texts. |
+| `src/viewer.js`, `materials.js`, `scope.js` | Renderer/camera/picking, materials, oscilloscope. |
+| `src/style.css`, `src/index.html` | UI (responsive rules at the end of the CSS). |
+| `tools/build.js` | Bundles `src/` + `assets/` into the single file `UNO-Q-Learning-Lab.html` (and `dist/index.html`). |
+| `tools/check_code.mjs` | Verifies simulator line numbers against the code listings. |
+| `tools/check_lessons.mjs` | Electrical audit of every lesson circuit (wires land on real pins, no shorts, polarity, 5 V safety, text claims vs 3D wires, per-kind I/O checks). |
+| `tools/build_pcb.py`, `g2svg.js`, `svg2png.js` | PCB texture pipeline (Gerber → SVG → PNG → albedo/ORM/bump + `board_data.json`). See `README.md` "Rebuild". |
+| `tools/dev/shot.js` | Headless-Chrome screenshot runner (see section 5). |
+
+How a lesson is defined (see `lessons.js`): `{ id, num, module, title, goal, hardware[], code, code2?, code3?, program, widgets[], circuit, io, explain{line→html}, steps[{title, view, have[], power, showCode, action, body}], quiz[], sources[] }`. Steps use `have` (ids of parts present), `power` (USB plugged), `labels`, `pins`, `holes`, `focus`, `view` (a camera preset).
+
+## 4. Normal workflow for a new lesson
+
+1. **Research first** from primary sources (datasheet PDFs, official docs, library source). Save notes; verify every number. Download PDFs with `curl`, read with PyMuPDF (`pymupdf`).
+2. Write the code listing in `code.js`; add its line checks in `tools/check_code.mjs`.
+3. Add the simulator program in `sim.js` (line numbers = listing lines).
+4. Add parts to `hardware.js` (+ `HW_INFO` texts) and a type in `bench.js`; add checker rules in `tools/check_lessons.mjs`.
+5. Add the lesson data to `lessons.js` (and sources to `SRC`), dock widget + tick logic in `main.js` if needed.
+6. Run `node tools/check_code.mjs && node tools/check_lessons.mjs && npm run build`.
+7. **Screenshot-verify** at close range (labels, wires, colours), also run a planted-error test of the checker for any new rule.
+8. Update `README.md` (lesson list + sources table), commit, `git push`.
+
+## 5. Testing in a browser (headless Chrome)
+
+`tools/dev/shot.js` runs scenarios against the built `UNO-Q-Learning-Lab.html`:
+`node tools/dev/shot.js UNO-Q-Learning-Lab.html <outdir> <scenario>`.
+It needs `puppeteer-core` (not in this repo's package.json — run `npm i --no-save puppeteer-core` or install it in a separate folder) and Google Chrome at `C:/Program Files/Google/Chrome/Application/chrome.exe`.
+Env vars `VW`, `VH`, `MOBILE=1`, `TAG` set a device size (used for the responsive checks). Scenarios were written per lesson (they call `app.startLesson('l22')`, `app.goStep(n)`, click `#run`, etc.); add new ones in the `scripts` object. The page logs a harmless 404 for the Vercel Speed Insights script when opened locally.
+
+## 6. Practical tips and past pitfalls
+
+- Windows. Prefer the file tools to write scripts; **inline shell heredocs with many quotes break** — write a `.py`/`.js` file and run it. Use `python -I` for scripts that read downloaded files.
+- If headless Chrome says "browser is already running": kill leftover `puppeteer_dev_chrome_profile` processes, then retry.
+- GitHub fetches sometimes fail on the first try: retry. `git push` needs the owner's GitHub login (already configured on their PC). Do not ask for or paste tokens.
+- `setMode()` resets `#app` className, so UI state for responsive layout lives on `body` (`data-menu`, `data-tab`).
+- The original Arduino CAD/Gerber downloads are **not** in the repo (large). To rebuild textures, download `ABX00162-cad-files.zip` from docs.arduino.cc/hardware/uno-q (CC BY-SA 4.0).
+- `new.txt` in the repo root is a stray file from the owner; ignore it.
+- Memory notes for Claude (project status and rules) are in the owner's PC folder `C:\Users\Arul SJ\.claude\projects\c--Users-Arul-SJ-Downloads-iot-3d\memory\` — a new Claude Code session on the same PC may load them automatically; this file duplicates the important parts.
+
+## 7. NEXT: Raspberry Pi 4 version (owner's request)
+
+**Owner's requirement:** "the same as the UNO Q for Raspberry Pi — every hardware part and every connection should be there, in lessons, in a learning way", with the same quality bar (section 2).
+
+### Key differences to respect (do not copy UNO Q lessons blindly)
+
+- The Pi 4 is a **Linux computer**, not a microcontroller board: **no Arduino sketches**. Lessons use the OS, the terminal and **Python** (e.g. `gpiozero` / `RPi.GPIO` / `lgpio` — verify which are current in the official docs).
+- **All GPIO is 3.3 V logic** (verify in the official documentation) — no 5 V-tolerant pins; strict safety lessons. **No analog inputs** (analog sensors need an ADC chip; prefer digital I²C/1-wire sensors or teach an ADC).
+- First-use steps differ: SD card, imaging the OS, first boot, headless/SSH, power supply requirements. All of this must be taught and shown in 3D (SD card, cable, monitor, keyboard).
+- The simulator must change: instead of line-by-line Arduino sketches, simulate **Python programs** and a **terminal** (command → output) with the same line-highlighting idea. The Bridge/Web UI lessons of UNO Q (Python side, web page with Flask-like server) are useful models, but only teach APIs that exist on Raspberry Pi OS and are verified.
+
+### Hardware/connection checklist to cover (verify each against the official Raspberry Pi 4 Model B datasheet and mechanical drawing BEFORE writing)
+
+Chips: BCM2711 SoC, LPDDR4 RAM, PMIC, USB controller, Ethernet PHY, Wi-Fi/Bluetooth module (check exact parts and positions from the official drawing/photos).
+Connectors: USB-C power, 2 × micro-HDMI, 3.5 mm audio/composite jack, 2 × USB 3.0, 2 × USB 2.0, Gigabit Ethernet, CSI camera connector, DSI display connector, microSD slot, 40-pin GPIO header, PoE header, LEDs (power/activity).
+Then the accessories and wiring a learner needs: power supply, microSD card, HDMI monitor + cable, keyboard/mouse, Ethernet cable, breadboard, jumper wires (female–male), resistors, LEDs, push button, sensors.
+
+### Suggested plan
+
+1. **Source check first (no building yet):** find and verify the official board dimensions, 40-pin pinout, mechanical drawing and any official 3D/STEP model, plus photos for markings. Tell the owner if a realistic model is not possible from official sources.
+2. **Architecture:** keep one repo; reuse `viewer.js`, `materials.js`, `bench.js`, `hardware.js` parts (breadboard, LED, resistor, wires …). Add a Pi board module (e.g. `src/pi4/board.js`, its own `parts`/`pins` data, its own lessons file) and either a board chooser or a second entry/build (`Pi4-Learning-Lab.html`). Avoid breaking the UNO Q app; keep both checkers green.
+3. **Explore mode:** 360° realistic Pi 4, every chip/connector/pin clickable with verified info, pin table (40-pin with function names and the verified 3.3 V/5 V/GND power pins).
+4. **Lessons (suggested order, each with 3D hardware, wiring, simulated Python/terminal, quiz, sources):** meet the board → power and SD card/OS → first boot and the desktop/terminal → terminal basics → the 40-pin header and GPIO safety → LED + resistor on a breadboard → button → PWM (LED fade) → buzzer → digital sensor (e.g. I²C) → camera connector → a small web page served from the Pi → final project. Adjust after the source check.
+5. Per-lesson workflow = section 4. Add checkers for Pi wiring (3.3 V only, no short, correct pin numbers: use BCM/GPIO numbers **and** physical pin numbers consistently and verify the mapping).
+
+### Open question the owner should confirm at the start
+
+Whether to (a) put the Pi 4 inside the same site as a second board or (b) make a separate site. Default recommendation: same repo, board chooser on the start screen.
+
+## 8. Daily summary format the owner likes
+
+```
+Task: <one line>
+Description: <one short paragraph: what was done today and what comes next>
+```

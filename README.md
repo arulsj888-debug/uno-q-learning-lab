@@ -46,6 +46,8 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
 
 The layout adapts to the device: laptops and desktops (three columns), tablets (the lesson list becomes a slide-out ☰ menu), phones in portrait (3D view on top, then **Lesson** / **Code & run** tabs with quick ▶ Run and ■ Stop buttons) and phones in landscape (3D view left, lesson right). Touch: drag to rotate, pinch to zoom, tap any part. The 3D renderer uses a lower pixel ratio on touch screens to save battery.
 
+> **Developers / new Claude sessions:** read [`HANDOFF.md`](HANDOFF.md) first (rules, architecture, workflow, next steps).
+
 ## Where the facts come from
 
 | Source | Used for |
