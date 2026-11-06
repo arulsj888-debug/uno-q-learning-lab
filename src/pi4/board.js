@@ -267,14 +267,11 @@ export class Pi4Board {
     this.add('wireless', photoBox(6.61, 36.1, 17.4, 49.09, 0, 1.3, [this.mat.shield, this.mat.shield, pm, C, this.mat.shield, this.mat.shield]));
     this.add('vl805', photoBox(55.3, 20.0, 63.6, 28.2, 0, 0.85, [C, C, ph, C, C, C]));
     // other parts: raised with their real photo tops but not labelled (their part numbers are not given in the official documents)
-    const misc = this.part('misc');
-    misc.add(photoBox(55.5, 35.0, 61.5, 41.2, 0, 0.85, [C, C, ph, C, C, C]));
-    misc.add(photoBox(7.3, 9.9, 12.3, 14.8, 0, 0.85, [C, C, ph, C, C, C]));
-    misc.add(photoBox(13.0, 14.16, 16.75, 17.92, 0, 1.6, [this.mat.shield, this.mat.shield, ph, C, this.mat.shield, this.mat.shield], { r: 0.4 }));
-    misc.add(photoBox(17.9, 5.8, 21.2, 11.7, 0, 1.2, [C, C, ph, C, C, C]));
-    misc.add(photoBox(65.6, 29.3, 70.0, 37.0, 0, 1.2, [C, C, ph, C, C, C]));
-    misc.traverse(o => { o.userData.part = undefined; });
-    delete this.parts.misc; misc.userData.part = undefined;
+    this.add('ethphy', photoBox(55.5, 35.0, 61.5, 41.2, 0, 0.85, [C, C, ph, C, C, C]));        // Gigabit Ethernet transceiver, beside the RJ45 jack
+    this.add('pmic', photoBox(7.3, 9.9, 12.3, 14.8, 0, 0.85, [C, C, ph, C, C, C]));            // power-management chip (marking "MxL" visible in the photo)
+    this.add('inductor', photoBox(13.0, 14.16, 16.75, 17.92, 0, 1.6, [this.mat.shield, this.mat.shield, ph, C, this.mat.shield, this.mat.shield], { r: 0.4 }));   // marking R47
+    this.add('othercomp', photoBox(17.9, 5.8, 21.2, 11.7, 0, 1.2, [C, C, ph, C, C, C]));
+    this.add('othercomp', photoBox(65.6, 29.3, 70.0, 37.0, 0, 1.2, [C, C, ph, C, C, C]));
   }
 
   // ------------------------------------------------------------ underside: microSD socket (from the bottom photo)

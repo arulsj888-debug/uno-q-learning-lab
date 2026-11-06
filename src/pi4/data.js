@@ -59,7 +59,7 @@ export const findPinPi = id => J8.find(p => p.id === id);
 export const J8_HEADER = { id: 'gpio', name: 'GPIO (J8)', pins: J8, common: 'All GPIO pins work at 3.3 V and are not 5 V tolerant. One pin can supply up to 16 mA; all GPIO pins together at most 50 mA (official GPIO documentation).' };
 
 export const CATEGORIES_PI = [
-  { id: 'brains', name: 'Processor & memory' },
+  { id: 'brains', name: 'Chips' },
   { id: 'conn', name: 'Ports & connectors' },
   { id: 'gpio', name: 'Pin headers' },
   { id: 'status', name: 'LEDs & board' },
@@ -93,6 +93,31 @@ export const PARTS_PI = {
     summary: 'The two USB 3.0 and two USB 2.0 ports are connected to this VL805 USB controller (marked with the VIA logo).',
     simple: ['Runs all four USB-A ports.', 'Linked to the BCM2711 over PCIe.'],
     src: 'DOC “USB” and “BCM2711” · PHOTO',
+  },
+  ethphy: {
+    cat: 'brains', name: 'Gigabit Ethernet transceiver', ref: 'BCM54213PE (per teardowns)', tag: 'Network chip',
+    summary: 'The chip between the Ethernet jack and the processor. The BCM2711 contains the Ethernet controller; this separate transceiver chip next to the jack turns its data into the signals on the network cable.',
+    simple: ['Connects the Ethernet jack to the processor.', 'Part number from published teardowns — Raspberry Pi’s own documents do not name it.'],
+    points: ['The marking is not legible in the photo, so the identification rests on its position next to the jack and on teardowns listing the Broadcom BCM54213PE.'],
+    src: 'DOC “BCM2711” (Ethernet controller) · SCH (LAN lines from the jack) · community teardowns',
+  },
+  pmic: {
+    cat: 'brains', name: 'Power-management chip', ref: 'MxL7704 (per teardowns)', tag: 'Makes the voltages',
+    summary: 'Turns the 5 V supply into the lower voltages the chips need. The reduced schematic lists rails such as 3V3, 1V8, 1V1_DDR and VDD_CORE.',
+    simple: ['Makes the board’s different supply voltages.', 'The marking shows the “MxL” logo of MaxLinear; teardowns list the MxL7704.'],
+    src: 'SCH (supply rails) · PHOTO (marking “MxL”) · community teardowns',
+  },
+  inductor: {
+    cat: 'brains', name: 'Power inductor', ref: 'Marking R47', tag: 'Part of a voltage regulator',
+    summary: 'A coil that smooths the current of a switching voltage regulator. By the standard marking code, “R47” means 0.47 µH. It sits next to the power-management chip.',
+    simple: ['A coil used in the power supply circuit.', 'Marking R47 = 0.47 µH (standard code).'],
+    src: 'PHOTO (marking)',
+  },
+  othercomp: {
+    cat: 'brains', name: 'Other small components', ref: 'Not identified', tag: 'Supporting parts',
+    summary: 'Small parts near the Ethernet jack and near the power input (a black capacitor-like body and a black rectangular part). Their markings are not legible in the photo and the official documents do not name them, so no function is claimed here.',
+    simple: ['Supporting parts of the power and network circuits.', 'Markings not legible — not identified.'],
+    src: 'PHOTO',
   },
   gpio: {
     cat: 'gpio', name: '40-pin GPIO header', ref: 'J8 · 2 × 20, 2.54 mm', tag: 'Connect your electronics',

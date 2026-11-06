@@ -48,3 +48,8 @@ CSI 45.06–47.91 × 0.29–22.69, DSI 1.51–5.45 × 16.78–39.20 (Z 5.5); SoC
 From the photos: pin 1 = square pad on the underside at the SD-card end, inner row (x 8.37, y 51.23 mm); PWR LED (1.0, 7.87), ACT LED (1.0, 11.4); microSD socket on the underside x 1.5–13.6, y 22.1–34.6; micro-HDMI shells are silver with an amber film on the top front; camera/display connectors beige with a black latch; USB 3.0 tongues blue, USB 2.0 black, in the lower half of each opening; RJ45 latch slot at the bottom, green and amber lenses in the bottom corners.
 
 Not stated anywhere (so not shown as facts): PCB thickness (model uses 1.4 mm visually), heights of RAM / wireless can / small chips, part numbers of the Ethernet PHY and power chips.
+
+## Step 3 — chips beside the Ethernet jack / power input (2026-11-06)
+Reported by the owner: a small black chip above the VL805 was not clickable. It is now the clickable part `ethphy` (Gigabit Ethernet transceiver).
+- Identification: it sits right next to the RJ45 jack (J10); the BCM2711 has a native Ethernet controller (official docs), so a separate transceiver is needed; the schematic shows the LAN signal lines of the magjack. Published teardowns (community wikis, reviews) list it as the **Broadcom BCM54213PE**. The marking is not legible in the photo and Raspberry Pi's own documents do not name it — the app labels it "per teardowns".
+- `pmic`: the photo shows the "MxL" logo (MaxLinear); the schematic lists the supply rails; teardowns list the **MxL7704**. `inductor`: marking "R47" (= 0.47 µH by the standard code). `othercomp`: two parts with illegible markings — explicitly "not identified".
