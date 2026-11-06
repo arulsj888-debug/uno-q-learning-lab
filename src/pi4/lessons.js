@@ -194,34 +194,34 @@ export const PI_LESSONS = [
         <p>On the Raspberry Pi 4 the card <b>slides in and stops without a click</b>. To remove it later, gently pull it out — but only after shutting down.</p>`,
       },
       {
-        title: 'Connect the monitor', view: 'pifront', acc: ['sd', 'hdmi'],
+        title: 'Connect the monitor', view: 'pidesk', acc: ['sd', 'hdmi', 'monitor'],
         body: `<p>Plug the small end of the micro-HDMI cable into <b>HDMI0</b> (the one next to the power socket) and the big end into the monitor.</p>
         <p class="tip">If the monitor has several HDMI inputs, select the input you plugged into.</p>`,
       },
       {
-        title: 'Keyboard and mouse', view: 'piports', acc: ['sd', 'hdmi', 'kbd', 'mouse'],
+        title: 'Keyboard and mouse', view: 'piports', acc: ['sd', 'hdmi', 'monitor', 'kbd', 'mouse'],
         body: `<p>Plug the keyboard and the mouse into the <b>black USB 2.0 ports</b>. That keeps the blue USB 3.0 ports free for fast devices.</p>
         <p class="tip">Connect USB devices <b>before</b> switching on: plugging in a power-hungry device while running can make the voltage drop and the board restart.</p>`,
       },
       {
-        title: 'Power last', view: 'home', acc: ['sd', 'hdmi', 'kbd', 'mouse'], power: true, action: 'piboot',
+        title: 'Power last', view: 'pidesk', acc: ['sd', 'hdmi', 'monitor', 'kbd', 'mouse'], power: true, action: 'piboot',
         body: `<p>Power is always the <b>last</b> connection. Plug in the USB-C supply — the Raspberry Pi starts immediately (it has no power button).</p>
         <ul><li><b>Red PWR LED</b> on: the supply is good.</li><li><b>Green ACT LED</b> flickers: the microSD card is being read.</li></ul>
         <p class="sim">The flicker of the ACT LED is simulated here.</p>`,
       },
       {
-        title: 'First boot', view: 'home', acc: ['sd', 'hdmi', 'kbd', 'mouse'],
+        title: 'First boot', view: 'pidesk', acc: ['sd', 'hdmi', 'monitor', 'kbd', 'mouse'],
         body: `<p>If you did the customisation in Imager, Raspberry Pi OS starts with your settings. If you skipped it, a <b>configuration wizard</b> asks for the same information (country, user, password, Wi-Fi) on the first boot.</p>
         <p class="tip">If it does not boot within about 5 minutes, look at the green ACT LED: its flash pattern tells you what is wrong.</p>`,
       },
       {
-        title: 'Shut down safely', view: 'home', acc: ['sd', 'hdmi', 'kbd', 'mouse'],
+        title: 'Shut down safely', view: 'pidesk', acc: ['sd', 'hdmi', 'monitor', 'kbd', 'mouse'],
         body: `<p>Never just pull the plug while the system is running — the microSD card may be in the middle of writing. Shut down from the menu, or in a Terminal type:</p>
         <pre class="tree">sudo poweroff</pre>
         <p>When the green ACT LED shows a <b>series of short flashes</b>, it is safe to unplug the power cable.</p>`,
       },
       {
-        title: 'Summary', view: 'home', acc: ['sd', 'hdmi', 'kbd', 'mouse'],
+        title: 'Summary', view: 'pidesk', acc: ['sd', 'hdmi', 'monitor', 'kbd', 'mouse'],
         body: `<ol><li>Prepare the card with <b>Raspberry Pi Imager</b> (Device → OS → Storage → Customisation).</li><li>Insert it underneath, label away from the board.</li><li>Monitor in <b>HDMI0</b>, keyboard and mouse in the <b>black</b> USB ports.</li><li><b>Power last</b>; shut down with <code>sudo poweroff</code> before unplugging.</li></ol>`,
       },
     ],
@@ -510,43 +510,43 @@ pause()</pre>
   },
   // ================================================================== P8
   {
-    id: 'p8', num: 8, module: 3, title: 'The Terminal: your first commands', level: 'Beginner', time: '20 min',
-    goal: 'Open the Terminal, read a command, and know the most useful commands for your Raspberry Pi.',
-    hardware: ['Raspberry Pi 4 (set up, Lesson 2)'],
+    id: 'p8', num: 8, module: 3, title: 'The Terminal: type commands, see the board react', level: 'Beginner', time: '20 min',
+    goal: 'Type commands in the Terminal on the Raspberry Pi desktop and watch the screen and the board react.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'Monitor, keyboard, mouse'],
     steps: [
       {
-        title: 'What is the Terminal?', view: 'home', acc: [],
-        body: `<p>The <b>Terminal</b> is a window where you give the computer <b>written commands</b> instead of clicking. You open it from the Raspberry Pi OS desktop (the Terminal icon). It is the fastest way to update the system, check the temperature, or start a Python program.</p>
-        <p>In the Raspberry Pi documentation, commands are shown like this:</p>
-        <pre class="tree">$ sudo poweroff</pre>
-        <p class="tip">The <b>$</b> is only the <b>prompt</b> — the computer shows it. You type what comes after it, then press <b>Enter</b>.</p>`,
+        title: 'The Terminal on the desktop', view: 'pidesk', acc: ['sd', 'hdmi', 'monitor', 'kbd', 'mouse'], power: true,
+        body: `<p>Look at the <b>monitor</b> in the 3D view: it shows the Raspberry Pi’s desktop with a <b>Terminal</b> window. The Terminal is where you give the computer <b>written commands</b> instead of clicking.</p>
+        <p>Its last line is the <b>prompt</b>: <code>user@raspberrypi:~ $</code>. It tells you who you are, the name of the computer, and the folder you are in (<code>~</code> = your home folder). In the documentation commands are written with a <b>$</b> in front: you type only what comes after it, then press <b>Enter</b>.</p>
+        <p class="sim">The desktop is an illustration (the real one looks slightly different), and the results are simulated. The commands themselves are the real ones.</p>`,
       },
       {
-        title: 'sudo: run as the administrator', view: 'home',
-        body: `<p>Many commands start with <code>sudo</code>. It means “run this as the <b>superuser</b> (administrator)”. These commands can change the whole system, so the Raspberry Pi asks for <b>your password</b> first.</p>
+        title: 'sudo: run as the administrator', view: 'pidesk',
+        body: `<p>Many commands start with <code>sudo</code>: “run this as the <b>superuser</b> (administrator)”. These commands can change the whole system, so the Raspberry Pi asks for <b>your password</b> first.</p>
         <p class="warn"><b>Read a command before you press Enter</b>, especially after <code>sudo</code>. Only run commands from sources you trust, such as the official Raspberry Pi documentation.</p>`,
       },
       {
-        title: 'Practice terminal', view: 'home',
-        body: `<p>Click a command (or type it and press Enter) to see what it does. This is a <b>practice terminal</b>: it explains the commands instead of running them.</p>
-        <div class="term"><div class="term-out"><div class="term-hint">Click a command below…</div></div>
+        title: 'Try the commands', view: 'pidesk',
+        body: `<p>Click a command below (or type it and press <b>Enter</b>). <b>Watch the monitor</b> — and the <b>LEDs on the board</b>:</p>
+        <ul><li><code>vcgencmd measure_temp</code> → the processor temperature appears on the screen.</li><li><code>pinout</code> → the GPIO pin map is printed.</li><li><code>sudo apt update</code> → the <b>green ACT LED flickers</b> (the microSD card is being used).</li><li><code>sudo reboot</code> → screen goes dark, the board restarts, the desktop returns.</li><li><code>sudo poweroff</code> → the ACT LED gives its short “safe to unplug” flashes, then the red <b>PWR LED goes out</b>.</li></ul>
+        <div class="term"><div class="term-out"><div class="term-hint">What the command does appears here; the result appears on the monitor.</div></div>
         <div class="term-row"><span class="term-ps">$</span><input class="term-in" placeholder="type a command and press Enter" autocomplete="off" spellcheck="false"></div>
         <div class="term-chips"></div></div>
-        <p class="sim">The documentation does not print the exact output of these commands, so none is invented here. On your Raspberry Pi you will see the real output.</p>`,
+        <p class="sim">Exact outputs differ on your Raspberry Pi (versions, names, numbers). The temperature shown here is made up.</p>`,
       },
       {
-        title: 'Keep the software up to date', view: 'home',
+        title: 'Keep the software up to date', view: 'pidesk',
         body: `<p>Raspberry Pi’s documentation gives two commands, in this order:</p>
         <ol><li><code>sudo apt update</code> — refresh the list of available software.</li><li><code>sudo apt full-upgrade</code> — install the newest versions.</li></ol>
-        <p>Before a big update, check that you have enough free disk space on the microSD card.</p>`,
+        <p>Try both in the practice terminal. Before a big update, check that you have enough free disk space on the microSD card.</p>`,
       },
       {
-        title: 'Python is already there', view: 'home',
+        title: 'Python is already there', view: 'pidesk',
         body: `<p>Raspberry Pi OS comes with <b>Python 3</b> pre-installed — you used it in Lessons 4–7 through the GPIO Zero library.</p>
         <p class="warn">Do not interfere with the system’s own Python: it can break your operating system. To install extra Python libraries use <code>sudo apt install python3-xyz</code> (xyz = the package), or create a <b>virtual environment</b> with <code>python3 -m venv path/to/venv</code> and use the <code>python</code> and <code>pip</code> inside it (documentation).</p>`,
       },
       {
-        title: 'Summary', view: 'home',
+        title: 'Summary', view: 'pidesk',
         body: `<ul><li>The Terminal takes typed commands; the <b>$</b> is the prompt, not typed.</li><li><code>sudo</code> = run as administrator (asks for your password) — read before you press Enter.</li><li>Useful: <code>sudo poweroff</code>, <code>sudo reboot</code>, <code>sudo apt update</code>, <code>sudo apt full-upgrade</code>, <code>vcgencmd measure_temp</code>, <code>pinout</code>, <code>ls -la</code>, <code>cd</code>, <code>groups</code>.</li><li>Python 3 is pre-installed; use <code>apt</code> or a virtual environment for extra libraries.</li></ul>`,
       },
     ],
@@ -555,9 +555,9 @@ pause()</pre>
       { q: 'What does sudo do?', a: ['Deletes files', 'Runs the command as the superuser (administrator)', 'Starts Python', 'Opens the desktop'], c: 1, why: 'sudo = superuser do; it asks for your password.' },
       { q: 'Which command gives an accurate reading of the processor temperature?', a: ['pinout', 'groups', 'vcgencmd measure_temp', 'sudo reboot'], c: 2, why: 'Raspberry Pi: vcgencmd communicates with the GPU directly and gives an accurate, instantaneous reading.' },
       { q: 'Which two commands update the software, in order?', a: ['sudo reboot, then sudo poweroff', 'sudo apt update, then sudo apt full-upgrade', 'passwd, then groups', 'ls -la, then cd'], c: 1, why: 'First refresh the package list, then install the newest versions.' },
-      { q: 'Which command prints a map of the GPIO pins?', a: ['pinout', 'passwd', 'ls -l /home', 'python3'], c: 0, why: 'pinout is a GPIO Zero tool that prints the pin map of your board.' },
+      { q: 'What tells you it is safe to unplug the power after sudo poweroff?', a: ['The PWR LED turns blue', 'The green ACT LED shows a series of short flashes', 'The monitor turns on', 'Nothing'], c: 1, why: 'Raspberry Pi: the green activity LED briefly displays a series of short flashes when it is safe to remove the power cable.' },
     ],
-    sources: [SRC_PI.setup, SRC_PI.osupdate, SRC_PI.users, SRC_PI.thermal, SRC_PI.gpio, SRC_PI.python],
+    sources: [SRC_PI.setup, SRC_PI.osupdate, SRC_PI.users, SRC_PI.thermal, SRC_PI.gpio, SRC_PI.python, SRC_PI.leds],
   },
 ];
 

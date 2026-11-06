@@ -8,6 +8,7 @@ import { UnoQBoard } from './board.js';
 import { Pi4Board } from './pi4/board.js';
 import { PARTS_PI, CATEGORIES_PI, BOARD_FACTS_PI, J8_HEADER, findPinPi } from './pi4/data.js';
 import { PI_LESSONS, PI_MODULES, PI_COMING, TERM_CMDS } from './pi4/lessons.js';
+import { J8 } from './pi4/data.js';
 import { makePiAccessories, PI_ACC_INFO } from './pi4/peripherals.js';
 import uqThumb from '../assets/pcb_top_albedo.jpg';
 import piThumb from '../assets/pi4/pi4_top.jpg';
@@ -51,6 +52,7 @@ const VIEWS = {
   smart: { t: new THREE.Vector3(95, 0, 8), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 430 },
   pibench: { t: new THREE.Vector3(-4, 0, -30), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 235 },
   pibb: { t: new THREE.Vector3(-6, 2, -57), d: new THREE.Vector3(-0.08, 0.88, 0.47), dist: 118 },
+  pidesk: { t: new THREE.Vector3(-65, 62, -95), d: new THREE.Vector3(-0.04, 0.42, 0.9), dist: 650 },
   pifront: { t: new THREE.Vector3(-4, 0, 26), d: new THREE.Vector3(-0.25, 0.55, 0.8), dist: 125 },
   piports: { t: new THREE.Vector3(42, 4, -2), d: new THREE.Vector3(0.78, 0.48, 0.4), dist: 150 },
   motor: { t: new THREE.Vector3(0, 0, 90), d: new THREE.Vector3(-0.06, 0.9, 0.43), dist: 285 },
@@ -106,6 +108,7 @@ class App {
     this.usbPlugged = false;
     this.bb = new Breadboard(new THREE.Vector3(0, DESK_Y + 8.5, IS_PI ? -62 : 68)); this.bb.group.visible = false; s.add(this.bb.group);
     this.bench = new Bench(s, this.board, this.bb);
+    this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2 };
     if (IS_PI) { this.acc = makePiAccessories(this.board); for (const a of this.acc.all) { a.on = false; s.add(a.group); } Object.assign(HW_INFO, PI_ACC_INFO); }
     this.strips = new THREE.Group(); this.strips.visible = false; s.add(this.strips);
     // desk lamp over the light sensor (Lesson 11): brightness follows the simulated light level
@@ -259,9 +262,9 @@ class App {
 
   async bootAnimation(ms = 5200) {
     if (IS_PI) {
-      const tok = this.bootToken = {}, t0 = performance.now();
+      const tok = this.bootToken = {}, t0 = performance.now(); this.pios.mode = 'boot';
       while (performance.now() - t0 < ms) { if (this.bootToken !== tok || !this.board.powered) return; this.board.setLed('act', Math.random() < 0.45); await sleep(60 + Math.random() * 140); }
-      this.board.setLed('act', false); return;
+      this.board.setLed('act', false); if (this.bootToken === tok) this.pios.mode = 'on'; return;
     }
     const tok = this.bootToken = {};
     const t0 = performance.now();
@@ -321,6 +324,7 @@ class App {
     this.servoTick(Math.min(dt, 0.1));
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
+    if (this.acc && this.acc.monitor.group.visible) this.acc.monitor.draw({ ...this.pios, mode: this.board.powered ? this.pios.mode : 'off' });
     this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
@@ -836,6 +840,43 @@ class App {
     $('#explain').innerHTML = 'Click a line to see what it does.';
   }
 
+  // ---- Pi lesson 8: Terminal on the 3D monitor. Results are simulated; the board reacts (LEDs) ----
+  async actFlicker(ms) { const t0 = performance.now(); while (performance.now() - t0 < ms) { this.board.setLed('act', Math.random() < 0.5); await sleep(70 + Math.random() * 110); } this.board.setLed('act', false); }
+  async piCmd(raw) {
+    const P = this.pios; if (!P || P.busy || P.mode !== 'on' || !this.board.powered) return;
+    const q = raw.trim().replace(/\s+/g, ' '); if (!q) return;
+    P.busy = true; P.cur = '';
+    const add = (t, c) => P.lines.push({ text: t, c });
+    P.lines.push({ prompt: true, cwd: P.cwd, text: q });
+    const lc = q.toLowerCase();
+    try {
+      if (lc === 'vcgencmd measure_temp') { P.temp = Math.round((P.temp + (Math.random() - 0.5) * 1.2) * 10) / 10; add(`temp=${P.temp.toFixed(1)}'C`); }
+      else if (lc === 'pinout') {
+        add('J8:   (simulated map — physical pin / name)', '#8fa3b5');
+        for (let r = 0; r < 20; r++) { const a = J8[2 * r], b = J8[2 * r + 1], f = p => p.gpio === null ? p.label : 'GPIO' + p.gpio; add(`${f(a).padStart(7)} (${String(a.pin).padStart(2)}) (${String(b.pin).padStart(2)}) ${f(b)}`); }
+      }
+      else if (lc === 'sudo apt update') { add('[sudo] password for user: (simulated)', '#8fa3b5'); await this.actFlicker(1800); add('Reading package lists... Done'); }
+      else if (lc === 'sudo apt full-upgrade') { add('[sudo] password for user: (simulated)', '#8fa3b5'); await this.actFlicker(2200); add('Reading package lists... Done'); add('Calculating upgrade... Done'); }
+      else if (lc === 'sudo raspi-config') { add('[sudo] password for user: (simulated)', '#8fa3b5'); add('Opens the Raspberry Pi configuration tool (text menu). Press Esc to leave it. (not simulated further)', '#8fa3b5'); }
+      else if (lc === 'sudo reboot') {
+        add('[sudo] password for user: (simulated)', '#8fa3b5'); await sleep(500);
+        P.mode = 'reboot'; this.actFlicker(3200); await sleep(3400); P.lines = []; P.cwd = '~'; P.mode = 'on';
+      }
+      else if (lc === 'sudo poweroff') {
+        add('[sudo] password for user: (simulated)', '#8fa3b5'); await sleep(500);
+        P.mode = 'shutdown'; await this.actFlicker(1500);
+        for (let i = 0; i < 6; i++) { this.board.setLed('act', true); await sleep(110); this.board.setLed('act', false); await sleep(130); }   // "safe to unplug" flashes
+        this.board.setPowerLed(false); P.mode = 'off';
+      }
+      else if (lc === 'ls -l /home') { add('total 4'); add('drwx------ 3 user user 4096 example output  user', '#d6dbe0'); }
+      else if (/^cd \/home\/\S+$/.test(lc)) { if (q.split('/')[2] === 'user') P.cwd = '~'; else add(`bash: cd: ${q.slice(3)}: No such file or directory`, '#ff9b8e'); }
+      else if (lc === 'ls -la') { add('total 8'); add('drwx------ user user  .'); add('drwxr-xr-x root root  ..'); add('-rw-r--r-- user user  .bashrc   (example output)', '#8fa3b5'); }
+      else if (lc === 'groups') add('user ... gpio ...   (list shortened)');
+      else if (lc === 'passwd') { add('Changing password for user.'); add('Current password: (simulated)', '#8fa3b5'); }
+      else if (lc === 'python3') { add('Python 3 — version depends on your system. (simulated; type exit() to leave)', '#8fa3b5'); }
+      else add(`${q.split(' ')[0]}: this is not one of the practice commands`, '#ff9b8e');
+    } finally { P.busy = false; }
+  }
   bindTerm() {
     const t = $('#panel .term'); if (!t) return;
     const out = t.querySelector('.term-out'), inp = t.querySelector('.term-in'), chips = t.querySelector('.term-chips');
@@ -849,12 +890,18 @@ class App {
         ? `<div class="term-ans">${esc(hit.does)} <span class="term-src">(${esc(hit.src)})</span></div>`
         : `<div class="term-ans dim">Not one of the practice commands — pick one from the list below.</div>`);
       out.appendChild(line); out.scrollTop = out.scrollHeight;
+      this.piCmd(raw);
     };
-    chips.innerHTML = TERM_CMDS.map(c => `<button class="term-chip" data-c="${esc(c.cmd)}">${esc(c.cmd)}</button>`).join('');
-    chips.querySelectorAll('.term-chip').forEach(b => b.onclick = () => run(b.dataset.c.replace('<username>', 'pi')));
-    inp.onkeydown = e => { if (e.key === 'Enter') { run(inp.value); inp.value = ''; } e.stopPropagation(); };
+    chips.innerHTML = `<button class="term-chip term-power" style="display:none">⏻ Plug the power in again</button>` + TERM_CMDS.map(c => `<button class="term-chip" data-c="${esc(c.cmd)}">${esc(c.cmd)}</button>`).join('');
+    chips.querySelectorAll('.term-chip[data-c]').forEach(b => b.onclick = () => run(b.dataset.c.replace('<username>', 'user')));
+    const pw = chips.querySelector('.term-power');
+    pw.onclick = () => { this.board.setPowerLed(true); this.pios.lines = []; this.pios.cwd = '~'; this.pios.mode = 'boot'; this.bootAnimation(6000); };
+    clearInterval(this.termTimer); this.termTimer = setInterval(() => { if (!document.body.contains(pw)) { clearInterval(this.termTimer); return; } pw.style.display = this.pios.mode === 'off' ? '' : 'none'; }, 250);
+    // live typing is shown on the 3D monitor too
+    inp.oninput = () => { this.pios.cur = inp.value; };
+    inp.onkeydown = e => { if (e.key === 'Enter') { run(inp.value); inp.value = ''; this.pios.cur = ''; } e.stopPropagation(); };
   }
-  hideAcc() { if (this.acc) for (const a of this.acc.all) { a.set(false); a.on = false; } }
+  hideAcc() { if (this.acc) for (const a of this.acc.all) { a.set(false); a.on = false; } this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2 }; this.bootToken = this.bootToken; }
   async applyAcc(i, prev, alive) {
     const L = this.lesson; let list = null;
     for (let k = 0; k <= i; k++) if (L.steps[k].acc) list = L.steps[k].acc;

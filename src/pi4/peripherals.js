@@ -75,19 +75,88 @@ export class PlugCable {
   set(on) { this.group.visible = on; this.plug.position.x = on ? 0 : this.out; }
 }
 
+// ---------------------------------------------------------------- monitor showing the desktop and a Terminal window (illustration)
+// A generic 16:9 monitor, drawn at about 78 % of a 15.6-inch screen (345 x 194 mm) so it fits beside the board. The picture is an ILLUSTRATION of a desktop with a Terminal window:
+// the real Raspberry Pi OS desktop looks slightly different. Results shown in the Terminal are simulated.
+export class Monitor {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const dark = new THREE.MeshStandardMaterial({ color: 0x151618, roughness: 0.5 });
+    const W = 360, Hh = 211, D = 16, y0 = 52;
+    const bezel = new THREE.Mesh(new RoundedBoxGeometry(W, Hh, D, 3, 3), dark); bezel.position.set(0, y0 + Hh / 2, 0); g.add(bezel);
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(36, y0 + 4, 9), new THREE.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.4, metalness: 0.6 })); neck.position.set(0, (y0 + 4) / 2, -6); g.add(neck);
+    const base = new THREE.Mesh(new RoundedBoxGeometry(150, 5, 100, 2, 1.5), new THREE.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.4, metalness: 0.6 })); base.position.set(0, 2.5, -4); g.add(base);
+    this.canvas = document.createElement('canvas'); this.canvas.width = 1280; this.canvas.height = 720;
+    this.ctx = this.canvas.getContext('2d');
+    this.tex = new THREE.CanvasTexture(this.canvas); this.tex.colorSpace = THREE.SRGBColorSpace; this.tex.anisotropy = 8;
+    this.screen = new THREE.Mesh(new THREE.PlaneGeometry(345, 194), new THREE.MeshBasicMaterial({ map: this.tex, toneMapped: false }));
+    this.screen.position.set(0, y0 + Hh / 2, D / 2 + 0.1); g.add(this.screen);
+    tag(g, 'pi:monitor');
+    this.key = null; this.draw({ mode: 'off', lines: [], cwd: '~' });
+    g.visible = false;
+  }
+  set(on) { this.group.visible = on; }
+  connect(on) { this.set(on); }
+  draw(st) {
+    const key = JSON.stringify([st.mode, st.lines.length, st.lines[st.lines.length - 1], st.cwd, st.cur]);
+    if (key === this.key) return; this.key = key;
+    const c = this.ctx, w = 1280, h = 720;
+    c.fillStyle = '#000'; c.fillRect(0, 0, w, h);
+    if (st.mode === 'off') { this.tex.needsUpdate = true; return; }
+    if (st.mode === 'boot' || st.mode === 'reboot' || st.mode === 'shutdown') {
+      c.fillStyle = '#0b0d10'; c.fillRect(0, 0, w, h); c.fillStyle = '#9fb2c4'; c.font = '28px Arial'; c.textAlign = 'center';
+      c.fillText(st.mode === 'shutdown' ? 'Shutting down…' : 'Starting…', w / 2, h / 2); this.tex.needsUpdate = true; return;
+    }
+    // desktop wallpaper (generic illustration) and top bar
+    const bg = c.createLinearGradient(0, 0, w, h); bg.addColorStop(0, '#24364f'); bg.addColorStop(1, '#5f86b3'); c.fillStyle = bg; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(15,18,22,0.92)'; c.fillRect(0, 0, w, 44);
+    c.fillStyle = '#e6edf3'; c.font = '600 22px Arial'; c.textAlign = 'left'; c.fillText('Raspberry Pi OS desktop (illustration)', 18, 30);
+    c.fillStyle = 'rgba(255,255,255,0.16)'; c.fillRect(w - 150, 8, 132, 28); c.fillStyle = '#e6edf3'; c.font = '18px Arial'; c.fillText('>_ Terminal', w - 140, 28);
+    // Terminal window
+    const x0 = 70, y0 = 90, ww = w - 140, hh = h - 130;
+    c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x0 + 8, y0 + 10, ww, hh);
+    c.fillStyle = '#2b2d31'; c.fillRect(x0, y0, ww, 34); c.fillStyle = '#d6dbe0'; c.font = '600 19px Arial'; c.fillText('user@raspberrypi: ' + st.cwd, x0 + 14, y0 + 23);
+    c.fillStyle = '#ff6b5b'; c.beginPath(); c.arc(x0 + ww - 24, y0 + 17, 7, 0, 7); c.fill();
+    c.fillStyle = '#16181b'; c.fillRect(x0, y0 + 34, ww, hh - 34);
+    c.font = '20px Consolas, monospace'; const lh = 24, rows = Math.floor((hh - 52) / lh);
+    // wrap
+    const all = [];
+    for (const L of st.lines) {
+      if (L.prompt) all.push({ prompt: true, cwd: L.cwd, text: L.text });
+      else { const t = L.text, max = 96; if (!t.length) all.push({ text: '', c: L.c }); for (let i = 0; i < t.length; i += max) all.push({ text: t.slice(i, i + max), c: L.c }); }
+    }
+    if (st.mode === 'on') all.push({ prompt: true, cwd: st.cwd, text: st.cur || '', live: true });
+    const show = all.slice(-rows);
+    show.forEach((L, i) => {
+      const y = y0 + 34 + 26 + i * lh; let x = x0 + 14;
+      if (L.prompt) {
+        const a = 'user@raspberrypi', b = ':' + L.cwd, d = ' $ ';
+        c.fillStyle = '#7ee787'; c.fillText(a, x, y); x += c.measureText(a).width;
+        c.fillStyle = '#79b8ff'; c.fillText(b, x, y); x += c.measureText(b).width;
+        c.fillStyle = '#e6edf3'; c.fillText(d, x, y); x += c.measureText(d).width;
+        c.fillText(L.text, x, y); x += c.measureText(L.text).width;
+        if (L.live) { c.fillStyle = '#e6edf3'; c.fillRect(x + 2, y - 17, 11, 21); }
+      } else { c.fillStyle = L.c || '#d6dbe0'; c.fillText(L.text, x, y); }
+    });
+    this.tex.needsUpdate = true;
+  }
+}
+
 /** All accessories of the setup lesson, built at the real port positions of the board model. */
 export function makePiAccessories(board) {
   const sd = new MicroSD();
+  const monitor = new Monitor(); monitor.group.position.set(-95, -6.05, -215); monitor.group.rotation.y = 0.12; monitor.group.scale.setScalar(0.78);   // a compact ~12-inch screen so it fits beside the board
   const down = -5.6;   // cable centre 1.9–2.2 mm above the desk
-  const hdmi = new PlugCable('hdmi', P(26.01, -1.45, 1.5), new THREE.Vector3(0, 0, 1), { depth: 4.5, route: [[60, down, 6], [140, down, 30], [260, down, 40]] });
+  const hdmi = new PlugCable('hdmi', P(26.01, -1.45, 1.5), new THREE.Vector3(0, 0, 1), { depth: 4.5, route: [[40, down, 10], [56, down, 60], [30, down, 125], [-70, down, 150], [-170, down, 140], [-205, down, 95]] });   // leaves HDMI0, goes round the left side to the back of the monitor   // leaves HDMI0, bends left to the monitor
   const kbd = new PlugCable('kbd', P(88.02, 8.99, 11.76), new THREE.Vector3(1, 0, 0), { depth: 8, route: [[60, -10, 0], [110, -15.9, 25], [220, -15.9, 60]] });
   const mouse = new PlugCable('mouse', P(88.02, 8.99, 4.06), new THREE.Vector3(1, 0, 0), { depth: 8, route: [[60, -5, -6], [110, -8.2, -30], [220, -8.2, -60]] });
-  return { sd, hdmi, kbd, mouse, all: [sd, hdmi, kbd, mouse] };
+  return { sd, hdmi, kbd, mouse, monitor, all: [sd, hdmi, kbd, mouse, monitor] };
 }
 
 export const PI_ACC_INFO = {
   'pi:sd': { name: 'microSD card', tag: 'The boot media', summary: 'Holds the operating system (Raspberry Pi OS). It is prepared on another computer with Raspberry Pi Imager, then inserted with the label facing away from the Raspberry Pi.', points: ['Raspberry Pi OS: at least 32 GB recommended (Lite: 8 GB).'], src: 'raspberrypi.com — Getting started' },
   'pi:hdmi': { name: 'micro-HDMI to HDMI cable', tag: 'Monitor', summary: 'The small end goes into the Raspberry Pi, the large (full-size HDMI) end into the monitor. The primary monitor goes in HDMI0.', src: 'raspberrypi.com — Getting started' },
   'pi:kbd': { name: 'USB keyboard', tag: 'Input', summary: 'Plugged into a black USB 2.0 port, so the blue USB 3.0 ports stay free for fast devices.', src: 'raspberrypi.com — Getting started' },
+  'pi:monitor': { name: 'Monitor', tag: 'Shows the desktop', summary: 'The Raspberry Pi’s picture appears here. The picture on this 3D monitor is an illustration of a desktop with a Terminal window; the real desktop looks slightly different.', src: 'raspberrypi.com — Getting started' },
   'pi:mouse': { name: 'USB mouse', tag: 'Input', summary: 'Also in a black USB 2.0 port.', src: 'raspberrypi.com — Getting started' },
 };
