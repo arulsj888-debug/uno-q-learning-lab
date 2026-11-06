@@ -29,3 +29,22 @@ Connectors: J8 GPIO, 2 × micro-HDMI, USB-C power in, Gigabit Ethernet, A/V jack
 - **No official Gerber/STEP/3D model** was found (the UNO Q had official Gerbers + STEP). Raspberry Pi publishes the datasheet, drawing and (per third-party pages) a DXF. Third-party 3D models exist (MakerWorld, Sketchfab, Shanhu3D) but are not official and have unclear licences.
 - Chip markings, board colour, silkscreen text and exact connector shapes must come from official **photos** (e.g. raspberrypi.com product images) — still to be collected and checked.
 - Datasheet says up to 8 GB RAM in the intro but lists 1/2/4 GB in Features: state "1, 2, 4 or 8 GB depending on version" only after checking the product page.
+
+## Step 2 — verified details used in the 3D model and info texts (2026-11-06)
+Official documentation (github.com/raspberrypi/documentation, `computers/raspberry-pi/*.adoc`, `processors/bcm2711.adoc`, `configuration/led_blink_warnings.adoc`):
+- BCM2711: Cortex-A72 (Armv8-A) 64-bit @ 1.5 GHz; L1 32 kB data + 48 kB instruction per core, 1 MB L2; VideoCore VI up to 500 MHz; up to 8 GB LPDDR4-2400; PCIe link connects the USB 2.0/3.0 ports; natively attached Ethernet controller; heat-spreading package.
+- USB: the 2 × USB 3.0 + 2 × USB 2.0 ports connect to a **VL805** USB controller (chip carries the VIA logo in the photo). Max USB output Pi 2/3/4: 1200 mA total (docs table) — datasheet says ≈ 1.1 A; both shown.
+- Power: all models need a 5.1 V supply; Pi 4 recommended 3.0 A, max USB peripheral draw 1.2 A, typical bare-board active 600 mA. Ethernet jack PoE-capable (IEEE 802.3af) with a PoE HAT.
+- LEDs (Pi 1–4): **red PWR** (stable 5 V; off/flickering = undervoltage) and **green ACT** (microSD activity, flash codes).
+- GPIO page: pins 3.3 V, **not 5 V tolerant**; up to 16 mA per pin, 50 mA total; GP2/GP3 have 1.8 kΩ on-board pull-ups to 3.3 V; GP0/GP1 (pins 27/28) reserved for the HAT ID EEPROM; 5V pins can also accept 5 V input via a HAT; pin 1 lower-left / pin 40 upper-right; typical function per pin (table copied into `src/pi4/data.js`).
+- Bootloader: with `POWER_OFF_ON_HALT=1`, GLOBAL_EN must be shorted to ground to boot after a halt.
+- FCC integration guide (FCC ID 2ABCB-RPI4B): wireless based on the Cypress 43455 (802.11 b/g/n/ac + Bluetooth 5), on-board antenna.
+
+From the official drawing (vector data, mm): J8 7.11–57.92 × 49.98–54.98 (Z 8.5); Ethernet 66.66–88.02 × 37.98–53.49 (Z 13.5);
+USB3 70.52–88.02 × 20.41–33.55, USB2 70.31–88.02 × 2.42–15.56 (Z 16); USB-C 6.88–15.54 × −1.26–6.14 (Z 3.2);
+micro-HDMI body 6.2 wide centred x 26.01 / 39.51, −0.85–6.51, flange 7.21 wide at −1.45 (Z 3.0); A/V body 50.52–57.5 × −0.02–12.48 (Z 6.0), barrel Ø6 to −2.52;
+CSI 45.06–47.91 × 0.29–22.69, DSI 1.51–5.45 × 16.78–39.20 (Z 5.5); SoC 21.76–36.76 × 24.98–39.98 (Z 2.4); RAM 39.05–50.56 × 24.98–39.98; wireless can 6.61–17.40 × 36.10–49.09; PoE 59.01–64.01 × 43.84–48.84.
+
+From the photos: pin 1 = square pad on the underside at the SD-card end, inner row (x 8.37, y 51.23 mm); PWR LED (1.0, 7.87), ACT LED (1.0, 11.4); microSD socket on the underside x 1.5–13.6, y 22.1–34.6; micro-HDMI shells are silver with an amber film on the top front; camera/display connectors beige with a black latch; USB 3.0 tongues blue, USB 2.0 black, in the lower half of each opening; RJ45 latch slot at the bottom, green and amber lenses in the bottom corners.
+
+Not stated anywhere (so not shown as facts): PCB thickness (model uses 1.4 mm visually), heights of RAM / wireless can / small chips, part numbers of the Ethernet PHY and power chips.

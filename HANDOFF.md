@@ -2,7 +2,7 @@
 
 This file lets a **new** Claude Code session (or a person) continue the project without the old chat.
 Project: **Arduino UNO Q 3D Learning Lab** — a browser app (Three.js) that teaches the UNO Q from zero to a final project.
-Owner: Arul (arul.vendhan@petalautomations.com). Language: **English only**.
+Owner: Arul. Language: **English only**.
 
 Repo: https://github.com/arulsj888-debug/uno-q-learning-lab (branch `main`). Vercel auto-deploys on every push to `main` (build `npm run build`, output `dist`).
 
@@ -10,7 +10,7 @@ Repo: https://github.com/arulsj888-debug/uno-q-learning-lab (branch `main`). Ver
 
 - **Done:** 23 lessons in 8 modules (see `README.md`), responsive layout for phones, tablets and laptops.
 - Everything is committed and pushed. Last big pieces: Lesson 23 (final project), responsive update.
-- **Next planned work: a Raspberry Pi 4 version** (see section 7). Nothing of it exists yet.
+- **Raspberry Pi 4 (in progress):** board chooser + realistic 3D Pi 4 in *Explore* mode are done (`src/pi4/board.js`, `src/pi4/data.js`, `assets/pi4/`, `docs/pi4-source-notes.md`, `tools/pi4/`). `main.js` selects the board from `?board=pi4` (constants `IS_PI`, `PARTS`, `findPin`, `PIN_HEADERS` … at the top). **Next: Pi 4 lessons** (section 7, step 4).
 - Not done / known gaps: nothing was tested on real hardware; no final read-through of all lesson texts; English only.
 
 ## 2. The owner's hard rules (never break these)

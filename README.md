@@ -1,13 +1,13 @@
-# Arduino UNO Q · 3D Learning Lab (Stages 1–3, in progress)
+# 3D Learning Lab — Arduino UNO Q and Raspberry Pi 4
 
-An interactive, realistic 3D model of the **Arduino UNO Q** with clickable parts and step-by-step lessons.
+Interactive, realistic 3D models with clickable parts and step-by-step lessons. A start screen lets you choose the board (or open `?board=unoq` / `?board=pi4` directly; **⇄ Board** in the top bar switches).
 
 ## Open it
 
 Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, with no install, server or internet connection needed.
 
 - **Explore the board**: drag to rotate 360°, scroll to zoom, right-drag to pan. Click any part or any single header pin to read about it. Use **Top**, **Bottom**, **360°** and **Labels** in the top bar.
-- **Lessons**: seventeen lessons in order, each ending with a quiz:
+- **Lessons**: 23 lessons in order, each ending with a quiz:
   - **Module 1: Getting started**
     1. Meet the Arduino UNO Q (guided tour of every part)
     2. Power the board safely (inputs, voltage rails, boot, limits, power button)
@@ -41,6 +41,12 @@ Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, 
     23. Final project: a smart room controller (Thermo + relay + lamp, Python decides Auto/Manual, web page with working buttons)
 
 Purple notes in the lessons mark behavior that is only **simulated** in the app, such as the shortened boot time.
+
+## Raspberry Pi 4 Model B (new)
+
+- **Explore the board** is ready: a 360° Raspberry Pi 4 at exact size, with every chip, port, LED and all 40 GPIO pins clickable (pin card: physical pin, GPIO number, 3.3 V level, typical use, default pull and ALT0–ALT5 functions from the datasheet).
+- How it is built: geometry (board outline, holes, every connector's position, size and height) from Raspberry Pi's **official mechanical drawing**, read from its vector data; surface from **real CC BY-SA photographs** of the board, straightened onto the exact millimetre grid with the four mounting holes. Connectors are real 3D shapes with hollow openings (USB tongues and contacts, RJ45 contacts and LED lenses, USB-C and micro-HDMI shells). Details and every source: [`docs/pi4-source-notes.md`](docs/pi4-source-notes.md), pipeline: [`tools/pi4/`](tools/pi4/README.md).
+- Lessons for the Pi 4 are next (listed in the app under *Lessons*).
 
 ## Works on every screen
 
@@ -87,5 +93,7 @@ To regenerate the PCB textures from Arduino's CAD package (`ABX00162-cad-files.z
 3. Run `python tools/build_pcb.py <work folder> <…-1-8.drl drill file> assets`.
 
 ## Licenses
+
+Raspberry Pi 4 textures (`assets/pi4/`) are derived from photographs on Wikimedia Commons, licensed **CC BY-SA 4.0**: “Raspberry Pi 4 Model B - Top.jpg” by Laserlicht and “Raspberry Pi 4, 2 GB RAM version 3.jpg” by Suyash Dwivedi. The straightened textures are shared under the same licence. Raspberry Pi is a trademark of Raspberry Pi Ltd; this project is not affiliated with Raspberry Pi Ltd.
 
 The board artwork in `assets/` is derived from Arduino's UNO Q CAD files, licensed **CC BY-SA 4.0** (© Arduino). The derived textures are shared under the same license. Arduino®, UNO and Qualcomm® Dragonwing™ are trademarks of their respective owners. This is an independent learning tool, not an official Arduino product.

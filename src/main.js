@@ -5,11 +5,27 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Viewer } from './viewer.js';
 import { initMaterials, canvasTex, noise } from './materials.js';
 import { UnoQBoard } from './board.js';
+import { Pi4Board } from './pi4/board.js';
+import { PARTS_PI, CATEGORIES_PI, BOARD_FACTS_PI, J8_HEADER, findPinPi } from './pi4/data.js';
+import uqThumb from '../assets/pcb_top_albedo.jpg';
+import piThumb from '../assets/pi4/pi4_top.jpg';
 import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, HandModel } from './hardware.js';
 import { Bench } from './bench.js';
-import { PARTS, CATEGORIES, BOARD_FACTS } from './data/parts.js';
-import { JDIGITAL, JANALOG, JSPI, JCTL, findPin } from './data/pins.js';
-import { LESSONS, COMING_SOON, MODULES } from './data/lessons.js';
+import { PARTS as UQ_PARTS, CATEGORIES as UQ_CATEGORIES, BOARD_FACTS as UQ_FACTS } from './data/parts.js';
+import { JDIGITAL, JANALOG, JSPI, JCTL, findPin as uqFindPin } from './data/pins.js';
+import { LESSONS as UQ_LESSONS, COMING_SOON as UQ_SOON, MODULES as UQ_MODULES } from './data/lessons.js';
+
+// ------------------------------------------------------------------ board profile
+const BOARD = new URLSearchParams(location.search).get('board') === 'pi4' ? 'pi4' : 'unoq';
+const IS_PI = BOARD === 'pi4';
+const PARTS = IS_PI ? PARTS_PI : UQ_PARTS;
+const CATEGORIES = IS_PI ? CATEGORIES_PI : UQ_CATEGORIES;
+const BOARD_FACTS = IS_PI ? BOARD_FACTS_PI : UQ_FACTS;
+const findPin = IS_PI ? findPinPi : uqFindPin;
+const PIN_HEADERS = IS_PI ? [J8_HEADER] : [JDIGITAL, JANALOG, JSPI];
+const LESSONS = IS_PI ? [] : UQ_LESSONS;
+const MODULES = IS_PI ? {} : UQ_MODULES;
+const COMING_SOON = IS_PI ? ['Meet the Raspberry Pi 4', 'Power supply, microSD card and the operating system', 'First boot, desktop and the terminal', 'The 40-pin GPIO header and 3.3 V safety', 'Blink an LED with Python', 'Read a push button', 'PWM: fade an LED', 'An I²C sensor', 'Camera module', 'A web page served by the Pi', 'Final project'] : UQ_SOON;
 import { LOGO_ARRAY, SHADES_ARRAY, matrixCode } from './data/code.js';
 import { Sim, blinkCode, VREF } from './sim.js';
 import { Scope } from './scope.js';
@@ -34,7 +50,7 @@ const VIEWS = {
   drvclose: { t: new THREE.Vector3(0, 3, 71), d: new THREE.Vector3(-0.22, 0.86, 0.46), dist: 78 },
   sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
 };
-const BOTTOM_PARTS = new Set(['mcu', 'emmc', 'jmisc', 'jmedia']);
+const BOTTOM_PARTS = new Set(IS_PI ? ['sdcard'] : ['mcu', 'emmc', 'jmisc', 'jmedia']);
 const shortName = n => n.replace(/^(Qualcomm Dragonwing™|STMicroelectronics|Qualcomm) /, '');
 
 class App {
@@ -45,12 +61,13 @@ class App {
 
     this.viewer = new Viewer($('#stage'));
     initMaterials(this.viewer.renderer);
-    this.board = new UnoQBoard();
+    this.board = IS_PI ? new Pi4Board() : new UnoQBoard();
+    this.applyBoardBranding();
     this.viewer.scene.add(this.board.group);
     this.mode = 'explore';
     this.selected = null; this.hovered = null;
     this.tempObjs = []; this.partLabels = [];
-    this.progress = JSON.parse(localStorage.getItem('unoq-lab-progress') || '{}');
+    this.progress = JSON.parse(localStorage.getItem(IS_PI ? 'pi4-lab-progress' : 'unoq-lab-progress') || '{}');
     this.blinkDelay = 1000;
     this.soundOn = true;
     this.editorFrame = LOGO_ARRAY.map(v => v * 7);
@@ -317,7 +334,8 @@ class App {
     if (name === 'relayclose') return this.frameRelay(ms);
     if (name === 'servo' || name === 'servoclose') return this.frameServo(name === 'servoclose', ms);
     if (name === 'pirfront' || name === 'pirback') return this.framePir(name === 'pirback' ? 'back' : 'front', ms);
-    const v = VIEWS[name];
+    let v = VIEWS[name];
+    if (IS_PI && (name === 'home' || name === 'top' || name === 'bottom')) v = { ...v, dist: v.dist * 1.25 };
     if (!ms) { this.viewer.controls.target.copy(v.t); this.viewer.camera.position.copy(v.t.clone().add(v.d.clone().normalize().multiplyScalar(v.dist))); return Promise.resolve(); }
     return this.viewer.flyTo(v.t, v.dist, v.d, ms);
   }
@@ -392,6 +410,7 @@ class App {
       const hdr = id === 'jdigital' ? JDIGITAL : id === 'janalog' ? JANALOG : JSPI;
       h += `<div class="pingrid">${hdr.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b> · pin ${p.pin}</button>`).join('')}</div>`;
     }
+    if (IS_PI && id === 'gpio') h += `<div class="pingrid">${J8_HEADER.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b> · pin ${p.pin}</button>`).join('')}</div>`;
     if (id === 'jctl') h += `<table class="kv">${JCTL.pins.map(p => `<tr><td>Pin ${p.pin}</td><td>${p.label}</td></tr>`).join('')}</table>`;
     if (info.warn) h += `<p class="warn">⚠ ${info.warn}</p>`;
     if (info.src) h += `<div class="src">Source: ${info.src}</div>`;
@@ -425,8 +444,8 @@ class App {
       title = info ? `Pin ${info.label}` : `Pin ${pinId}`;
       ref = info && info.mcu && info.mcu !== '—' ? info.mcu : `${info ? info.header : 'Header'}`;
       tag = info && info.v ? info.v : '3.3V';
-      const fns = info && info.fn ? info.fn.join(', ') : '';
-      line1 = fns ? `Functions: ${fns}` : 'Direct microcontroller input/output pin.';
+      const fns = info && info.fn ? (IS_PI ? info.fn[0] : info.fn.join(', ')) : '';
+      line1 = fns ? (IS_PI ? fns + '.' : `Functions: ${fns}`) : 'Direct microcontroller input/output pin.';
       line2 = info && info.note ? info.note : 'Connect sensors, actuators, or test probes here.';
     } else if (PARTS[id]) {
       const part = PARTS[id];
@@ -564,6 +583,7 @@ class App {
   }
 
   pinCard(pinId) {
+    if (IS_PI) return this.pinCardPi(pinId);
     const p = findPin(pinId);
     const hdr = p.header === 'JDIGITAL' ? JDIGITAL : p.header === 'JANALOG' ? JANALOG : JSPI;
     let h = `<div class="card"><h2><span class="pinchip">${p.label}</span> ${p.id !== p.label && !/^(GND|SPI_)/.test(p.id) ? p.id : ''}</h2>`;
@@ -575,7 +595,41 @@ class App {
     h += `<div class="src">Source: UNO Q datasheet §9.4–9.7 · full pinout · user manual</div></div>`;
     return h;
   }
+  pinCardPi(pinId) {
+    const p = findPin(pinId);
+    let h = `<div class="card"><h2><span class="pinchip">${p.label}</span> physical pin ${p.pin}</h2><div class="ref">J8 · 40-pin GPIO header</div>`;
+    h += `<table class="kv"><tr><td>Pin</td><td>${p.pin} (${p.pin % 2 ? 'inner row, odd numbers' : 'outer row, even numbers'})</td></tr>`;
+    if (p.gpio !== null) h += `<tr><td>In code</td><td><b>GPIO${p.gpio}</b> (BCM number)</td></tr>`;
+    h += `<tr><td>Level</td><td>${p.v}</td></tr><tr><td>Functions</td><td>${p.fn.join('<br>')}</td></tr></table>`;
+    h += `<p class="${p.warn ? 'warn' : ''}">${p.note}</p><p class="tip">${J8_HEADER.common}</p>`;
+    h += `<p><button class="item" data-part="gpio">← About the 40-pin GPIO header</button></p>`;
+    h += `<div class="src">Source: Raspberry Pi 4 datasheet §5.1 (Figure 3, Table 5) · raspberrypi.com GPIO documentation</div></div>`;
+    return h;
+  }
+  applyBoardBranding() {
+    if (IS_PI) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'Raspberry Pi 4'; const lg = document.querySelector('.brand .logo'); if (lg) lg.style.display = 'none'; }
+    document.title = (IS_PI ? 'Raspberry Pi 4' : 'Arduino UNO Q') + ' · 3D Learning Lab';
+    const ch = $('#chooser');
+    if (ch) {
+      const cards = ch.querySelectorAll('[data-board]');
+      cards.forEach(c => { const im = c.querySelector('.ch-img'); if (im && !im.firstChild) { const img = new Image(); img.alt = ''; img.src = c.dataset.board === 'pi4' ? piThumb : uqThumb; im.appendChild(img); } c.classList.toggle('cur', c.dataset.board === BOARD); });
+      const go = b => { if (b === BOARD) { ch.classList.remove('on'); history.replaceState(null, '', '?board=' + b); } else location.search = '?board=' + b; };
+      cards.forEach(c => c.onclick = () => go(c.dataset.board));
+      if (!new URLSearchParams(location.search).get('board')) ch.classList.add('on');
+      $('#switch-board').onclick = () => ch.classList.add('on');
+      $('#chooser-close').onclick = () => ch.classList.remove('on');
+    }
+  }
   showWelcome() {
+    if (IS_PI) {
+      $('#panel').innerHTML = `<div class="card welcome"><h2>${BOARD_FACTS.name}</h2><span class="tag">Interactive 3D model</span>
+        <p>This model is built from Raspberry Pi’s <b>official mechanical drawing</b> (exact size, hole and connector positions and heights) with the surface taken from <b>real photographs</b> of the board, straightened to the exact millimetre grid.</p>
+        <div class="facts"><span>Size</span><span>${BOARD_FACTS.size}</span><span>Memory</span><span>${BOARD_FACTS.ram}</span><span>Operating temp.</span><span>${BOARD_FACTS.temp}</span></div>
+        <p class="tip"><b>Click any part</b> on the board — or choose one on the left — to learn what it does. Click a single GPIO pin to see its function.</p>
+        <p>Use <b>Top</b> / <b>Bottom</b> to turn the board over (the microSD slot is underneath), and <b>360°</b> to spin it.</p>
+        <div class="src">Sources: Raspberry Pi 4 Model B datasheet and mechanical drawing (Raspberry Pi Ltd). Board photos: “Raspberry Pi 4 Model B - Top” by Laserlicht and “Raspberry Pi 4, 2 GB RAM version 7” by Suyash Dwivedi, Wikimedia Commons, CC BY-SA 4.0 — straightened and used as textures (same licence). Raspberry Pi is a trademark of Raspberry Pi Ltd.</div></div>`;
+      return;
+    }
     $('#panel').innerHTML = `<div class="card welcome"><h2>${BOARD_FACTS.name}</h2><span class="tag">Interactive 3D model</span>
       <p>This model is built from Arduino’s official open-source CAD files — the real copper, solder-mask and silkscreen artwork, drill holes and part positions.</p>
       <div class="facts"><span>Versions</span><span>${BOARD_FACTS.skus}</span><span>Size</span><span>${BOARD_FACTS.size}</span><span>Operating temp.</span><span>${BOARD_FACTS.temp}</span></div>
@@ -597,7 +651,7 @@ class App {
         for (const [id, p] of items) h += `<button class="item" data-id="${id}"><span class="dot"></span>${p.name.replace(/^(Qualcomm Dragonwing™|STMicroelectronics) /, '')}<small>${(p.ref || '').split(' ')[0]}</small></button>`;
       }
       h += `<h3>Header pins</h3>`;
-      for (const hd of [JDIGITAL, JANALOG, JSPI]) h += `<div class="pingrid">${hd.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b></button>`).join('')}</div>`;
+      for (const hd of PIN_HEADERS) h += `<div class="pingrid">${hd.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b>${IS_PI ? ` · ${p.pin}` : ''}</button>`).join('')}</div>`;
       side.innerHTML = h;
       side.querySelectorAll('.item').forEach(b => b.onclick = () => this.select(b.dataset.id));
       side.querySelectorAll('[data-pin]').forEach(b => b.onclick = () => this.select('pin:' + b.dataset.pin));
@@ -609,7 +663,7 @@ class App {
         h += `<button class="lesson-card ${this.lesson && this.lesson.id === L.id ? 'on' : ''} ${done ? 'done' : ''}" data-lesson="${L.id}">
           <span class="num">${done ? '✓' : L.num}</span><b>${L.title}</b><p>${L.goal}</p><div class="meta">${L.level} · ${L.time}${done ? ' · completed' : ''}</div></button>`;
       }
-      if (COMING_SOON.length) h += '<h3>Coming next (stage 3)</h3>' + COMING_SOON.map(s => `<div class="soon">${s}</div>`).join('');
+      if (COMING_SOON.length) h += `<h3>${IS_PI ? 'Raspberry Pi 4 lessons — coming next' : 'Coming next (stage 3)'}</h3>` + COMING_SOON.map(s => `<div class="soon">${s}</div>`).join('');
       side.innerHTML = h;
       side.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => this.startLesson(b.dataset.lesson));
       const on = side.querySelector('.lesson-card.on'); if (on) on.scrollIntoView({ block: 'nearest' });
@@ -635,6 +689,13 @@ class App {
   }
 
   lessonHome() {
+    if (IS_PI) {
+      $('#panel').innerHTML = `<div class="card"><div class="lesson-head">Course</div><h2>Raspberry Pi 4 lessons</h2>
+        <p>The Raspberry Pi 4 course is being built. Each lesson will show the real hardware and every connection in 3D, step by step, with verified facts — like the UNO Q course.</p>
+        <ol>${COMING_SOON.map(t => `<li>${t}</li>`).join('')}</ol>
+        <p class="tip">Meanwhile, explore the board: open <b>Explore the board</b> and click any part or GPIO pin.</p></div>`;
+      return;
+    }
     $('#panel').innerHTML = `<div class="card"><div class="lesson-head">Course</div><h2>Learn the UNO Q step by step</h2>
       <p>The lessons go in order, from the very basics to circuits with inputs, outputs, light and sound. Each step moves the 3D board, highlights the parts and explains them.</p>
       ${Object.entries(MODULES).map(([m, name]) => `<p><b>${name}</b></p><ol start="${LESSONS.find(l => l.module === +m).num}">${LESSONS.filter(l => l.module === +m).map(L => `<li>${L.title} — ${L.time}</li>`).join('')}</ol>`).join('')}

@@ -25,8 +25,21 @@
       <button id="v-bottom" title="Turn the board over">Bottom</button>
       <button id="v-rotate" class="tgl" title="Rotate 360° automatically">⟳ 360°</button>
       <button id="v-labels" class="tgl" title="Show part names">Labels</button>
+      <button id="switch-board" title="Choose another board">⇄ Board</button>
     </div>
   </header>
+
+  <div id="chooser" role="dialog" aria-label="Choose a board">
+    <div class="ch-box">
+      <button id="chooser-close" class="ch-x" title="Close" aria-label="Close">×</button>
+      <h2>Choose a board to learn</h2>
+      <p>Realistic 3D boards — click every part, then learn step by step.</p>
+      <div class="ch-cards">
+        <button class="ch-card" data-board="unoq"><span class="ch-img"></span><b>Arduino UNO Q</b><small>Microcontroller + Linux · 23 lessons</small></button>
+        <button class="ch-card" data-board="pi4"><span class="ch-img"></span><b>Raspberry Pi 4 Model B</b><small>Linux computer · explore the board · lessons coming</small></button>
+      </div>
+    </div>
+  </div>
 
   <aside id="side"></aside>
 
