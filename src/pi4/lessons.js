@@ -39,6 +39,19 @@ while True:
         print("Released")
     sleep(1)`;
 
+export const PI_PWM = `from gpiozero import PWMLED
+from time import sleep
+
+led = PWMLED(17)
+
+while True:
+    led.value = 0  # off
+    sleep(1)
+    led.value = 0.5  # half brightness
+    sleep(1)
+    led.value = 1  # full brightness
+    sleep(1)`;
+
 export const PI_BUTTON_LED = `from gpiozero import LED, Button
 
 led = LED(17)
@@ -413,6 +426,67 @@ button.when_released = led.off</pre>
     ],
     sources: [SRC_PI.usegpio, SRC_PI.gpiozero],
   },
+  // ================================================================== P7
+  {
+    id: 'p7', num: 7, module: 2, title: 'Fade an LED with PWM', level: 'Beginner', time: '15 min',
+    goal: 'Set the brightness of the LED with PWMLED: values from 0 (off) to 1 (full).',
+    hardware: ['Lesson 4 circuit (LED on GPIO17)'],
+    code: PI_PWM, file: 'pwm_led.py', program: 'pi_pwm', fast: true,
+    circuit: PI_LED_PARTS, io: { p11: IO_LED }, led: true,
+    explain: {
+      1: 'Take <b>PWMLED</b>: an LED whose brightness you can set (instead of only on / off).',
+      2: 'Take <b>sleep</b>.',
+      4: '<b>PWMLED(17)</b>: the same LED on GPIO17 (pin 11), now with variable brightness. The pin pulses at <b>100 Hz</b> by default (GPIO Zero source).',
+      6: 'Repeat forever.',
+      7: '<b>led.value = 0</b>: brightness 0 = off. Values run from <b>0 to 1</b>.',
+      8: 'Wait 1 second.',
+      9: '<b>0.5</b>: the pin is HIGH half of the time → half brightness.',
+      10: 'Wait 1 second.',
+      11: '<b>1</b>: HIGH all the time → full brightness.',
+      12: 'Wait 1 second, then start again.',
+    },
+    steps: [
+      {
+        title: 'What is PWM?', view: 'pibench', have: PI_LED_PARTS.map(d => d.id), power: false,
+        body: `<p>A GPIO pin is either <b>HIGH (3.3 V)</b> or <b>LOW (0 V)</b> — it cannot output 1.65 V. <b>PWM</b> (pulse-width modulation) fakes in-between brightness by switching the pin on and off <b>very fast</b> (100 times per second here). The LED follows the <b>fraction of time it is on</b> — the <b>duty cycle</b>.</p>
+        <table class="kv"><tr><th>value</th><th>pin is HIGH</th><th>average voltage</th></tr><tr><td>0</td><td>never</td><td>0 V</td></tr><tr><td>0.5</td><td>half of the time</td><td>≈ 1.65 V</td></tr><tr><td>1</td><td>always</td><td>3.3 V</td></tr></table>
+        <p class="tip">Your eye cannot see 100 flashes per second, so it sees one steady, dimmer light.</p>`,
+      },
+      {
+        title: 'The same circuit', view: 'pibench', have: PI_LED_PARTS.map(d => d.id), pins: ['p11', 'p9'],
+        body: `<p>No new wiring: LED and 220 Ω resistor on <b>GPIO17 (pin 11)</b>, ground on <b>pin 9</b>, exactly as in Lesson 4. Only the program changes.</p>
+        <p class="sim">The Raspberry Pi 4 datasheet lists two hardware PWM channels (PWM0 / PWM1, e.g. on GPIO12 and GPIO13). GPIO Zero’s <code>PWMLED</code> works on any GPIO pin you give it.</p>`,
+      },
+      { title: 'The program', view: 'pibench', showCode: true, power: true, body: `<p>The official “LED with variable brightness” example. Click any line to read about it.</p>` },
+      {
+        title: 'Run it', view: 'pibench', showCode: true, power: true, action: 'run',
+        body: `<p>Every second the brightness changes: <b>off → half → full</b>. Watch the line <code>led.value = …</code>, the pin panel (duty and average voltage) and the LED.</p>
+        <p class="sim">Simulated. The LED drawing shows the brightness level; the real pulses are too fast to see.</p>`,
+      },
+      {
+        title: 'Fading automatically', view: 'pibench', power: true,
+        body: `<p>The documentation has an even shorter program: <code>led.pulse()</code> fades the LED in and out continuously.</p>
+        <pre class="tree">from gpiozero import PWMLED
+from signal import pause
+
+led = PWMLED(17)
+led.pulse()
+pause()</pre>
+        <p><code>pause()</code> keeps the script alive — without it the program would end and the LED would stop.</p>`,
+      },
+      {
+        title: 'Summary', view: 'pibench', power: true,
+        body: `<ul><li><code>PWMLED(17)</code>; <code>led.value</code> from <b>0</b> (off) to <b>1</b> (full).</li><li>PWM switches the pin fast; brightness = fraction of time HIGH.</li><li>Default frequency 100 Hz; <code>pulse()</code> fades automatically.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'What value gives half brightness with PWMLED?', a: ['0', '0.5', '50', '255'], c: 1, why: 'PWMLED values run from 0 to 1; 0.5 is half.' },
+      { q: 'What does PWM do?', a: ['Makes the pin output 1.65 V', 'Switches the pin on and off very fast; the on-time fraction sets brightness', 'Raises the voltage to 5 V', 'Slows the CPU'], c: 1, why: 'The pin is only ever 0 V or 3.3 V; the duty cycle sets the average.' },
+      { q: 'Average voltage at value 0.5 (3.3 V pin)?', a: ['0 V', '1.65 V', '3.3 V', '5 V'], c: 1, why: '0.5 × 3.3 V ≈ 1.65 V.' },
+      { q: 'Default PWMLED frequency in GPIO Zero?', a: ['1 Hz', '100 Hz', '1 kHz', '1 MHz'], c: 1, why: 'GPIO Zero PWMOutputDevice: frequency defaults to 100 Hz.' },
+    ],
+    sources: [SRC_PI.usegpio, SRC_PI.gpiozero, SRC_PI.ds, SRC_PI.gpio],
+  },
 ];
 
-export const PI_COMING = ['PWM: fade an LED (PWMLED)', 'Buzzer', 'An I²C sensor', 'The Terminal and files', 'Camera module', 'A web page served by the Pi', 'Final project'];
+export const PI_COMING = ['Buzzer', 'An I²C sensor', 'The Terminal and files', 'Camera module', 'A web page served by the Pi', 'Final project'];

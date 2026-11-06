@@ -81,6 +81,7 @@ export class Sim {
       servoWrite: (pin, angle) => { const a = Math.min(180, Math.max(0, angle)); const us = Math.floor((Math.trunc(a * (2400 - 544) / 180) + 544) / 4) * 4; H.servo(pin, us, a); },
       tone: (pin, f, ms) => { pins[pin] = { mode: 'OUTPUT' }; tok.tonePin = pin; H.tone(pin, f, ms); },
       noTone: (pin) => { H.noTone(pin); },
+      pwmValue: (pin, v) => { pins[pin] = { mode: 'OUTPUT' }; H.pwm(pin, v, v); },   // GPIO Zero PWMLED.value, 0..1
       map: (x, a, b, c, d) => Math.trunc((x - a) * (d - c) / (b - a)) + c,   // Arduino integer map()
       serialBegin: () => { serialOn = true; },
       print: (v, digits) => { if (serialOn) lineBuf += fmt(v, digits); },
@@ -395,6 +396,20 @@ export const PROGRAMS = {
       await rt.at(8); await rt.delay(1000);
       await rt.at(9); rt.digitalWrite('p11', 0);
       await rt.at(10); await rt.delay(1000);
+    }
+  },
+  async pi_pwm(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2);
+    await rt.at(4); rt.pinMode('p11', 'OUTPUT'); rt.pwmValue('p11', 0);
+    for (;;) {
+      await rt.at(6);
+      await rt.at(7); rt.pwmValue('p11', 0);
+      await rt.at(8); await rt.delay(1000);
+      await rt.at(9); rt.pwmValue('p11', 0.5);
+      await rt.at(10); await rt.delay(1000);
+      await rt.at(11); rt.pwmValue('p11', 1);
+      await rt.at(12); await rt.delay(1000);
     }
   },
   async pi_button(rt) {

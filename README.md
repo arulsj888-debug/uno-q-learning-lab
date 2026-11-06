@@ -55,6 +55,7 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
     4. Blink an LED (`LED(17)`, female–male jumpers from the header to a breadboard)
     5. Read a push button (`Button(2)`, pull-up)
     6. The button controls the LED
+    7. Fade an LED with PWM (`PWMLED`, value 0–1, duty cycle, default 100 Hz)
 
 ## Works on every screen
 

@@ -1632,7 +1632,7 @@ class App {
     const on = !!(L && L.led && this.board.powered && this.wired(L.io));
     if (L && L.led) L.led.set(on && duty > 0, duty);
     if (this.scope && (this.lesson.scopePin || 'D5') === pin) this.scope.set({ type: 'pwm', freq: 500, duty });
-    this.setPinLevel(`${pin}: PWM <span class="hi">${(duty * 100).toFixed(0)} %</span> (value ${raw}) · average ≈ ${(duty * VREF).toFixed(2)} V`);
+    this.setPinLevel(`${pinName(pin)}: PWM <span class="hi">${(duty * 100).toFixed(0)} %</span> (value ${raw}) · average ≈ ${(duty * VREF).toFixed(2)} V`);
   }
 
   onTone(pin, f, ms) {
