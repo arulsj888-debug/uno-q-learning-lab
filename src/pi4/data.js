@@ -113,10 +113,16 @@ export const PARTS_PI = {
     simple: ['A coil used in the power supply circuit.', 'Marking R47 = 0.47 µH (standard code).'],
     src: 'PHOTO (marking)',
   },
-  othercomp: {
-    cat: 'brains', name: 'Other small components', ref: 'Not identified', tag: 'Supporting parts',
-    summary: 'Small parts near the Ethernet jack and near the power input (a black capacitor-like body and a black rectangular part). Their markings are not legible in the photo and the official documents do not name them, so no function is claimed here.',
-    simple: ['Supporting parts of the power and network circuits.', 'Markings not legible — not identified.'],
+  misc_pwr: {
+    cat: 'brains', name: 'Black part near the power input', ref: 'Not identified', tag: 'Small part',
+    summary: 'A black rectangular part with a marked (silver) end, close to the USB-C power socket. Its marking is not legible in the photo and the official documents do not name it, so no function is claimed.',
+    simple: ['A small black part beside the USB-C power input.', 'Not identified — no function claimed.'],
+    src: 'PHOTO',
+  },
+  misc_eth: {
+    cat: 'brains', name: 'Black part beside the USB jacks', ref: 'Not identified', tag: 'Small part',
+    summary: 'A black capacitor-like part with a marked end, next to the USB and Ethernet jacks. Its marking is not legible in the photo and the official documents do not name it, so no function is claimed.',
+    simple: ['A small black part beside the USB jacks.', 'Not identified — no function claimed.'],
     src: 'PHOTO',
   },
   gpio: {
