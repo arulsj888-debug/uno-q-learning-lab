@@ -39,6 +39,8 @@ export function terminals(d) {
     case 'pot': return [['A', `${row}${c}`], ['W', `${row}${c + 2}`], ['B', `${row}${c + 4}`]];
     case 'tmp36': return d.flip ? [['VS', `${row}${c + 2}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c}`]] : [['VS', `${row}${c}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c + 2}`]];
     case 'sht31': return [['VIN', `${row}${c}`], ['GND', `${row}${c + 1}`], ['SCL', `${row}${c + 2}`], ['SDA', `${row}${c + 3}`], ['ADDR', `${row}${c + 4}`], ['RST', `${row}${c + 5}`], ['ALRT', `${row}${c + 6}`]];
+    case 'l293d': { const out = []; for (let i = 1; i <= 16; i++) out.push([`p${i}`, i <= 8 ? `f${c + i - 1}` : `e${c + 16 - i}`]); return out; }
+    case 'motor': return [['M1', `${d.id}.M1`], ['M2', `${d.id}.M2`]];
     case 'relay': return [['DCP', `${d.id}.DCP`], ['DCN', `${d.id}.DCN`], ['IN', `${d.id}.IN`], ['NO', `${d.id}.NO`], ['COM', `${d.id}.COM`], ['NC', `${d.id}.NC`]];
     case 'battery': return [['POS', `${d.id}.POS`], ['NEG', `${d.id}.NEG`]];
     case 'lamp': return [['L1', `${d.id}.L1`], ['L2', `${d.id}.L2`]];
@@ -79,6 +81,12 @@ export function solveDC(n, elems, temp = 25) {
         const vs = v[e.vs] - v[e.gnd], ramp = Math.min(1, Math.max(0, (vs - 2.4) / 0.3));
         const out = ramp * Math.min(2.0, Math.max(0.1, 0.5 + 0.01 * temp)), g = 1 / 50;
         G(e.out, e.gnd, g); I(e.out, out * g); I(e.gnd, -out * g);
+      } else if (e.t === 'H') {   // one output of the L293D H-bridge: high = VCC2 through 2.3 ohm, low = GND through 2 ohm, off = high impedance
+        const gd = v[e.gnd];
+        if (e.grounded && v[e.en] - gd >= 2.3 && v[e.vcc1] - gd >= 4.5) {
+          const high = v[e.a] - gd >= 2.3, g = 1 / (high ? 2.3 : 2), val = high ? Math.max(0, v[e.vcc2] - gd) : 0;
+          e.on = true; e.high = high; G(e.y, e.gnd, g); I(e.y, val * g); I(e.gnd, -val * g); e.target = val; e.g = g;
+        } else e.on = false;
       } else if (e.t === 'M') {   // module output: voltage out = fn(supply voltage), measured against the module's own GND
         const out = e.fn(v[e.vs] - v[e.gnd]), g = 1 / (e.r || 100);
         G(e.out, e.gnd, g); I(e.out, out * g); I(e.gnd, -out * g);
@@ -151,7 +159,8 @@ export function evaluate(model) {
   for (const d of parts) {
     for (const [, ref] of terminals(d)) find(nodeOfRef(ref));
     if (d.type === 'wire' || d.type === 'fwire' || d.type === 'lead') union(nodeOfRef(d.from), nodeOfRef(d.to));
-    if (d.type === 'button') { union(T(d, 'e1'), T(d, 'e2')); union(T(d, 'f1'), T(d, 'f2')); }   // the two legs on one side of a tactile switch are joined inside it
+    if (d.type === 'button') { union(T(d, 'e1'), T(d, 'e2')); union(T(d, 'f1'), T(d, 'f2')); }
+    if (d.type === 'l293d') { union(T(d, 'p4'), T(d, 'p5')); union(T(d, 'p4'), T(d, 'p12')); union(T(d, 'p4'), T(d, 'p13')); }   // the four middle pins are one ground   // the two legs on one side of a tactile switch are joined inside it
   }
   const ids = new Map([['GROUND', 0]]);
   const nid = key => { const r = find(key); if (!ids.has(r)) ids.set(r, ids.size); return ids.get(r); };
@@ -224,6 +233,16 @@ export function evaluate(model) {
         if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 3300 }, { t: 'R', a: nid(T(d, 'SDA')), b: vn, g: 1 / 10000 }, { t: 'R', a: nid(T(d, 'SCL')), b: vn, g: 1 / 10000 });   // power LED; 10 kOhm pull-ups on the breakout
         pe[d.id] = { vn, gn };
       }
+      else if (d.type === 'l293d') {
+        const N_ = k => nid(T(d, 'p' + k)), gnd = N_(4), vcc1 = N_(16), vcc2 = N_(8);
+        pe[d.id] = { H: [] };
+        if (!dead) {
+          elems.push({ t: 'R', a: vcc1, b: gnd, g: 1 / 300, load: true });
+          for (const [en, a, y] of [[1, 2, 3], [1, 7, 6], [9, 10, 11], [9, 15, 14]]) { const e = { t: 'H', y: N_(y), a: N_(a), en: N_(en), gnd, vcc1, vcc2 }; elems.push(e); pe[d.id].H.push(e); }
+        }
+        Object.assign(pe[d.id], { gnd, vcc1, vcc2, en1: N_(1), en2: N_(9) });
+      }
+      else if (d.type === 'motor') { const a = nid(T(d, 'M1')), b = nid(T(d, 'M2')); if (!dead) elems.push({ t: 'R', a, b, g: 1 / 6 }); pe[d.id] = { a, b }; }
       else if (d.type === 'battery') { const a = nid(T(d, 'POS')), b = nid(T(d, 'NEG')); if (!dead) elems.push({ t: 'S', a, b, g: 1 / 0.6, i: 6 / 0.6 }); pe[d.id] = { a, b, S: elems[elems.length - 1] }; }
       else if (d.type === 'lamp') { const a = nid(T(d, 'L1')), b = nid(T(d, 'L2')); if (!dead) elems.push({ t: 'R', a, b, g: 1 / 20 }); pe[d.id] = { a, b }; }
       else if (d.type === 'relay') {
@@ -234,6 +253,13 @@ export function evaluate(model) {
       }
       else if (d.type === 'tmp36') { const vs = nid(T(d, 'VS')), out = nid(T(d, 'OUT')), g = nid(T(d, 'GND')); elems.push({ t: 'R', a: vs, b: g, g: 1 / 66000 }, { t: 'T', vs, out, gnd: g }); pe[d.id] = { vs, out, g }; }
     }
+    const reach = list => {
+      const adj = new Map(); const link = (a, b) => { (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a); };
+      for (const e of list) { if (e.t === 'R' || e.t === 'D') link(e.a, e.b); else if (e.t === 'S') link(e.a, e.b); else if (e.t === 'T' || e.t === 'M') { link(e.out, e.gnd); link(e.vs, e.gnd); } }
+      const seen = new Set([0]), q = [0]; while (q.length) { const x = q.pop(); for (const y of adj.get(x) || []) if (!seen.has(y)) { seen.add(y); q.push(y); } }
+      return seen;
+    };
+    { const seen0 = reach(elems.filter(e => !e.load)); for (const e of elems) if (e.t === 'H') e.grounded = seen0.has(e.gnd); }
     let { v } = solveDC(n, elems, env.tempC ?? 25);
     // relay modules: the coil state follows the voltages (low-level trigger); then the contacts switch and the circuit is solved again
     let flipped = false;
@@ -247,6 +273,13 @@ export function evaluate(model) {
     for (const d of parts) { const q = pe[d.id]; if (!q) continue;
       if (d.type === 'relay') { acc(d.id, 'on', q.on ? 1 : 0); acc(d.id, 'sup', q.sup); acc(d.id, 'dv', q.dv); }
       else if (d.type === 'lamp') { const V = v[q.a] - v[q.b]; acc(d.id, 'V', V); acc(d.id, 'Vmax', V, 'max'); }
+      else if (d.type === 'motor') { const V = v[q.a] - v[q.b]; acc(d.id, 'V', V); }
+      else if (d.type === 'l293d') {
+        acc(d.id, 'v1', v[q.vcc1] - v[q.gnd]); acc(d.id, 'v2', v[q.vcc2] - v[q.gnd]); acc(d.id, 'en1', v[q.en1] - v[q.gnd]); acc(d.id, 'en2', v[q.en2] - v[q.gnd]);
+        acc(d.id, 'grounded', q.H.length && q.H[0].grounded ? 1 : 0);
+        let mx = 0; for (const e of q.H) if (e.on) mx = Math.max(mx, Math.abs((e.target - (v[e.y] - v[e.gnd])) * e.g)); acc(d.id, 'Imax', mx, 'max');
+        acc(d.id, 'on', q.H.some(e => e.on) ? 1 : 0);
+      }
       else if (d.type === 'battery') { const V = v[q.a] - v[q.b]; acc(d.id, 'V', V); acc(d.id, 'Imax', Math.abs(q.S.i - q.S.g * V), 'max'); }
     }
     for (const p of pinSrc) {
@@ -266,9 +299,8 @@ export function evaluate(model) {
       else if (d.type === 'tmp36') { acc(d.id, 'Vs', v[q.vs] - v[q.g]); acc(d.id, 'Vout', v[q.out] - v[q.g]); }
     }
     if (step === N - 1) {   // floating nets: no conducting path to any source
-      const adj = new Map(); const link = (a, b) => { (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a); };
-      for (const e of elems) { if (e.t === 'R' || e.t === 'D') link(e.a, e.b); else if (e.t === 'S') link(e.a, e.b); else if (e.t === 'T' || e.t === 'M') { link(e.out, e.gnd); link(e.vs, e.gnd); } }
-      const seen = new Set([0]), q = [0]; while (q.length) { const x = q.pop(); for (const y of adj.get(x) || []) if (!seen.has(y)) { seen.add(y); q.push(y); } }
+      const extra = elems.filter(e => e.t === 'H' && e.on).map(e => ({ t: 'R', a: e.y, b: e.gnd, g: 1 }));
+      const seen = reach([...elems, ...extra]);
       floating = new Set(); for (let i = 1; i < n; i++) if (!seen.has(i)) floating.add(i);
     }
   }
@@ -344,6 +376,26 @@ export function evaluate(model) {
     } else if (d.type === 'ldr') {
       if (dangling(d, 'a') || dangling(d, 'b')) { R.status = 'warn'; note('warn', `${label}: one leg is not connected to anything.`, d.id); }
       R.msg = `${(LDR_OHMS(env.lux) / 1000).toFixed(1)} kΩ at ${env.lux < 1 ? 'under 1' : Math.round(env.lux)} lux`;
+    } else if (d.type === 'motor') {
+      const V = s.V ?? 0, sp = Math.max(-1, Math.min(1, V / 3.4)); R.speed = Math.abs(V) < 0.6 ? 0 : sp;
+      const dn = dangling(d, 'M1') || dangling(d, 'M2');
+      if (burnt.has(d.id)) { R.status = 'bad'; R.msg = 'Burnt out.'; }
+      else if (!powered) R.status = 'off';
+      else if (dn) { R.status = 'warn'; R.msg = 'A motor wire is not connected.'; note('bad', `${label}: one of the two motor wires is not connected, so no current can flow.`, d.id); }
+      else if (R.speed) { R.msg = `${V > 0 ? 'Direction 1' : 'Direction 2'}, ${Math.round(Math.abs(R.speed) * 100)} % (${Math.abs(V).toFixed(1)} V across the motor).`; note('ok', `${label} spins: ${R.msg}`, d.id); }
+      else { R.status = 'off'; R.msg = 'Stopped: almost no voltage across the motor.'; note('info', `${label} is stopped (${Math.abs(V).toFixed(1)} V across it). Check the driver's enable and input pins, and the motor supply.`, d.id); }
+    } else if (d.type === 'l293d') {
+      const v1 = s.v1 ?? 0, v2 = s.v2 ?? 0, on = (s.on ?? 0) > 0.5, I = s.Imax ?? 0;
+      if (burnt.has(d.id)) { R.status = 'bad'; R.msg = 'Burnt out.'; note('bad', burnWhy[d.id] || `${label} is burnt out. Delete it and place a new one.`, d.id); }
+      else if (!powered) R.status = 'off';
+      else if (I > 1.2) { R.status = 'bad'; burn(d.id, `${label} is destroyed: ${I.toFixed(1)} A flowed through one output, above its 1.2 A peak rating (0.6 A continuous). A stalled or too-big motor does this.`); }
+      else if (!(s.grounded > 0.5)) { R.status = 'off'; R.msg = 'No common ground.'; note('bad', `${label}: its ground is not connected to the board's GND. Every supply and signal must share one ground: join the battery − and the driver's GND pins (4, 5, 12, 13) to a GND pin of the board.`, d.id); }
+      else if (v1 < 4.5) { R.status = 'off'; R.msg = `Logic supply is ${Math.max(0, v1).toFixed(1)} V.`; note('bad', `${label}: pin 16 (VCC1, logic supply) has only ${Math.max(0, v1).toFixed(1)} V. It needs 4.5 V … 7 V: connect it to 5 V.`, d.id); }
+      else if (!on) { R.status = 'warn'; R.msg = 'Outputs off.'; note('warn', `${label}: the outputs are off because the enable pin (pin 1 or 9) is not HIGH.`, d.id); }
+      else {
+        if (v2 < 2.5) { R.status = 'warn'; R.msg = `Motor supply (pin 8) only ${Math.max(0, v2).toFixed(1)} V.`; note('bad', `${label}: pin 8 (VCC2, motor supply) has only ${Math.max(0, v2).toFixed(1)} V: the motor gets no power. Connect it to the battery +.`, d.id); }
+        else { R.msg = `Outputs on, motor supply ${v2.toFixed(1)} V.`; if (I > 0.6) { R.status = 'warn'; note('warn', `${label}: ${I.toFixed(2)} A in one output is above the 0.6 A continuous rating.`, d.id); } else note('ok', `${label}: outputs enabled, motor supply ${v2.toFixed(1)} V.`, d.id); }
+      }
     } else if (d.type === 'battery') {
       R.msg = `${(s.V ?? 0).toFixed(1)} V`;
       if (powered || true) { if ((s.Imax ?? 0) > 2) { R.status = 'bad'; note('bad', `${label} is short-circuited: about ${(s.Imax).toFixed(0)} A would flow and the batteries would get very hot. Remove the wire that joins + and −.`, d.id); } }
@@ -453,7 +505,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }

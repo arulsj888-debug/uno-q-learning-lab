@@ -83,6 +83,14 @@ r = evaluate(base({ pinInfo: unoR, parts: relayParts, pinCfg: { D4: { mode: 'out
 r = evaluate(base({ pinInfo: unoR, parts: relayParts, pinCfg: { D4: { mode: 'in' } } })); ok(!r.parts.rel1.on && r.parts.lamp1.status === 'off', 'relay released (pin input): lamp off');
 r = evaluate(base({ pinInfo: unoR, parts: relayParts, pinCfg: { D4: { mode: 'out1' } } })); ok(!r.parts.rel1.on && r.parts.rel1.status === 'warn', 'relay with pin HIGH stays off and warns');
 r = evaluate(base({ pinInfo: unoR, parts: [{ id: 'bat1', type: 'battery' }, L('x', 'bat1.POS', 'bat1.NEG')] })); ok(r.parts.bat1.status === 'bad', 'battery short is flagged');
+const unoM = id => ({ D5: { id: 'D5' }, D7: { id: 'D7' }, D8: { id: 'D8' }, '5V': { id: '5V' }, GND2: { id: 'GND2', kind: 'gnd' }, GND3: { id: 'GND3', kind: 'gnd' } }[id]);
+const motor = ground => [{ id: 'u1', type: 'l293d', col: 12 }, { id: 'bat1', type: 'battery' }, { id: 'mot1', type: 'motor' }, W('w1', '5V', 'a12', 'red'), W('w3', 'D5', 'j12', 'orange'), W('w4', 'D7', 'j13', 'yellow'), W('w5', 'D8', 'j18', 'blue'),
+  ...(ground ? [W('w6', 'GND3', 'a15', 'black')] : []), L('l1', 'bat1.POS', 'j19'), L('l2', 'bat1.NEG', 'j16'), L('l3', 'mot1.M1', 'j14'), L('l4', 'mot1.M2', 'j17')];
+r = evaluate(base({ pinInfo: unoM, parts: motor(true), pinCfg: { D5: { mode: 'out1' }, D7: { mode: 'out1' }, D8: { mode: 'out0' } } })); ok(r.parts.mot1.speed > 0.5, 'L293D drives the motor in direction 1');
+r = evaluate(base({ pinInfo: unoM, parts: motor(true), pinCfg: { D5: { mode: 'out1' }, D7: { mode: 'out0' }, D8: { mode: 'out1' } } })); ok(r.parts.mot1.speed < -0.5, 'L293D reverses the motor');
+r = evaluate(base({ pinInfo: unoM, parts: motor(true), pinCfg: { D5: { mode: 'out1' }, D7: { mode: 'out1' }, D8: { mode: 'out1' } } })); ok(r.parts.mot1.speed === 0, 'equal inputs brake the motor');
+r = evaluate(base({ pinInfo: unoM, parts: motor(true), pinCfg: { D5: { mode: 'out0' }, D7: { mode: 'out1' }, D8: { mode: 'out0' } } })); ok(r.parts.mot1.speed === 0 && r.parts.u1.status === 'warn', 'enable LOW stops the motor');
+r = evaluate(base({ pinInfo: unoM, parts: motor(false), pinCfg: { D5: { mode: 'out1' }, D7: { mode: 'out1' }, D8: { mode: 'out0' } } })); ok(r.parts.mot1.speed === 0 && /ground/.test(r.parts.u1.msg), 'no common ground is detected');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);
