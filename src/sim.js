@@ -49,7 +49,7 @@ export class Sim {
         const id = setTimeout(() => { tok.timers.delete(id); tok.wake.delete(wake); res(); }, ms);
         tok.timers.add(id); tok.wake.add(wake);
       }),
-      pinMode: (pin, mode) => { pins[pin] = { mode }; },
+      pinMode: (pin, mode) => { pins[pin] = { mode }; if (H.mode) H.mode(pin, mode); },
       digitalWrite: (pin, level) => { if (!pins[pin] || pins[pin].mode !== 'OUTPUT') return; H.pin(pin, level); },
       digitalRead: (pin) => H.read(pin, pins[pin] ? pins[pin].mode : 'INPUT'),
       analogReadResolution: (b) => { readBits = Math.min(31, Math.max(1, b)); },
@@ -317,6 +317,21 @@ export const PROGRAMS = {
       await rt.at(31); await rt.delay(2000);
       await rt.at(34); rt.digitalWrite('D8', 0);
       await rt.at(35); await rt.delay(1500);
+    }
+  },
+
+  async relay(rt) {
+    await rt.at(2);
+    await rt.at(13); await rt.at(14); await rt.at(10); rt.pinMode('D4', 'INPUT');
+    await rt.at(15); rt.serialBegin(9600);
+    for (;;) {
+      await rt.at(18);
+      await rt.at(19); await rt.at(5); rt.pinMode('D4', 'OUTPUT'); await rt.at(6); rt.digitalWrite('D4', 0);
+      await rt.at(20); rt.println('Relay ON  - lamp ON');
+      await rt.at(21); await rt.delay(3000);
+      await rt.at(22); await rt.at(10); rt.pinMode('D4', 'INPUT');
+      await rt.at(23); rt.println('Relay OFF - lamp OFF');
+      await rt.at(24); await rt.delay(3000);
     }
   },
 

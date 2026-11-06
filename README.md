@@ -7,7 +7,7 @@ An interactive, realistic 3D model of the **Arduino UNO Q** with clickable parts
 Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, with no install, server or internet connection needed.
 
 - **Explore the board**: drag to rotate 360°, scroll to zoom, right-drag to pan. Click any part or any single header pin to read about it. Use **Top**, **Bottom**, **360°** and **Labels** in the top bar.
-- **Lessons**: sixteen lessons in order, each ending with a quiz:
+- **Lessons**: seventeen lessons in order, each ending with a quiz:
   - **Module 1: Getting started**
     1. Meet the Arduino UNO Q (guided tour of every part)
     2. Power the board safely (inputs, voltage rails, boot, limits, power button)
@@ -29,6 +29,7 @@ Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, 
   - **Module 5: Motion**
     15. Turn a servo motor to an angle (SG90, Servo library, pulse-width oscilloscope)
     16. Drive a DC motor with an L293D (H-bridge, direction + PWM speed, battery, common ground)
+    17. Switch a lamp with a relay module (low-level trigger, see-through relay, safe 3.3 V use)
 
 Purple notes in the lessons mark behavior that is only **simulated** in the app, such as the shortened boot time.
 
@@ -47,6 +48,7 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
 | HC-SR501 datasheet + Handson user guide | PIR supply, 3.3 V output, range, angle, delay, trigger modes, pinout |
 | TowerPro SG90 datasheet + Arduino Servo library source | servo wires, 4.8 V, 180°, 0.1 s/60°, 544–2400 µs pulses every 20 ms, Zephyr support |
 | TI L293x datasheet (SLRS008D) + Adafruit #711 motor spec | L293D pinout, 600 mA/1.2 A, VIH 2.3 V, VCC1/VCC2, function tables, clamp diodes; 130 motor currents |
+| Handsontec 1-channel relay module guide | relay pinout COM/NO/NC, active-low trigger, DC 30 V / AC 250 V 10 A contacts, optocoupler schematic, 3.3 V note |
 | Analog Devices TMP35/36/37 datasheet, Rev. F | TMP36 output (0.5 V + 10 mV/°C), supply, accuracy, TO-92 pinout |
 | Arduino Zephyr core source (ArduinoCore-zephyr) | `analogRead` 10-bit default, `analogWrite` 8-bit default and non-PWM behavior, `tone()` behavior |
 

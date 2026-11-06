@@ -11,7 +11,7 @@ import { JDIGITAL, JANALOG, JSPI } from '../src/data/pins.js';
 const PINS = new Set([...JDIGITAL.pins, ...JANALOG.pins, ...JSPI.pins].map(p => p.id));
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
-const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2)$/;          // pin of an off-board module, e.g. pir1.OUT
+const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2)$/;          // pin of an off-board module, e.g. pir1.OUT
 const isMod = r => MOD.test(r);
 const isWire = d => d.type === 'wire' || d.type === 'fwire' || d.type === 'lead';
 const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
@@ -44,6 +44,7 @@ function nets(defs, pressed = false) {
     if (isWire(d)) { u(node(d.from), node(d.to)); continue; }
     for (const [leg, h] of Object.entries(legs(d))) u(leg, colNet(h));
     if (d.type === 'l293d') { for (const k of [5, 12, 13]) u(d.id + '.p4', d.id + '.p' + k); }   // TI block diagram: pins 4, 5, 12, 13 = one ground
+    if (d.type === 'relay') u(d.id + '.COM', d.id + (pressed ? '.NO' : '.NC'));   // contact position: energised (pressed) = COM–NO
     if (d.type === 'button') { u(d.id + '.1', d.id + '.2'); u(d.id + '.3', d.id + '.4'); if (pressed) u(d.id + '.1', d.id + '.3'); }
   }
   return { same: (a, b) => f(a) === f(b), f };
@@ -59,7 +60,7 @@ for (const L of LESSONS) {
     const ends = isWire(d) ? [d.from, d.to] : Object.values(legs(d));
     for (const e of ends) {
       if (isHole(e)) { const [, , c] = HOLE.exec(e); if (+c < 1 || +c > 30) bad(L, `${d.id}: hole ${e} out of range`); (used[e] ??= []).push(d.id); }
-      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
+      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
       else if (!PINS.has(e)) bad(L, `${d.id}: unknown header pin ${e}`);
     }
   }
@@ -148,6 +149,17 @@ for (const L of LESSONS) {
       if (!N.same(P_(7), 'PIN:' + io.in2)) bad(L, `L293D 2A (pin 7) not on ${io.in2}`);
       if (!N.same(io.item + '.M1', P_(3)) || !N.same(io.item + '.M2', P_(6))) bad(L, `motor not between 1Y (pin 3) and 2Y (pin 6)`);
       for (const p of ['5V', '3V3', 'IOREF', 'VIN', 'D5', 'D7', 'D8']) if (N.same(io.bat + '.POS', 'PIN:' + p)) bad(L, `battery + is connected to UNO Q ${p}!`);
+    }
+    if (io.kind === 'relay') {
+      const r = io.item, lamp = io.lamp, bat = io.bat;
+      if (!N.same(r + '.DCP', 'PIN:5V')) bad(L, `relay DC+ not on 5V`);
+      if (!N.same(r + '.DCN', G)) bad(L, `relay DC− not on GND`);
+      if (!N.same(r + '.IN', P)) bad(L, `relay IN not on ${pin}`);
+      const on = nets(all, true), off = nets(all, false);
+      if (!on.same(bat + '.POS', lamp + '.L1') || !on.same(lamp + '.L2', bat + '.NEG')) bad(L, `lamp circuit is not closed when the relay is ON (battery + → COM → NO → lamp → battery −)`);
+      if (off.same(bat + '.POS', lamp + '.L1')) bad(L, `lamp is powered even when the relay is OFF`);
+      if (on.same(bat + '.POS', bat + '.NEG')) bad(L, `battery is shorted`);
+      for (const nm of [bat + '.POS', bat + '.NEG']) for (const p of ['5V', '3V3', 'IOREF', 'VIN', 'GND', 'D4', 'D5', 'D7', 'D8']) if (on.same(nm, 'PIN:' + p)) bad(L, `load battery is connected to UNO Q ${p} — the load circuit must stay separate`);
     }
     if (io.kind === 'buzzer') {
       const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));

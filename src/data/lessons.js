@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -20,6 +20,7 @@ const SRC = {
   servolib: { t: 'Arduino Servo library (source, incl. Zephyr support)', u: 'https://github.com/arduino-libraries/Servo' },
   l293: { t: 'Texas Instruments L293x quadruple half-H drivers datasheet (SLRS008D)', u: 'https://www.ti.com/lit/ds/symlink/l293.pdf' },
   motor130: { t: 'Adafruit #711 DC toy/hobby motor (130 size) — specifications', u: 'https://www.adafruit.com/product/711' },
+  relaymod: { t: 'Handsontec: 1-channel 5 V optical-isolated relay module (user guide)', u: 'https://handsontec.com/dataspecs/module/Relay%20Module/1Ch-relay%20Opto.pdf' },
   dhtforum: { t: 'Arduino Forum: “DHT11 and UNO Q”', u: 'https://forum.arduino.cc/t/dht11-and-uno-q/1416409' },
 };
 
@@ -106,6 +107,19 @@ const MOTOR_PARTS = [
 const MOTOR_IDS = MOTOR_PARTS.map(d => d.id);
 const MOTOR_LOGIC = ['w26', 'w27', 'w28', 'w29', 'w30'];
 const MOTOR_IO = { kind: 'motor', item: 'mot1', drv: 'u1', bat: 'bat1', en: 'D5', in1: 'D7', in2: 'D8', needs: MOTOR_IDS };
+const RELAY_PARTS = [
+  { id: 'rel1', type: 'relay', x: 95, z: -48 },
+  { id: 'bat2', type: 'battery', x: 125, z: 12 },
+  { id: 'lamp1', type: 'lamp', x: 165, z: -26 },
+  { id: 'l5', type: 'lead', from: 'rel1.DCP', to: '5V', color: 'red', lift: 18 },
+  { id: 'l6', type: 'lead', from: 'rel1.DCN', to: 'GND3', color: 'black', lift: 26 },
+  { id: 'l7', type: 'lead', from: 'rel1.IN', to: 'D4', color: 'yellow', lift: 14 },
+  { id: 'l8', type: 'lead', from: 'bat2.POS', to: 'rel1.COM', color: 'red', lift: 14 },
+  { id: 'l9', type: 'lead', from: 'rel1.NO', to: 'lamp1.L1', color: 'orange', lift: 12 },
+  { id: 'l10', type: 'lead', from: 'lamp1.L2', to: 'bat2.NEG', color: 'black', lift: 12 },
+];
+const RELAY_IDS = RELAY_PARTS.map(d => d.id);
+const RELAY_IO = { kind: 'relay', item: 'rel1', lamp: 'lamp1', bat: 'bat2', needs: RELAY_IDS };
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
 
 const BLINK_CODE = BLINK;
@@ -1462,12 +1476,112 @@ export const LESSONS = [
     ],
     sources: [SRC.l293, SRC.motor130, SRC.st, SRC.ds],
   },
+
+  // ================================================================== 17
+  {
+    id: 'l17', num: 17, module: 5, title: 'Switch a lamp with a relay module', level: 'Intermediate', time: '20 min',
+    goal: 'Switch a separate circuit on and off with a relay, and use an active-low module safely with the 3.3 V UNO Q.',
+    hardware: ['Arduino UNO Q', '1-channel 5 V relay module (low-level trigger)', '4 × AA battery holder (≈ 6 V)', 'Small lamp (E10, 6 V)', '6 × wires'],
+    code: RELAY_CODE, program: 'relay', fast: true, widgets: ['relay'], noBreadboard: true,
+    circuit: RELAY_PARTS, io: { D4: RELAY_IO },
+    explain: {
+      2: 'The module’s <b>IN</b> terminal is connected to <b>D4</b>.',
+      4: '<b>relayOn()</b>: a small function that switches the relay on.',
+      5: 'D4 becomes an output …',
+      6: '… and goes <b>LOW</b>. This module is <b>low-level triggered</b>: the relay switches <b>ON when IN is LOW</b> (Handsontec guide).',
+      9: '<b>relayOff()</b>: switches the relay off.',
+      10: 'D4 becomes an <b>INPUT</b> = the pin lets go (high impedance). No current can flow through the module’s input, so the relay is OFF. We do <b>not</b> use <code>digitalWrite(HIGH)</code>: a 3.3 V HIGH leaves the 5 V-powered input only partly “off” on some modules.',
+      13: 'setup() runs once.',
+      14: 'Start with the relay OFF.',
+      15: 'Serial output on.',
+      19: 'Relay ON → the lamp circuit closes.',
+      20: 'Print what happens.',
+      21: 'Wait 3 seconds.',
+      22: 'Relay OFF → the lamp circuit opens.',
+      24: 'Wait 3 seconds, then repeat.',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'relay', have: RELAY_IDS, power: false, labels: [['rel1', 'Relay module'], ['lamp1', 'Lamp'], ['bat2', 'Battery 4 × AA'], ['board', 'UNO Q']],
+        body: `<p>The UNO Q will switch a <b>lamp</b> on and off — but the lamp is <b>not</b> connected to the UNO Q. It has its <b>own battery</b>.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">UNO Q pin D4 (a small signal)</span></div><div class="pt-arrow">↓</div>
+        <div class="pt-row"><span class="pt">relay module — a switch you control with a signal</span></div><div class="pt-arrow">↓ opens / closes the lamp circuit</div>
+        <div class="pt-row"><span class="pt in">battery</span><span class="pt bus">lamp</span></div></div>
+        <p>This is how a tiny microcontroller can control things with their <b>own power</b>: lamps, fans, pumps, door locks…</p>`,
+      },
+      {
+        title: 'What is inside a relay?', view: 'relayclose', cutaway: true, power: true, have: RELAY_IDS,
+        body: `<p>A relay is an <b>electromagnet that moves a switch</b>. The case is shown see-through here.</p>
+        <ol><li>The <b>coil</b> (copper) is an electromagnet. Current through it makes it pull on the iron <b>armature</b>.</li>
+        <li>The armature moves the <b>moving contact</b> (gold blade, connected to <b>COM</b>).</li>
+        <li>Without current a spring holds the blade on <b>NC</b> (normally closed).</li><li>With current the blade snaps over to <b>NO</b> (normally open) — with a <b>click</b>.</li></ol>
+        <p><b>Try it:</b> press the <b>“Energise the coil”</b> button in the panel below and listen.</p>
+        <p class="tip">The coil circuit and the switch contacts are <b>not electrically connected</b> — only magnetism links them. That is why the lamp circuit can have a different battery (and voltage).</p>`,
+      },
+      {
+        title: 'The module: click every part', view: 'relayclose',
+        body: `<p>The relay alone needs more current than a pin can give, so the module adds a small driver circuit. <b>Click each part:</b></p>
+        <ul><li><b>Input terminal:</b> DC+ (5 V), DC− (ground), IN (signal)</li><li><b>Output terminal:</b> NO, COM, NC — the switch, same names as in the relay</li>
+        <li><b>Optocoupler 817C</b>: light inside carries the signal across (electrical isolation)</li><li><b>Transistor</b> and <b>diode</b>: switch the coil and absorb its voltage spike</li>
+        <li><b>Trigger jumper</b> (H / L) and the two <b>LEDs</b></li></ul>`,
+      },
+      {
+        title: 'Low-level trigger and the 3.3 V UNO Q', view: 'relayclose', pins: ['5V', 'GND3', 'D4'],
+        body: `<table class="kv"><tr><th>Module pin</th><th>Goes to</th></tr><tr><td>DC+</td><td><b>5V</b> (module and coil need 5 V)</td></tr><tr><td>DC−</td><td><b>GND</b></td></tr><tr><td>IN</td><td><b>D4</b></td></tr></table>
+        <p>The jumper is on <b>L</b> (low-level trigger). The guide says: <b>“the relay actuates and the LED lights when the input pin is LOW, and turns off on HIGH”</b> — the opposite of what you might expect.</p>
+        <p><b>Why we release the pin instead of writing HIGH:</b> the input is powered from 5 V. A UNO Q pin gives only <b>3.3 V</b> when HIGH, so about 1.7 V remains across the optocoupler input — and some boards then stay partly on. Letting the pin go (<code>INPUT</code>) leaves no current path: the relay is off for sure. (The guide also notes that some boards need changes to work reliably with 3.3 V signals.)</p>
+        <p>Because D4 is a 5 V-tolerant pin (UNO Q datasheet) it can safely sit at the module’s 5 V when released; we use plain <code>INPUT</code>, without pull-up.</p>`,
+      },
+      {
+        title: 'Safety first', view: 'relay',
+        body: `<p class="warn"><b>Mains voltage (220/230 V) can kill.</b> The relay’s contacts are rated for AC 250 V / 10 A, but wiring mains is only for trained people, with the proper enclosure and insulation. In this course we only switch a <b>6 V battery</b> and a small lamp.</p>
+        <ul><li>Contacts: max <b>DC 30 V / 10 A</b> and <b>AC 250 V / 10 A</b> (module guide).</li><li>Keep the load circuit <b>separate</b> from the UNO Q: no wire from the battery to any UNO Q pin.</li>
+        <li>A lamp or motor on a <b>real</b> supply needs a fuse suited to the load.</li></ul>`,
+      },
+      {
+        title: 'Step 1 — place the parts', view: 'relay', power: false, have: ['rel1', 'bat2', 'lamp1'], labels: [['rel1', 'Relay module'], ['lamp1', 'Lamp'], ['bat2', 'Battery']],
+        body: `<p>Put the relay module, the battery holder and the lamp on the desk. Nothing is connected yet.</p>`,
+      },
+      {
+        title: 'Step 2 — the control wires', view: 'relay', have: ['rel1', 'bat2', 'lamp1', 'l5', 'l6', 'l7'], pins: ['5V', 'GND3', 'D4'],
+        body: `<ul><li>Red: <b>5V → DC+</b></li><li>Black: <b>GND → DC−</b></li><li>Yellow: <b>D4 → IN</b></li></ul>
+        <p>Strip about 6 mm of insulation, push the bare wire into the terminal and tighten the screw. The module’s power LED lights up.</p>`,
+      },
+      {
+        title: 'Step 3 — the lamp circuit', view: 'relay', have: RELAY_IDS,
+        body: `<ul><li>Battery <b>+</b> (red) → <b>COM</b></li><li><b>NO</b> → lamp terminal 1</li><li>Lamp terminal 2 → battery <b>−</b> (black)</li></ul>
+        <p class="path">battery + → COM → (relay switch) → NO → lamp → battery −</p>
+        <p>Right now the relay is off, so the switch connects <b>COM–NC</b> (unused) and the circuit is open: the lamp is off. When the relay switches on, <b>COM–NO</b> closes the circuit.</p>`,
+      },
+      { title: 'The code', view: 'relay', showCode: true, body: `<p>Two small functions, <code>relayOn()</code> and <code>relayOff()</code>, make the program easy to read. Click any line in the code panel.</p>` },
+      {
+        title: 'Run it', view: 'relay', showCode: true, power: true, action: 'run',
+        body: `<ol><li>Pin D4 goes <b>LOW</b> → the module’s LED lights → the relay <b>clicks</b> → the lamp <b>turns on</b>.</li><li>3 s later the pin is released → the relay clicks again → the lamp <b>turns off</b>.</li></ol>
+        <p>The three boxes in the panel show the chain, and the table highlights the row that applies.</p>
+        <p class="sim">The click sound is generated by your browser (turn sound on in the top bar if you cannot hear it).</p>`,
+      },
+      {
+        title: 'Summary', view: 'relay',
+        body: `<ul><li>A relay is an <b>electromagnet-operated switch</b>: COM, NO (normally open), NC (normally closed).</li>
+        <li>This module is <b>low-level triggered</b>: pin LOW = relay ON.</li><li>With the 3.3 V UNO Q, <b>release the pin</b> (INPUT) to switch off — don’t drive HIGH.</li>
+        <li>The load has its <b>own supply</b>; never wire mains without proper training.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Which terminals does the lamp circuit use in this lesson?', a: ['DC+ and DC−', 'COM and NO', 'IN and GND', 'NC and DC+'], c: 1, why: 'Battery + goes to COM; NO goes to the lamp. COM–NO closes only when the relay is on.' },
+      { q: 'This module is low-level triggered. The relay switches ON when IN is…', a: ['HIGH', 'LOW', 'floating', 'never'], c: 1, why: 'Handsontec guide: the relay actuates and the LED lights when the input pin is LOW.' },
+      { q: 'Why does the sketch switch the relay off with pinMode(INPUT) instead of digitalWrite(HIGH)?', a: ['INPUT is faster', 'A 3.3 V HIGH can leave the 5 V-powered input partly on; releasing the pin leaves no current path', 'HIGH would damage the UNO Q', 'The relay needs INPUT to click'], c: 1, why: 'With a 5 V supply and a 3.3 V HIGH, about 1.7 V remains across the optocoupler input.' },
+      { q: 'What links the relay’s coil to the lamp circuit?', a: ['A copper wire', 'The battery', 'Only magnetism — they are not electrically connected', 'The UNO Q GND'], c: 2, why: 'The coil’s magnet moves the contact; the two circuits stay electrically separate.' },
+      { q: 'What is the maximum DC the module’s contacts may switch (guide)?', a: ['5 V / 1 A', '12 V / 2 A', '30 V / 10 A', '250 V / 100 A'], c: 2, why: 'Relay maximum output: DC 30 V / 10 A, AC 250 V / 10 A.' },
+    ],
+    sources: [SRC.relaymod, SRC.ds, SRC.st],
+  },
 ];
 
 export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion' };
 
 export const COMING_SOON = [
-  'Relay module',
+  
   'I²C & Qwiic: Modulino® Thermo (temperature + humidity)', 'I²C displays',
   'Linux side: Python + Bridge', 'Wi-Fi web dashboard', 'Final IoT project',
 ];

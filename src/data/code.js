@@ -334,3 +334,30 @@ void loop() {
   digitalWrite(in2Pin, LOW);
   delay(1500);
 }`;
+
+// Lesson 17 — low-level-trigger relay module on D4 (Handsontec: relay actuates when IN is LOW); released pin = off
+export const RELAY_CODE = `// Relay module (low-level trigger): the relay is ON when the pin is LOW
+int relayPin = D4;
+
+void relayOn() {
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, LOW);   // LOW = relay ON (the lamp lights)
+}
+
+void relayOff() {
+  pinMode(relayPin, INPUT);      // let go of the pin: relay OFF (do not drive HIGH)
+}
+
+void setup() {
+  relayOff();
+  Serial.begin(9600);
+}
+
+void loop() {
+  relayOn();
+  Serial.println("Relay ON  - lamp ON");
+  delay(3000);
+  relayOff();
+  Serial.println("Relay OFF - lamp OFF");
+  delay(3000);
+}`;

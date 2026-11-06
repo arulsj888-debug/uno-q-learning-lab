@@ -858,22 +858,204 @@ export class HobbyMotor {
 
 // ---------------------------------------------------------------- component lead wire (stranded, tinned end into a hole)
 export class LeadWire {
-  constructor(a, dir, b, color = 'red', { lift = 18, id = 'lead' } = {}) {
+  /** a: start (dir = direction leaving it). b: end point; dirB (optional) = outward direction of a screw terminal the wire enters. */
+  constructor(a, dir, b, color = 'red', { lift = 18, id = 'lead', dirB = null, clamp = false } = {}) {
     const g = this.group = new THREE.Group();
     const ins = new THREE.MeshPhysicalMaterial({ color: WIRE[color] || color, roughness: 0.4, clearcoat: 0.4 });
     const up = new THREE.Vector3(0, 1, 0);
-    const p1 = a.clone().addScaledVector(dir, 10), top = b.clone().addScaledVector(up, 7);
-    const mid = p1.clone().lerp(top, 0.5); mid.y = Math.max(p1.y, top.y) + lift;
-    this.tubeGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, p1, mid, top.clone().addScaledVector(up, 6), top], false, 'centripetal'), 120, 0.7, 10, false);
+    const p1 = a.clone().addScaledVector(dir, 10);
+    const endDir = dirB ? dirB.clone().normalize() : up.clone();
+    const top = b.clone().addScaledVector(endDir, dirB ? 9 : 7);
+    const pre = top.clone().addScaledVector(endDir, dirB ? 8 : 6);
+    const mid = p1.clone().lerp(pre, 0.5); mid.y = Math.max(p1.y, pre.y) + lift;
+    this.tubeGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, p1, mid, pre, top], false, 'centripetal'), 120, 0.7, 10, false);
     g.add(new THREE.Mesh(this.tubeGeo, ins));
-    const tin = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 12, 8), M.tin); tin.position.copy(b).addScaledVector(up, 1); this.tip = tin; g.add(tin);
-    const solder = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8), M.solder); solder.position.copy(a); g.add(solder);
+    const tin = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 12, 8), M.tin);
+    tin.quaternion.setFromUnitVectors(up, endDir);
+    tin.position.copy(b).addScaledVector(endDir, dirB ? 2.5 : 1); this.tip = tin; g.add(tin);
+    if (!clamp) { const solder = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8), M.solder); solder.position.copy(a); g.add(solder); }
     tagHW(g, id);
   }
   async grow(ms = 1000) {
     const total = this.tubeGeo.index.count; this.tip.visible = false;
     await tween(ms, e => { this.tubeGeo.setDrawRange(0, Math.floor(total * e / 3) * 3); });
     this.tubeGeo.setDrawRange(0, Infinity); this.tip.visible = true;
+  }
+}
+
+// ---------------------------------------------------------------- 1-channel 5 V relay module (low/high level trigger)
+// Handsontec user guide (SKU MDU1150): board 50 × 25 mm, relay + terminals 18.5 mm high, relay "JQC-3FF-S-Z",
+// SPDT (COM, NO, NC), max DC 30 V / 10 A and AC 250 V / 10 A, optocoupler 817C, H/L trigger jumper, PWR + relay LEDs.
+// Local frame: input screw terminal (DC+ · DC− · IN) at x = −25, output terminal (NO · COM · NC) at x = +25;
+// terminal openings face outward (±x); pin order along z. Lying on the desk on its PCB.
+export class RelayModule {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const k = 24, y0 = 3.0, T = 1.6, top = y0 + T;
+    const pcbTex = canvasTex(50 * k, 25 * k, (c, w, h) => {
+      const X = x => (x + 25) * k, Z = z => (z + 12.5) * k;
+      c.fillStyle = '#b81d27'; c.fillRect(0, 0, w, h); noise(c, w, h, 8);
+      c.strokeStyle = 'rgba(255,160,150,0.18)'; c.lineWidth = 0.4 * k; c.lineCap = 'round';
+      for (const z of [-5, 0, 5]) { c.beginPath(); c.moveTo(X(-20), Z(z)); c.lineTo(X(-12), Z(z * 0.4)); c.lineTo(X(-6), Z(z * 0.4 + 3)); c.stroke(); c.beginPath(); c.moveTo(X(20), Z(z)); c.lineTo(X(12), Z(z * 0.6)); c.stroke(); }
+      c.fillStyle = '#f3f3ee'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.font = `700 ${Math.round(1.7 * k)}px Arial, Helvetica, sans-serif`;
+      [['DC+', -5], ['DC-', 0], ['IN', 5]].forEach(([t, z]) => c.fillText(t, X(-14.2), Z(z)));
+      [['NO', 5], ['COM', 0], ['NC', -5]].forEach(([t, z]) => c.fillText(t, X(14.8), Z(z)));
+      c.font = `700 ${Math.round(1.3 * k)}px Arial`; c.fillText('PWR', X(-13.5), Z(-10.2)); c.fillText('H', X(-17.5), Z(-8.5)); c.fillText('L', X(-17.5), Z(-4.9));
+      c.fillStyle = 'rgba(255,255,255,0.8)'; c.font = `600 ${Math.round(1.05 * k)}px Arial`; c.fillText('1 Channel Relay Module', X(2), Z(10.6));
+      for (const [x, z] of [[-23.4, -10.8], [-23.4, 10.8], [23.4, -10.8], [23.4, 10.8]]) { c.fillStyle = '#e8e8e4'; c.beginPath(); c.arc(X(x), Z(z), 1.4 * k, 0, 7); c.fill(); c.fillStyle = '#17181a'; c.beginPath(); c.arc(X(x), Z(z), 0.95 * k, 0, 7); c.fill(); }
+    });
+    const edge = new THREE.MeshStandardMaterial({ color: 0xa81822, roughness: 0.6 });
+    const bottom = new THREE.MeshStandardMaterial({ color: 0x8e1219, roughness: 0.7 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(50, T, 25), [edge, edge, new THREE.MeshPhysicalMaterial({ map: pcbTex, roughness: 0.45, clearcoat: 0.35 }), bottom, edge, edge]);
+    pcb.position.y = y0 + T / 2; g.add(pcb);
+    for (const [x, z] of [[-20, -9], [-20, 9], [20, -9], [20, 9]]) { const f = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, y0, 12), new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.8 })); f.position.set(x, y0 / 2, z); g.add(f); }
+
+    // screw terminals (blue, 3-way, 5 mm pitch) — the wire goes in from the outer side and is clamped by the screw
+    this.pinPos = {};
+    const blue = new THREE.MeshPhysicalMaterial({ color: 0x1f5fd0, roughness: 0.35, clearcoat: 0.5 });
+    const block = (cx, names, id) => {
+      const b = new THREE.Mesh(new RoundedBoxGeometry(8.2, 10.2, 16.2, 2, 0.5), blue); b.position.set(cx, top + 5.1, 0); g.add(sub(b, id));
+      names.forEach((n, i) => {
+        const z = (i - 1) * 5, out = Math.sign(cx);
+        const screw = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 0.7, 20), M.steelSatin); screw.position.set(cx - out * 0.4, top + 10.4, z); g.add(sub(screw, 'rel:' + n));
+        const slot = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.3, 0.5), new THREE.MeshBasicMaterial({ color: 0x1a1a1a })); slot.position.set(cx - out * 0.4, top + 10.8, z); g.add(sub(slot, 'rel:' + n));
+        const hole = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.2, 3.2), new THREE.MeshBasicMaterial({ color: 0x07090d })); hole.position.set(cx + out * 4.15, top + 4.2, z); g.add(sub(hole, 'rel:' + n));
+        this.pinPos[n] = { p: new THREE.Vector3(cx + out * 4.4, top + 4.2, z), d: new THREE.Vector3(out, 0, 0) };
+      });
+    };
+    block(-21.2, ['DCP', 'DCN', 'IN'], 'rel:in');
+    block(21.2, ['NC', 'COM', 'NO'], 'rel:out');
+    // pin map along z: NC (−5), COM (0), NO (+5); DC+ (−5), DC− (0), IN (+5) — printed on the board as above
+
+    // relay JQC-3FF-S-Z: blue case 19 × 15.5 × 15.3 mm, printed top
+    const rtex = canvasTex(512, 424, (c, w, h) => {
+      c.fillStyle = '#2d63c9'; c.fillRect(0, 0, w, h); noise(c, w, h, 6);
+      c.fillStyle = '#e9eef8'; c.textAlign = 'left'; c.textBaseline = 'middle';
+      c.font = '700 34px Arial'; c.fillText('10A 250VAC  15A 125VAC', 22, 80); c.fillText('10A 30VDC', 22, 128);
+      c.font = '700 46px Arial'; c.fillText('JQC-3FF-S-Z', 22, 220); c.font = '700 38px Arial'; c.fillText('5VDC', 22, 290);
+      c.strokeStyle = '#e9eef8'; c.lineWidth = 4; c.beginPath(); c.moveTo(w - 70, 60); c.lineTo(w - 36, 118); c.lineTo(w - 104, 118); c.closePath(); c.stroke();
+    });
+    const caseMat = this.caseMat = new THREE.MeshPhysicalMaterial({ color: 0x2a5fd0, roughness: 0.4, clearcoat: 0.5, transparent: true, opacity: 1 });
+    const sideM = caseMat, topM = new THREE.MeshPhysicalMaterial({ map: rtex, roughness: 0.4, clearcoat: 0.5, transparent: true, opacity: 1 });
+    this.topMat = topM;
+    const rc = new THREE.Mesh(new RoundedBoxGeometry(19, 15.3, 15.5, 2, 0.5), [sideM, sideM, topM, sideM, sideM, sideM]);
+    rc.position.set(2, top + 7.65, 0); g.add(sub(rc, 'rel:relay'));
+    // relay internals (visible in the cutaway view): coil + core, armature, moving contact, NC / NO fixed contacts
+    const inner = this.inner = new THREE.Group(); inner.position.set(2, top, 0); g.add(inner);
+    const copper = new THREE.MeshStandardMaterial({ color: 0xc8662a, roughness: 0.4, metalness: 0.8 });
+    const iron = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.35, metalness: 1 });
+    const coil = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 10, 28), copper); coil.rotation.z = Math.PI / 2; coil.position.set(-3.2, 5.1, -1.6); inner.add(sub(coil, 'rel:coil'));
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 12, 16), iron); core.rotation.z = Math.PI / 2; core.position.set(-3.2, 5.1, -1.6); inner.add(sub(core, 'rel:coil'));
+    const yoke = new THREE.Mesh(new THREE.BoxGeometry(1, 9.5, 2), iron); yoke.position.set(-9, 5.6, -1.6); inner.add(sub(yoke, 'rel:coil'));
+    // armature pivots on the yoke top; its free end is pulled down toward the core when the coil is energised
+    const arm = this.arm = new THREE.Group(); arm.position.set(-9, 10.4, -1.6); inner.add(arm);
+    const armBar = new THREE.Mesh(new THREE.BoxGeometry(14, 0.9, 5.4), iron); armBar.position.set(7, 0, 0); arm.add(sub(armBar, 'rel:arm'));
+    const spring = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.22, 6, 14), M.steelSatin); spring.position.set(12.5, -1.2, 0); spring.rotation.y = Math.PI / 2; arm.add(sub(spring, 'rel:arm'));
+    const blade = this.blade = new THREE.Group(); blade.position.set(8.8, 9.3, 3.2); inner.add(blade);           // moving contact blade (connected to COM)
+    const bladeBar = new THREE.Mesh(new THREE.BoxGeometry(0.4, 4.8, 1.8), M.gold); bladeBar.position.y = -2.4; blade.add(sub(bladeBar, 'rel:blade'));
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.85, 12, 8), M.solder); tip.position.set(0, -4.9, 0); blade.add(sub(tip, 'rel:blade'));
+    const ncPost = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.2, 1.6), M.gold); ncPost.position.set(8.3, 5.9, 3.2); inner.add(sub(ncPost, 'rel:nc'));
+    const ncTip = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 8), M.solder); ncTip.position.set(8.3, 5.0, 3.2); inner.add(sub(ncTip, 'rel:nc'));
+    const noPost = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.2, 1.6), M.gold); noPost.position.set(9.3, 5.9, 3.2); inner.add(sub(noPost, 'rel:no'));
+    const noTip = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 8), M.solder); noTip.position.set(9.3, 5.0, 3.2); inner.add(sub(noTip, 'rel:no'));
+    inner.visible = false;
+    // --- SMD driver circuit (817C optocoupler, transistor, resistors, flyback diode, two LEDs)
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.55 });
+    const opto = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.6, 4.2), dark); opto.position.set(-10.5, top + 1.3, 8.2); g.add(sub(opto, 'rel:opto'));
+    for (const sx of [-1, 1]) for (const i of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 1.6), M.tin); l.position.set(-10.5 + i * 1.27, top + 0.15, 8.2 + sx * 2.5); g.add(sub(l, 'rel:opto')); }
+    const q1 = new THREE.Mesh(new THREE.BoxGeometry(2.9, 1.1, 1.5), dark); q1.position.set(-9.5, top + 0.55, 3.6); g.add(sub(q1, 'rel:q1'));
+    for (const [x, z, id] of [[-12.5, 3.5, 'rel:r'], [-5.5, 8.5, 'rel:r'], [-6.6, 4.2, 'rel:d1']]) { const r = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.55, 1.6), new THREE.MeshStandardMaterial({ color: id === 'rel:d1' ? 0x1a1b1d : 0x161616, roughness: 0.6 })); r.position.set(x, top + 0.3, z); g.add(sub(r, id)); const e = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.6, 1.7), M.capEnd); e.scale.set(1, 0.9, 1.0); e.position.set(x, top + 0.28, z); e.renderOrder = -1; g.add(e); }
+    this.leds = [];
+    for (const [x, z, id] of [[-9.5, -10.2, 'rel:pwr'], [-5.2, -10.2, 'rel:led']]) {
+      const body = new THREE.Mesh(new RoundedBoxGeometry(3.4, 1.1, 1.8, 1, 0.2), new THREE.MeshPhysicalMaterial({ color: 0xd9a39d, roughness: 0.3, clearcoat: 0.6 })); body.position.set(x, top + 0.55, z); g.add(sub(body, id));
+      const gl = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 1.3), new THREE.MeshBasicMaterial({ color: 0x331111, toneMapped: false })); gl.position.set(x, top + 1.15, z); g.add(gl);
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+      halo.scale.set(11, 11, 1); halo.position.set(x, top + 1.8, z); halo.raycast = () => {}; g.add(halo);
+      this.leds.push({ gl, halo });
+    }
+    // H/L trigger-select jumper: 3-pin header with a yellow cap on "L" (low-level trigger)
+    const hdr = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.5, 7.8), M.blackPlastic); hdr.position.set(-17.5, top + 1.25, -6.7); g.add(sub(hdr, 'rel:jumper'));
+    for (const z of [-9.3, -6.7, -4.1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 6, 0.64), M.gold); p.position.set(-17.5, top + 2.6, z); g.add(sub(p, 'rel:jumper')); }
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(2.9, 2.7, 5.4), new THREE.MeshStandardMaterial({ color: 0xf2c418, roughness: 0.5 })); cap.position.set(-17.5, top + 4.2, -5.4); g.add(sub(cap, 'rel:jumper'));
+    tagHW(g, 'relaymod');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+    this.energized = false; this.t = 0; this.cutaway = false; this.pwr = false;
+    this.applyArm(0);
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    const q = this.group.getWorldQuaternion(new THREE.Quaternion());
+    return { pos: this.group.localToWorld(this.pinPos[name].p.clone()), dir: this.pinPos[name].d.clone().applyQuaternion(q) };
+  }
+  setCutaway(on) {
+    this.cutaway = on; this.inner.visible = on;
+    this.caseMat.opacity = on ? 0.22 : 1; this.topMat.opacity = on ? 0.22 : 1;
+    this.caseMat.transmission = on ? 0.6 : 0; this.caseMat.depthWrite = !on; this.topMat.depthWrite = !on;
+    this.caseMat.needsUpdate = this.topMat.needsUpdate = true;
+  }
+  applyArm(t) {
+    this.t = t;
+    this.arm.rotation.z = -0.075 * t;                                // free end of the armature drops toward the coil core
+    this.blade.rotation.z = -0.12 * t;                                // blade swings from NC (left) to NO (right)
+    this.blade.position.x = 8.3 + 1.0 * t;
+  }
+  /** energized: coil current flows; pwr: module has power. Returns true when the state changed (click). */
+  update(dt, energized, pwr) {
+    let changed = false;
+    if (energized !== this.energized) { this.energized = energized; changed = true; }
+    const target = energized ? 1 : 0, rate = energized ? 1 / 0.012 : 1 / 0.02;     // snaps in a few ms; slowed for display
+    this.applyArm(this.t + Math.sign(target - this.t) * Math.min(Math.abs(target - this.t), Math.max(dt, 0.045) * rate * 0.06));
+    this.setLeds(pwr, energized);
+    return changed;
+  }
+  setLeds(pwr, on) {
+    const set = (i, v) => { const L = this.leds[i]; L.gl.material.color.setRGB(v ? 1.0 : 0.25, v ? 0.0 : 0.06, v ? 0.0 : 0.06); L.halo.material.color.setRGB(v ? 1 : 0, v ? 0.12 : 0, v ? 0.08 : 0); };
+    set(0, pwr); set(1, on);
+  }
+}
+
+// ---------------------------------------------------------------- miniature E10 lamp in a small holder
+export class MiniLamp {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const blk = new THREE.MeshStandardMaterial({ color: 0x232427, roughness: 0.6 });
+    const base = new THREE.Mesh(new RoundedBoxGeometry(30, 7, 14, 2, 0.8), blk); base.position.y = 3.5; g.add(sub(base, 'lamp:holder'));
+    const sock = new THREE.Mesh(new THREE.CylinderGeometry(5.4, 5.4, 6, 24), M.steelSatin); sock.position.set(2, 10, 0); g.add(sub(sock, 'lamp:holder'));
+    const blue = new THREE.MeshPhysicalMaterial({ color: 0x1f5fd0, roughness: 0.35, clearcoat: 0.5 });
+    this.pinPos = {};
+    for (const [n, z] of [['L1', -4], ['L2', 4]]) {
+      const t = new THREE.Mesh(new RoundedBoxGeometry(5.5, 6, 4.8, 1, 0.4), blue); t.position.set(-11.8, 10, z); g.add(sub(t, 'lamp:term'));
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.6, 16), M.steelSatin); s.position.set(-11.8, 13.2, z); g.add(sub(s, 'lamp:term'));
+      this.pinPos[n] = { p: new THREE.Vector3(-14.6, 10, z), d: new THREE.Vector3(-1, 0, 0) };
+    }
+    // E10 lamp: metal screw base (Ø 9.5 mm thread) + glass bulb with a tungsten filament
+    const thread = new THREE.Mesh(new THREE.CylinderGeometry(4.75, 4.75, 8, 24), M.nickel); thread.position.set(2, 17, 0); g.add(sub(thread, 'lamp:bulb'));
+    for (let i = 0; i < 4; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(4.8, 0.3, 6, 24), M.nickel); r.rotation.x = Math.PI / 2; r.position.set(2, 14.5 + i * 1.7, 0); g.add(sub(r, 'lamp:bulb')); }
+    const glassMat = this.glass = new THREE.MeshPhysicalMaterial({ color: 0xfff6dc, roughness: 0.05, transmission: 0.9, thickness: 1.2, ior: 1.45, transparent: true, opacity: 0.55, emissive: 0xffb050, emissiveIntensity: 0 });
+    const glass = new THREE.Mesh(new THREE.SphereGeometry(5.6, 28, 20), glassMat); glass.position.set(2, 27, 0); glass.scale.set(1, 1.18, 1); g.add(sub(glass, 'lamp:bulb'));
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.2, 5, 20), glassMat); neck.position.set(2, 21.5, 0); g.add(sub(neck, 'lamp:bulb'));
+    const fil = this.fil = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.22, 8, 24), new THREE.MeshStandardMaterial({ color: 0x8a8d92, roughness: 0.4, metalness: 1, emissive: 0xff8a2a, emissiveIntensity: 0 }));
+    fil.position.set(2, 26, 0); fil.rotation.x = Math.PI / 2; g.add(sub(fil, 'lamp:bulb'));
+    for (const x of [-1.3, 1.3]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 5.5, 6), M.steel); w.position.set(2 + x, 23.4, 0); g.add(sub(w, 'lamp:bulb')); }
+    this.light = new THREE.PointLight(0xffb561, 0, 220, 1.4); this.light.position.set(2, 28, 0); g.add(this.light);
+    this.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    this.halo.scale.set(52, 52, 1); this.halo.position.set(2, 27, 0); this.halo.raycast = () => {}; g.add(this.halo);
+    tagHW(g, 'lamp');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+    this.set(false);
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    const q = this.group.getWorldQuaternion(new THREE.Quaternion());
+    return { pos: this.group.localToWorld(this.pinPos[name].p.clone()), dir: this.pinPos[name].d.clone().applyQuaternion(q) };
+  }
+  set(on) {
+    this.glass.emissiveIntensity = on ? 1.6 : 0; this.fil.material.emissiveIntensity = on ? 4 : 0;
+    this.light.intensity = on ? 9000 : 0; this.halo.material.color.setRGB(on ? 1 : 0, on ? 0.62 : 0, on ? 0.28 : 0);
+    this.fil.material.color.set(on ? 0xffd9a0 : 0x8a8d92);
   }
 }
 
@@ -1069,6 +1251,32 @@ export const HW_INFO = {
   'mot:prop': { name: 'Propeller', tag: 'Shows speed and direction', summary: 'Makes the rotation easy to see. The yellow blade helps you follow it.', src: '—' },
   'mot:stand': { name: 'Motor stand', tag: 'Holds the motor', summary: 'Keeps the motor upright so the propeller can spin freely.', src: '—' },
   lead: { name: 'Lead wire', tag: 'Stranded, tinned end', summary: 'The tinned end is pushed straight into a breadboard hole.', src: '—' },
+  'rel:in': { name: 'Input screw terminal', tag: 'DC+ · DC− · IN', summary: 'Three screw terminals for the control side: DC+ (5 V), DC− (ground) and IN (the signal from the UNO Q).', src: 'Handsontec 1-channel relay module guide' },
+  'rel:out': { name: 'Output screw terminal', tag: 'NO · COM · NC', summary: 'The three terminals of the relay switch. COM is the common contact; it touches NC when the relay is off and NO when it is on.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:DCP': { name: 'DC+ terminal', tag: 'Power in · 5 V', summary: 'Supply for the module and the relay coil. Goes to the UNO Q 5V pin.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:DCN': { name: 'DC− terminal', tag: 'Ground', summary: 'Goes to a UNO Q GND pin.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:IN': { name: 'IN terminal', tag: 'Signal', summary: 'The control input. On this low-level-trigger module the relay switches ON when IN is LOW. Goes to D4.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:NO': { name: 'NO terminal', tag: 'Normally open', summary: 'Not connected to COM when the relay is off; connected to COM when the relay is on. Our lamp goes here.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:COM': { name: 'COM terminal', tag: 'Common', summary: 'The moving contact. Battery + goes here.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:NC': { name: 'NC terminal', tag: 'Normally closed', summary: 'Connected to COM when the relay is off; disconnected when the relay is on. Not used in this lesson.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:relay': { name: 'Relay JQC-3FF-S-Z', tag: '5 V coil · SPDT', summary: 'An electromagnet that moves a switch. Contacts: AC 250 V / 10 A, DC 30 V / 10 A (module guide).', src: 'Handsontec 1-channel relay module guide' },
+  'rel:coil': { name: 'Coil and iron core', tag: 'The electromagnet', summary: 'Current through the copper coil makes the iron core a magnet that pulls the armature.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:arm': { name: 'Armature and spring', tag: 'Moves the switch', summary: 'Pulled down by the coil; the spring pulls it back when the current stops.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:blade': { name: 'Moving contact', tag: 'Connected to COM', summary: 'The blade that swings between the NC and NO contacts.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:nc': { name: 'NC contact', tag: 'Normally closed', summary: 'Touches the blade while the coil is off.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:no': { name: 'NO contact', tag: 'Normally open', summary: 'Touches the blade only while the coil is energised.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:opto': { name: 'Optocoupler 817C', tag: 'Electrical isolation', summary: 'An LED and a light sensor in one package: the signal crosses as light, so the UNO Q side is electrically separated from the coil driver.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:q1': { name: 'Driver transistor', tag: 'Switches the coil', summary: 'A transistor switches the coil current, which is far more than a UNO Q pin can give.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:d1': { name: 'Flyback diode', tag: 'Protects the transistor', summary: 'Absorbs the voltage spike the coil makes when the current is switched off.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:r': { name: 'Resistor', tag: 'Limits current', summary: 'R1 = 1 kΩ and R2 = 510 Ω in the guide’s schematic.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:pwr': { name: 'Power LED', tag: 'Lit when DC+ has power', summary: 'Shows that the module is powered.', src: 'Handsontec 1-channel relay module guide' },
+  'rel:led': { name: 'Relay LED', tag: 'Lit when the relay is on', summary: 'On this module it lights when the input pin is LOW (relay energised).', src: 'Handsontec 1-channel relay module guide' },
+  'rel:jumper': { name: 'Trigger-level jumper', tag: 'H / L', summary: 'Selects high-level (H) or low-level (L) trigger. Here it is on L: the relay switches on when IN is LOW.', src: 'Handsontec 1-channel relay module guide' },
+  'relaymod': { name: '1-channel 5 V relay module', tag: '50 × 25 mm · optocoupler', summary: 'Lets a small signal switch a separate circuit, with electrical isolation. Contacts up to DC 30 V / 10 A or AC 250 V / 10 A.', src: 'Handsontec 1-channel relay module guide' },
+  'lamp': { name: 'Miniature lamp (E10)', tag: 'Our safe load', summary: 'A small incandescent lamp in a holder. It glows when current flows through its filament.', src: 'Handsontec 1-channel relay module guide' },
+  'lamp:bulb': { name: 'Bulb with filament', tag: 'E10 screw base', summary: 'The thin tungsten filament heats up and glows when current flows.', src: 'Handsontec 1-channel relay module guide' },
+  'lamp:holder': { name: 'Lamp holder', tag: 'E10 socket', summary: 'Holds the bulb and connects it to the two screw terminals.', src: 'Handsontec 1-channel relay module guide' },
+  'lamp:term': { name: 'Lamp terminals', tag: '2 screws', summary: 'One goes to the relay NO terminal, the other to battery −.', src: 'Handsontec 1-channel relay module guide' },
   obstacle: {
     name: 'Obstacle', tag: 'Drag it closer or farther',
     summary: 'A flat object in front of the sensor. Drag it in the 3D view or use the slider; the label shows the real distance.',

@@ -24,6 +24,7 @@ const VIEWS = {
   bottom: { t: new THREE.Vector3(0, -1, 0), d: new THREE.Vector3(0, -1, -0.02), dist: 132 },
   bench: { t: new THREE.Vector3(0, 0, 30), d: new THREE.Vector3(-0.28, 0.82, 0.5), dist: 235 },
   breadboard: { t: new THREE.Vector3(4, 2.4, 60), d: new THREE.Vector3(-0.1, 0.86, 0.5), dist: 115 },
+  relay: { t: new THREE.Vector3(88, 0, -12), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 395 },
   motor: { t: new THREE.Vector3(0, 0, 90), d: new THREE.Vector3(-0.06, 0.9, 0.43), dist: 285 },
   drvclose: { t: new THREE.Vector3(0, 3, 71), d: new THREE.Vector3(-0.22, 0.86, 0.46), dist: 78 },
   sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
@@ -186,7 +187,8 @@ class App {
   refreshPickTargets() {
     const t = [this.board.group];
     if (this.cable.visible) t.push(this.cable);
-    if (this.bb.group.visible) t.push(this.bb.group, ...this.bench.pickables());
+    if (this.bb.group.visible) t.push(this.bb.group);
+    if (this.bb.group.visible || (this.lesson && this.lesson.noBreadboard)) t.push(...this.bench.pickables());
     if (this.obstacle && this.obstacle.visible) t.push(this.obstacle);
     this.viewer.pickTargets = t;
   }
@@ -208,6 +210,7 @@ class App {
   async ensurePower() { if (!this.usbPlugged) await this.plug(true); }
 
   outputsOff() {
+    if (this.rly) { this.rly.mode = 'INPUT'; this.rly.level = null; }
     for (const it of Object.values(this.bench.items)) {
       if (it.def.type === 'led') it.obj.set(false);
       if (it.def.type === 'buzzer') it.obj.vibrate(false);
@@ -275,6 +278,7 @@ class App {
     this.pirTick(Math.min(dt, 0.1));
     this.servoTick(Math.min(dt, 0.1));
     this.motorTick(Math.min(dt, 0.1));
+    this.relayTick(Math.min(dt, 0.1));
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -299,6 +303,7 @@ class App {
   view(name, ms = 1100) {
     if (name === 'sonar' && this.sonarGeom()) return this.frameSonar(ms);
     if (name === 'room') return this.frameRoom(ms);
+    if (name === 'relayclose') return this.frameRelay(ms);
     if (name === 'servo' || name === 'servoclose') return this.frameServo(name === 'servoclose', ms);
     if (name === 'pirfront' || name === 'pirback') return this.framePir(name === 'pirback' ? 'back' : 'front', ms);
     const v = VIEWS[name];
@@ -607,7 +612,7 @@ class App {
     this.hideFloat(); this.clearTemp(); this.hideCallout();
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
     if (mode === 'explore') {
-      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false);
+      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false); this.showRelay(false);
       this.lesson = null;
       this.renderSide();
       this.select(null, { card: false });
@@ -638,8 +643,8 @@ class App {
     this.sim.stop(); this.stopSound(); this.outputsOff();
     this.lesson = L; this.stepIdx = 0; this.inQuiz = false;
     this.board.setMatrix(null);
-    this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false);
-    if (L.circuit) { this.bench.setDefs(L.circuit); this.bb.group.visible = true; }
+    this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false); this.showRelay(false);
+    if (L.circuit) { this.bench.setDefs(L.circuit); this.bb.group.visible = !L.noBreadboard; }
     else { this.bench.clear(); this.bench.setDefs([]); this.bb.group.visible = false; this.strips.visible = false; }
     if (L.id === 'l1' && this.usbPlugged) await this.plug(false);
     this.refreshPickTargets();
@@ -676,6 +681,10 @@ class App {
         <div class="io-tools"><button id="pir-wave" class="hold">👋 Wave hand</button><button id="pir-still" class="lvl">✋ Hold hand still</button></div></div>
         <div class="io-block pirstat"><div><span>Sensor</span><b id="ps-sensor">—</b></div><div class="arrow">→</div><div><span>OUT → D2</span><b id="ps-out">—</b></div><div class="arrow">→</div><div><span>Alarm LED (D5)</span><b id="ps-led">—</b></div></div>
         <div id="ps-note" class="io-note"></div>`;
+    if (w.includes('relay')) h += `<div class="io-block pirstat"><div><span>D4 → IN</span><b id="rl-pin">—</b></div><div class="arrow">→</div><div><span>Relay</span><b id="rl-rel">—</b></div><div class="arrow">→</div><div><span>Lamp</span><b id="rl-lamp">—</b></div></div>
+        <div class="io-tools"><button id="rl-manual" class="hold small">⚡ Energise the coil</button></div><div id="rl-note" class="io-note"></div>
+        <table class="kv rtable"><tr><th>Pin D4</th><th>Relay (low-level trigger)</th></tr>
+        <tr data-r="low"><td>LOW (0 V)</td><td>ON · COM connected to NO · lamp ON</td></tr><tr data-r="off"><td>released (INPUT)</td><td>OFF · COM connected to NC · lamp OFF</td></tr></table>`;
     if (w.includes('motor')) h += `<div class="io-block pirstat"><div><span>D7 → 1A</span><b id="mt-in1">—</b></div><div><span>D8 → 2A</span><b id="mt-in2">—</b></div><div><span>D5 → EN</span><b id="mt-en">—</b></div><div class="arrow">→</div><div><span>Motor</span><b id="mt-mot">—</b></div></div>
         <table class="kv mtable"><tr><th>EN</th><th>1A</th><th>2A</th><th>Motor (L293D datasheet)</th></tr>
         <tr data-r="d1"><td>on</td><td>HIGH</td><td>LOW</td><td>turns · direction 1</td></tr><tr data-r="d2"><td>on</td><td>LOW</td><td>HIGH</td><td>turns · direction 2</td></tr>
@@ -699,6 +708,7 @@ class App {
     if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); $('#dist').onchange = e => this.setDist(+e.target.value, true); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist, true)); this.setDist(this.distCm); }
     else this.hideSonar();
     this.refreshPickTargets();
+    if ($('#rl-manual')) $('#rl-manual').onclick = () => { if (this.rly && !this.sim.running) this.rly.manual = !this.rly.manual; };
     if ($('#pir-wave')) { $('#pir-wave').onclick = () => this.pirWave(); $('#pir-still').onclick = () => this.pirHoldStill(); }
     this.showRoom(w.includes('pir') && !!this.pirSensor());
     if ($('#tempc')) { $('#tempc').oninput = e => this.setTemp(+e.target.value); this.setTemp(this.tempC); }
@@ -770,7 +780,10 @@ class App {
       if ($('#dist')) this.setDist(this.distCm, S.view === 'sonar');
       this.showRoom(!!(L.widgets && L.widgets.includes('pir')) && !!this.pirSensor());
       this.showMotor(!!(L.widgets && L.widgets.includes('motor')) && !!this.bench.get('mot1'));
+      this.showRelay(!!(L.widgets && L.widgets.includes('relay')) && !!this.bench.get('rel1'));
+      { const rm = this.bench.get('rel1'); if (rm) rm.setCutaway(!!S.cutaway); }
       if (S.view === 'room') this.frameRoom();
+      if (S.view === 'relayclose') this.view('relayclose');
       if (S.view === 'pirfront' || S.view === 'pirback' || S.view === 'servo' || S.view === 'servoclose') this.view(S.view);
       if (S.labels) for (const [id, text] of S.labels) {
         let p;
@@ -1061,6 +1074,52 @@ class App {
     this.pirFan.position.set(L.x, DESK_Y + 2, L.z); this.pirFan.scale.set(r, r, 1);
   }
   // ---- Lesson 15: SG90 servo ------------------------------------------------------------------------
+  // ---- Lesson 17: relay module + lamp ---------------------------------------------------------------
+  relayIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'relay'); }
+  frameRelay(ms = 1000) {
+    const r = this.bench.items.rel1; if (!r) return this.view('relay', ms);
+    const p = r.group.position;
+    return this.viewer.flyTo(new THREE.Vector3(p.x + 3, 10, p.z + 2), 88, new THREE.Vector3(-0.1, 0.8, 0.6), ms);
+  }
+  showRelay(on) {
+    if (this.rlyTags) { this.rlyTags.forEach(t => { t.parent && t.parent.remove(t); t.element.remove(); }); this.rlyTags = null; }
+    this.rly = { mode: 'INPUT', level: null, manual: false };
+    const m = this.bench.get('rel1'), lamp = this.bench.get('lamp1');
+    if (m) { m.setCutaway(false); m.update(1, false, false); } if (lamp) lamp.set(false);
+    if (!on || !m) return;
+    const mk = (obj, y) => { const el = document.createElement('div'); el.className = 'part-label pirtag'; const t = new CSS2DObject(el); const p = obj.group.position; t.position.set(p.x, y, p.z); this.viewer.scene.add(t); return t; };
+    this.rlyTags = [mk(this.bench.items.rel1.obj, 38), mk(this.bench.items.lamp1.obj, 52)];
+  }
+  relayTick(dt) {
+    const io = this.relayIo(), m = this.bench.get('rel1'), lamp = this.bench.get('lamp1'); if (!io || !m || !this.rly) return;
+    const R = this.rly, wired = this.wired(io), pwr = this.board.powered && wired;
+    const simOn = this.sim.running && R.mode === 'OUTPUT' && R.level === 0;
+    const coil = pwr && (this.sim.running ? simOn : R.manual);
+    if (m.update(dt, coil, pwr)) this.playClick(coil);
+    const lampOn = coil && m.t > 0.5;
+    if (lamp) lamp.set(lampOn);
+    const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; e.className = cls; } };
+    const pinTxt = !this.sim.running ? (R.manual ? 'LOW (manual)' : '—') : R.mode === 'INPUT' ? 'released' : R.level === 0 ? 'LOW · 0 V' : '—';
+    set('#rl-pin', pinTxt, coil ? 'on' : 'off');
+    set('#rl-rel', coil ? 'ON · COM–NO' : 'OFF · COM–NC', coil ? 'on' : 'off');
+    set('#rl-lamp', lampOn ? 'ON' : 'OFF', lampOn ? 'on' : 'off');
+    document.querySelectorAll('.rtable tr[data-r]').forEach(tr => tr.classList.toggle('hit', pwr && ((tr.dataset.r === 'low') === coil)));
+    const btn = $('#rl-manual'); if (btn) { btn.disabled = this.sim.running; btn.textContent = R.manual && !this.sim.running ? '⚡ Coil energised — click to release' : '⚡ Energise the coil'; btn.classList.toggle('on', R.manual && !this.sim.running); }
+    set('#rl-note', !this.board.powered ? 'USB-C is not plugged in — the module has no power.' : !this.sim.running ? 'Press <b>▶ Run</b>, or energise the coil by hand.' : coil ? 'Pin LOW → relay <b>clicks ON</b> → lamp circuit closed.' : 'Pin released → relay <b>clicks OFF</b> → lamp circuit open.', 'io-note');
+    if (this.rlyTags) { const [a, b] = this.rlyTags; const t1 = coil ? 'Relay ON' : 'Relay OFF', t2 = lampOn ? 'Lamp ON' : 'Lamp OFF'; if (a.element.textContent !== t1) { a.element.textContent = t1; a.element.className = 'part-label pirtag ' + (coil ? 'on' : ''); } if (b.element.textContent !== t2) { b.element.textContent = t2; b.element.className = 'part-label pirtag ' + (lampOn ? 'on' : ''); } }
+  }
+  playClick(on) {
+    if (!this.soundOn) return; const ac = this.audioCtx(); if (!ac) return;
+    const t = ac.currentTime;
+    for (const [dt, f, gn] of on ? [[0, 2600, 0.55], [0.011, 1500, 0.4]] : [[0, 1900, 0.4], [0.008, 1100, 0.28]]) {
+      const buf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.03), ac.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ac.sampleRate * 0.004));
+      const src = ac.createBufferSource(); src.buffer = buf;
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 1.1;
+      const g = ac.createGain(); g.gain.value = gn;
+      src.connect(bp).connect(g).connect(ac.destination); src.start(t + dt);
+    }
+  }
   // ---- Lesson 16: L293D + DC motor -------------------------------------------------------------------
   motorIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'motor'); }
   showMotor(on) {
@@ -1276,6 +1335,7 @@ class App {
       },
       matrix: vals => this.board.setMatrix(vals),
       servo: (pin, us, angle) => this.onServo(pin, us, angle),
+      mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {
         const io = this.ioFor(pin);
         if (io && io.kind === 'hcsr04' && this.wired(io) && this.board.powered) { const us = this.pulseInUs(); await sleep(Math.max(1, us / 1000)); this.setPinLevel(`D8 ECHO: HIGH for ${Math.round(this.echoUs())} µs → pulseIn() = ${us} µs`); return us; }
@@ -1303,6 +1363,7 @@ class App {
       return;
     }
     if (pin === 'D5' && this.pir) this.pir.ledOn = !!(level && this.board.powered);
+    if (pin === 'D4' && this.relayIo() && this.rly) this.rly.level = level;
     { const mio = this.motorIo(); if (mio && this.mot && (pin === mio.in1 || pin === mio.in2)) this.mot[pin === mio.in1 ? 'in1' : 'in2'] = level; }
     { const us = this.ioFor('D8'); if (pin === 'D7' && level && us && us.kind === 'hcsr04' && this.wired(us) && this.board.powered) this.sonarBurst(); }
     const L = this.ledFor(pin);

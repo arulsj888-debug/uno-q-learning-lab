@@ -398,3 +398,8 @@ code { background: #0d1217; border: 1px solid #253040; border-radius: 5px; paddi
 
 .mtable { margin-top: 8px; font-size: 12px; }
 .mtable tr.hit td { background: rgba(255,211,77,.18); color: #ffe9a6; font-weight: 700; }
+
+.rtable { margin-top: 8px; font-size: 12px; }
+.rtable tr.hit td { background: rgba(255,211,77,.18); color: #ffe9a6; font-weight: 700; }
+.hold.small.on { background: var(--teal); color: #fff; }
+.hold:disabled { opacity: .45; cursor: default; }
