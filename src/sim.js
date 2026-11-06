@@ -69,6 +69,7 @@ export class Sim {
         H.pwm(pin, Math.min(max, Math.max(0, value)) / max, value);
       },
       delayMicroseconds: async () => { if (slow) await frame(); },
+      web: (stage, val) => { if (H.web) H.web({ stage, val }); },
       uiEvents: () => (H.ui ? H.ui() : []),
       bridge: (stage, val) => { if (H.bridge) H.bridge({ stage, val }); },
       sensor: () => (H.sensor ? H.sensor() : { found: false }),
@@ -410,6 +411,23 @@ export const PROGRAMS = {
       await rt.at(9); const r = rt.sensor(); rt.println(''); rt.println(`Temperature: ${r.c.toFixed(1)} C`);
       await rt.at(10); rt.println(`Humidity: ${r.rh.toFixed(1)} %`);
       await rt.at(11); await rt.delay(2000);
+    }
+  },
+  // Lesson 10 — Flask server on the Pi; the phone's taps arrive as 'on' / 'off' events (simulated)
+  async pi_web(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4);
+    await rt.at(5); rt.pinMode('p11', 'OUTPUT'); rt.digitalWrite('p11', 0);
+    let lit = false;
+    const page = async () => { await rt.at(8); await rt.at(9); await rt.at(10); rt.web('page', { lit }); };
+    rt.println('[simulated] server started on port 5000');
+    await rt.at(7); await page();
+    for (;;) {
+      for (const evn of rt.uiEvents()) {
+        if (evn === 'on') { rt.println('[simulated] request: GET /on'); await rt.at(12); await rt.at(13); await rt.at(14); lit = true; rt.digitalWrite('p11', 1); await rt.at(15); await page(); }
+        else if (evn === 'off') { rt.println('[simulated] request: GET /off'); await rt.at(17); await rt.at(18); await rt.at(19); lit = false; rt.digitalWrite('p11', 0); await rt.at(20); await page(); }
+      }
+      await rt.delay(120);
     }
   },
   async pi_pwm(rt) {

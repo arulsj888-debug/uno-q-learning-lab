@@ -548,3 +548,9 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 .term-chip:hover { border-color: var(--teal); }
 .term-grp { flex-basis: 100%; font: 700 10.5px/1 'Segoe UI', sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #6c7a88; margin: 6px 0 -1px; }
 .term-chips { max-height: 230px; overflow-y: auto; }
+
+/* ---------------- phone showing the Pi's web page (Pi lesson 10) */
+#phone .ph-body { min-height: 120px; }
+#phone .pw-h { font-size: 15px; margin-bottom: 10px; } #phone .pw-h b { color: #6a7c8c; } #phone .pw-h b.on { color: #1f9d55; }
+#phone .pw-a { display: inline-block; color: #0b57d0; text-decoration: underline; font-size: 14px; margin-right: 12px; cursor: pointer; padding: 4px 0; }
+#phone .pw-err { font: 13px Arial, sans-serif; color: #444; } #phone .pw-err small { display: block; color: #777; font-size: 11px; margin-top: 4px; }

@@ -18,6 +18,7 @@ export const SRC_PI = {
   thermal: { t: 'Raspberry Pi documentation — Frequency management and thermal control', u: 'https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#frequency-management-and-thermal-control' },
   sht31: { t: 'Adafruit SHT31-D Temperature & Humidity Sensor Breakout (product page and guide)', u: 'https://learn.adafruit.com/adafruit-sht31-d-temperature-and-humidity-sensor-breakout' },
   sht31lib: { t: 'Adafruit CircuitPython SHT31D library (README, example, source)', u: 'https://github.com/adafruit/Adafruit_CircuitPython_SHT31D' },
+  flask: { t: 'Flask documentation — Quickstart (minimal app, flask run, externally visible server)', u: 'https://flask.palletsprojects.com/en/stable/quickstart/' },
   usegpio: { t: 'Raspberry Pi documentation — Use GPIO from Python', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-gpio-from-python' },
   python: { t: 'Raspberry Pi documentation — Use Python on a Raspberry Pi', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-python-on-a-raspberry-pi' },
   gpiozero: { t: 'GPIO Zero documentation (recipes, LED, Button, pin numbering)', u: 'https://gpiozero.readthedocs.io/' },
@@ -71,6 +72,27 @@ while True:
     print(f"\\nTemperature: {sensor.temperature:0.1f} C")
     print(f"Humidity: {sensor.relative_humidity:0.1f} %")
     time.sleep(2)`;
+
+export const PI_WEB = `from flask import Flask
+from gpiozero import LED
+
+app = Flask(__name__)
+led = LED(17)
+
+@app.route("/")
+def home():
+    state = "ON" if led.is_lit else "OFF"
+    return f"<h1>LED is {state}</h1><a href='/on'>Turn on</a> <a href='/off'>Turn off</a>"
+
+@app.route("/on")
+def turn_on():
+    led.on()
+    return home()
+
+@app.route("/off")
+def turn_off():
+    led.off()
+    return home()`;
 
 export const PI_BUTTON_LED = `from gpiozero import LED, Button
 
@@ -146,7 +168,7 @@ export const TERM_CMDS = [
   { g: 'Python', cmd: 'python3', does: 'Starts Python 3, which comes pre-installed with Raspberry Pi OS.', src: 'Using Python' },
 ];
 
-export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors' };
+export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web' };
 
 export const PI_LESSONS = [
   // ================================================================== P1
@@ -697,6 +719,87 @@ pause()</pre>
     ],
     sources: [SRC_PI.sht31, SRC_PI.sht31lib, SRC_PI.cfg, SRC_PI.gpio, SRC_PI.ds, SRC_PI.python],
   },
+  // ================================================================== P10
+  {
+    id: 'p10', num: 10, module: 5, title: 'A web page served by the Pi: switch the LED from your phone', level: 'Intermediate', time: '25 min',
+    goal: 'Run a small web server (Flask) on the Raspberry Pi so that a phone on the same Wi-Fi can switch the LED on and off.',
+    hardware: ['Raspberry Pi 4 with the Lesson 4 LED circuit (GPIO17)', 'A phone or computer on the same Wi-Fi / network'],
+    code: PI_WEB, file: 'led_server.py', program: 'pi_web', fast: true, widgets: ['piweb'],
+    circuit: PI_LED_PARTS, io: { p11: IO_LED }, led: true,
+    explain: {
+      1: 'Import <b>Flask</b>: a small framework that turns Python functions into web pages.',
+      2: 'The LED class from GPIO Zero (Lesson 4).',
+      4: 'Create the web application. <code>__name__</code> tells Flask where this program lives.',
+      5: 'The LED on GPIO17 (pin 11), same circuit as Lesson 4.',
+      7: '<b>@app.route("/")</b>: when a browser asks for the page <b>/</b> (the main page), run the function below.',
+      8: 'The function that builds the main page.',
+      9: '<b>led.is_lit</b> is True while the LED is on. We turn that into the word ON or OFF.',
+      10: 'What the function returns is the web page. The default content type is HTML, so the browser draws the heading and two links. Clicking a link asks for another address: <b>/on</b> or <b>/off</b>.',
+      12: 'When the browser asks for <b>/on</b> …',
+      13: '… run this function.',
+      14: '<b>led.on()</b> sets GPIO17 to 3.3 V: the real LED lights.',
+      15: 'Send the main page back, now showing “LED is ON”.',
+      17: 'When the browser asks for <b>/off</b> …',
+      18: '… run this function.',
+      19: '<b>led.off()</b>: GPIO17 to 0 V, the LED goes out.',
+      20: 'Send the main page back, now showing “LED is OFF”.',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'pibench', have: LED_IDS, power: false,
+        body: `<p>The Raspberry Pi will <b>serve a web page</b> — like a tiny website. Your phone opens it in its browser and taps a link; the Pi switches the real LED.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">Phone browser</span></div><div class="pt-arrow">↓ Wi-Fi: “give me /on”</div><div class="pt-row"><span class="pt">Raspberry Pi: Flask web server (Python)</span></div><div class="pt-arrow">↓ led.on()</div><div class="pt-row"><span class="pt bus">LED on GPIO17</span></div></div>
+        <p>The wiring is the one from Lesson 4. Only the program is new.</p>`,
+      },
+      {
+        title: 'Server and browser', view: 'pibench', have: LED_IDS,
+        body: `<table class="kv"><tr><th></th><th>Runs on</th><th>Job</th></tr><tr><td><b>Web server</b></td><td>the Raspberry Pi</td><td>waits for requests, runs your Python, sends back a page</td></tr><tr><td><b>Browser</b></td><td>your phone / computer</td><td>asks for an address, draws the page</td></tr></table>
+        <p>The browser asks for an address like <code>http://&lt;ip-address&gt;:5000/on</code>. After the <b>IP address</b> of the Pi comes the <b>port</b> (5000 is Flask’s default), then the <b>route</b> (<code>/on</code>). Your program decides what each route does.</p>
+        <p class="tip">Find the Pi’s IP address with <code>hostname -I</code> (Lesson 8).</p>`,
+      },
+      {
+        title: 'Install Flask', view: 'home', acc: [],
+        body: `<p><b>Flask</b> is a small, popular Python web framework. On Raspberry Pi OS (which is based on Debian) install it as a system package:</p>
+        <pre class="tree">sudo apt install python3-flask</pre>
+        <p>This is the way Raspberry Pi’s documentation recommends for Python libraries (<code>apt install python3-xyz</code>, Lesson 8). Do <code>sudo apt update</code> first if apt cannot find it.</p>`,
+      },
+      { title: 'The program', view: 'pibench', have: LED_IDS, showCode: true, power: true, body: `<p>Click every line of <code>led_server.py</code>. Each <code>@app.route(…)</code> line connects an <b>address</b> to the function below it.</p>
+        <p class="tip">The first lines (1–10) are Flask’s “minimal application” pattern from its documentation; routes <code>/on</code> and <code>/off</code> follow the same pattern.</p>` },
+      {
+        title: 'Start the server', view: 'pibench', have: LED_IDS, showCode: true, power: true,
+        body: `<p>In the Terminal, in the folder of the file:</p>
+        <pre class="tree">flask --app led_server run --host=0.0.0.0</pre>
+        <ul><li><code>--app led_server</code> — the Python file (without <code>.py</code>). Do not name your file <code>flask.py</code>: it would conflict with Flask itself.</li>
+        <li><code>--host=0.0.0.0</code> — by default Flask answers only on the Pi itself; this makes it reachable from <b>other devices on the network</b>.</li></ul>
+        <p>Flask prints a line with the port (default 5000). Stop the server with <b>Ctrl+C</b>.</p>`,
+      },
+      {
+        title: 'Run it', view: 'pibench', have: LED_IDS, showCode: true, power: true,
+        body: `<p>The <b>phone</b> at the bottom right of the 3D view stands for your phone. Press <b>▶ Run</b> (this starts the server), then <b>tap “Turn on”</b> and <b>“Turn off”</b> on the phone.</p>
+        <ol><li>The tap asks the Pi for <code>/on</code>.</li><li>The matching function runs <code>led.on()</code> — the real LED lights.</li><li>The Pi sends the page back, now saying “LED is ON”.</li></ol>
+        <p>Before you press Run the phone shows <b>“can’t reach this page”</b>: no server is running yet.</p>
+        <p class="sim">Simulated: no real network is used here.</p>`,
+      },
+      {
+        title: 'Safety: keep it on your network', view: 'pibench', have: LED_IDS, power: true,
+        body: `<p class="warn"><b>Anyone on your network who knows the address can open this page.</b> It has no password. With <code>--host=0.0.0.0</code> Flask listens on all the Pi’s addresses (Flask documentation: do this only if you trust the users on your network).</p>
+        <ul><li>Never use Flask’s <b>debug mode</b> together with <code>--host=0.0.0.0</code>: the debugger lets people run Python code on your computer.</li><li>Do not expose this page to the Internet.</li><li>Flask’s built-in server is for testing and learning, not for real production use.</li></ul>
+        <p>One more thing: our links change the LED when they are opened, which is simple but not how professional sites do it. Anything that opens the link — even a browser pre-loading a page — would switch the LED.</p>`,
+      },
+      {
+        title: 'Summary', view: 'pibench', have: LED_IDS, power: true,
+        body: `<ul><li>A <b>web server</b> runs on the Pi; the <b>browser</b> on the phone asks for addresses.</li><li><code>@app.route("/on")</code> connects an address to a Python function; the returned text is the page.</li><li>Start with <code>flask --app led_server run --host=0.0.0.0</code>; default port <b>5000</b>.</li><li>Open <code>http://&lt;pi-ip&gt;:5000</code> from a phone on the same network; keep it off the Internet.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'What does @app.route("/on") do?', a: ['Switches the LED on', 'Connects the address /on to the function below it', 'Starts Wi-Fi', 'Installs Flask'], c: 1, why: 'The decorator tells Flask which URL should run the function.' },
+      { q: 'What is the default port of Flask’s development server?', a: ['80', '5000', '7000', '8080'], c: 1, why: 'Flask quickstart: Running on http://127.0.0.1:5000.' },
+      { q: 'Why add --host=0.0.0.0?', a: ['To make the page faster', 'So other devices on the network can reach the server', 'To turn off the LED', 'To use 5 V'], c: 1, why: 'By default the server is only reachable from the Pi itself.' },
+      { q: 'How do you find the Pi’s IP address?', a: ['hostname -I', 'pinout', 'df -h', 'ls'], c: 0, why: 'hostname -I prints the local IP address (Lesson 8).' },
+      { q: 'What should you avoid?', a: ['Using the page on your home network', 'Debug mode together with --host=0.0.0.0, or exposing it to the Internet', 'Stopping with Ctrl+C', 'Using Python'], c: 1, why: 'The debugger can run arbitrary Python code, and the page has no password.' },
+    ],
+    sources: [SRC_PI.flask, SRC_PI.usegpio, SRC_PI.gpiozero, SRC_PI.remote, SRC_PI.python],
+  },
 ];
 
-export const PI_COMING = ['Buzzer', 'Camera module', 'A web page served by the Pi', 'Final project'];
+export const PI_COMING = ['Buzzer', 'Camera module', 'Final project'];
