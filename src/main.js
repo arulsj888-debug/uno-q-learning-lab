@@ -7,7 +7,7 @@ import { initMaterials, canvasTex, noise } from './materials.js';
 import { UnoQBoard } from './board.js';
 import { Pi4Board } from './pi4/board.js';
 import { PARTS_PI, CATEGORIES_PI, BOARD_FACTS_PI, J8_HEADER, findPinPi } from './pi4/data.js';
-import { PI_LESSONS, PI_MODULES, PI_COMING } from './pi4/lessons.js';
+import { PI_LESSONS, PI_MODULES, PI_COMING, TERM_CMDS } from './pi4/lessons.js';
 import { makePiAccessories, PI_ACC_INFO } from './pi4/peripherals.js';
 import uqThumb from '../assets/pcb_top_albedo.jpg';
 import piThumb from '../assets/pi4/pi4_top.jpg';
@@ -836,6 +836,24 @@ class App {
     $('#explain').innerHTML = 'Click a line to see what it does.';
   }
 
+  bindTerm() {
+    const t = $('#panel .term'); if (!t) return;
+    const out = t.querySelector('.term-out'), inp = t.querySelector('.term-in'), chips = t.querySelector('.term-chips');
+    const norm = c => c.trim().replace(/\s+/g, ' ').toLowerCase();
+    const run = raw => {
+      const q = norm(raw); if (!q) return;
+      const hit = TERM_CMDS.find(c => norm(c.cmd) === q || (c.cmd.includes('<username>') && /^cd \/home\/\S+$/.test(q)));
+      out.querySelector('.term-hint')?.remove();
+      const line = document.createElement('div'); line.className = 'term-line';
+      line.innerHTML = `<div><span class="term-ps">$</span> <b>${esc(raw.trim())}</b></div>` + (hit
+        ? `<div class="term-ans">${esc(hit.does)} <span class="term-src">(${esc(hit.src)})</span></div>`
+        : `<div class="term-ans dim">Not one of the practice commands — pick one from the list below.</div>`);
+      out.appendChild(line); out.scrollTop = out.scrollHeight;
+    };
+    chips.innerHTML = TERM_CMDS.map(c => `<button class="term-chip" data-c="${esc(c.cmd)}">${esc(c.cmd)}</button>`).join('');
+    chips.querySelectorAll('.term-chip').forEach(b => b.onclick = () => run(b.dataset.c.replace('<username>', 'pi')));
+    inp.onkeydown = e => { if (e.key === 'Enter') { run(inp.value); inp.value = ''; } e.stopPropagation(); };
+  }
   hideAcc() { if (this.acc) for (const a of this.acc.all) { a.set(false); a.on = false; } }
   async applyAcc(i, prev, alive) {
     const L = this.lesson; let list = null;
@@ -966,6 +984,7 @@ class App {
     h += `</div></div>`;
     $('#panel').innerHTML = h; $('#panel').scrollTop = 0;
     $('#panel').querySelectorAll('.steps-bar i').forEach(b => b.onclick = () => this.goStep(+b.dataset.k));
+    this.bindTerm();
     $('#prev').onclick = () => this.goStep(this.stepIdx - 1);
     if ($('#next')) $('#next').onclick = () => this.goStep(this.stepIdx + 1);
     if ($('#quiz')) $('#quiz').onclick = () => this.showQuiz();

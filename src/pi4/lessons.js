@@ -10,6 +10,9 @@ export const SRC_PI = {
   power: { t: 'Raspberry Pi documentation — Power supply', u: 'https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#power-supply' },
   leds: { t: 'Raspberry Pi documentation — LED warning flash codes', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#led-warning-flash-codes' },
   bcm: { t: 'Raspberry Pi documentation — BCM2711', u: 'https://www.raspberrypi.com/documentation/computers/processors.html#bcm2711' },
+  osupdate: { t: 'Raspberry Pi documentation — Update Raspberry Pi OS', u: 'https://www.raspberrypi.com/documentation/computers/os.html#update-software' },
+  users: { t: 'Raspberry Pi documentation — Manage users', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#users' },
+  thermal: { t: 'Raspberry Pi documentation — Frequency management and thermal control', u: 'https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#frequency-management-and-thermal-control' },
   usegpio: { t: 'Raspberry Pi documentation — Use GPIO from Python', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-gpio-from-python' },
   python: { t: 'Raspberry Pi documentation — Use Python on a Raspberry Pi', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-python-on-a-raspberry-pi' },
   gpiozero: { t: 'GPIO Zero documentation (recipes, LED, Button, pin numbering)', u: 'https://gpiozero.readthedocs.io/' },
@@ -83,7 +86,25 @@ const BTN_IDS = PI_BTN_PARTS.map(d => d.id);
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
 const IO_BTN = { kind: 'button', item: 'btn1', needs: BTN_IDS };
 
-export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python' };
+// Practice terminal (Lesson 8). Each meaning is taken from the official Raspberry Pi documentation (see 'src').
+// The docs do not print the exact output of these commands, so the practice terminal explains instead of inventing output.
+export const TERM_CMDS = [
+  { cmd: 'sudo poweroff', does: 'Shuts the Raspberry Pi down safely. When the green ACT LED shows a series of short flashes, it is safe to unplug the power.', src: 'Getting started — Shutdown options' },
+  { cmd: 'sudo reboot', does: 'Restarts the Raspberry Pi.', src: 'Getting started — Shutdown options' },
+  { cmd: 'sudo apt update', does: 'Refreshes the list of available software packages (it does not install anything yet).', src: 'Updating Raspberry Pi OS' },
+  { cmd: 'sudo apt full-upgrade', does: 'Downloads and installs the newest versions of your installed packages. Raspberry Pi recommends full-upgrade instead of the standard upgrade.', src: 'Updating Raspberry Pi OS' },
+  { cmd: 'sudo raspi-config', does: 'Opens the Raspberry Pi configuration tool (text menus) — Wi-Fi, interfaces such as I²C, boot options and more.', src: 'Getting started — Configuration' },
+  { cmd: 'vcgencmd measure_temp', does: 'Shows the current temperature of the processor. Raspberry Pi says this command gives an accurate, instantaneous reading because it asks the GPU directly.', src: 'Frequency management and thermal control' },
+  { cmd: 'pinout', does: 'Prints a map of the GPIO pins of your board: physical pin numbers, GPIO numbers and functions (from the GPIO Zero library).', src: 'GPIO — pinout map' },
+  { cmd: 'ls -l /home', does: 'Lists the user accounts: every user has a folder inside /home.', src: 'Users' },
+  { cmd: 'cd /home/<username>', does: 'Changes into your own folder (replace <username> with your user name). cd means “change directory”.', src: 'Users' },
+  { cmd: 'ls -la', does: 'Lists the files in the current folder, including hidden ones (names starting with a dot), with details.', src: 'Users' },
+  { cmd: 'groups', does: 'Shows which groups your user belongs to (for example the gpio group that allows GPIO access).', src: 'Users; GPIO — permissions' },
+  { cmd: 'passwd', does: 'Changes your password.', src: 'Users' },
+  { cmd: 'python3', does: 'Starts Python 3, which comes pre-installed with Raspberry Pi OS.', src: 'Using Python' },
+];
+
+export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi' };
 
 export const PI_LESSONS = [
   // ================================================================== P1
@@ -487,6 +508,57 @@ pause()</pre>
     ],
     sources: [SRC_PI.usegpio, SRC_PI.gpiozero, SRC_PI.ds, SRC_PI.gpio],
   },
+  // ================================================================== P8
+  {
+    id: 'p8', num: 8, module: 3, title: 'The Terminal: your first commands', level: 'Beginner', time: '20 min',
+    goal: 'Open the Terminal, read a command, and know the most useful commands for your Raspberry Pi.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)'],
+    steps: [
+      {
+        title: 'What is the Terminal?', view: 'home', acc: [],
+        body: `<p>The <b>Terminal</b> is a window where you give the computer <b>written commands</b> instead of clicking. You open it from the Raspberry Pi OS desktop (the Terminal icon). It is the fastest way to update the system, check the temperature, or start a Python program.</p>
+        <p>In the Raspberry Pi documentation, commands are shown like this:</p>
+        <pre class="tree">$ sudo poweroff</pre>
+        <p class="tip">The <b>$</b> is only the <b>prompt</b> — the computer shows it. You type what comes after it, then press <b>Enter</b>.</p>`,
+      },
+      {
+        title: 'sudo: run as the administrator', view: 'home',
+        body: `<p>Many commands start with <code>sudo</code>. It means “run this as the <b>superuser</b> (administrator)”. These commands can change the whole system, so the Raspberry Pi asks for <b>your password</b> first.</p>
+        <p class="warn"><b>Read a command before you press Enter</b>, especially after <code>sudo</code>. Only run commands from sources you trust, such as the official Raspberry Pi documentation.</p>`,
+      },
+      {
+        title: 'Practice terminal', view: 'home',
+        body: `<p>Click a command (or type it and press Enter) to see what it does. This is a <b>practice terminal</b>: it explains the commands instead of running them.</p>
+        <div class="term"><div class="term-out"><div class="term-hint">Click a command below…</div></div>
+        <div class="term-row"><span class="term-ps">$</span><input class="term-in" placeholder="type a command and press Enter" autocomplete="off" spellcheck="false"></div>
+        <div class="term-chips"></div></div>
+        <p class="sim">The documentation does not print the exact output of these commands, so none is invented here. On your Raspberry Pi you will see the real output.</p>`,
+      },
+      {
+        title: 'Keep the software up to date', view: 'home',
+        body: `<p>Raspberry Pi’s documentation gives two commands, in this order:</p>
+        <ol><li><code>sudo apt update</code> — refresh the list of available software.</li><li><code>sudo apt full-upgrade</code> — install the newest versions.</li></ol>
+        <p>Before a big update, check that you have enough free disk space on the microSD card.</p>`,
+      },
+      {
+        title: 'Python is already there', view: 'home',
+        body: `<p>Raspberry Pi OS comes with <b>Python 3</b> pre-installed — you used it in Lessons 4–7 through the GPIO Zero library.</p>
+        <p class="warn">Do not interfere with the system’s own Python: it can break your operating system. To install extra Python libraries use <code>sudo apt install python3-xyz</code> (xyz = the package), or create a <b>virtual environment</b> with <code>python3 -m venv path/to/venv</code> and use the <code>python</code> and <code>pip</code> inside it (documentation).</p>`,
+      },
+      {
+        title: 'Summary', view: 'home',
+        body: `<ul><li>The Terminal takes typed commands; the <b>$</b> is the prompt, not typed.</li><li><code>sudo</code> = run as administrator (asks for your password) — read before you press Enter.</li><li>Useful: <code>sudo poweroff</code>, <code>sudo reboot</code>, <code>sudo apt update</code>, <code>sudo apt full-upgrade</code>, <code>vcgencmd measure_temp</code>, <code>pinout</code>, <code>ls -la</code>, <code>cd</code>, <code>groups</code>.</li><li>Python 3 is pre-installed; use <code>apt</code> or a virtual environment for extra libraries.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'In “$ sudo poweroff”, what do you type?', a: ['$ sudo poweroff', 'sudo poweroff', 'poweroff only', 'sudo'], c: 1, why: 'The $ is the prompt, shown by the computer.' },
+      { q: 'What does sudo do?', a: ['Deletes files', 'Runs the command as the superuser (administrator)', 'Starts Python', 'Opens the desktop'], c: 1, why: 'sudo = superuser do; it asks for your password.' },
+      { q: 'Which command gives an accurate reading of the processor temperature?', a: ['pinout', 'groups', 'vcgencmd measure_temp', 'sudo reboot'], c: 2, why: 'Raspberry Pi: vcgencmd communicates with the GPU directly and gives an accurate, instantaneous reading.' },
+      { q: 'Which two commands update the software, in order?', a: ['sudo reboot, then sudo poweroff', 'sudo apt update, then sudo apt full-upgrade', 'passwd, then groups', 'ls -la, then cd'], c: 1, why: 'First refresh the package list, then install the newest versions.' },
+      { q: 'Which command prints a map of the GPIO pins?', a: ['pinout', 'passwd', 'ls -l /home', 'python3'], c: 0, why: 'pinout is a GPIO Zero tool that prints the pin map of your board.' },
+    ],
+    sources: [SRC_PI.setup, SRC_PI.osupdate, SRC_PI.users, SRC_PI.thermal, SRC_PI.gpio, SRC_PI.python],
+  },
 ];
 
-export const PI_COMING = ['Buzzer', 'An I²C sensor', 'The Terminal and files', 'Camera module', 'A web page served by the Pi', 'Final project'];
+export const PI_COMING = ['Buzzer', 'An I²C sensor', 'Camera module', 'A web page served by the Pi', 'Final project'];

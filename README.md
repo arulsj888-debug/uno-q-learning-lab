@@ -56,6 +56,8 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
     5. Read a push button (`Button(2)`, pull-up)
     6. The button controls the LED
     7. Fade an LED with PWM (`PWMLED`, value 0–1, duty cycle, default 100 Hz)
+  - **Module 3: Working on the Pi**
+    8. The Terminal: your first commands (practice terminal; every command and its meaning from the official documentation, no invented output)
 
 ## Works on every screen
 
