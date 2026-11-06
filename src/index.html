@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1216">
 <title>Arduino UNO Q · 3D Learning Lab</title>
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <div id="app" class="mode-explore">
   <header id="topbar">
+    <button id="menu-btn" aria-label="Open the menu" title="Menu">☰</button>
     <div class="brand">
       <svg viewBox="0 0 64 30" class="logo" aria-hidden="true"><ellipse cx="17" cy="15" rx="13.5" ry="12" fill="none" stroke="currentColor" stroke-width="4"/><ellipse cx="47" cy="15" rx="13.5" ry="12" fill="none" stroke="currentColor" stroke-width="4"/><rect x="11" y="13.2" width="12" height="3.6" fill="currentColor"/><rect x="41" y="13.2" width="12" height="3.6" fill="currentColor"/><rect x="45.2" y="9" width="3.6" height="12" fill="currentColor"/></svg>
       <div><b>Arduino UNO Q</b><span>3D Learning Lab</span></div>
@@ -69,6 +71,14 @@
   </main>
 
   <aside id="panel"></aside>
+
+  <nav id="mtabs" aria-label="Views">
+    <button data-tab="lesson" class="on">📖 Lesson</button>
+    <button data-tab="code" class="mt-dock">⌨ Code &amp; run</button>
+    <button id="mt-run" class="mt-dock primary">▶ Run</button>
+    <button id="mt-stop" class="mt-dock">■ Stop</button>
+  </nav>
+  <div id="scrim"></div>
 
   <section id="dock">
     <div class="dock-code">

@@ -434,3 +434,83 @@ pre.tree { background: #10161d; border: 1px solid var(--line); border-radius: 8p
 #phone.live { pointer-events: auto; }
 #phone .ph-btn { display: block; width: 100%; margin: 4px 0; padding: 7px 8px; border: 0; border-radius: 8px; background: #0f8f84; color: #fff; font: 600 12px Arial, sans-serif; cursor: pointer; }
 #phone .ph-btn:disabled { background: #b8c4cf; cursor: default; }
+
+
+/* ======================================================================================================
+   RESPONSIVE: laptops → tablets → phones (portrait and landscape)
+   ====================================================================================================== */
+html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+@supports (height: 100dvh) { #app { height: 100dvh; } }
+#menu-btn, #scrim, #mtabs { display: none; }
+#float-card { width: min(330px, calc(100% - 24px)); }
+#stage { touch-action: none; }
+
+/* ---- tablets and small laptops: the left list becomes a slide-out menu */
+@media (max-width: 1024px) {
+  :root { --panelw: 340px; }
+  #app, #app.with-dock { grid-template-columns: minmax(0, 1fr) var(--panelw); grid-template-areas: "top top" "stage panel" "dock dock"; }
+  #menu-btn { display: inline-grid; place-items: center; width: 38px; height: 34px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; font-size: 18px; flex: none; }
+  .brand { min-width: 0; }
+  #side { position: fixed; top: 54px; left: 0; bottom: 0; width: min(84vw, 320px); z-index: 60; transform: translateX(-104%); transition: transform .25s ease; }
+  body[data-menu="open"] #side { transform: none; box-shadow: 10px 0 40px rgba(0,0,0,.65); }
+  body[data-menu="open"] #scrim { display: block; position: fixed; inset: 54px 0 0 0; background: rgba(0,0,0,.5); z-index: 55; }
+}
+
+/* ---- shared rules for phones (portrait) and short landscape screens */
+@media (max-width: 900px), (max-height: 520px) {
+  #topbar { gap: 8px; padding: 0 8px; }
+  .brand div { display: none; }
+  .brand .logo { width: 34px; }
+  .modes button { padding: 6px 10px; font-size: 13px; }
+  .tools { overflow-x: auto; scrollbar-width: none; }
+  .tools::-webkit-scrollbar { display: none; }
+  .tools button { white-space: nowrap; padding: 6px 9px; }
+  #side { top: 46px; }
+  body[data-menu="open"] #scrim { inset: 46px 0 0 0; }
+  #legend { font-size: 10.5px; left: 8px; bottom: 6px; max-width: 70%; }
+  #panel { padding: 12px 12px 24px; }
+  .nav { bottom: -24px; }
+  #mtabs { display: flex; gap: 6px; padding: 6px 8px; background: #121820; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  #mtabs button { flex: none; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel2); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  #mtabs button.on { background: rgba(0,168,181,.22); border-color: var(--teal); color: #bff7fb; }
+  #mtabs button.primary { background: var(--teal); border-color: var(--teal); color: #fff; }
+  #app:not(.with-dock) #mtabs { display: none; }
+  #panel, #dock { grid-area: content; }
+  body[data-tab="code"] #app.with-dock #panel { display: none; }
+  body:not([data-tab="code"]) #dock { display: none !important; }
+  /* the dock (code, controls, serial monitor) stacks and scrolls */
+  #dock, #dock.with-io, #dock.with-io.no-serial, #dock.no-serial:not(.with-io) { display: flex; flex-direction: column; overflow-y: auto; border-top: 0; }
+  .dock-code, .dock-io, .dock-serial { flex: none; grid-column: auto !important; border-left: 0 !important; border-top: 1px solid var(--line); }
+  .dock-code { border-top: 0; }
+  .code-wrap, #dock.with-io .code-wrap { display: block; }
+  #code { max-height: 230px; font-size: 12px; }
+  #explain { border-left: 0; border-top: 1px solid var(--line); max-height: 120px; }
+  .dock-serial { min-height: 120px; max-height: 190px; }
+  #serial { min-height: 80px; }
+  #phone { transform: scale(.72); transform-origin: right bottom; right: 6px; bottom: 6px; }
+  .callout-box { width: min(260px, calc(100% - 20px)); }
+}
+
+/* ---- phones in portrait: stage on top, tabs, then lesson or code */
+@media (max-width: 900px) and (min-height: 521px) {
+  #app, #app.with-dock { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(220px, 42dvh) auto minmax(0, 1fr); grid-template-areas: "top" "stage" "tabs" "content"; }
+}
+
+/* ---- phones in landscape: stage on the left, lesson / code on the right */
+@media (max-height: 520px) {
+  #app, #app.with-dock { grid-template-columns: minmax(0, 1fr) 46%; grid-template-rows: 46px auto minmax(0, 1fr); grid-template-areas: "top top" "stage tabs" "stage content"; }
+}
+
+/* ---- touch screens: bigger targets */
+@media (pointer: coarse) {
+  .tools button, .modes button, .nav button, .runbar button { min-height: 38px; }
+  #side .item { min-height: 40px; }
+  .steps-bar i { height: 8px; }
+  #code .ln { padding-top: 2px; padding-bottom: 2px; }
+  .quiz button.opt { padding: 11px 12px; }
+  .hold { min-height: 46px; }
+}
+
+#topbar, #stage, #panel, #dock, #mtabs, #side { min-width: 0; }
+#panel { overflow-x: hidden; word-wrap: break-word; }
+#panel pre, #panel table { max-width: 100%; overflow-x: auto; }

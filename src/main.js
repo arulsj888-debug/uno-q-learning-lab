@@ -61,6 +61,7 @@ class App {
     this.setupSim();
     this.bindUI();
     this.bindDirectInput();
+    this.bindResponsive();
     this.buildPartLabels();
     this.refreshPickTargets();
     this.setMode('explore');
@@ -1381,6 +1382,25 @@ class App {
     const k = $('#knob'); if (k && document.activeElement !== k) k.value = Math.round(this.knob * 1000);
     const kv = $('#knob-val');
     if (kv) kv.innerHTML = `Wiper ≈ <b>${v.toFixed(2)} V</b> → 14-bit reading ≈ <b>${Math.round(v / VREF * 16383)}</b>`;
+  }
+  bindResponsive() {
+    const body = document.body;
+    body.dataset.tab = 'lesson';
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    if (coarse) $('#legend').textContent = 'Drag to rotate · Pinch to zoom · Tap any part';
+    const closeMenu = () => { body.dataset.menu = ''; };
+    $('#menu-btn').onclick = () => { body.dataset.menu = body.dataset.menu === 'open' ? '' : 'open'; };
+    $('#scrim').onclick = closeMenu;
+    // choosing something in the side menu closes it and shows the explanation (small screens)
+    $('#side').addEventListener('click', e => { if (e.target.closest('.item, .lesson-card')) setTimeout(() => { closeMenu(); body.dataset.tab = 'lesson'; document.querySelectorAll('#mtabs [data-tab]').forEach(x => x.classList.toggle('on', x.dataset.tab === 'lesson')); }, 60); });
+    document.querySelectorAll('#mtabs [data-tab]').forEach(b => b.onclick = () => {
+      body.dataset.tab = b.dataset.tab;
+      document.querySelectorAll('#mtabs [data-tab]').forEach(x => x.classList.toggle('on', x === b));
+      setTimeout(() => this.viewer.resize(), 60);
+    });
+    $('#mt-run').onclick = () => $('#run').click();
+    $('#mt-stop').onclick = () => $('#stop').click();
+    addEventListener('resize', () => { if (innerWidth > 1024) closeMenu(); });
   }
   bindDirectInput() {
     // press the 3D push button / drag the 3D knob without rotating the camera
