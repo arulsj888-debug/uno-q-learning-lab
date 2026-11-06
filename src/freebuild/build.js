@@ -14,6 +14,7 @@ const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
 const TERMS = { pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
 const DESK_SLOT = { relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
+const MOVABLE = new Set(['resistor', 'led', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
 
 export class FreeBuild {
@@ -49,6 +50,42 @@ export class FreeBuild {
     this.cand.setColorAt(0, new THREE.Color(1, 1, 1));
     this.hover = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0x35d0ff, transparent: true, depthTest: false, toneMapped: false, side: THREE.DoubleSide })); this.hover.scale.setScalar(1.5); this.hover.renderOrder = 13; this.hover.visible = false; this.hover.raycast = () => {}; scene.add(this.hover);
     const stage = $('#stage');
+    // ---- drag and drop: parts from the left column onto the breadboard
+    $('#side').addEventListener('dragstart', e => { const b = e.target.closest('[data-tool]'); if (!this.active || !b) return; this.dragType = b.dataset.tool; e.dataTransfer.setData('text/plain', this.dragType); e.dataTransfer.effectAllowed = 'copy'; });
+    $('#side').addEventListener('dragend', () => { this.dragType = null; this.hover.visible = false; });
+    stage.addEventListener('dragover', e => {
+      if (!this.active || !this.dragType) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+      if (DESK_SLOT[this.dragType] || this.dragType === 'pir') { this.hover.visible = false; return; }
+      const q = this.nearest(e, 14); if (!q || q.kind !== 'hole') { this.hover.visible = false; return; }
+      this.hover.position.set(q.pos.x, q.pos.y + 0.45, q.pos.z); this.hover.visible = true; this.hover.material.color.set(this.autoPlace(this.dragType, q.ref) ? 0x46d37e : 0xff6b5b);
+      $('#legend').textContent = this.pointName(q);
+    });
+    stage.addEventListener('drop', e => { if (!this.active || !this.dragType) return; e.preventDefault(); const t = this.dragType; this.dragType = null; this.hover.visible = false; this.dropPart(t, e); });
+    // ---- drag a wire from a board pin / module terminal (or from anywhere with the wire tool) to its other end
+    stage.addEventListener('pointerdown', e => {
+      if (!this.active || e.button !== 0) return;
+      const T = this.tool; if (T && (T.type !== 'wire' || T.step === 1)) return;
+      const q = this.nearest(e, 9); if (!q || q.kind === 'qwiic' || (!T && !['pin', 'modpin', 'term'].includes(q.kind))) return;
+      e.stopImmediatePropagation(); e.preventDefault(); app.viewer.controls.enabled = false;
+      const x0 = e.clientX, y0 = e.clientY; let dragging = false;
+      const geo = new THREE.BufferGeometry().setFromPoints([q.pos, q.pos]), line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffd34d, depthTest: false, toneMapped: false })); line.renderOrder = 14; line.frustumCulled = false; line.raycast = () => {}; scene.add(line);
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(q.pos.y + 6)), pt = new THREE.Vector3();
+      const mv = ev => {
+        if (!dragging && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 6) dragging = true;
+        if (!dragging) return;
+        const v = app.viewer; v.setPointer(ev); v.raycaster.setFromCamera(v.pointer, v.camera);
+        const n = this.nearest(ev, 14), end = n ? n.pos.clone().add(new THREE.Vector3(0, 1, 0)) : (v.raycaster.ray.intersectPlane(plane, pt) ? pt.clone() : q.pos.clone());
+        geo.setFromPoints([q.pos.clone().add(new THREE.Vector3(0, 1, 0)), end]);
+        if (n) { this.hover.position.set(n.pos.x, n.pos.y + 0.45, n.pos.z); this.hover.visible = true; this.hover.material.color.set(this.wireOk(q, n) && n.ref !== q.ref ? 0x46d37e : 0xff6b5b); } else this.hover.visible = false;
+      };
+      const up = ev => {
+        window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); scene.remove(line); geo.dispose(); this.hover.visible = false; app.viewer.controls.enabled = true;
+        if (!dragging) { if (T) this.click(q.ref); return; }
+        const n = this.nearest(ev, 14); if (!n || n.ref === q.ref) return;
+        const saved = this.tool; this.tool = { type: 'wire', step: 1, first: q.ref }; this.occ = this.occupied(); this.click(n.ref); if (!saved) this.cancel();
+      };
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+    }, true);
     // press the push button / turn the knob directly in the 3D view
     stage.addEventListener('pointerdown', e => {
       if (!this.active || e.button !== 0 || this.tool) return;
@@ -58,6 +95,21 @@ export class FreeBuild {
         e.stopPropagation(); app.viewer.controls.enabled = false; this.env.pressed[d.id] = true; this.dirty = true;
         const up = () => { this.env.pressed[d.id] = false; this.dirty = true; app.viewer.controls.enabled = true; window.removeEventListener('pointerup', up); };
         window.addEventListener('pointerup', up);
+      } else if (d && MOVABLE.has(d.type)) {
+        e.stopPropagation(); app.viewer.controls.enabled = false; const x0 = e.clientX, y0 = e.clientY; let dragging = false;
+        const mv = ev => {
+          if (!dragging && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 6) dragging = true;
+          if (!dragging) return; const n = this.nearest(ev, 14);
+          if (n && n.kind === 'hole') { this.hover.position.set(n.pos.x, n.pos.y + 0.45, n.pos.z); this.hover.visible = true; this.hover.material.color.set(this.autoPlace(d.type, n.ref, d) ? 0x46d37e : 0xff6b5b); } else this.hover.visible = false;
+        };
+        const up = ev => {
+          window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); app.viewer.controls.enabled = true; this.hover.visible = false;
+          if (!dragging) { this.select(d.id); return; }
+          const n = this.nearest(ev, 14); if (!n || n.kind !== 'hole') return;
+          const nd = this.autoPlace(d.type, n.ref, d); if (!nd) return this.toast('The part does not fit there.');
+          this.mutate(() => { Object.assign(nd, { id: d.id }); this.parts = this.parts.map(p => (p.id === d.id ? nd : p)); this.rebuild3D(); }); this.select(d.id);
+        };
+        window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
       } else if (d && d.type === 'pot') {
         e.stopPropagation(); app.viewer.controls.enabled = false; const x0 = e.clientX, f0 = this.env.pot[d.id] ?? 0.5;
         const mv = ev => { this.env.pot[d.id] = Math.min(1, Math.max(0, f0 + (ev.clientX - x0) / 200)); this.dirty = true; this.syncControls(); };
@@ -169,6 +221,35 @@ export class FreeBuild {
     if (DESK_SLOT[type]) { this.cancel(); this.placeDesk(type); return; }
     this.cancel(); this.probeOn = false; this.tool = { type, step: 0, first: null };
     this.updateCandidates(); this.setHint(); this.renderSide();
+  }
+  /** the part definition that results from putting the part's first leg in hole `ref` (second leg chosen automatically); `old` keeps value/colour when a part is moved */
+  autoPlace(type, ref, old) {
+    const keep = this.parts; if (old) this.parts = this.parts.filter(p => p.id !== old.id);
+    this.occ = this.occupied(); let def = null;
+    try {
+      const fp = this.footprint(type, ref);
+      if (fp) { if (fp.refs.every(r => this.free(r))) { def = { ...fp.def }; if (type === 'tmp36' && old) def.flip = old.flip; } }
+      else if (this.firstOk(type, ref)) {
+        const cands = this.second(type, ref), p = this.byRef.get(ref);
+        const pref = { resistor: [4, -4, 5, -5, 3, -3], led: [1, -1], ldr: [1, -1], buzzer: [3, -3] }[type] || [];
+        let b = null; for (const dc of pref) { const r = p.row + (p.col + dc); if (cands.includes(r)) { b = r; break; } }
+        if (!b && type === 'resistor' && cands.length) b = cands[0];
+        if (b) {
+          if (type === 'resistor') def = { type, a: ref, b, ohms: old ? old.ohms : this.opts.ohms };
+          else if (type === 'led') { const c = old ? old.color : this.opts.color; def = { type, anode: ref, cathode: b, color: c, hex: LED_TYPES[c].hex }; }
+          else if (type === 'ldr') def = { type, a: ref, b };
+          else if (type === 'buzzer') def = { type, plus: ref, minus: b };
+        }
+      }
+    } finally { this.parts = keep; this.occ = this.occupied(); }
+    return def;
+  }
+  dropPart(type, e) {
+    if (type === 'pir' || DESK_SLOT[type]) { this.begin(type); return; }
+    if (type === 'wire' || type === 'qwiic') return;
+    const q = this.nearest(e, 14); if (!q || q.kind !== 'hole') return this.toast('Drop the part onto a breadboard hole.');
+    const def = this.autoPlace(type, q.ref); if (!def) return this.toast('The part does not fit there (a hole is used, or it reaches the edge). Try another hole.');
+    def.id = this.nextId(type); this.mutate(() => this.add(def));
   }
   placePir() {
     const n = this.parts.filter(p => p.type === 'pir').length;
@@ -411,7 +492,7 @@ export class FreeBuild {
   // ------------------------------------------------------------------ text for the learner
   setHint() {
     const T = this.tool, h = $('#fb-hint'); let t;
-    if (!T) t = this.probeOn ? 'Voltmeter: click any hole or board pin to measure the voltage there.' : 'Pick a part or a wire on the left. Click a placed part to select it. Hold the mouse on a push button to press it; drag a knob to turn it.';
+    if (!T) t = this.probeOn ? 'Voltmeter: click any hole or board pin to measure the voltage there.' : 'Drag a part from the left onto the breadboard (or click it, then click holes). Drag from a board pin to a hole to make a wire. Drag a placed part to move it. Hold a push button to press it; drag a knob to turn it.';
     else if (T.type === 'wire') t = T.step ? 'Click the other end of the wire (green = free).' : 'Click where the wire starts: a board pin, a breadboard hole or a power rail.';
     else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d'].includes(T.type)) t = { l293d: 'Click a hole: the 16-pin chip straddles the middle gap over 8 columns (n … n+7). Pin 1 is at the left of the row nearest you (row f); the notch marks the pin-1 end.', sht31: 'Click a hole in row f to j for the VIN pin: the breakout has 7 pins in columns n … n+6: VIN, GND, SCL, SDA, ADDR, RST, ALRT. The board lies over the middle of the breadboard.', hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
     else if (T.type === 'qwiic') t = T.step ? 'Click the other Qwiic socket (green).' : 'Click a Qwiic socket: the one on the board (left edge) or one of a module. The cable fits only one way.';
@@ -500,6 +581,7 @@ export class FreeBuild {
       <h3>Examples</h3>
       ${EXAMPLES(this.boardKind).map((x, i) => `<button class="fb-btn ex" data-ex="${i}">${esc(x.title)}</button>`).join('')}
     </div>`;
+    $('#side').querySelectorAll('[data-tool]').forEach(b => { if (!['wire', 'qwiic'].includes(b.dataset.tool)) { b.draggable = true; b.title = 'Drag onto the breadboard, or click and then click the holes'; } });
     this.setHint();
   }
   piSideHtml() {
