@@ -19,6 +19,11 @@ export const SRC_PI = {
   sht31: { t: 'Adafruit SHT31-D Temperature & Humidity Sensor Breakout (product page and guide)', u: 'https://learn.adafruit.com/adafruit-sht31-d-temperature-and-humidity-sensor-breakout' },
   sht31lib: { t: 'Adafruit CircuitPython SHT31D library (README, example, source)', u: 'https://github.com/adafruit/Adafruit_CircuitPython_SHT31D' },
   flask: { t: 'Flask documentation — Quickstart (minimal app, flask run, externally visible server)', u: 'https://flask.palletsprojects.com/en/stable/quickstart/' },
+  camin: { t: 'Raspberry Pi documentation — Install a Raspberry Pi camera', u: 'https://www.raspberrypi.com/documentation/accessories/camera.html#install-a-raspberry-pi-camera' },
+  cam3: { t: 'Raspberry Pi documentation — Camera Module 3 (product photo CC BY-SA 4.0)', u: 'https://www.raspberrypi.com/documentation/accessories/camera.html#camera-module-3' },
+  camsw: { t: 'Raspberry Pi documentation — rpicam-hello and rpicam-still', u: 'https://www.raspberrypi.com/documentation/computers/camera_software.html' },
+  camtr: { t: 'Raspberry Pi documentation — Camera troubleshooting', u: 'https://www.raspberrypi.com/documentation/accessories/camera.html' },
+  magpi45: { t: 'Raspberry Pi Official Magazine issue 45 — correction about the ribbon cable (blue side faces the Ethernet/USB ports)', u: 'https://magazine.raspberrypi.com/issues/45' },
   tonal: { t: 'GPIO Zero documentation — Buzzer and TonalBuzzer (API and source)', u: 'https://gpiozero.readthedocs.io/en/stable/api_output.html#tonalbuzzer' },
   usegpio: { t: 'Raspberry Pi documentation — Use GPIO from Python', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-gpio-from-python' },
   python: { t: 'Raspberry Pi documentation — Use Python on a Raspberry Pi', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-python-on-a-raspberry-pi' },
@@ -229,10 +234,15 @@ export const TERM_CMDS = [
   { g: 'Network', cmd: 'hostname -I', does: 'Prints your Raspberry Pi’s local IP address. You need it to connect from another computer.', src: 'Remote access — find your IP address' },
   { g: 'Network', cmd: 'ping raspberrypi.local', does: 'Checks that a computer on your network answers. The default hostname of a fresh Raspberry Pi OS is raspberrypi, so raspberrypi.local reaches it (if you changed the hostname, use the new one). Press Ctrl+C to stop.', src: 'Remote access — find your IP address', re: /^ping \S+$/ },
   { g: 'Network', cmd: 'ssh user@192.168.1.131', does: 'Run on ANOTHER computer: logs in to your Raspberry Pi remotely (replace user and the IP address with yours). Needs SSH enabled on the Pi; at the first connection you must type yes at a security warning.', src: 'Remote access — SSH', re: /^ssh \S+@\S+$/ },
+  { g: 'Camera', only: 'p13', cmd: 'rpicam-hello', does: 'Shows a preview window with the picture from the camera for five seconds (the default timeout).', src: 'Camera software — rpicam-hello' },
+  { g: 'Camera', only: 'p13', cmd: 'rpicam-hello --timeout 0', does: 'A timeout of 0 runs the preview without end. Press Ctrl+C in the terminal to stop it.', src: 'Camera software — rpicam-hello' },
+  { g: 'Camera', only: 'p13', cmd: 'rpicam-hello -n', does: 'The -n option (nopreview) suppresses the preview window.', src: 'Camera software — rpicam-hello' },
+  { g: 'Camera', only: 'p13', cmd: 'rpicam-still --output test.jpg', does: 'Takes a full-resolution picture and saves it in a file called test.jpg. The preview shows for five seconds first.', src: 'Camera software — rpicam-still', re: /^rpicam-still --output [\w.\-]+$/ },
+  { g: 'Camera', only: 'p13', cmd: 'rpicam-still --encoding png --output test.png', does: 'Saves the picture as a PNG file. The encoding option decides the format; the file name does not.', src: 'Camera software — rpicam-still' },
   { g: 'Python', cmd: 'python3', does: 'Starts Python 3, which comes pre-installed with Raspberry Pi OS.', src: 'Using Python' },
 ];
 
-export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project', 7: 'Module 7 — Extra: sound' };
+export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project', 7: 'Module 7 — Extra: sound', 8: 'Module 8 — Camera' };
 
 export const PI_LESSONS = [
   // ================================================================== P1
@@ -1021,6 +1031,76 @@ pause()</pre>
     ],
     sources: [SRC_PI.tonal, SRC_PI.gpiozero, SRC_PI.gpio, SRC_PI.ds],
   },
+  // ================================================================== P13
+  {
+    id: 'p13', num: 13, module: 8, title: 'Connect the Camera Module and take a picture', level: 'Beginner', time: '25 min',
+    goal: 'Plug a Camera Module 3 into the CAMERA connector with its ribbon cable, then take a picture with rpicam-still.',
+    hardware: ['Raspberry Pi 4 (set up)', 'Camera Module 3 with its 15-pin ribbon cable', 'Monitor, keyboard, mouse'],
+    termGroups: ['Camera', 'Files and folders'],
+    steps: [
+      {
+        title: 'The camera and its ribbon cable', view: 'picam', acc: ['cam'], power: false,
+        body: `<p>On the desk lies a <b>Camera Module 3</b> with its flat <b>ribbon cable</b>. <b>Click the camera</b> and the cable in the 3D view.</p>
+        <ul><li>12-megapixel camera, Sony <b>IMX708</b> sensor, 4608 × 2592 pixels, <b>powered autofocus</b>; the board is <b>25 × 24 mm</b>.</li><li>The cable has the standard <b>15-pin</b> connection. Every Raspberry Pi camera uses it; the Raspberry Pi 4 takes the cable that comes with the camera.</li></ul>
+        <p class="sim">The board picture is the official product photo. The lens part’s height and the cable’s length are only approximate in this 3D model.</p>`,
+      },
+      {
+        title: 'Safety first', view: 'picam', acc: ['cam'], power: false,
+        body: `<p class="warn"><b>Cameras are sensitive to static electricity.</b> Touch something earthed (for example a metal tap) before you handle the board.</p>
+        <p>Then <b>shut the Raspberry Pi down and unplug the power</b> before you connect the cable. The red PWR LED is off in the 3D view: the board has no power.</p>
+        <p>If a small piece of translucent blue film covers the lens, peel it off gently: it only protects the lens during shipping.</p>`,
+      },
+      {
+        title: 'Find the CAMERA connector (J3)', focus: 'camera', acc: ['cam'], power: false,
+        body: `<p>On the Raspberry Pi 4 the camera connector is by the edge closest to you, <b>between the micro-HDMI connector and the audio jack</b>. It is labelled <b>CAMERA</b> (J3).</p>
+        <p class="warn">Do not use the <b>DISPLAY</b> connector (J4, on the left edge). The cable fits both, but <b>only the CAMERA (CSI) port</b> powers and controls a camera.</p>`,
+      },
+      {
+        title: 'Push the cable into the connector', view: 'picam', acc: ['cam', 'camlink'], power: false,
+        body: `<p>Watch the cable end slide down into J3. On the real board you do it in this order:</p>
+        <ol><li><b>Open the flap</b> of the connector: gently pull it out until you feel it stop, and tilt it slightly away from the opening.</li><li><b>Insert the cable</b> with the <b>metallic contacts facing away from the flap</b>. Push it in straight and firmly; do not bend it sharply.</li><li><b>Close the flap</b>: tilt it back and push it down until it clicks. The flap holds the cable and presses the contacts together.</li></ol>
+        <p>To remove the cable, do the same steps in reverse.</p>
+        <p class="sim">The 3D model does not animate the flap.</p>`,
+      },
+      {
+        title: 'Which way round?', view: 'picam', acc: ['cam', 'camlink'], power: false,
+        body: `<p>The cable can go in the wrong way round if you are not careful. Rule from the official guide: <b>contacts facing away from the flap</b>.</p>
+        <p>The cable’s end has a <b>blue backing</b> on the side without contacts. Raspberry Pi’s magazine published a correction saying the blue side must face the <b>Ethernet/USB ports</b>, not the HDMI ports. In the 3D view the <b>blue side faces the USB/Ethernet end</b> of the board and the <b>silver contacts face the HDMI ports</b>.</p>
+        <p class="tip">Check this before you power on: a cable in the wrong way round simply does not work.</p>`,
+      },
+      {
+        title: 'Power on and keep the software up to date', view: 'pidesk', acc: ['sd', 'hdmi', 'monitor', 'kbd', 'mouse', 'cam', 'camlink'], power: true,
+        body: `<p>Now plug the power in again (the monitor shows the desktop). The camera programs, called <b>rpicam-apps</b>, are included in Raspberry Pi OS, so you can take pictures even on a fresh installation.</p>
+        <p>Raspberry Pi advises keeping the kernel and applications up to date first, with <code>sudo apt update</code> and <code>sudo apt full-upgrade</code> (Lesson 8).</p>`,
+      },
+      {
+        title: 'Take a picture', view: 'pidesk', acc: ['sd', 'hdmi', 'monitor', 'kbd', 'mouse', 'cam', 'camlink'], power: true,
+        body: `<p>Type or click the commands. <b>Watch the monitor</b>:</p>
+        <ul><li><code>rpicam-hello</code> → a <b>preview window</b> with the camera picture for 5 seconds.</li><li><code>rpicam-hello --timeout 0</code> → the preview runs until you press <b>Ctrl+C</b>.</li><li><code>rpicam-still --output test.jpg</code> → the preview for 5 seconds, then the picture is taken and saved as <b>test.jpg</b>.</li><li><code>ls</code> → the file is in your folder.</li></ul>
+        <div class="term"><div class="term-out"><div class="term-hint">What the command does appears here; the result appears on the monitor.</div></div>
+        <div class="term-row"><span class="term-ps">$</span><input class="term-in" placeholder="type a command and press Enter" autocomplete="off" spellcheck="false"></div>
+        <div class="term-chips"></div></div>
+        <p class="sim">The picture on the monitor is a made-up illustration: a real preview shows what the lens sees. A real rpicam-still also prints some information lines.</p>`,
+      },
+      {
+        title: 'If it does not work', view: 'picam', acc: ['cam', 'camlink'], power: false,
+        body: `<p>Raspberry Pi’s troubleshooting list:</p>
+        <ul><li>Is the cable in the <b>CAMERA (CSI)</b> connector, not DISPLAY (DSI)? Look for the CSI label near the port.</li><li>Is it pushed in fully, straight, and the flap closed? Is the cable the right way round?</li><li>Try a <b>better power supply</b>: the camera adds about <b>200–250 mA</b> to what the Raspberry Pi needs.</li></ul>`,
+      },
+      {
+        title: 'Summary', view: 'picam', acc: ['cam', 'camlink'], power: false,
+        body: `<ul><li>Camera Module 3: IMX708, 12 megapixels, autofocus, 15-pin ribbon cable.</li><li>Static warning; <b>power off</b> before connecting.</li><li>Cable into <b>CAMERA (J3)</b>, contacts away from the flap, flap closed.</li><li><code>rpicam-hello</code> = preview, <code>rpicam-still --output test.jpg</code> = picture.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Which connector takes the camera cable on the Raspberry Pi 4?', a: ['DISPLAY (J4)', 'CAMERA (J3)', 'The USB-C port', 'The GPIO header'], c: 1, why: 'The CAMERA (CSI) connector; DISPLAY (DSI) does not power or control a camera.' },
+      { q: 'Which way do the metallic contacts of the cable face?', a: ['Towards the flap', 'Away from the flap', 'It does not matter', 'Up, towards the ceiling'], c: 1, why: 'Official guide: contacts facing away from the flap.' },
+      { q: 'What should you do before connecting the cable?', a: ['Nothing', 'Touch something earthed, and shut down and unplug the Pi', 'Heat the cable', 'Remove the SD card only'], c: 1, why: 'Cameras are sensitive to static, and the Pi should be off.' },
+      { q: 'Which command shows a preview for five seconds?', a: ['rpicam-still', 'rpicam-hello', 'ls', 'pinout'], c: 1, why: 'rpicam-hello shows a preview window; five seconds is the default.' },
+      { q: 'How much extra current does the camera add?', a: ['About 2 mA', 'About 200–250 mA', 'About 5 A', 'None'], c: 1, why: 'Raspberry Pi troubleshooting: about 200–250 mA.' },
+    ],
+    sources: [SRC_PI.camin, SRC_PI.cam3, SRC_PI.camsw, SRC_PI.camtr, SRC_PI.magpi45],
+  },
 ];
 
-export const PI_COMING = ['Buzzer', 'Camera module', 'Buzzer (optional extra)'];
+export const PI_COMING = [];

@@ -66,6 +66,7 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
     11. Final project: a Pi control panel on your phone (SHT31-D sensor + LED + Flask page that refreshes every 5 s; `redirect("/")` so reloads never repeat an action; wiring, checklist, loose-wire error, safety)
   - **Module 7: Extra — sound**
     12. Make music with a buzzer (passive piezo on GPIO17 with a 220 Ω resistor; GPIO Zero `TonalBuzzer`, note frequencies from A4 = 440 Hz; clickable piano keys; vibrating 3D buzzer)
+    13. Connect the Camera Module and take a picture (Camera Module 3 with its 15-pin ribbon cable into the CAMERA connector J3; safety; practice `rpicam-hello` / `rpicam-still` with a simulated preview on the 3D monitor)
 
 ## Works on every screen
 
@@ -115,6 +116,6 @@ To regenerate the PCB textures from Arduino's CAD package (`ABX00162-cad-files.z
 
 The SHT31-D sensor texture (`assets/sht31_top.jpg`) is straightened from Adafruit's photo `assets/2857.jpg` in the repository github.com/adafruit/Adafruit-SHT31-Sensor-Breakout-PCB, and the 3D shape follows that repository's board file. Designed by Limor Fried/Ladyada for Adafruit Industries, Creative Commons Attribution/Share-Alike. Please support Adafruit and open-source hardware by purchasing products from Adafruit.
 
-Raspberry Pi 4 textures (`assets/pi4/`) are derived from photographs on Wikimedia Commons, licensed **CC BY-SA 4.0**: “Raspberry Pi 4 Model B - Top.jpg” by Laserlicht and “Raspberry Pi 4, 2 GB RAM version 3.jpg” by Suyash Dwivedi. The straightened textures are shared under the same licence. Raspberry Pi is a trademark of Raspberry Pi Ltd; this project is not affiliated with Raspberry Pi Ltd.
+Raspberry Pi 4 textures (`assets/pi4/`) are derived from photographs on Wikimedia Commons, licensed **CC BY-SA 4.0**: “Raspberry Pi 4 Model B - Top.jpg” by Laserlicht and “Raspberry Pi 4, 2 GB RAM version 3.jpg” by Suyash Dwivedi. The straightened textures are shared under the same licence. The Camera Module 3 picture (`cam3_top.jpg`) is cropped from the official product photo in the Raspberry Pi documentation (CC BY-SA 4.0). Raspberry Pi is a trademark of Raspberry Pi Ltd; this project is not affiliated with Raspberry Pi Ltd.
 
 The board artwork in `assets/` is derived from Arduino's UNO Q CAD files, licensed **CC BY-SA 4.0** (© Arduino). The derived textures are shared under the same license. Arduino®, UNO and Qualcomm® Dragonwing™ are trademarks of their respective owners. This is an independent learning tool, not an official Arduino product.

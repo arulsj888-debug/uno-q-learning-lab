@@ -52,6 +52,7 @@ const VIEWS = {
   smart: { t: new THREE.Vector3(95, 0, 8), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 430 },
   pibench: { t: new THREE.Vector3(-4, 0, -30), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 235 },
   pibb: { t: new THREE.Vector3(-6, 2, -57), d: new THREE.Vector3(-0.08, 0.88, 0.47), dist: 118 },
+  picam: { t: new THREE.Vector3(-34, 8, 14), d: new THREE.Vector3(-0.12, 0.8, 0.6), dist: 230 },
   pidesk: { t: new THREE.Vector3(-65, 62, -95), d: new THREE.Vector3(-0.04, 0.42, 0.9), dist: 650 },
   pifront: { t: new THREE.Vector3(-4, 0, 26), d: new THREE.Vector3(-0.25, 0.55, 0.8), dist: 125 },
   piports: { t: new THREE.Vector3(42, 4, -2), d: new THREE.Vector3(0.78, 0.48, 0.4), dist: 150 },
@@ -885,6 +886,28 @@ class App {
     if (c0 === 'rm' && args.length === 1) { const t = P.fs[key(args[0])]; if (!t) add(`rm: cannot remove '${args[0]}': No such file or directory`, '#ff9b8e'); else if (t === 'dir') add(`rm: cannot remove '${args[0]}': Is a directory`, '#ff9b8e'); else delete P.fs[key(args[0])]; return true; }
     return false;
   }
+  // Camera commands of Lesson 13 (rpicam-hello, rpicam-still). They only work when the ribbon cable is plugged into J3. The preview picture is an illustration.
+  async piCam(lc, q, P, add) {
+    const wait = async ms => { P.abort = false; const t0 = performance.now(); while (performance.now() - t0 < ms && !P.abort && P.mode === 'on') await sleep(60); P.abort = false; };
+    if (!(this.acc && this.acc.camlink.on)) { add('(practice terminal) No camera found — push the ribbon cable into the CAMERA connector first.', '#ff9b8e'); return; }
+    if (lc.startsWith('rpicam-hello')) {
+      const forever = lc === 'rpicam-hello --timeout 0' || lc === 'rpicam-hello -t 0';
+      if (lc === 'rpicam-hello -n') { add('(simulated) running without a preview window; nothing is shown.', '#8fa3b5'); await sleep(1200); return; }
+      if (lc !== 'rpicam-hello' && !forever) { add(`${q.split(' ')[0]}: only the listed practice options work here`, '#ff9b8e'); return; }
+      P.preview = { kind: 'live' };
+      if (forever) add('(the preview keeps running — click the input box and press Ctrl+C to stop it)', '#8fa3b5');
+      await wait(forever ? 3600000 : 5000);
+      P.preview = null; if (forever) add('^C', '#8fa3b5');
+      return;
+    }
+    const m = lc.match(/^rpicam-still (?:--encoding (?:png|jpg) )?--output ([\w.\-]+)$/);
+    if (!m) { add('rpicam-still: only the listed practice options work here', '#ff9b8e'); return; }
+    const name = m[1], here = P.cwd;
+    P.preview = { kind: 'live' }; await wait(5000);             // the preview runs for the timeout (default 5 s), then the picture is taken
+    P.preview = { kind: 'photo', name }; P.fs[here + '/' + name] = 'file';
+    add(`(simulated) saved ${name} — a real rpicam-still also prints some information lines`, '#8fa3b5');
+    await sleep(3500); P.preview = null;
+  }
   async piCmd(raw) {
     const P = this.pios; if (!P || P.busy || P.mode !== 'on' || !this.board.powered) return;
     const q = raw.trim().replace(/\s+/g, ' '); if (!q) return;
@@ -924,6 +947,7 @@ class App {
       }
       else if (/^ssh \S+@\S+$/.test(lc)) add('ssh runs on ANOTHER computer to log in to your Pi — not here on the Pi itself.', '#8fa3b5');
       else if (lc === 'sudo nano /boot/firmware/config.txt') { add('[sudo] password for user: (simulated)', '#8fa3b5'); add('Opens the nano text editor. Ctrl+O saves, Ctrl+X exits. (not simulated further)', '#8fa3b5'); }
+      else if (/^rpicam-(hello|still)\b/.test(lc)) await this.piCam(lc, q, P, add);
       else if (this.piFs(q, P, add)) { /* handled by the file-system commands */ }
       else add(`${q.split(' ')[0]}: this is not one of the practice commands`, '#ff9b8e');
     } finally { P.busy = false; }
@@ -943,15 +967,17 @@ class App {
       out.appendChild(line); out.scrollTop = out.scrollHeight;
       this.piCmd(raw);
     };
-    const groups = [...new Set(TERM_CMDS.map(c => c.g))];
-    chips.innerHTML = `<button class="term-chip term-power" style="display:none">⏻ Plug the power in again</button>` + groups.map(g => `<div class="term-grp">${esc(g)}</div>` + TERM_CMDS.filter(c => c.g === g).map(c => `<button class="term-chip" data-c="${esc(c.cmd)}">${esc(c.cmd)}</button>`).join('')).join('');
+    const lid = this.lesson && this.lesson.id, tg = this.lesson && this.lesson.termGroups;
+    const shown = TERM_CMDS.filter(c => (!c.only || c.only === lid) && (!tg || tg.includes(c.g)));
+    const groups = [...new Set(shown.map(c => c.g))].sort((a, b) => tg ? tg.indexOf(a) - tg.indexOf(b) : 0);
+    chips.innerHTML = `<button class="term-chip term-power" style="display:none">⏻ Plug the power in again</button>` + groups.map(g => `<div class="term-grp">${esc(g)}</div>` + shown.filter(c => c.g === g).map(c => `<button class="term-chip" data-c="${esc(c.cmd)}">${esc(c.cmd)}</button>`).join('')).join('');
     chips.querySelectorAll('.term-chip[data-c]').forEach(b => b.onclick = () => run(b.dataset.c));
     const pw = chips.querySelector('.term-power');
     pw.onclick = () => { this.board.setPowerLed(true); this.pios.lines = []; this.pios.cwd = '~'; this.pios.mode = 'boot'; this.bootAnimation(6000); };
     clearInterval(this.termTimer); this.termTimer = setInterval(() => { if (!document.body.contains(pw)) { clearInterval(this.termTimer); return; } pw.style.display = this.pios.mode === 'off' ? '' : 'none'; }, 250);
     // live typing is shown on the 3D monitor too
     inp.oninput = () => { this.pios.cur = inp.value; };
-    inp.onkeydown = e => { if (e.key === 'Enter') { run(inp.value); inp.value = ''; this.pios.cur = ''; } e.stopPropagation(); };
+    inp.onkeydown = e => { if (e.ctrlKey && e.key.toLowerCase() === 'c') this.pios.abort = true; if (e.key === 'Enter') { run(inp.value); inp.value = ''; this.pios.cur = ''; } e.stopPropagation(); };
   }
   hideAcc() { if (this.acc) for (const a of this.acc.all) { a.set(false); a.on = false; } this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2, fs: {} }; this.bootToken = this.bootToken; }
   async applyAcc(i, prev, alive) {
