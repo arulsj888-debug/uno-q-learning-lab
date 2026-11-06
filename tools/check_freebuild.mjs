@@ -76,6 +76,13 @@ r = evaluate(base({ pinInfo: unoI2c, parts: shtParts('A4', 'D21'), pinCfg: { A4:
 r = evaluate({ boardKind: 'pi4', pinInfo: id => ({ p1: { label: '3V3', gpio: null }, p2: { label: '5V', gpio: null }, p6: { label: 'GND', gpio: null }, p3: { gpio: 2 }, p5: { gpio: 3 } }[id]), powered: true, env, t: 0, pinCfg: { p3: { mode: 'i2c' }, p5: { mode: 'i2c' } },
   parts: [{ id: 'sen1', type: 'sht31', row: 'g', col: 10 }, W('w1', 'p1', 'j10', 'red'), W('w2', 'p6', 'j11', 'black'), W('w3', 'p5', 'j12', 'yellow'), W('w4', 'p3', 'j13', 'blue')] });
 ok(r.parts.sen1.status === 'ok' && r.pins.p3.V > 3.2 && !r.newDamage.size, 'SHT31 on the Pi (GPIO2/GPIO3, 3.3 V) works');
+const L = (id, from, to) => ({ id, type: 'lead', from, to });
+const relayParts = [{ id: 'rel1', type: 'relay' }, { id: 'bat1', type: 'battery' }, { id: 'lamp1', type: 'lamp' }, L('a', 'rel1.DCP', '5V'), L('b', 'rel1.DCN', 'GND2'), L('c', 'rel1.IN', 'D4'), L('d', 'bat1.POS', 'rel1.COM'), L('e', 'rel1.NO', 'lamp1.L1'), L('f', 'lamp1.L2', 'bat1.NEG')];
+const unoR = id => ({ D4: { id: 'D4' }, '5V': { id: '5V' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+r = evaluate(base({ pinInfo: unoR, parts: relayParts, pinCfg: { D4: { mode: 'out0' } } })); ok(r.parts.rel1.on && r.parts.lamp1.level > 0.3 && r.parts.lamp1.status === 'ok', 'relay with pin LOW switches the lamp on');
+r = evaluate(base({ pinInfo: unoR, parts: relayParts, pinCfg: { D4: { mode: 'in' } } })); ok(!r.parts.rel1.on && r.parts.lamp1.status === 'off', 'relay released (pin input): lamp off');
+r = evaluate(base({ pinInfo: unoR, parts: relayParts, pinCfg: { D4: { mode: 'out1' } } })); ok(!r.parts.rel1.on && r.parts.rel1.status === 'warn', 'relay with pin HIGH stays off and warns');
+r = evaluate(base({ pinInfo: unoR, parts: [{ id: 'bat1', type: 'battery' }, L('x', 'bat1.POS', 'bat1.NEG')] })); ok(r.parts.bat1.status === 'bad', 'battery short is flagged');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

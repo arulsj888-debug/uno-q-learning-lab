@@ -26,7 +26,7 @@ export function nodeOfRef(ref) {
 }
 export const isHoleRef = ref => HOLE_RE.test(ref) || RAIL_RE.test(ref);
 /** a pin of a module standing on the desk, e.g. "pir1.VCC" */
-export const isModRef = ref => /^[a-z]+\d+\.[A-Z]+$/.test(ref);
+export const isModRef = ref => /^[a-z]+\d+\.[A-Z][A-Z0-9]*$/.test(ref);
 
 /** terminals of a placed part: [[terminalName, holeRef], ...] */
 export function terminals(d) {
@@ -39,10 +39,13 @@ export function terminals(d) {
     case 'pot': return [['A', `${row}${c}`], ['W', `${row}${c + 2}`], ['B', `${row}${c + 4}`]];
     case 'tmp36': return d.flip ? [['VS', `${row}${c + 2}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c}`]] : [['VS', `${row}${c}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c + 2}`]];
     case 'sht31': return [['VIN', `${row}${c}`], ['GND', `${row}${c + 1}`], ['SCL', `${row}${c + 2}`], ['SDA', `${row}${c + 3}`], ['ADDR', `${row}${c + 4}`], ['RST', `${row}${c + 5}`], ['ALRT', `${row}${c + 6}`]];
+    case 'relay': return [['DCP', `${d.id}.DCP`], ['DCN', `${d.id}.DCN`], ['IN', `${d.id}.IN`], ['NO', `${d.id}.NO`], ['COM', `${d.id}.COM`], ['NC', `${d.id}.NC`]];
+    case 'battery': return [['POS', `${d.id}.POS`], ['NEG', `${d.id}.NEG`]];
+    case 'lamp': return [['L1', `${d.id}.L1`], ['L2', `${d.id}.L2`]];
     case 'hcsr04': return [['VCC', `${row}${c}`], ['TRIG', `${row}${c + 1}`], ['ECHO', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'servo': return [['GND', `${row}${c}`], ['V', `${row}${c + 1}`], ['SIG', `${row}${c + 2}`]];
     case 'pir': return [['VCC', `${d.id}.VCC`], ['OUT', `${d.id}.OUT`], ['GND', `${d.id}.GND`]];
-    case 'wire': case 'fwire': return [['from', d.from], ['to', d.to]];
+    case 'wire': case 'fwire': case 'lead': return [['from', d.from], ['to', d.to]];
     default: return [];
   }
 }
@@ -147,7 +150,7 @@ export function evaluate(model) {
   const T = (d, name) => nodeOfRef(terminals(d).find(([n]) => n === name)[1]);
   for (const d of parts) {
     for (const [, ref] of terminals(d)) find(nodeOfRef(ref));
-    if (d.type === 'wire' || d.type === 'fwire') union(nodeOfRef(d.from), nodeOfRef(d.to));
+    if (d.type === 'wire' || d.type === 'fwire' || d.type === 'lead') union(nodeOfRef(d.from), nodeOfRef(d.to));
     if (d.type === 'button') { union(T(d, 'e1'), T(d, 'e2')); union(T(d, 'f1'), T(d, 'f2')); }   // the two legs on one side of a tactile switch are joined inside it
   }
   const ids = new Map([['GROUND', 0]]);
@@ -155,7 +158,7 @@ export function evaluate(model) {
   const nodeOf = ref => nid(nodeOfRef(ref));
 
   const usedPins = new Map();
-  for (const d of parts) if (d.type === 'wire' || d.type === 'fwire') for (const ref of [d.from, d.to]) if (!isHoleRef(ref) && !isModRef(ref)) usedPins.set(ref, pinKind(boardKind, ref, pinInfo(ref)));
+  for (const d of parts) if (d.type === 'wire' || d.type === 'fwire' || d.type === 'lead') for (const ref of [d.from, d.to]) if (!isHoleRef(ref) && !isModRef(ref)) usedPins.set(ref, pinKind(boardKind, ref, pinInfo(ref)));
   for (const [id] of usedPins) nodeOf(id);
   for (const d of parts) for (const [, ref] of terminals(d)) nodeOf(ref);
   const n = ids.size;
@@ -221,10 +224,31 @@ export function evaluate(model) {
         if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 3300 }, { t: 'R', a: nid(T(d, 'SDA')), b: vn, g: 1 / 10000 }, { t: 'R', a: nid(T(d, 'SCL')), b: vn, g: 1 / 10000 });   // power LED; 10 kOhm pull-ups on the breakout
         pe[d.id] = { vn, gn };
       }
+      else if (d.type === 'battery') { const a = nid(T(d, 'POS')), b = nid(T(d, 'NEG')); if (!dead) elems.push({ t: 'S', a, b, g: 1 / 0.6, i: 6 / 0.6 }); pe[d.id] = { a, b, S: elems[elems.length - 1] }; }
+      else if (d.type === 'lamp') { const a = nid(T(d, 'L1')), b = nid(T(d, 'L2')); if (!dead) elems.push({ t: 'R', a, b, g: 1 / 20 }); pe[d.id] = { a, b }; }
+      else if (d.type === 'relay') {
+        const dcp = nid(T(d, 'DCP')), dcn = nid(T(d, 'DCN')), inn = nid(T(d, 'IN')), com = nid(T(d, 'COM')), no = nid(T(d, 'NO')), nc = nid(T(d, 'NC'));
+        elems.push({ t: 'R', a: dcp, b: dcn, g: 1 / 100 }, { t: 'R', a: dcp, b: inn, g: 1 / 1000 });   // coil + LED, optocoupler path (simulation values)
+        const contact = { t: 'R', a: com, b: nc, g: 20 }; elems.push(contact);
+        pe[d.id] = { dcp, dcn, inn, contact, no, nc };
+      }
       else if (d.type === 'tmp36') { const vs = nid(T(d, 'VS')), out = nid(T(d, 'OUT')), g = nid(T(d, 'GND')); elems.push({ t: 'R', a: vs, b: g, g: 1 / 66000 }, { t: 'T', vs, out, gnd: g }); pe[d.id] = { vs, out, g }; }
     }
-    const { v } = solveDC(n, elems, env.tempC ?? 25);
+    let { v } = solveDC(n, elems, env.tempC ?? 25);
+    // relay modules: the coil state follows the voltages (low-level trigger); then the contacts switch and the circuit is solved again
+    let flipped = false;
+    for (const d of parts) if (d.type === 'relay' && pe[d.id]) {
+      const q = pe[d.id], sup = v[q.dcp] - v[q.dcn], dv = v[q.dcp] - v[q.inn];
+      q.sup = sup; q.dv = dv; q.on = sup >= 4 && dv >= 2.5 && !burnt.has(d.id);
+      if (q.on) { q.contact.b = q.no; flipped = true; }
+    }
+    if (flipped) ({ v } = solveDC(n, elems, env.tempC ?? 25));
     lastV = v;
+    for (const d of parts) { const q = pe[d.id]; if (!q) continue;
+      if (d.type === 'relay') { acc(d.id, 'on', q.on ? 1 : 0); acc(d.id, 'sup', q.sup); acc(d.id, 'dv', q.dv); }
+      else if (d.type === 'lamp') { const V = v[q.a] - v[q.b]; acc(d.id, 'V', V); acc(d.id, 'Vmax', V, 'max'); }
+      else if (d.type === 'battery') { const V = v[q.a] - v[q.b]; acc(d.id, 'V', V); acc(d.id, 'Imax', Math.abs(q.S.i - q.S.g * V), 'max'); }
+    }
     for (const p of pinSrc) {
       if (!p.id) continue;
       const cur = p.e.i - p.e.g * v[p.e.a];
@@ -243,7 +267,7 @@ export function evaluate(model) {
     }
     if (step === N - 1) {   // floating nets: no conducting path to any source
       const adj = new Map(); const link = (a, b) => { (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a); };
-      for (const e of elems) { if (e.t === 'R' || e.t === 'D') link(e.a, e.b); else if (e.t === 'S') link(e.a, 0); else if (e.t === 'T' || e.t === 'M') { link(e.out, e.gnd); link(e.vs, e.gnd); } }
+      for (const e of elems) { if (e.t === 'R' || e.t === 'D') link(e.a, e.b); else if (e.t === 'S') link(e.a, e.b); else if (e.t === 'T' || e.t === 'M') { link(e.out, e.gnd); link(e.vs, e.gnd); } }
       const seen = new Set([0]), q = [0]; while (q.length) { const x = q.pop(); for (const y of adj.get(x) || []) if (!seen.has(y)) { seen.add(y); q.push(y); } }
       floating = new Set(); for (let i = 1; i < n; i++) if (!seen.has(i)) floating.add(i);
     }
@@ -320,6 +344,27 @@ export function evaluate(model) {
     } else if (d.type === 'ldr') {
       if (dangling(d, 'a') || dangling(d, 'b')) { R.status = 'warn'; note('warn', `${label}: one leg is not connected to anything.`, d.id); }
       R.msg = `${(LDR_OHMS(env.lux) / 1000).toFixed(1)} kΩ at ${env.lux < 1 ? 'under 1' : Math.round(env.lux)} lux`;
+    } else if (d.type === 'battery') {
+      R.msg = `${(s.V ?? 0).toFixed(1)} V`;
+      if (powered || true) { if ((s.Imax ?? 0) > 2) { R.status = 'bad'; note('bad', `${label} is short-circuited: about ${(s.Imax).toFixed(0)} A would flow and the batteries would get very hot. Remove the wire that joins + and −.`, d.id); } }
+    } else if (d.type === 'lamp') {
+      const V = s.V ?? 0, Vm = s.Vmax ?? 0; R.level = Math.min(1, Math.max(0, (V * V / 20) / 1.8));
+      if (burnt.has(d.id)) { R.status = 'bad'; R.level = 0; R.msg = 'Blown.'; note('bad', burnWhy[d.id] || `${label} is blown. Delete it and place a new one.`, d.id); }
+      else if (Vm > 8) { R.status = 'bad'; burn(d.id, `${label} burns out: it is made for 6 V and got ${Vm.toFixed(1)} V.`); }
+      else if (V > 1.5) { R.msg = `Lit: ${V.toFixed(1)} V across the filament.`; if (Math.abs(V) > 7) R.status = 'warn'; note('ok', `${label} lights (${V.toFixed(1)} V).`, d.id); }
+      else if (V < -1.5) { R.msg = 'Polarity does not matter for a filament: it lights.'; R.level = Math.min(1, (V * V / 20) / 1.8); note('ok', `${label} lights (${Math.abs(V).toFixed(1)} V).`, d.id); }
+      else { R.status = 'off'; R.msg = 'Dark: no voltage across it.'; }
+    } else if (d.type === 'relay') {
+      const on = (s.on ?? 0) > 0.5, sup = s.sup ?? 0, dv = s.dv ?? 0; R.on = on;
+      if (!powered) R.status = 'off';
+      else if (sup < -0.5) { R.status = 'bad'; R.msg = 'Connected backwards.'; note('bad', `${label} is connected backwards (DC+ and DC− swapped). A real module can be damaged.`, d.id); }
+      else if (sup < 4) { R.status = 'off'; R.msg = `Only ${Math.max(0, sup).toFixed(1)} V on DC+.`; note('bad', `${label} gets only ${Math.max(0, sup).toFixed(1)} V between DC+ and DC−. The 5 V relay needs 5 V: connect DC+ to 5 V and DC− to GND.`, d.id); }
+      else if (on) { R.msg = 'Coil energised: COM–NO closed (click).'; note('ok', `${label} is ON: the input is pulled LOW (${dv.toFixed(1)} V across the optocoupler), so COM connects to NO.`, d.id); }
+      else {
+        R.msg = 'Coil off: COM–NC closed.';
+        if (dv >= 1.5) { R.status = 'warn'; note('warn', `${label}: ${dv.toFixed(1)} V across the optocoupler is not clearly “off” (3.3 V HIGH from a pin leaves the 5 V input partly on). Release the relay by setting the pin to an input instead.`, d.id); }
+        else note('info', `${label} is OFF: COM–NC closed. This module is low-level triggered: the IN wire must be pulled LOW (pin set to Output LOW) to switch it on.`, d.id);
+      }
     } else if (d.type === 'sht31') {
       const vs = s.Vs ?? 0, sda = gpioOn(d, 'SDA'), scl = gpioOn(d, 'SCL'), kind = id => usedPins.get(id) || {};
       const where = boardKind === 'pi4' ? 'SDA must go to GPIO2 (pin 3) and SCL to GPIO3 (pin 5)' : 'SDA must go to D20 (or A4) and SCL to D21 (or A5)';
@@ -408,7 +453,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { sht31: 'SHT31-D', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }
