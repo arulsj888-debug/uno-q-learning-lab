@@ -202,6 +202,8 @@ export class CameraModule {
     tag(this.ribbon, 'pi:ribbon');
     root.visible = false;
   }
+  /** the cable end turned round: contacts and blue backing swap sides */
+  setFlip(b) { this.flipped = !!b; this.tip.rotation.y = b ? Math.PI : 0; }
   /** k = 0: end hovering above the connector; 1: pushed all the way in. */
   setDepth(k) {
     this.depth = k;

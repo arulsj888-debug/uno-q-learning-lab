@@ -21,7 +21,7 @@ export class FreeBuild {
     this.app = app; this.isPi = isPi; this.boardKind = isPi ? 'pi4' : 'unoq'; this.pinInfo = pinInfo;
     this.active = false;
     this.parts = []; this.pinCfg = {}; this.burnt = new Set(); this.damaged = new Set(); this.burnWhy = {};
-    this.env = { lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
+    this.env = { lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
     this.seq = {}; this.undoStack = []; this.tool = null; this.selected = null; this.probe = null; this.probeOn = false;
     this.opts = { ohms: 220, color: 'red', wire: 'auto', flip: false };
     this.result = null; this.tripMsg = null; this.lastRun = 0; this.lastHtml = {}; this.soundHz = 0;
@@ -87,21 +87,52 @@ export class FreeBuild {
     app.bench.clear(); app.bench.setDefs([]); app.bb.group.visible = true; app.strips.visible = false;
     app.setOutline([]); app.refreshPickTargets();
     this.load();
-    this.rebuild3D();
+    this.rebuild3D(); this.applyPi();
     app.view(this.isPi ? 'pibench' : 'bench');
     this.renderSide(); this.renderPanel(); this.setHint();
+  }
+  /** Raspberry Pi accessories: show them as chosen */
+  applyPi(animate = false) {
+    if (!this.isPi || !this.app.acc) return;
+    const a = this.app.acc, p = this.pi, set = (o, on) => { o.on = on; o.set(on); };
+    set(a.sd, p.sd); set(a.hdmi, p.hdmi); set(a.monitor, p.hdmi); set(a.kbd, p.kbd); set(a.mouse, p.mouse);
+    set(a.cam, p.cam !== 'none'); a.camlink.on = p.cam === 'plugged'; a.cam.setFlip(p.flip);
+    if (animate && p.cam === 'plugged') a.camlink.connect(true); else a.camlink.set(p.cam === 'plugged');
+    this.app.refreshPickTargets();
+  }
+  /** what the Raspberry Pi does with this setup: [{lvl, text}] */
+  piNotes(powered) {
+    const p = this.pi, out = [], n = (lvl, text) => out.push({ lvl, text });
+    if (!powered) return out;
+    if (!p.sd) n('bad', 'No microSD card: the Raspberry Pi has no operating system to start from, so the screen stays black. Insert a card with Raspberry Pi OS (the slot is on the underside, label facing away from the board).');
+    else n('ok', 'The microSD card holds Raspberry Pi OS: the Raspberry Pi starts.');
+    if (p.sd) {
+      if (!p.hdmi) n('info', 'No monitor connected: the Raspberry Pi still starts (“headless”), but you cannot see anything. Connect a micro-HDMI cable to HDMI0 and a monitor.');
+      else n('ok', 'Monitor on HDMI0: the desktop is shown.');
+      if (p.hdmi && !p.kbd && !p.mouse) n('info', 'No keyboard and no mouse: you can see the desktop but cannot control it.');
+      else if (p.hdmi && !p.kbd) n('info', 'No keyboard: you cannot type commands.');
+      else if (p.hdmi && !p.mouse) n('info', 'No mouse: you can only use the keyboard.');
+    }
+    if (p.cam === 'desk') n('info', 'The camera is not connected to the CAMERA connector yet.');
+    if (p.cam === 'plugged') {
+      if (p.flip) n('bad', 'The camera cable is the wrong way round: the metal contacts must face away from the connector’s flap (blue side toward the Ethernet/USB ports). The Raspberry Pi does not detect the camera.');
+      else if (p.sd) n('ok', 'Camera Module 3 detected on CAMERA (J3): rpicam-hello and rpicam-still would work.');
+      else n('info', 'The camera is connected correctly, but without a microSD card there is no software to use it.');
+    }
+    if (this.piWarn) n('warn', this.piWarn);
+    return out;
   }
   deactivate() {
     if (!this.active) return; this.active = false;
     const app = this.app; this.cancel(); app.stopSound(); this.soundHz = 0;
     this.clearProbe(); this.hover.visible = false; this.cand.count = 0;
-    app.bench.clear(); app.bb.group.visible = false; app.setOutline([]); app.refreshPickTargets();
+    app.bench.clear(); app.bb.group.visible = false; app.setOutline([]); if (this.isPi) app.hideAcc(); app.refreshPickTargets();
     $('#legend').textContent = app._legend0 || $('#legend').textContent;
   }
 
   // ------------------------------------------------------------------ saving, undo
-  snap() { return JSON.stringify({ parts: this.parts, pinCfg: this.pinCfg, burnt: [...this.burnt], damaged: [...this.damaged], seq: this.seq, burnWhy: this.burnWhy }); }
-  restore(s) { const o = JSON.parse(s); this.parts = o.parts; this.pinCfg = o.pinCfg; this.burnt = new Set(o.burnt); this.damaged = new Set(o.damaged); this.seq = o.seq || {}; this.burnWhy = o.burnWhy || {}; }
+  snap() { return JSON.stringify({ parts: this.parts, pinCfg: this.pinCfg, burnt: [...this.burnt], damaged: [...this.damaged], seq: this.seq, burnWhy: this.burnWhy, pi: this.pi }); }
+  restore(s) { const o = JSON.parse(s); this.parts = o.parts; this.pinCfg = o.pinCfg; this.burnt = new Set(o.burnt); this.damaged = new Set(o.damaged); this.seq = o.seq || {}; this.burnWhy = o.burnWhy || {}; this.pi = o.pi || this.pi; }
   save() { try { localStorage.setItem(this.key, this.snap()); } catch (e) { /* private mode */ } }
   load() { try { const s = localStorage.getItem(this.key); if (s) this.restore(s); } catch (e) { /* ignore */ } this.undoStack = []; }
   commit() { this.undoStack.push(this.pre); if (this.undoStack.length > 60) this.undoStack.shift(); this.save(); this.dirty = true; this.renderPanel(); }
@@ -353,6 +384,7 @@ export class FreeBuild {
       this.commit(); for (const id of res.newBurn) { const it = this.app.bench.items[id]; if (it && it.obj.setBurnt) it.obj.setBurnt(true); } this.dirty = true;
       this.app.toast && this.app.toast(res.newBurn.size ? 'A part burnt out! Read the explanation on the right.' : 'A pin was damaged! Read the explanation on the right.');
     }
+    if (this.isPi && this.app.pios) this.app.pios.mode = this.powered() && this.pi.sd ? 'on' : 'off';
     this.result = res; this.apply(res); this.updateProbe(); this.liveText(res);
   }
   apply(res) {
@@ -435,6 +467,7 @@ export class FreeBuild {
     const wireName = this.isPi ? 'Jumper wire (female–male for the pins)' : 'Jumper wire (male–male)';
     $('#side').innerHTML = `<div class="fb-side">
       <div class="fb-box"><b>Free build</b><div id="fb-hint" class="fb-hint"></div></div>
+      ${this.isPi ? this.piSideHtml() : ''}
       <h3>Power</h3>
       <button class="fb-btn big${this.powered() ? ' on' : ''}" data-act="power">${this.powered() ? '🔌 Unplug the power' : '🔌 Plug in the power'}</button>
       <div class="fb-small">${this.isPi ? 'The Raspberry Pi is already running its operating system.' : 'The UNO Q is powered over USB-C.'} Wire first, then plug in: that is the safe order.</div>
@@ -469,13 +502,29 @@ export class FreeBuild {
     </div>`;
     this.setHint();
   }
+  piSideHtml() {
+    const p = this.pi, t = (k, label) => `<button class="fb-btn${p[k] ? ' on' : ''}" data-pitog="${k}">${p[k] ? '✔ ' : ''}${label}</button>`;
+    return `<h3>Raspberry Pi setup</h3>
+      ${t('sd', 'microSD card with Raspberry Pi OS')}${t('hdmi', 'Monitor + micro-HDMI cable (HDMI0)')}${t('kbd', 'USB keyboard')}${t('mouse', 'USB mouse')}
+      <div class="fb-row"><span class="fb-small" style="margin:0">Camera</span><select data-picam><option value="none"${p.cam === 'none' ? ' selected' : ''}>not used</option><option value="desk"${p.cam === 'desk' ? ' selected' : ''}>on the desk</option><option value="plugged"${p.cam === 'plugged' ? ' selected' : ''}>plugged in (J3)</option></select></div>
+      <label class="fb-chk" style="margin:0 8px"><input type="checkbox" data-piflip${p.flip ? ' checked' : ''}> cable turned round (wrong way)</label>
+      <div class="fb-small">Change these with the power off: shutting down first is the safe way.</div>`;
+  }
+  piToggle(k, v) {
+    const was = this.powered(), before = JSON.stringify(this.pi);
+    this.pre = this.snap(); this.pi[k] = v;
+    if (was && (k === 'sd' || (k === 'cam'))) this.piWarn = k === 'sd' ? 'The microSD card was inserted or removed with the power on. Shut the Raspberry Pi down first, or the card can be corrupted.' : 'The camera cable was connected or removed with the power on. Shut the Raspberry Pi down and unplug it first.';
+    if (!was) this.piWarn = '';
+    this.commit(); this.applyPi(k === 'cam' && v === 'plugged'); this.renderSide(); this.dirty = true;
+  }
   sideClick(e) {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.tool) { this.tool && this.tool.type === b.dataset.tool ? this.cancel() : this.begin(b.dataset.tool); return; }
     if (b.dataset.wcolor) { this.opts.wire = b.dataset.wcolor; this.renderSide(); return; }
     if (b.dataset.ex !== undefined) { this.loadExample(+b.dataset.ex); return; }
+    if (b.dataset.pitog) { this.piToggle(b.dataset.pitog, !this.pi[b.dataset.pitog]); return; }
     const a = b.dataset.act;
-    if (a === 'power') { this.tripMsg = null; this.app.plug(!this.app.usbPlugged).then(() => { this.dirty = true; this.renderSide(); this.renderPanel(); }); }
+    if (a === 'power') { this.tripMsg = null; if (this.app.usbPlugged) this.piWarn = ''; this.app.plug(!this.app.usbPlugged).then(() => { this.dirty = true; this.renderSide(); this.renderPanel(); }); }
     else if (a === 'probe') { this.cancel(); this.probeOn = !this.probeOn; if (!this.probeOn) this.clearProbe(); this.renderSide(); this.setHint(); }
     else if (a === 'undo') this.undo();
     else if (a === 'clear') { if (!this.parts.length || confirm('Remove every part and wire?')) this.mutate(() => { this.parts = []; this.pinCfg = {}; this.burnt.clear(); this.damaged.clear(); this.burnWhy = {}; this.seq = {}; this.rebuild3D(); this.select(null); }); }
@@ -484,7 +533,10 @@ export class FreeBuild {
     else if (a === 'view2') this.app.view(this.isPi ? 'pibb' : 'breadboard');
   }
   sideChange(e) {
-    const t = e.target, o = t.dataset.opt; if (!o) return;
+    const t = e.target;
+    if (t.dataset.picam !== undefined) { this.piToggle('cam', t.value); return; }
+    if (t.dataset.piflip !== undefined) { this.piToggle('flip', t.checked); return; }
+    const o = t.dataset.opt; if (!o) return;
     this.opts[o] = o === 'ohms' ? +t.value : o === 'flip' ? t.checked : t.value;
   }
   loadExample(i) {
@@ -595,7 +647,7 @@ export class FreeBuild {
     for (const el of document.querySelectorAll('[data-partmsg]')) { const R = res.parts[el.dataset.partmsg]; put('pm' + el.dataset.partmsg, R && R.msg ? `<span class="${R.status === 'bad' ? 'bad' : R.status === 'warn' ? 'warn' : ''}">${esc(R.msg)}</span>` : '', el); }
     const notes = $('#fb-notes');
     if (notes) {
-      const order = { bad: 0, warn: 1, ok: 2, info: 3 }, seen = new Set(), list = [...res.notes].filter(n => { if (seen.has(n.text)) return false; seen.add(n.text); return true; }).sort((a, b) => order[a.lvl] - order[b.lvl]);
+      const order = { bad: 0, warn: 1, ok: 2, info: 3 }, seen = new Set(), list = [...(this.isPi ? this.piNotes(pw) : []), ...res.notes].filter(n => { if (seen.has(n.text)) return false; seen.add(n.text); return true; }).sort((a, b) => order[a.lvl] - order[b.lvl]);
       put('notes', list.length ? list.map(n => `<div class="fb-note ${n.lvl}"><span class="ic">${{ bad: '✖', warn: '⚠', ok: '✔', info: 'ℹ' }[n.lvl]}</span><span>${esc(n.text)}</span></div>`).join('') : '<div class="fb-note info"><span class="ic">ℹ</span><span>Nothing placed yet.</span></div>', notes);
     }
   }
