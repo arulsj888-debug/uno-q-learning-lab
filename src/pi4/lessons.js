@@ -189,7 +189,7 @@ const PANEL_IDS = PI_PANEL_PARTS.map(d => d.id);
 const IO_PANEL_LED = { kind: 'led', item: 'led1', needs: PANEL_IDS };
 const IO_PANEL_I2C = { kind: 'i2c', item: 'sen2', needs: PANEL_IDS };
 export const PI_BUZ_PARTS = [
-  { id: 'r1', type: 'resistor', a: 'h8', b: 'h12' },
+  { id: 'r1', type: 'resistor', a: 'i8', b: 'i12' },
   { id: 'bz1', type: 'buzzer', plus: 'g12', minus: 'g15' },
   { id: 'w1', type: 'fwire', from: 'p11', to: 'j8', color: 'orange', lift: 26 },
   { id: 'w2', type: 'fwire', from: 'p9', to: 'j15', color: 'black', lift: 36 },
@@ -985,8 +985,8 @@ pause()</pre>
         <p><b>Why a 220 Ω resistor?</b> In the worst case (a short circuit) it limits the current to 3.3 V ÷ 220 Ω = <b>15 mA</b>, just under the <b>16 mA</b> that one GPIO pin may supply. Never connect a loudspeaker or a motor directly to a GPIO pin.</p>`,
       },
       {
-        title: 'Step 1 — resistor and buzzer', view: 'pibb', have: ['r1', 'bz1'], power: false, holes: ['h8', 'h12', 'g12 · +', 'g15 · −'],
-        body: `<ul><li><b>220 Ω resistor</b> from <b>h8</b> to <b>h12</b>.</li><li><b>Buzzer</b>: <b>+</b> leg in <b>g12</b>, <b>−</b> leg in <b>g15</b>.</li></ul>
+        title: 'Step 1 — resistor and buzzer', view: 'pibb', have: ['r1', 'bz1'], power: false, holes: ['i8', 'i12', 'g12 · +', 'g15 · −'],
+        body: `<ul><li><b>220 Ω resistor</b> from <b>i8</b> to <b>i12</b> (one row further from the buzzer, because the round body of the buzzer covers the holes right next to its legs).</li><li><b>Buzzer</b>: <b>+</b> leg in <b>g12</b>, <b>−</b> leg in <b>g15</b>.</li></ul>
         <p>The resistor and the + leg meet in column 12, because holes f–j of one column are connected.</p>`,
       },
       {
