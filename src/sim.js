@@ -68,6 +68,7 @@ export class Sim {
         H.pwm(pin, Math.min(max, Math.max(0, value)) / max, value);
       },
       delayMicroseconds: async () => { if (slow) await frame(); },
+      thermo: () => (H.thermo ? H.thermo() : { found: false }),
       pulseIn: async (pin, state) => { const us = await H.pulse(pin, state); check(); return us; },
       servoAttach: (pin) => { pins[pin] = { mode: 'OUTPUT' }; H.servo(pin, null); },
       // Servo library (Zephyr): map(angle, 0, 180, 544, 2400) µs, stored in 4 µs timer ticks
@@ -213,6 +214,28 @@ export const PROGRAMS = {
       if (light < threshold) { await rt.at(16); rt.digitalWrite('D5', 1); }
       else { await rt.at(18); rt.digitalWrite('D5', 0); }
       await rt.at(20); await rt.delay(200);
+    }
+  },
+
+  async thermo(rt) {
+    await rt.at(1); await rt.at(3);
+    await rt.at(6); rt.serialBegin(9600);
+    await rt.at(7);
+    await rt.at(8); const found = rt.thermo().found;
+    if (!found) {
+      await rt.at(9); rt.println('Thermo not found - check the Qwiic cable');
+      await rt.at(10); for (;;) await rt.delay(1000);
+    }
+    for (;;) {
+      await rt.at(14);
+      await rt.at(15); const celsius = rt.thermo().c;
+      await rt.at(16); const humidity = rt.thermo().rh;
+      await rt.at(17); rt.print('Temperature: ');
+      await rt.at(18); rt.print(celsius, 1);
+      await rt.at(19); rt.print(' C   Humidity: ');
+      await rt.at(20); rt.print(humidity, 1);
+      await rt.at(21); rt.println(' %RH');
+      await rt.at(22); await rt.delay(1000);
     }
   },
 

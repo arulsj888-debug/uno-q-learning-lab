@@ -9,11 +9,12 @@ import { LESSONS } from '../src/data/lessons.js';
 import { JDIGITAL, JANALOG, JSPI } from '../src/data/pins.js';
 
 const PINS = new Set([...JDIGITAL.pins, ...JANALOG.pins, ...JSPI.pins].map(p => p.id));
+PINS.add('QWIIC');                                         // the UNO Q Qwiic connector (I2C4 / Wire1)
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
-const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2)$/;          // pin of an off-board module, e.g. pir1.OUT
+const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2|QA|QB)$/;          // pin of an off-board module, e.g. pir1.OUT
 const isMod = r => MOD.test(r);
-const isWire = d => d.type === 'wire' || d.type === 'fwire' || d.type === 'lead';
+const isWire = d => d.type === 'wire' || d.type === 'fwire' || d.type === 'lead' || d.type === 'qwiic';
 const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
 const sigOf = r => (/^GND\d?$|^SPI_GND$/.test(r) ? 'GND' : r);            // all GND pins are one net
 const colNet = h => { const [, row, c] = HOLE.exec(h); return `col${c}${'abcde'.includes(row) ? 'top' : 'bot'}`; };
@@ -44,6 +45,7 @@ function nets(defs, pressed = false) {
     if (isWire(d)) { u(node(d.from), node(d.to)); continue; }
     for (const [leg, h] of Object.entries(legs(d))) u(leg, colNet(h));
     if (d.type === 'l293d') { for (const k of [5, 12, 13]) u(d.id + '.p4', d.id + '.p' + k); }   // TI block diagram: pins 4, 5, 12, 13 = one ground
+    if (d.type === 'thermo') u(d.id + '.QA', d.id + '.QB');   // datasheet: the two Qwiic connectors are wired in parallel
     if (d.type === 'relay') u(d.id + '.COM', d.id + (pressed ? '.NO' : '.NC'));   // contact position: energised (pressed) = COM–NO
     if (d.type === 'button') { u(d.id + '.1', d.id + '.2'); u(d.id + '.3', d.id + '.4'); if (pressed) u(d.id + '.1', d.id + '.3'); }
   }
@@ -60,7 +62,7 @@ for (const L of LESSONS) {
     const ends = isWire(d) ? [d.from, d.to] : Object.values(legs(d));
     for (const e of ends) {
       if (isHole(e)) { const [, , c] = HOLE.exec(e); if (+c < 1 || +c > 30) bad(L, `${d.id}: hole ${e} out of range`); (used[e] ??= []).push(d.id); }
-      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
+      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
       else if (!PINS.has(e)) bad(L, `${d.id}: unknown header pin ${e}`);
     }
   }
@@ -160,6 +162,18 @@ for (const L of LESSONS) {
       if (off.same(bat + '.POS', lamp + '.L1')) bad(L, `lamp is powered even when the relay is OFF`);
       if (on.same(bat + '.POS', bat + '.NEG')) bad(L, `battery is shorted`);
       for (const nm of [bat + '.POS', bat + '.NEG']) for (const p of ['5V', '3V3', 'IOREF', 'VIN', 'GND', 'D4', 'D5', 'D7', 'D8']) if (on.same(nm, 'PIN:' + p)) bad(L, `load battery is connected to UNO Q ${p} — the load circuit must stay separate`);
+    }
+    if (io.kind === 'thermo') {
+      const th = io.item, cab = byId[io.cable];
+      if (!cab || cab.type !== 'qwiic') bad(L, `thermo: no Qwiic cable ${io.cable}`);
+      else {
+        const ends = [cab.from, cab.to];
+        if (!ends.includes('QWIIC')) bad(L, `thermo: Qwiic cable does not start at the UNO Q Qwiic connector`);
+        if (!ends.some(e => e === th + '.QA' || e === th + '.QB')) bad(L, `thermo: Qwiic cable does not reach a Qwiic connector of ${th}`);
+      }
+      if (!N.same(th + '.QA', P) || !N.same(th + '.QB', P)) bad(L, `thermo: module is not on the UNO Q Qwiic bus`);
+      for (const p of ['5V', '3V3', 'VIN', 'IOREF', 'GND', 'D4', 'D5']) if (N.same(th + '.QA', 'PIN:' + p)) bad(L, `thermo: Qwiic bus is connected to ${p} — Qwiic is its own 3.3 V I²C bus`);
+      if (all.some(d => d.id !== io.cable && isWire(d) && [d.from, d.to].some(e => e.startsWith(th + '.')))) bad(L, `thermo: extra wire on the module besides the Qwiic cable`);
     }
     if (io.kind === 'buzzer') {
       const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));

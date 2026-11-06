@@ -445,6 +445,7 @@ export class UnoQBoard {
       g.add(box(cx - 0.6, cy + 3.3, 0, 1.6, 0.7, 1.7, M.tin));
       g.add(box(cx - 0.6, cy - 3.3, 0, 1.6, 0.7, 1.7, M.tin));
       this.add('qwiic', g);
+      this.qwiic = { pos: P(cx, cy, 1.45).add(new THREE.Vector3(2.125, 0, 0)) };   // opening of the socket (faces +x)
     }
   }
 

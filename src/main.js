@@ -25,6 +25,8 @@ const VIEWS = {
   bench: { t: new THREE.Vector3(0, 0, 30), d: new THREE.Vector3(-0.28, 0.82, 0.5), dist: 235 },
   breadboard: { t: new THREE.Vector3(4, 2.4, 60), d: new THREE.Vector3(-0.1, 0.86, 0.5), dist: 115 },
   relay: { t: new THREE.Vector3(88, 0, -12), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 395 },
+  thermo: { t: new THREE.Vector3(62, 0, 6), d: new THREE.Vector3(-0.08, 0.92, 0.38), dist: 215 },
+  thermoclose: { t: new THREE.Vector3(100, -4, 6), d: new THREE.Vector3(-0.06, 0.93, 0.36), dist: 62 },
   motor: { t: new THREE.Vector3(0, 0, 90), d: new THREE.Vector3(-0.06, 0.9, 0.43), dist: 285 },
   drvclose: { t: new THREE.Vector3(0, 3, 71), d: new THREE.Vector3(-0.22, 0.86, 0.46), dist: 78 },
   sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
@@ -82,7 +84,7 @@ class App {
     this.lamp.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 70, 6)));
     this.lamp.target.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 0, 0)));
     s.add(this.lamp, this.lamp.target);
-    this.lux = 300; this.tempC = 25; this.distCm = 40;
+    this.lux = 300; this.tempC = 25; this.distCm = 40; this.th = { t: 22.5, h: 45, unplug: false, last: null };
     // ---- Lesson 13 scene, all at true scale (1 unit = 1 mm) -------------------------------------------
     // obstacle: a corrugated cardboard box standing on the desk (flat, hard face — what the datasheet asks for)
     {
@@ -279,6 +281,7 @@ class App {
     this.servoTick(Math.min(dt, 0.1));
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
+    this.thermoTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -612,7 +615,7 @@ class App {
     this.hideFloat(); this.clearTemp(); this.hideCallout();
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
     if (mode === 'explore') {
-      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false); this.showRelay(false);
+      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false); this.showRelay(false); this.showThermo(false);
       this.lesson = null;
       this.renderSide();
       this.select(null, { card: false });
@@ -681,6 +684,11 @@ class App {
         <div class="io-tools"><button id="pir-wave" class="hold">👋 Wave hand</button><button id="pir-still" class="lvl">✋ Hold hand still</button></div></div>
         <div class="io-block pirstat"><div><span>Sensor</span><b id="ps-sensor">—</b></div><div class="arrow">→</div><div><span>OUT → D2</span><b id="ps-out">—</b></div><div class="arrow">→</div><div><span>Alarm LED (D5)</span><b id="ps-led">—</b></div></div>
         <div id="ps-note" class="io-note"></div>`;
+    if (w.includes('thermo')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated — you decide)</span></div>
+        <div class="throw"><label>Temperature</label><input id="th-t" type="range" min="-10" max="60" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div>
+        <div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
+        <div class="io-block pirstat"><div><span>Module power</span><b id="th-pwr">—</b></div><div class="arrow">→</div><div><span>I²C address</span><b id="th-bus">—</b></div><div class="arrow">→</div><div><span>Sketch gets</span><b id="th-out">—</b></div></div>
+        <div class="io-tools"><button id="th-plug" class="hold small">🔌 Unplug the Qwiic cable</button></div><div id="th-note" class="io-note"></div>`;
     if (w.includes('relay')) h += `<div class="io-block pirstat"><div><span>D4 → IN</span><b id="rl-pin">—</b></div><div class="arrow">→</div><div><span>Relay</span><b id="rl-rel">—</b></div><div class="arrow">→</div><div><span>Lamp</span><b id="rl-lamp">—</b></div></div>
         <div class="io-tools"><button id="rl-manual" class="hold small">⚡ Energise the coil</button></div><div id="rl-note" class="io-note"></div>
         <table class="kv rtable"><tr><th>Pin D4</th><th>Relay (low-level trigger)</th></tr>
@@ -708,6 +716,7 @@ class App {
     if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); $('#dist').onchange = e => this.setDist(+e.target.value, true); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist, true)); this.setDist(this.distCm); }
     else this.hideSonar();
     this.refreshPickTargets();
+    if ($('#th-t')) { $('#th-t').oninput = e => this.setThermo({ t: +e.target.value }); $('#th-h').oninput = e => this.setThermo({ h: +e.target.value }); $('#th-plug').onclick = () => { if (!this.sim.running) this.th.unplug = !this.th.unplug; }; this.setThermo({}); }
     if ($('#rl-manual')) $('#rl-manual').onclick = () => { if (this.rly && !this.sim.running) this.rly.manual = !this.rly.manual; };
     if ($('#pir-wave')) { $('#pir-wave').onclick = () => this.pirWave(); $('#pir-still').onclick = () => this.pirHoldStill(); }
     this.showRoom(w.includes('pir') && !!this.pirSensor());
@@ -1074,6 +1083,33 @@ class App {
     this.pirFan.position.set(L.x, DESK_Y + 2, L.z); this.pirFan.scale.set(r, r, 1);
   }
   // ---- Lesson 15: SG90 servo ------------------------------------------------------------------------
+  // ---- Lesson 18: Modulino Thermo over Qwiic ------------------------------------------------------------
+  thermoIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'thermo'); }
+  thermoOk() { const io = this.thermoIo(); return !!io && this.wired(io) && !this.th.unplug && this.board.powered; }
+  showThermo(on) {
+    this.th.unplug = false; this.th.last = null;
+    const m = this.bench.get('th1'); if (m) m.setPower(false);
+    const c = this.bench.get('cab1'); if (c) c.group.visible = true;
+  }
+  setThermo(v) {
+    Object.assign(this.th, v);
+    const t = $('#th-tv'), h = $('#th-hv');
+    if (t) t.textContent = `${this.th.t.toFixed(1)} °C  (${(this.th.t * 9 / 5 + 32).toFixed(1)} °F)`;
+    if (h) h.textContent = `${Math.round(this.th.h)} %RH`;
+  }
+  thermoTick() {
+    const io = this.thermoIo(); if (!io) return;
+    const ok = this.thermoOk(), m = this.bench.get('th1'), c = this.bench.get('cab1');
+    if (m) m.setPower(ok);
+    if (c) c.group.visible = !this.th.unplug;
+    const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; e.className = cls; } };
+    const run = this.sim.running, bad = this.th.t < 5 || this.th.t > 60 || this.th.h < 20 || this.th.h > 80;
+    set('#th-pwr', ok ? '3.3 V' : this.th.unplug ? 'no cable' : 'off', ok ? 'on' : 'off');
+    set('#th-bus', ok ? '0x45 answers' : 'no answer', ok ? 'on' : 'off');
+    set('#th-out', !run ? '—' : !ok ? 'not found' : (this.th.last || '…'), run && ok ? 'on' : 'off');
+    const btn = $('#th-plug'); if (btn) { btn.disabled = run; btn.textContent = this.th.unplug ? '🔌 Plug the Qwiic cable back in' : '🔌 Unplug the Qwiic cable'; btn.classList.toggle('on', this.th.unplug); }
+    set('#th-note', !this.board.powered ? 'USB-C is not plugged in — the module has no power.' : this.th.unplug ? 'The cable is out: nobody answers, so <b>thermo.begin()</b> will return false.' : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : bad ? 'Outside the datasheet’s recommended range (5…60 °C, 20…80 %RH).' : 'The sketch reads the module once per second.', 'io-note');
+  }
   // ---- Lesson 17: relay module + lamp ---------------------------------------------------------------
   relayIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'relay'); }
   frameRelay(ms = 1000) {
@@ -1335,6 +1371,13 @@ class App {
       },
       matrix: vals => this.board.setMatrix(vals),
       servo: (pin, us, angle) => this.onServo(pin, us, angle),
+      thermo: () => {
+        const ok = this.thermoOk();
+        if (!ok) return { found: false };
+        const c = this.th.t + (Math.random() - 0.5) * 0.1, rh = Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3));
+        this.th.last = `${c.toFixed(1)} °C · ${rh.toFixed(1)} %RH`;
+        return { found: true, c, rh };
+      },
       mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {
         const io = this.ioFor(pin);

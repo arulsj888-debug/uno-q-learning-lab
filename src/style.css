@@ -403,3 +403,8 @@ code { background: #0d1217; border: 1px solid #253040; border-radius: 5px; paddi
 .rtable tr.hit td { background: rgba(255,211,77,.18); color: #ffe9a6; font-weight: 700; }
 .hold.small.on { background: var(--teal); color: #fff; }
 .hold:disabled { opacity: .45; cursor: default; }
+
+.throw { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 12px; }
+.throw label { width: 84px; color: #9fb2c4; }
+.throw input[type=range] { flex: 1; }
+.throw b { min-width: 118px; text-align: right; color: #ffe9a6; font-variant-numeric: tabular-nums; }

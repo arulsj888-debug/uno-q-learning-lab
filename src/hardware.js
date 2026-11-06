@@ -1065,6 +1065,138 @@ export async function dropIn(obj, from = 30, ms = 700) {
   await tween(ms, e => { obj.position.y = y + from * (1 - e); });
 }
 
+// ---------------------------------------------------------------- Arduino Modulino Thermo (ABX00103) + Qwiic cable
+// Datasheet (Modulino Thermo, 03/11/2026): board 41 × 25.36 mm, 1.6 mm; Qwiic connectors J1/J2 (SM04B-SRSS-TB) on the two short edges,
+// 1×4 header J4 (GND, 3V3, SDA, SCL), 1×5 header J3 (GND, 3V3, ADDR, nRST, ALERT), 4 mounting holes Ø3.2 mm (16 × 32 mm),
+// green power LED, GXHT30C sensor (black, DFN8 2.5 × 2.5 × 0.9 mm). Layout measured from the datasheet pinout drawing.
+// Local frame (lying on the desk, component side up): long axis = x. J2 faces −x ("QA"), J1 faces +x ("QB"); J4 on the +z edge, J3 on the −z edge.
+export class ModulinoThermo {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const L = 41, Wd = 25.36, T = 1.6, k = 24;
+    // --- PCB outline with the real cut-outs: 4 mounting holes, 4 small holes, 4 arc slots around the sensor, header holes
+    const rr = (s, w, h, r) => { s.moveTo(-w / 2 + r, -h / 2); s.lineTo(w / 2 - r, -h / 2); s.absarc(w / 2 - r, -h / 2 + r, r, -Math.PI / 2, 0); s.lineTo(w / 2, h / 2 - r); s.absarc(w / 2 - r, h / 2 - r, r, 0, Math.PI / 2); s.lineTo(-w / 2 + r, h / 2); s.absarc(-w / 2 + r, h / 2 - r, r, Math.PI / 2, Math.PI); s.lineTo(-w / 2, -h / 2 + r); s.absarc(-w / 2 + r, -h / 2 + r, r, Math.PI, Math.PI * 1.5); };
+    const shape = new THREE.Shape(); rr(shape, L, Wd, 3.2);
+    const circ = (x, z, r) => { const p = new THREE.Path(); p.absarc(x, -z, r, 0, Math.PI * 2, true); shape.holes.push(p); };
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { circ(sx * 16, sz * 8, 1.6); circ(sx * 5.5, sz * 5.5, 1.1); }
+    this.hdr4 = [['GND', 3.81], ['3V3', 1.27], ['SDA', -1.27], ['SCL', -3.81]];
+    this.hdr5 = [['GND', 5.08], ['3V3', 2.54], ['ADDR', 0], ['nRST', -2.54], ['ALERT', -5.08]];
+    for (const [, x] of this.hdr4) circ(x, 11.4, 0.5);
+    for (const [, x] of this.hdr5) circ(x, -11.4, 0.5);
+    // arc slots (radius 5.1 mm around the sensor, 1.5 mm wide, ±28° about each diagonal)
+    for (const ang of [45, 135, 225, 315]) {
+      const a0 = (ang - 28) * Math.PI / 180, a1 = (ang + 28) * Math.PI / 180, R = 5.1, w2 = 0.75, p = new THREE.Path();
+      p.absarc(0, 0, R + w2, a0, a1, false);
+      p.absarc(R * Math.cos(a1), R * Math.sin(a1), w2, a1, a1 + Math.PI, false);
+      p.absarc(0, 0, R - w2, a1, a0, true);
+      p.absarc(R * Math.cos(a0), R * Math.sin(a0), w2, a0 + Math.PI, a0 + Math.PI * 2, false);
+      shape.holes.push(p);
+    }
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false, curveSegments: 24 });
+    geo.rotateX(-Math.PI / 2);
+    const mask = new THREE.MeshPhysicalMaterial({ color: 0x1f4ea6, roughness: 0.42, clearcoat: 0.4, clearcoatRoughness: 0.35 });
+    const pcb = new THREE.Mesh(geo, mask); g.add(sub(pcb, 'th:pcb'));
+    // --- silkscreen + copper rings, drawn in the datasheet orientation (picture-up = +x, picture-right = +z)
+    const tex = canvasTex(Math.round(Wd * k), Math.round(L * k), (c, w, h) => {
+      const X = z => (z + Wd / 2) * k, Y = x => (L / 2 - x) * k;
+      c.clearRect(0, 0, w, h);
+      const ring = (x, z, ro, ri) => { c.fillStyle = '#d9b25f'; c.beginPath(); c.arc(X(z), Y(x), ro * k, 0, 7); c.arc(X(z), Y(x), ri * k, 0, 7, true); c.fill('evenodd'); };
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) ring(sx * 16, sz * 8, 2.8, 1.6);
+      for (const [, x] of this.hdr4) ring(x, 11.4, 0.95, 0.5);
+      for (const [, x] of this.hdr5) ring(x, -11.4, 0.95, 0.5);
+      c.fillStyle = '#f2f2ee'; c.textBaseline = 'middle'; c.font = `700 ${Math.round(1.25 * k)}px Arial, Helvetica, sans-serif`;
+      c.textAlign = 'right'; for (const [n, x] of this.hdr4) c.fillText(n, X(11.4 - 1.35), Y(x));
+      c.textAlign = 'left'; for (const [n, x] of this.hdr5) c.fillText(n, X(-11.4 + 1.35), Y(x));
+      // thermometer and droplet symbols (as on the real board)
+      c.strokeStyle = '#f2f2ee'; c.lineWidth = 0.28 * k; c.lineCap = 'round';
+      c.beginPath(); c.arc(X(6.2), Y(11.6), 0.9 * k, 0, 7); c.stroke();
+      c.beginPath(); c.moveTo(X(6.2), Y(11.6)); c.lineTo(X(6.2), Y(14.4)); c.stroke();
+      c.beginPath(); c.moveTo(X(8.2), Y(11.2)); c.quadraticCurveTo(X(5.6), Y(8.6), X(8.2), Y(7.2)); c.quadraticCurveTo(X(10.8), Y(8.6), X(8.2), Y(11.2)); c.stroke();
+    });
+    const qv = new THREE.BufferGeometry();
+    qv.setAttribute('position', new THREE.Float32BufferAttribute([-L / 2, 0, -Wd / 2, L / 2, 0, -Wd / 2, L / 2, 0, Wd / 2, -L / 2, 0, Wd / 2], 3));
+    qv.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
+    // u runs along +z (picture-right) and v along +x (picture-up): vertices (x,z) → (v,u)
+    qv.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0, 1, 1, 1, 1, 0], 2));
+    qv.setIndex([0, 2, 1, 0, 3, 2]);
+    const over = new THREE.Mesh(qv, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    over.position.y = T + 0.02; over.raycast = () => {}; g.add(over);
+    const top = T;
+
+    // --- Qwiic connectors J1 (+x end) and J2 (−x end): JST SH 4-pin right-angle SMD, opening toward the board edge
+    const frontTex = canvasTex(256, 128, (c, w, h) => {
+      c.fillStyle = '#efede4'; c.fillRect(0, 0, w, h); c.fillStyle = '#1a1a1a'; c.fillRect(22, 30, w - 44, h - 52);
+      c.fillStyle = '#d6aa52'; for (let i = 0; i < 4; i++) c.fillRect(54 + i * 44, 52, 10, 30);
+    });
+    const fMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.6 });
+    for (const sx of [1, -1]) {
+      const mats = [M.whiteNylon, M.whiteNylon, M.whiteNylon, M.whiteNylon, M.whiteNylon, M.whiteNylon]; mats[sx > 0 ? 0 : 1] = fMat;
+      const b = new THREE.Mesh(new RoundedBoxGeometry(4.25, 2.9, 6.0, 2, 0.15), mats); b.position.set(sx * 18.2, top + 1.45, 0); g.add(sub(b, 'th:qwiic'));
+      for (const sz of [-1, 1]) { const t = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.35, 1.5), M.tin); t.position.set(sx * 16.4, top + 0.17, sz * 3.5); g.add(sub(t, 'th:qwiic')); }
+    }
+    this.pinPos = { QA: { p: new THREE.Vector3(-18.2 - 2.125, top + 1.45, 0), d: new THREE.Vector3(-1, 0, 0) }, QB: { p: new THREE.Vector3(18.2 + 2.125, top + 1.45, 0), d: new THREE.Vector3(1, 0, 0) } };
+
+    // --- sensor: GXHT30C, black dustproof film over a DFN8 2.5 × 2.5 × 0.9 mm package, with the tiny sensing opening
+    const sens = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.9, 2.5), new THREE.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.5 })); sens.position.set(0, top + 0.45, 0); g.add(sub(sens, 'th:sensor'));
+    const film = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.04, 14), new THREE.MeshStandardMaterial({ color: 0x8a7a68, roughness: 0.7 })); film.position.set(0, top + 0.92, 0); g.add(sub(film, 'th:sensor'));
+    // --- power LED (green, LTST-C190KGKT) with its 1 kΩ resistor, decoupling capacitors, pull-ups
+    const led = new THREE.Mesh(new RoundedBoxGeometry(1.6, 0.8, 0.8, 1, 0.1), new THREE.MeshPhysicalMaterial({ color: 0x9fe5a8, roughness: 0.3, clearcoat: 0.6 })); led.position.set(16.95, top + 0.4, -4.2); g.add(sub(led, 'th:led'));
+    this.ledGlow = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 0.6), new THREE.MeshBasicMaterial({ color: 0x1d4a26, toneMapped: false })); this.ledGlow.position.set(16.95, top + 0.85, -4.2); g.add(sub(this.ledGlow, 'th:led'));
+    this.ledHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    this.ledHalo.scale.set(9, 9, 1); this.ledHalo.position.set(16.95, top + 1.6, -4.2); this.ledHalo.raycast = () => {}; g.add(this.ledHalo);
+    const smd = (x, z, w, d, col, id) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), new THREE.MeshStandardMaterial({ color: col, roughness: 0.55 })); m.position.set(x, top + 0.25, z); g.add(sub(m, id)); };
+    smd(14.6, -4.2, 1.0, 0.6, 0x141414, 'th:r');
+    smd(11.5, 0, 1.6, 1.0, 0x8c8478, 'th:r'); smd(9.6, 0, 1.0, 0.6, 0x141414, 'th:r');
+    smd(-8.3, 0, 1.0, 0.6, 0x141414, 'th:r'); smd(-9.6, 0, 1.0, 0.6, 0x8c8478, 'th:r'); smd(-11.4, 0, 1.6, 1.2, 0x8c7660, 'th:r');
+    tagHW(g, 'thermo');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+    this.setPower(false);
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    const q = this.group.getWorldQuaternion(new THREE.Quaternion());
+    return { pos: this.group.localToWorld(this.pinPos[name].p.clone()), dir: this.pinPos[name].d.clone().applyQuaternion(q) };
+  }
+  setPower(on) { this.ledGlow.material.color.set(on ? 0x62ff7a : 0x1d4a26); this.ledHalo.material.color.set(on ? 0x34e060 : 0x000000); }
+}
+
+// Qwiic cable: two JST SH 4-pin plugs joined by four flat wires (black GND, red 3.3 V, blue SDA, yellow SCL).
+export class QwiicCable {
+  constructor(a, dirA, b, dirB, { lift = 6 } = {}) {
+    const g = this.group = new THREE.Group();
+    const up = new THREE.Vector3(0, 1, 0);
+    const pA = a.clone().addScaledVector(dirA, 2.6), pB = b.clone().addScaledVector(dirB, 2.6);
+    const q1 = pA.clone().addScaledVector(dirA, 9), q2 = pB.clone().addScaledVector(dirB, 9);
+    const mid = q1.clone().lerp(q2, 0.5); mid.y = Math.max(q1.y, q2.y) + lift;
+    const base = new THREE.CatmullRomCurve3([pA, q1, mid, q2, pB], false, 'centripetal');
+    const N = 90, pts = base.getPoints(N), cols = [0x161616, 0xd8261e, 0x2369d6, 0xf2c21b];
+    this.geos = [];
+    cols.forEach((col, i) => {
+      const off = (i - 1.5) * 1.0, line = pts.map((p, j) => {
+        const t = base.getTangent(j / N), n = new THREE.Vector3().crossVectors(up, t).normalize();
+        return p.clone().addScaledVector(n, off);
+      });
+      const geo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(line, false, 'centripetal'), 140, 0.5, 8, false);
+      this.geos.push(geo);
+      g.add(new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.45, clearcoat: 0.3 })));
+    });
+    const plugMat = new THREE.MeshStandardMaterial({ color: 0xece9df, roughness: 0.55 });
+    this.plugs = [];
+    for (const [p, d] of [[a, dirA], [b, dirB]]) {
+      const m = new THREE.Mesh(new RoundedBoxGeometry(4.4, 2.7, 5.0, 2, 0.2), plugMat);
+      m.position.copy(p).addScaledVector(d, 0.4); m.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), d); g.add(m); this.plugs.push(m);
+    }
+    tagHW(g, 'qwiiccable');
+  }
+  async grow(ms = 1000) {
+    this.plugs.forEach(p => { p.visible = false; });
+    const totals = this.geos.map(x => x.index.count);
+    await tween(ms, e => { this.geos.forEach((x, i) => x.setDrawRange(0, Math.floor(totals[i] * e / 3) * 3)); });
+    this.geos.forEach(x => x.setDrawRange(0, Infinity)); this.plugs.forEach(p => { p.visible = true; });
+  }
+}
+
 export const HW_INFO = {
   usbcable: {
     name: 'USB-C® cable', tag: 'Power + data',
@@ -1277,6 +1409,13 @@ export const HW_INFO = {
   'lamp:bulb': { name: 'Bulb with filament', tag: 'E10 screw base', summary: 'The thin tungsten filament heats up and glows when current flows.', src: 'Handsontec 1-channel relay module guide' },
   'lamp:holder': { name: 'Lamp holder', tag: 'E10 socket', summary: 'Holds the bulb and connects it to the two screw terminals.', src: 'Handsontec 1-channel relay module guide' },
   'lamp:term': { name: 'Lamp terminals', tag: '2 screws', summary: 'One goes to the relay NO terminal, the other to battery −.', src: 'Handsontec 1-channel relay module guide' },
+  'th:pcb': { name: 'Modulino Thermo circuit board', tag: '41 × 25.36 mm · 1.6 mm thick', summary: 'The blue board that carries everything. Four Ø3.2 mm mounting holes are spaced 16 mm × 32 mm.', points: ['Hardware version V0.5 or later has the black GXHT30C sensor; earlier boards have a silver HS3003.'], src: 'Modulino Thermo datasheet §2.1, §2.3, §6.1' },
+  'th:sensor': { name: 'GXHT30C sensor', tag: 'Temp + humidity', summary: 'A single chip that measures both temperature and relative humidity and sends the numbers over I²C (address 0x45).', points: ['The black film is a dustproof, breathable cover — it must not be removed.', 'Datasheet: −45…+130 °C (±0.3 °C typ.), 0…100 %RH (±3 %RH typ.). Recommended use: 5…60 °C and 20…80 %RH.'], src: 'Modulino Thermo datasheet §2.2' },
+  'th:qwiic': { name: 'Qwiic connector (J1 / J2)', tag: 'SM04B-SRSS-TB · 4 pins', summary: 'Two identical connectors wired in parallel: one goes to the UNO Q, the other lets you daisy-chain another module.', points: ['The four pins are GND, +3.3 V, SDA and SCL.'], warn: 'Power the module with 3.3 V only — never 5 V.', src: 'Modulino Thermo datasheet §4.4' },
+  'th:led': { name: 'Power LED', tag: 'Green · LTST-C190KGKT', summary: 'Lights when the module has 3.3 V power. It is fed through a 1 kΩ resistor.', src: 'Modulino Thermo datasheet §4.7' },
+  'th:r': { name: 'Resistors and capacitors', tag: 'Supporting parts', summary: 'Pull-up resistors for the ADDR and nRST pins and the I²C lines, plus decoupling capacitors (4.7 µF and 100 nF) next to the sensor.', src: 'Modulino Thermo datasheet §4.3, §4.5' },
+  'thermo': { name: 'Arduino Modulino® Thermo', tag: 'ABX00103 · Qwiic', summary: 'A small board with a temperature and humidity sensor. Plug it into the UNO Q with one Qwiic cable — no breadboard and no loose wires.', points: ['Powered by 3.3 V from the Qwiic cable; there is no voltage regulator on the module.', 'Headers J4 (GND, 3V3, SDA, SCL) and J3 (GND, 3V3, ADDR, nRST, ALERT) are for direct wiring; they are not used here.'], warn: 'Never connect it to 5 V.', src: 'Modulino Thermo datasheet' },
+  'qwiiccable': { name: 'Qwiic cable', tag: '4 wires · 3.3 V I²C', summary: 'A 4-wire cable with a small polarised plug at each end. It carries power and the two I²C signals, so this one cable is the whole wiring.', points: ['Standard Qwiic colours: black = GND, red = 3.3 V, blue = SDA (data), yellow = SCL (clock).', 'The plug only fits one way round, so the wires cannot be swapped.'], src: 'SparkFun Qwiic system · Modulino Thermo datasheet §4.4' },
   obstacle: {
     name: 'Obstacle', tag: 'Drag it closer or farther',
     summary: 'A flat object in front of the sensor. Drag it in the 3D view or use the slider; the label shows the real distance.',

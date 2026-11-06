@@ -361,3 +361,29 @@ void loop() {
   Serial.println("Relay OFF - lamp OFF");
   delay(3000);
 }`;
+
+
+// Lesson 18 — Arduino Modulino Thermo over Qwiic (based on the official Thermo_Basic example of the Arduino_Modulino library)
+export const THERMO_CODE = `#include <Arduino_Modulino.h>
+
+ModulinoThermo thermo;
+
+void setup() {
+  Serial.begin(9600);
+  Modulino.begin();               // start the Qwiic bus (Wire1 on the UNO Q)
+  if (!thermo.begin()) {          // is the Thermo on the bus?
+    Serial.println("Thermo not found - check the Qwiic cable");
+    while (1);                    // stop here
+  }
+}
+
+void loop() {
+  float celsius = thermo.getTemperature();
+  float humidity = thermo.getHumidity();
+  Serial.print("Temperature: ");
+  Serial.print(celsius, 1);
+  Serial.print(" C   Humidity: ");
+  Serial.print(humidity, 1);
+  Serial.println(" %RH");
+  delay(1000);
+}`;

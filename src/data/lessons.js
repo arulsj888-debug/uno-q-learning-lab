@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE, RELAY_CODE, THERMO_CODE } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -21,6 +21,9 @@ const SRC = {
   l293: { t: 'Texas Instruments L293x quadruple half-H drivers datasheet (SLRS008D)', u: 'https://www.ti.com/lit/ds/symlink/l293.pdf' },
   motor130: { t: 'Adafruit #711 DC toy/hobby motor (130 size) — specifications', u: 'https://www.adafruit.com/product/711' },
   relaymod: { t: 'Handsontec: 1-channel 5 V optical-isolated relay module (user guide)', u: 'https://handsontec.com/dataspecs/module/Relay%20Module/1Ch-relay%20Opto.pdf' },
+  thermo: { t: 'Arduino Modulino® Thermo datasheet (ABX00103)', u: 'https://docs.arduino.cc/hardware/modulino-thermo' },
+  modulinolib: { t: 'Arduino_Modulino library (source and Thermo_Basic example)', u: 'https://github.com/arduino-libraries/Arduino_Modulino' },
+  qwiic: { t: 'SparkFun Qwiic system (connector and cable colour code)', u: 'https://www.sparkfun.com/qwiic' },
   dhtforum: { t: 'Arduino Forum: “DHT11 and UNO Q”', u: 'https://forum.arduino.cc/t/dht11-and-uno-q/1416409' },
 };
 
@@ -120,6 +123,12 @@ const RELAY_PARTS = [
 ];
 const RELAY_IDS = RELAY_PARTS.map(d => d.id);
 const RELAY_IO = { kind: 'relay', item: 'rel1', lamp: 'lamp1', bat: 'bat2', needs: RELAY_IDS };
+const THERMO_PARTS = [
+  { id: 'th1', type: 'thermo', x: 100, z: 6 },
+  { id: 'cab1', type: 'qwiic', from: 'QWIIC', to: 'th1.QA', lift: 4 },
+];
+const THERMO_IDS = THERMO_PARTS.map(d => d.id);
+const THERMO_IO = { kind: 'thermo', item: 'th1', cable: 'cab1', needs: THERMO_IDS };
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
 
 const BLINK_CODE = BLINK;
@@ -1576,12 +1585,115 @@ export const LESSONS = [
     ],
     sources: [SRC.relaymod, SRC.ds, SRC.st],
   },
+  // ================================================================== 18
+  {
+    id: 'l18', num: 18, module: 6, title: 'Temperature & humidity with Modulino® Thermo (I²C · Qwiic)', level: 'Intermediate', time: '25 min',
+    goal: 'Read temperature and humidity from a digital I²C sensor module, using one Qwiic cable and the Arduino_Modulino library.',
+    hardware: ['Arduino UNO Q', 'Arduino Modulino® Thermo (ABX00103)', 'Qwiic cable (4 wires, a plug at each end)', 'Arduino_Modulino library'],
+    code: THERMO_CODE, program: 'thermo', fast: true, widgets: ['thermo'], noBreadboard: true,
+    circuit: THERMO_PARTS, io: { QWIIC: THERMO_IO },
+    explain: {
+      1: 'This line adds the <b>Arduino_Modulino</b> library. It knows how to talk to every Modulino module (install it from the library manager first).',
+      3: 'Makes one object called <b>thermo</b> that stands for our Modulino Thermo module.',
+      6: 'Serial output on, so we can see the numbers.',
+      7: '<b>Modulino.begin()</b> starts the Qwiic I²C bus. On the UNO Q the Qwiic connector is I²C port <b>Wire1</b>, and the library uses it by default.',
+      8: '<b>thermo.begin()</b> looks for the module on the bus. It returns true if the module answers, false if nobody does.',
+      9: 'No answer: tell the user what to check.',
+      10: '<code>while (1);</code> is an endless loop — the sketch stops here on purpose.',
+      14: 'loop() repeats forever.',
+      15: 'Ask the sensor for the temperature. The library gives it directly in <b>°C</b> (a float, so it has decimals).',
+      16: 'Ask for the relative humidity in <b>%RH</b>.',
+      17: 'Print a label …',
+      18: '… the temperature with <b>1 decimal</b> …',
+      19: '… its unit, and a label for the humidity …',
+      20: '… the humidity with 1 decimal …',
+      21: '… its unit, and end the line.',
+      22: 'Wait 1 second, then measure again.',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'thermo', have: THERMO_IDS, power: false, labels: [['th1', 'Modulino Thermo'], ['cab1', 'Qwiic cable'], ['board', 'UNO Q']],
+        body: `<p>This sensor is <b>digital</b>: it measures <b>temperature and humidity</b> itself and sends the finished numbers to the UNO Q. Our TMP36 in Lesson 12 gave only a voltage that <i>we</i> had to convert.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">Modulino Thermo (sensor)</span></div><div class="pt-arrow">↓ one Qwiic cable: power + 2 data wires</div>
+        <div class="pt-row"><span class="pt">UNO Q Qwiic connector (I²C)</span></div><div class="pt-arrow">↓ numbers</div><div class="pt-row"><span class="pt bus">your sketch → Serial</span></div></div>
+        <p><b>No breadboard, no resistors, no wires to place:</b> one cable is the whole circuit.</p>`,
+      },
+      {
+        title: 'The module: click every part', view: 'thermoclose', have: ['th1'], power: false,
+        body: `<p><b>Click each part</b> of the board — a short note appears:</p>
+        <ul><li>The black square in the middle: the <b>GXHT30C sensor</b> (temperature + humidity).</li>
+        <li>The two white <b>Qwiic connectors</b> on the short edges (they are wired together).</li>
+        <li>The little green <b>power LED</b> and the rows of holes (<b>headers J3 and J4</b> — for direct wiring, not used today).</li>
+        <li>The four big <b>mounting holes</b>.</li></ul>
+        <p class="tip"><b>Two hardware versions:</b> boards marked <b>V0.5 or later</b> have this black GXHT30C sensor (I²C address <b>0x45</b>). Older boards have a silver HS3003 sensor (address 0x44). The library detects which one it is, so the sketch is the same.</p>`,
+      },
+      {
+        title: 'What is I²C?', view: 'thermo', have: THERMO_IDS, power: false,
+        body: `<p><b>I²C</b> lets one controller talk to many devices using just <b>two wires</b>:</p>
+        <table class="kv"><tr><th>Wire</th><th>Job</th></tr><tr><td><b>SDA</b></td><td>the <b>data</b> (numbers travel here)</td></tr><tr><td><b>SCL</b></td><td>the <b>clock</b> (keeps both sides in step)</td></tr></table>
+        <p>Every device on the bus has its own <b>address</b>. The UNO Q (the controller) calls out an address, and only the device with that address answers. Our Thermo answers to <b>0x45</b>.</p>
+        <p class="tip">Because every device has an address, you can plug several modules into the same two wires — that is why the module has <b>two</b> Qwiic connectors: one for the UNO Q, one to “daisy-chain” the next module.</p>`,
+      },
+      {
+        title: 'Qwiic and 3.3 V', view: 'thermo', have: THERMO_IDS, power: false,
+        body: `<p><b>Qwiic</b> is a small 4-pin plug that carries everything an I²C module needs:</p>
+        <table class="kv"><tr><th>Pin</th><th>Cable colour</th></tr><tr><td>GND (ground)</td><td>black</td></tr><tr><td>3.3 V (power)</td><td>red</td></tr><tr><td>SDA (data)</td><td>blue</td></tr><tr><td>SCL (clock)</td><td>yellow</td></tr></table>
+        <p>On the UNO Q this connector is I²C port 4 — in code it is <b><code>Wire1</code></b>, not <code>Wire</code> — and it supplies <b>3.3 V</b>.</p>
+        <p class="warn"><b>Never connect the Modulino Thermo to 5 V</b> or to an I²C bus that runs at 5 V (datasheet). It has no voltage regulator: the 3.3 V from the cable goes straight to the sensor. The Qwiic port on the UNO Q is 3.3 V only, so this cable is safe.</p>`,
+      },
+      {
+        title: 'Step 1 — put the module on the desk', view: 'thermo', have: ['th1'], power: false, labels: [['th1', 'Modulino Thermo'], ['board', 'UNO Q']],
+        body: `<p>Place the Modulino Thermo next to the UNO Q. Nothing is connected yet: the green LED is off.</p>`,
+      },
+      {
+        title: 'Step 2 — plug in the Qwiic cable', view: 'thermo', have: THERMO_IDS, power: true, labels: [['cab1', 'Qwiic cable']],
+        body: `<ul><li>One plug into the white <b>Qwiic connector</b> on the UNO Q.</li><li>The other plug into <b>either</b> Qwiic connector on the module (they are identical).</li></ul>
+        <p>The plugs are <b>keyed</b>: they only fit one way round, so you cannot swap the wires. The moment the UNO Q has power, the module’s <b>green LED</b> lights: 3.3 V arrives through the cable.</p>
+        <p class="tip">Click the cable or the plugs to see what is inside it.</p>`,
+      },
+      { title: 'The code', view: 'thermo', showCode: true, power: true, body: `<p>Before the first run, add the <b>Arduino_Modulino</b> library (library manager). The sketch is short — click any line in the code panel to see what it does.</p>
+        <p class="tip">It follows the official <i>Thermo_Basic</i> example of the library; <code>thermo.getTemperature()</code> and <code>thermo.getHumidity()</code> already return real units, so there is no conversion maths.</p>` },
+      {
+        title: 'Run it', view: 'thermo', showCode: true, power: true, action: 'run',
+        body: `<ol><li><code>Modulino.begin()</code> starts the Qwiic bus and <code>thermo.begin()</code> finds the module.</li><li>Every second the sketch asks for temperature and humidity and prints them.</li></ol>
+        <p><b>Try it:</b> move the <b>Temperature</b> and <b>Humidity</b> sliders in the panel (they stand for the air around the sensor) and watch the numbers follow.</p>
+        <p class="sim">Simulated values. With a real module, try breathing gently near the sensor: your breath is warm and humid, so the humidity number jumps quickly.</p>`,
+      },
+      {
+        title: 'What if the cable is not plugged in?', view: 'thermo', showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Unplug the Qwiic cable”</b> in the panel, then run it again.</p>
+        <p>Nobody answers at the Thermo’s address, so <code>thermo.begin()</code> returns <b>false</b>. The sketch prints <b>“Thermo not found - check the Qwiic cable”</b> and stops at <code>while (1);</code>. Plug the cable back in and run again.</p>
+        <p class="tip">This check is why the sketch tests the result of <code>begin()</code>: a clear message is much easier to debug than silence.</p>`,
+      },
+      {
+        title: 'Reading the numbers', view: 'thermo', have: THERMO_IDS, power: true,
+        body: `<ul><li><b>Temperature</b> is in °C. Accuracy: typically <b>±0.3 °C</b> (−40 … +90 °C). Resolution 0.015 °C.</li>
+        <li><b>Relative humidity (%RH)</b> tells how full of water vapour the air is <i>compared with the most it could hold at that temperature</i>. Accuracy: typically <b>±3 %RH</b>.</li>
+        <li>Recommended range: <b>5 … 60 °C</b> and <b>20 … 80 %RH</b>. The panel warns you when a slider leaves it.</li></ul>
+        <p class="tip">Warm air can hold more water vapour, so the same air gets a <b>lower %RH</b> when it is warmed up — and a higher one when it cools.</p>`,
+      },
+      {
+        title: 'Summary', view: 'thermo', have: THERMO_IDS, power: true,
+        body: `<ul><li>The Modulino Thermo is a <b>digital</b> sensor: it sends °C and %RH over <b>I²C</b> (address 0x45).</li>
+        <li>I²C needs two signal wires, <b>SDA</b> and <b>SCL</b>; <b>Qwiic</b> puts them, ground and 3.3 V into one keyed cable.</li>
+        <li>On the UNO Q the Qwiic port is <b><code>Wire1</code></b> and is <b>3.3 V only</b>.</li>
+        <li>Always check that <code>thermo.begin()</code> succeeded.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Which two wires carry the I²C signals?', a: ['TX and RX', 'SDA and SCL', 'MOSI and MISO', '5V and GND'], c: 1, why: 'SDA carries data and SCL carries the clock.' },
+      { q: 'What supply voltage does the Modulino Thermo need?', a: ['5 V', '12 V', '3.3 V', 'Any voltage'], c: 2, why: 'Datasheet: powered at 3.3 V; never connect it to 5 V.' },
+      { q: 'Which I²C port is the UNO Q’s Qwiic connector in code?', a: ['Wire', 'Wire1', 'Serial', 'SPI'], c: 1, why: 'The Qwiic connector is I²C port 4, which the Arduino core exposes as Wire1.' },
+      { q: 'What happens in our sketch when thermo.begin() returns false?', a: ['It prints a message and stops', 'It reads 0 °C', 'It restarts the board', 'Nothing'], c: 0, why: 'The code prints “Thermo not found” and stops in while (1);.' },
+      { q: 'Why does the module have two Qwiic connectors?', a: ['One is for 5 V', 'One goes to the UNO Q, the other lets you chain another module', 'One is a spare for the sensor', 'They carry different signals'], c: 1, why: 'Datasheet: the two connectors are wired in parallel on the same I²C bus.' },
+    ],
+    sources: [SRC.thermo, SRC.modulinolib, SRC.ds, SRC.qwiic],
+  },
 ];
 
-export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion' };
+export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion', 6: 'Module 6 — I²C & Qwiic' };
 
 export const COMING_SOON = [
-  
-  'I²C & Qwiic: Modulino® Thermo (temperature + humidity)', 'I²C displays',
+  'I²C display (Modulino® Pixels / Qwiic display)',
   'Linux side: Python + Bridge', 'Wi-Fi web dashboard', 'Final IoT project',
 ];

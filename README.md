@@ -30,6 +30,8 @@ Double-click **`UNO-Q-Learning-Lab.html`**. It runs in Chrome, Edge or Firefox, 
     15. Turn a servo motor to an angle (SG90, Servo library, pulse-width oscilloscope)
     16. Drive a DC motor with an L293D (H-bridge, direction + PWM speed, battery, common ground)
     17. Switch a lamp with a relay module (low-level trigger, see-through relay, safe 3.3 V use)
+  - **Module 6: I²C & Qwiic**
+    18. Temperature & humidity with the Arduino Modulino® Thermo (Qwiic cable, I²C basics, Wire1, 3.3 V only)
 
 Purple notes in the lessons mark behavior that is only **simulated** in the app, such as the shortened boot time.
 
@@ -49,6 +51,7 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
 | TowerPro SG90 datasheet + Arduino Servo library source | servo wires, 4.8 V, 180°, 0.1 s/60°, 544–2400 µs pulses every 20 ms, Zephyr support |
 | TI L293x datasheet (SLRS008D) + Adafruit #711 motor spec | L293D pinout, 600 mA/1.2 A, VIH 2.3 V, VCC1/VCC2, function tables, clamp diodes; 130 motor currents |
 | Handsontec 1-channel relay module guide | relay pinout COM/NO/NC, active-low trigger, DC 30 V / AC 250 V 10 A contacts, optocoupler schematic, 3.3 V note |
+| Arduino Modulino Thermo datasheet (ABX00103) + Arduino_Modulino library | GXHT30C specs, I²C address 0x45, Qwiic/headers, board outline, Thermo_Basic example |
 | Analog Devices TMP35/36/37 datasheet, Rev. F | TMP36 output (0.5 V + 10 mV/°C), supply, accuracy, TO-92 pinout |
 | Arduino Zephyr core source (ArduinoCore-zephyr) | `analogRead` 10-bit default, `analogWrite` 8-bit default and non-PWM behavior, `tone()` behavior |
 
