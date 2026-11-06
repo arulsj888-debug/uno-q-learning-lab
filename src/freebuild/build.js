@@ -9,7 +9,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 const RAILS = ['top+', 'top-', 'bot-', 'bot+'];
 const OHMS = [10, 100, 220, 330, 470, 1000, 2200, 4700, 10000, 47000, 100000, 1000000];
-const PREFIX = { hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
+const PREFIX = { sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
 const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
@@ -19,7 +19,7 @@ export class FreeBuild {
     this.app = app; this.isPi = isPi; this.boardKind = isPi ? 'pi4' : 'unoq'; this.pinInfo = pinInfo;
     this.active = false;
     this.parts = []; this.pinCfg = {}; this.burnt = new Set(); this.damaged = new Set(); this.burnWhy = {};
-    this.env = { lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40 }; this.servoNow = {}; this.modPts = [];
+    this.env = { lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.servoNow = {}; this.modPts = [];
     this.seq = {}; this.undoStack = []; this.tool = null; this.selected = null; this.probe = null; this.probeOn = false;
     this.opts = { ohms: 220, color: 'red', wire: 'auto', flip: false };
     this.result = null; this.tripMsg = null; this.lastRun = 0; this.lastHtml = {}; this.soundHz = 0;
@@ -159,6 +159,7 @@ export class FreeBuild {
     const { row, col } = p, at = (r, c) => `${r}${c}`;
     if (type === 'button') { if (col > 28) return null; return { def: { type, col }, refs: [at('e', col), at('e', col + 2), at('f', col), at('f', col + 2)] }; }
     if (type === 'pot') { if (col > 26) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 2), at(row, col + 4)] }; }
+    if (type === 'sht31') { if (col > 24 || row < 'f') return null; return { def: { type, row, col }, refs: [0, 1, 2, 3, 4, 5, 6].map(i => at(row, col + i)) }; }
     if (type === 'hcsr04') { if (col > 27) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 1), at(row, col + 2), at(row, col + 3)] }; }
     if (type === 'servo') { if (col > 28) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     if (type === 'tmp36') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
@@ -205,7 +206,7 @@ export class FreeBuild {
   }
   click(ref) {
     const T = this.tool; if (!T) return; this.occ = this.occupied();
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo'].includes(T.type)) {
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31'].includes(T.type)) {
       const fp = this.footprint(T.type, ref);
       if (!fp) return this.toast('That part does not fit there (it needs more holes to the right).');
       if (fp.refs.some(r => !this.free(r))) return this.toast('One of the holes is already used.');
@@ -278,13 +279,13 @@ export class FreeBuild {
   }
   hoverOk(ref) {
     const T = this.tool; this.occ = this.occupied();
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo'].includes(T.type)) { const fp = this.footprint(T.type, ref); return !!fp && fp.refs.every(r => this.free(r)); }
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31'].includes(T.type)) { const fp = this.footprint(T.type, ref); return !!fp && fp.refs.every(r => this.free(r)); }
     if (T.step === 0) return this.firstOk(T.type, ref) && this.second(T.type, ref).length > 0;
     return this.second(T.type, T.first).includes(ref);
   }
   previewFoot(ref) {
     const T = this.tool; if (!T) return;
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo'].includes(T.type)) { const fp = ref && this.footprint(T.type, ref); this.occ = this.occupied(); if (fp) this.setMarks(fp.refs.filter(r => this.free(r)), fp.refs.filter(r => !this.free(r))); else this.cand.count = 0; }
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31'].includes(T.type)) { const fp = ref && this.footprint(T.type, ref); this.occ = this.occupied(); if (fp) this.setMarks(fp.refs.filter(r => this.free(r)), fp.refs.filter(r => !this.free(r))); else this.cand.count = 0; }
   }
   pointName(q) {
     if (q.kind === 'hole') return `Hole ${q.ref} (column ${q.col}, row ${q.row})`;
@@ -348,7 +349,7 @@ export class FreeBuild {
     const T = this.tool, h = $('#fb-hint'); let t;
     if (!T) t = this.probeOn ? 'Voltmeter: click any hole or board pin to measure the voltage there.' : 'Pick a part or a wire on the left. Click a placed part to select it. Hold the mouse on a push button to press it; drag a knob to turn it.';
     else if (T.type === 'wire') t = T.step ? 'Click the other end of the wire (green = free).' : 'Click where the wire starts: a board pin, a breadboard hole or a power rail.';
-    else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo'].includes(T.type)) t = { hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
+    else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31'].includes(T.type)) t = { sht31: 'Click a hole in row f to j for the VIN pin: the breakout has 7 pins in columns n … n+6: VIN, GND, SCL, SDA, ADDR, RST, ALRT. The board lies over the middle of the breadboard.', hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
     else t = T.step ? { led: 'Click the neighbouring hole for the SHORT leg (cathode, −). The first hole is the long leg (anode, +).', buzzer: 'Click the hole 3 columns away for the − leg. The first hole is +.', resistor: 'Click the hole for the other leg (a resistor has no polarity).', ldr: 'Click the neighbouring hole for the other leg.' }[T.type] : { led: 'Click the hole for the LONG leg (anode, +).', buzzer: 'Click the hole for the + leg.', resistor: 'Click the hole for one leg.', ldr: 'Click the hole for one leg.' }[T.type];
     if (h) h.textContent = t;
     if (this.active) $('#legend').textContent = t;
@@ -365,6 +366,7 @@ export class FreeBuild {
         servo: `from gpiozero import AngularServo\ns = AngularServo(${n}, min_angle=0, max_angle=180, min_pulse_width=0.000544, max_pulse_width=0.0024)\ns.angle = ${Math.round(c.angle ?? 90)}`,
         pulse: `# HC-SR04: GPIO Zero sends the trigger pulse and times the echo for you\nfrom gpiozero import DistanceSensor\nsensor = DistanceSensor(echo=<ECHO GPIO>, trigger=${n})\nprint(sensor.distance * 100, "cm")`,
         tone: `from gpiozero import TonalBuzzer\nb = TonalBuzzer(${n})\nb.play(${f})   # Hz`,
+        i2c: `# I²C bus 1 (SDA = GPIO2, SCL = GPIO3): enable it in raspi-config first\nimport board, busio\ni2c = board.I2C()`,
         in: `from gpiozero import DigitalInputDevice\npin = DigitalInputDevice(${n}, pull_up=None, active_state=True)\nprint(pin.value)`,
         up: `from gpiozero import Button\nbutton = Button(${n})   # internal pull-up\nprint(button.is_pressed)`,
         down: `from gpiozero import Button\nbutton = Button(${n}, pull_up=False)   # internal pull-down\nprint(button.is_pressed)`,
@@ -376,12 +378,13 @@ export class FreeBuild {
       servo: `#include <Servo.h>\nServo s;\n// in setup():\ns.attach(${id});\ns.write(${Math.round(c.angle ?? 90)});   // degrees`,
       pulse: `pinMode(${id}, OUTPUT);\ndigitalWrite(${id}, LOW);  delayMicroseconds(2);\ndigitalWrite(${id}, HIGH); delayMicroseconds(10);   // 10 µs trigger pulse\ndigitalWrite(${id}, LOW);`,
       pwm: `pinMode(${id}, OUTPUT);\nanalogWrite(${id}, ${Math.round(duty * 255)});   // 0 … 255`, tone: `tone(${id}, ${f});   // Hz`,
+      i2c: `#include <Wire.h>\n// in setup():\nWire.begin();   // I²C bus (SDA D20 / SCL D21; A4 / A5 use Wire2)`,
       in: `pinMode(${id}, INPUT);\nint v = digitalRead(${id});`, up: `pinMode(${id}, INPUT_PULLUP);\nint v = digitalRead(${id});   // pressed = LOW`,
       analog: `int v = analogRead(${id});   // 0 … 1023 (10-bit default)`,
     })[c.mode] || '';
   }
   modesFor(k) {
-    const m = ['out0', 'out1', 'blink']; if (k.pwm) m.push('pwm'); m.push('tone', 'servo', 'pulse', 'in', 'up'); if (this.isPi) m.push('down'); if (k.analog) m.push('analog'); return m;
+    const m = ['out0', 'out1', 'blink']; if (k.pwm) m.push('pwm'); m.push('tone', 'servo', 'pulse', 'in', 'up'); if (this.isPi) m.push('down'); if (k.analog) m.push('analog'); if (k.i2c) m.push('i2c'); return m;
   }
   usedPins() {
     const seen = new Map();
@@ -414,6 +417,7 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('hcsr04')}" data-tool="hcsr04">HC-SR04 distance sensor</button></div>
       <div class="fb-row"><button class="fb-btn" data-tool="pir">PIR motion sensor HC-SR501</button></div>
       <div class="fb-row"><button class="fb-btn${on('servo')}" data-tool="servo">Servo SG90</button></div>
+      <div class="fb-row"><button class="fb-btn${on('sht31')}" data-tool="sht31">SHT31-D temperature + humidity (I²C)</button></div>
       <h3>Wires</h3>
       <button class="fb-btn${on('wire')}" data-tool="wire">${wireName}</button>
       <div class="fb-sws">${sw}</div>
@@ -479,13 +483,14 @@ export class FreeBuild {
     }
     if (sel) h += this.selectedHtml(sel);
     const hasLdr = this.parts.some(p => p.type === 'ldr'), hasT = this.parts.some(p => p.type === 'tmp36');
-    const hasUs = this.parts.some(p => p.type === 'hcsr04'), hasPir = this.parts.some(p => p.type === 'pir');
-    if (hasLdr || hasT || hasUs || hasPir) {
+    const hasSht = this.parts.some(p => p.type === 'sht31'), hasUs = this.parts.some(p => p.type === 'hcsr04'), hasPir = this.parts.some(p => p.type === 'pir');
+    if (hasLdr || hasT || hasUs || hasPir || hasSht) {
       h += `<h3>The room (simulated)</h3>`;
       if (hasUs) h += `<div class="fb-env">Obstacle <input type="range" min="2" max="400" value="${this.env.dist}" data-env="dist"><b data-envv="dist"></b></div>`;
       if (hasPir) h += `<div class="fb-env"><span>Motion</span><button class="hold" data-motion>👋 Hold to wave a hand</button><span></span></div>`;
       if (hasLdr) h += `<div class="fb-env">Light <input type="range" min="0" max="1000" value="${Math.round(250 * Math.log10(Math.max(this.env.lux, 0.1) / 0.1))}" data-env="lux"><b data-envv="lux"></b><div class="fb-chips">${Object.entries(LUX).map(([k, v]) => `<button class="lvl" data-lux="${v}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>`;
-      if (hasT) h += `<div class="fb-env">Temperature <input type="range" min="-20" max="100" value="${this.env.tempC}" data-env="tempC"><b data-envv="tempC"></b></div>`;
+      if (hasSht) h += `<div class="fb-env">Humidity <input type="range" min="0" max="100" value="${this.env.hum}" data-env="hum"><b data-envv="hum"></b></div>`;
+      if (hasT || hasSht) h += `<div class="fb-env">Temperature <input type="range" min="-20" max="100" value="${this.env.tempC}" data-env="tempC"><b data-envv="tempC"></b></div>`;
     }
     h += `<h3>What the circuit does</h3><div id="fb-notes"></div>
       <p class="sim">Simplified model: wires have no resistance, LED voltages are typical values, and the board's pin drivers use simulation values. Limits come from the datasheets: ${this.isPi ? 'Raspberry Pi GPIO is 3.3 V only, 16 mA per pin' : 'STM32U585 pins: 20 mA absolute maximum, D3 and A0–A5 are 3.3 V only'}.</p></div>`;
@@ -502,6 +507,7 @@ export class FreeBuild {
   }
   syncControls() {
     const set = (sel, txt) => { const el = $(sel); if (el) el.textContent = txt; };
+    set('[data-envv="hum"]', this.env.hum + ' %RH');
     set('[data-envv="dist"]', this.env.dist + ' cm');
     set('[data-envv="lux"]', this.env.lux < 1 ? '< 1 lux' : Math.round(this.env.lux) + ' lux'); set('[data-envv="tempC"]', this.env.tempC + ' °C');
     if (this.selected) set('[data-selpotv]', Math.round((this.env.pot[this.selected] ?? 0.5) * 100) + ' %');
@@ -523,6 +529,7 @@ export class FreeBuild {
     else if (t.dataset.pinangle) { (this.pinCfg[t.dataset.pinangle] ||= {}).angle = +t.value; t.nextElementSibling.textContent = t.value + '°'; this.dirty = true; this.save(); }
     else if (t.dataset.pinfreq) { (this.pinCfg[t.dataset.pinfreq] ||= {}).freq = +t.value; t.nextElementSibling.textContent = t.value + ' Hz'; this.dirty = true; this.save(); }
     else if (t.dataset.env === 'lux') { this.env.lux = 0.1 * Math.pow(10, +t.value / 250); this.dirty = true; this.syncControls(); }
+    else if (t.dataset.env === 'hum') { this.env.hum = +t.value; this.dirty = true; this.syncControls(); }
     else if (t.dataset.env === 'dist') { this.env.dist = +t.value; this.dirty = true; this.syncControls(); }
     else if (t.dataset.env === 'tempC') { this.env.tempC = +t.value; this.dirty = true; this.syncControls(); }
     else if (t.dataset.selpot !== undefined) { this.env.pot[this.selected] = +t.value / 100; this.dirty = true; this.syncControls(); }
@@ -538,6 +545,7 @@ export class FreeBuild {
       if (o && pw) {
         if (o.status === 'bad') t = `<span class="bad">${esc(o.msg || '')}</span>`;
         else if (cfg.mode === 'analog' && o.read !== undefined) t = o.read === 'floating' ? '<span class="warn">Reads: random (nothing connected)</span>' : `ADC value <b>${o.adc}</b> (0 … 1023) = ${o.V.toFixed(2)} V`;
+        else if (o.i2c) t = `I²C: ${esc(o.i2c)}`;
         else if (o.echo) t = `Echo pulse <b>${o.echo.us} µs</b> = ${o.echo.cm.toFixed(0)} cm`;
         else if (o.read !== undefined) t = o.read === 'floating' ? '<span class="warn">Reads: random (floating)</span>' : o.read === 'undefined' ? '<span class="warn">Reads: undefined (between LOW and HIGH)</span>' : `Reads: <b>${o.read ? 'HIGH' : 'LOW'}</b>`;
         else if (o.msg) t = esc(o.msg);

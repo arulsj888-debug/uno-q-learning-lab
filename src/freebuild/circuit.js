@@ -38,6 +38,7 @@ export function terminals(d) {
     case 'button': return [['e1', `e${c}`], ['e2', `e${c + 2}`], ['f1', `f${c}`], ['f2', `f${c + 2}`]];
     case 'pot': return [['A', `${row}${c}`], ['W', `${row}${c + 2}`], ['B', `${row}${c + 4}`]];
     case 'tmp36': return d.flip ? [['VS', `${row}${c + 2}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c}`]] : [['VS', `${row}${c}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c + 2}`]];
+    case 'sht31': return [['VIN', `${row}${c}`], ['GND', `${row}${c + 1}`], ['SCL', `${row}${c + 2}`], ['SDA', `${row}${c + 3}`], ['ADDR', `${row}${c + 4}`], ['RST', `${row}${c + 5}`], ['ALRT', `${row}${c + 6}`]];
     case 'hcsr04': return [['VCC', `${row}${c}`], ['TRIG', `${row}${c + 1}`], ['ECHO', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'servo': return [['GND', `${row}${c}`], ['V', `${row}${c + 1}`], ['SIG', `${row}${c + 2}`]];
     case 'pir': return [['VCC', `${d.id}.VCC`], ['OUT', `${d.id}.OUT`], ['GND', `${d.id}.GND`]];
@@ -104,7 +105,7 @@ export function solveDC(n, elems, temp = 25) {
 export function pinKind(boardKind, id, info) {
   if (!info) return { k: 'nc', name: id };
   if (boardKind === 'pi4') {
-    if (info.gpio !== null && info.gpio !== undefined) return { k: 'gpio', gpio: info.gpio, v3: true, pwm: [12, 13, 18, 19].includes(info.gpio), name: 'GPIO' + info.gpio, vil: 0.8, vih: 2.0, imax: 16, pull: 47000 };
+    if (info.gpio !== null && info.gpio !== undefined) return { k: 'gpio', gpio: info.gpio, v3: true, i2c: info.gpio === 2 ? 'sda' : info.gpio === 3 ? 'scl' : undefined, bus: 'i2c1', pwm: [12, 13, 18, 19].includes(info.gpio), name: 'GPIO' + info.gpio, vil: 0.8, vih: 2.0, imax: 16, pull: 47000 };
     if (info.label === '5V') return { k: '5v', name: '5V' };
     if (info.label === '3V3') return { k: '3v3', name: '3V3' };
     if (info.label === 'GND') return { k: 'gnd', name: 'GND' };
@@ -115,14 +116,15 @@ export function pinKind(boardKind, id, info) {
   if (id === '3V3') return { k: '3v3', name: '3V3' };
   if (/^D\d+$/.test(id) || /^A\d$/.test(id)) {
     const analog = /^A\d$/.test(id);
-    return { k: 'gpio', name: id, v3: id === 'D3' || analog, pwm: !!info.pwm, analog, vil: 0.3 * 3.3, vih: 0.7 * 3.3, imax: 20, pull: 40000 };
+    const i2c = { D20: ['sda', 'wire'], D21: ['scl', 'wire'], A4: ['sda', 'i2c3'], A5: ['scl', 'i2c3'] }[id] || [];
+    return { k: 'gpio', name: id, i2c: i2c[0], bus: i2c[1], v3: id === 'D3' || analog, pwm: !!info.pwm, analog, vil: 0.3 * 3.3, vih: 0.7 * 3.3, imax: 20, pull: 40000 };
   }
   return { k: 'nc', name: info.label || id };
 }
 
 export const PIN_MODES = {
   out0: 'Output LOW', out1: 'Output HIGH', blink: 'Blink (1 Hz)', pwm: 'PWM (duty cycle)', tone: 'Tone (frequency)',
-  servo: 'Servo angle (50 Hz pulses)', pulse: 'Trigger pulses (HC-SR04)',
+  i2c: 'I²C bus (SDA / SCL)', servo: 'Servo angle (50 Hz pulses)', pulse: 'Trigger pulses (HC-SR04)',
   in: 'Input (no pull resistor)', up: 'Input with pull-up', down: 'Input with pull-down', analog: 'Analog input (ADC)',
 };
 const OUTPUT_MODES = ['out0', 'out1', 'blink', 'pwm', 'tone', 'servo', 'pulse'];
@@ -214,6 +216,11 @@ export function evaluate(model) {
         if (d.type === 'hcsr04' && !dead) elems.push({ t: 'M', out: nid(T(d, 'ECHO')), vs: vn, gnd: gn, r: 100, fn: vs => (vs >= 4.5 ? Math.min(vs, 5.5) : 0) });
         pe[d.id] = { vn, gn };
       }
+      else if (d.type === 'sht31') {
+        const vn = nid(T(d, 'VIN')), gn = nid(T(d, 'GND'));
+        if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 3300 }, { t: 'R', a: nid(T(d, 'SDA')), b: vn, g: 1 / 10000 }, { t: 'R', a: nid(T(d, 'SCL')), b: vn, g: 1 / 10000 });   // power LED; 10 kOhm pull-ups on the breakout
+        pe[d.id] = { vn, gn };
+      }
       else if (d.type === 'tmp36') { const vs = nid(T(d, 'VS')), out = nid(T(d, 'OUT')), g = nid(T(d, 'GND')); elems.push({ t: 'R', a: vs, b: g, g: 1 / 66000 }, { t: 'T', vs, out, gnd: g }); pe[d.id] = { vs, out, g }; }
     }
     const { v } = solveDC(n, elems, env.tempC ?? 25);
@@ -231,7 +238,7 @@ export function evaluate(model) {
       else if (d.type === 'led') { const V = v[q.a] - v[q.b], I = burnt.has(d.id) ? 0 : q.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'Imax', I, 'max'); }
       else if (d.type === 'buzzer') { const V = v[q.a] - v[q.b]; acc(d.id, 'Vmax', V, 'max'); acc(d.id, 'Vmin', V, 'min'); acc(d.id, 'V', V); }
       else if (d.type === 'pot') acc(d.id, 'Vw', v[q.W]);
-      else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
+      else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo' || d.type === 'sht31') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'tmp36') { acc(d.id, 'Vs', v[q.vs] - v[q.g]); acc(d.id, 'Vout', v[q.out] - v[q.g]); }
     }
     if (step === N - 1) {   // floating nets: no conducting path to any source
@@ -313,6 +320,25 @@ export function evaluate(model) {
     } else if (d.type === 'ldr') {
       if (dangling(d, 'a') || dangling(d, 'b')) { R.status = 'warn'; note('warn', `${label}: one leg is not connected to anything.`, d.id); }
       R.msg = `${(LDR_OHMS(env.lux) / 1000).toFixed(1)} kΩ at ${env.lux < 1 ? 'under 1' : Math.round(env.lux)} lux`;
+    } else if (d.type === 'sht31') {
+      const vs = s.Vs ?? 0, sda = gpioOn(d, 'SDA'), scl = gpioOn(d, 'SCL'), kind = id => usedPins.get(id) || {};
+      const where = boardKind === 'pi4' ? 'SDA must go to GPIO2 (pin 3) and SCL to GPIO3 (pin 5)' : 'SDA must go to D20 (or A4) and SCL to D21 (or A5)';
+      let bad = null;
+      if (!powered) R.status = 'off';
+      else if (vs < -0.5) { R.status = 'bad'; bad = 'it is connected backwards (VIN and GND swapped)'; }
+      else if (vs < 2.5) { R.status = 'off'; bad = `it gets only ${Math.max(0, vs).toFixed(1)} V, and the SHT31-D needs 2.5 V … 5 V: connect VIN to 3.3 V`; }
+      else if (!sda.length || !scl.length) bad = `${!sda.length ? 'SDA' : 'SCL'} is not connected to a board pin`;
+      else if (sda.some(id => kind(id).i2c === 'scl') && scl.some(id => kind(id).i2c === 'sda')) bad = 'SDA and SCL are swapped: SDA (data) belongs on the data pin and SCL (clock) on the clock pin';
+      else if (!sda.some(id => kind(id).i2c === 'sda') || !scl.some(id => kind(id).i2c === 'scl')) bad = `the wires are not on I²C pins: ${where}`;
+      else if (kind(sda.find(id => kind(id).i2c === 'sda')).bus !== kind(scl.find(id => kind(id).i2c === 'scl')).bus) bad = 'SDA and SCL belong to two different I²C buses; use the pair of one bus';
+      else if (![...sda, ...scl].every(id => modeOf(id) === 'i2c')) bad = 'the SDA/SCL pins are not set to the I²C bus function. Set both pins to “I²C bus”';
+      if (bad) { if (R.status === 'ok') R.status = 'warn'; R.msg = bad[0].toUpperCase() + bad.slice(1) + '.'; if (powered) note('bad', `${label}: ${bad}.`, d.id); }
+      else if (powered) {
+        const t = env.tempC ?? 25, h = env.hum ?? 45; R.msg = `Found at address 0x44: ${t.toFixed(1)} °C, ${h.toFixed(0)} %RH.`;
+        for (const id of [...sda, ...scl]) (result.pins[id] ||= { I: 0, Imax: 0, V: 0 }).i2c = `SHT31-D answers at 0x44`;
+        note('ok', `${label}: ${R.msg}`, d.id);
+        if (boardKind === 'pi4' && vs > 4) note('warn', `${label} runs from ${vs.toFixed(1)} V: its 10 kΩ pull-ups pull SDA/SCL up to that voltage. On a Raspberry Pi power VIN from 3.3 V (pin 1), not from 5 V.`, d.id);
+      }
     } else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo') {
       const vs = s.Vs ?? 0, dn = terminals(d).map(x => x[0]).filter(x => dangling(d, x));
       const needs = { pir: 'the PIR sensor needs 4.5 V … 20 V: connect VCC to 5 V', hcsr04: 'the HC-SR04 is made for 5 V: connect VCC to 5 V', servo: 'an SG90 servo needs 4.8 V … 6 V: connect the red wire (middle pin) to 5 V' }[d.type];
@@ -358,7 +384,8 @@ export function evaluate(model) {
     if (damaged.has(id)) { o.status = 'bad'; o.msg = 'Damaged (simulation).'; note('bad', `${k.name} is damaged: it was driven beyond its limits. Press “Replace broken parts”.`, id); continue; }
     if (!powered) continue;
     const isOut = OUTPUT_MODES.includes(cfg.mode), mA = o.Imax * 1000;
-    if (!isOut) {
+    if (!isOut && cfg.mode === 'i2c') { o.read = undefined; if (!k.i2c) note('warn', `${k.name} cannot be an I²C pin on this board.`, id); }
+    else if (!isOut) {
       o.read = o.floating ? 'floating' : V >= k.vih ? 1 : V <= k.vil ? 0 : 'undefined';
       if (cfg.mode === 'analog') o.adc = Math.round(Math.min(1, Math.max(0, V / 3.3)) * 1023);
     }
@@ -366,7 +393,7 @@ export function evaluate(model) {
     else if (isOut && mA > k.imax * 2) { newDamage.add(id); o.status = 'bad'; note('bad', `${k.name} has to deliver ${mA.toFixed(0)} mA, far above its ${k.imax} mA limit, and would be damaged (in this simulation: more than twice the limit damages the pin).`, id); }
     else if (isOut && mA > k.imax) { o.status = 'warn'; note('warn', `${k.name} delivers ${mA.toFixed(1)} mA, above the ${k.imax} mA limit of one pin. Use a larger resistor.`, id); }
     else if (isOut && mA > 0.1) o.msg = `${mA.toFixed(1)} mA`;
-    if (!isOut && cfg.mode === 'in' && o.floating) note('warn', `${k.name} is an input with nothing driving it (it “floats”) and reads random values. Use a pull-up or pull-down (set the pin to “Input with pull-up”), or connect it to 3.3 V or GND through a button.`, id);
+    if (!isOut && cfg.mode === 'in' && o.floating && !k.i2c) note('warn', `${k.name} is an input with nothing driving it (it “floats”) and reads random values. Use a pull-up or pull-down (set the pin to “Input with pull-up”), or connect it to 3.3 V or GND through a button.`, id);
     if (!isOut && cfg.mode === 'analog' && boardKind === 'pi4') note('warn', 'The Raspberry Pi has no analog inputs (no ADC). Analog sensors need an extra ADC chip.', id);
     if (!isOut && !isOut) { /* inputs: nothing else to check */ }
   }
@@ -381,7 +408,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { sht31: 'SHT31-D', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }

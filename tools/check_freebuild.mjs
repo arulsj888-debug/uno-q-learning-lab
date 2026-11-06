@@ -66,6 +66,16 @@ const svParts = [sv, W('w1', 'GND2', 'i11', 'black'), W('w2', '5V', 'i12', 'red'
 r = evaluate(base({ parts: svParts, pinCfg: { D5: { mode: 'servo', angle: 45 } } })); ok(r.parts.sv1.angle === 45 && r.parts.sv1.status === 'ok', 'servo moves with pulses and 5 V');
 r = evaluate(base({ parts: svParts, pinCfg: { D5: { mode: 'out1' } } })); ok(/Servo angle/.test(r.notes.map(n => n.text).join()), 'servo without pulses is explained');
 r = evaluate(base({ parts: svParts.map(p => p.id === 'w2' ? W('w2', '3V3', 'i12', 'orange') : p), pinCfg: { D5: { mode: 'servo' } } })); ok(r.parts.sv1.status === 'off', 'servo on 3.3 V does not move');
+const shtParts = (sdaPin, sclPin, vin = '3V3') => [{ id: 'sen1', type: 'sht31', row: 'g', col: 10 }, W('w1', vin, 'j10', 'red'), W('w2', 'GND2', 'j11', 'black'), W('w3', sclPin, 'j12', 'yellow'), W('w4', sdaPin, 'j13', 'blue')];
+const unoI2c = id => ({ D20: { id: 'D20' }, D21: { id: 'D21' }, D8: { id: 'D8' }, A4: { id: 'A4' }, A5: { id: 'A5' }, '3V3': { id: '3V3' }, '5V': { id: '5V' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+r = evaluate(base({ pinInfo: unoI2c, parts: shtParts('D20', 'D21'), pinCfg: { D20: { mode: 'i2c' }, D21: { mode: 'i2c' } } })); ok(r.parts.sen1.status === 'ok' && /0x44/.test(r.parts.sen1.msg), 'SHT31 on D20/D21 works');
+r = evaluate(base({ pinInfo: unoI2c, parts: shtParts('D21', 'D20'), pinCfg: { D20: { mode: 'i2c' }, D21: { mode: 'i2c' } } })); ok(r.parts.sen1.status !== 'ok' && /swapped/.test(r.parts.sen1.msg), 'SHT31 with SDA/SCL swapped is flagged');
+r = evaluate(base({ pinInfo: unoI2c, parts: shtParts('D20', 'D21'), pinCfg: {} })); ok(/I²C bus/.test(r.parts.sen1.msg), 'SHT31 with pins not in I2C mode is flagged');
+r = evaluate(base({ pinInfo: unoI2c, parts: shtParts('D8', 'D21'), pinCfg: { D8: { mode: 'in' }, D21: { mode: 'i2c' } } })); ok(/not on I²C pins/.test(r.parts.sen1.msg), 'SHT31 on a non-I2C pin is flagged');
+r = evaluate(base({ pinInfo: unoI2c, parts: shtParts('A4', 'D21'), pinCfg: { A4: { mode: 'i2c' }, D21: { mode: 'i2c' } } })); ok(/different I²C buses/.test(r.parts.sen1.msg), 'SHT31 across two buses is flagged');
+r = evaluate({ boardKind: 'pi4', pinInfo: id => ({ p1: { label: '3V3', gpio: null }, p2: { label: '5V', gpio: null }, p6: { label: 'GND', gpio: null }, p3: { gpio: 2 }, p5: { gpio: 3 } }[id]), powered: true, env, t: 0, pinCfg: { p3: { mode: 'i2c' }, p5: { mode: 'i2c' } },
+  parts: [{ id: 'sen1', type: 'sht31', row: 'g', col: 10 }, W('w1', 'p1', 'j10', 'red'), W('w2', 'p6', 'j11', 'black'), W('w3', 'p5', 'j12', 'yellow'), W('w4', 'p3', 'j13', 'blue')] });
+ok(r.parts.sen1.status === 'ok' && r.pins.p3.V > 3.2 && !r.newDamage.size, 'SHT31 on the Pi (GPIO2/GPIO3, 3.3 V) works');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);
