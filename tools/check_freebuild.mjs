@@ -91,6 +91,11 @@ r = evaluate(base({ pinInfo: unoM, parts: motor(true), pinCfg: { D5: { mode: 'ou
 r = evaluate(base({ pinInfo: unoM, parts: motor(true), pinCfg: { D5: { mode: 'out1' }, D7: { mode: 'out1' }, D8: { mode: 'out1' } } })); ok(r.parts.mot1.speed === 0, 'equal inputs brake the motor');
 r = evaluate(base({ pinInfo: unoM, parts: motor(true), pinCfg: { D5: { mode: 'out0' }, D7: { mode: 'out1' }, D8: { mode: 'out0' } } })); ok(r.parts.mot1.speed === 0 && r.parts.u1.status === 'warn', 'enable LOW stops the motor');
 r = evaluate(base({ pinInfo: unoM, parts: motor(false), pinCfg: { D5: { mode: 'out1' }, D7: { mode: 'out1' }, D8: { mode: 'out0' } } })); ok(r.parts.mot1.speed === 0 && /ground/.test(r.parts.u1.msg), 'no common ground is detected');
+const Q = (id, from, to) => ({ id, type: 'qwiic', from, to });
+r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, Q('c1', 'QWIIC', 'th1.QA')], env: { ...env, tempC: 30 } })); ok(r.parts.th1.status === 'ok' && /0x45/.test(r.parts.th1.msg), 'Thermo on Qwiic answers');
+r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: 'pixels' }, Q('c1', 'QWIIC', 'th1.QA'), Q('c2', 'th1.QB', 'pix1.QA')], env: { ...env, tempC: 25 } })); ok(r.parts.pix1.colors && r.parts.pix1.colors.filter(c => c[3] > 0).length === 5, 'Pixels bar: 25 C = 5 of 8 LEDs');
+r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: 'pixels' }, Q('c2', 'th1.QB', 'pix1.QA')] })); ok(r.parts.th1.status === 'off' && r.parts.pix1.status === 'off', 'modules without a cable to the board are off');
+r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'th2', type: 'thermo' }, Q('c1', 'QWIIC', 'th1.QA'), Q('c2', 'th1.QB', 'th2.QA')] })); ok(r.parts.th1.status === 'warn', 'two Thermos clash');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

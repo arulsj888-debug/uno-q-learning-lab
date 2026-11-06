@@ -152,7 +152,7 @@ export class Bench {
     const obj = this.create(d).obj, g = obj.group;
     this.items[d.id] = { def: d, obj, group: g };
     this.scene.add(g);
-    if (!(d.type === 'wire' || d.type === 'fwire' || d.type === 'lead')) { const { pos, rotY } = this.pose(d); g.position.copy(pos); g.rotation.set(0, rotY, 0); }
+    if (!(d.type === 'wire' || d.type === 'fwire' || d.type === 'lead' || d.type === 'qwiic')) { const { pos, rotY } = this.pose(d); g.position.copy(pos); g.rotation.set(0, rotY, 0); }
     return obj;
   }
 

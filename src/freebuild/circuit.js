@@ -39,6 +39,7 @@ export function terminals(d) {
     case 'pot': return [['A', `${row}${c}`], ['W', `${row}${c + 2}`], ['B', `${row}${c + 4}`]];
     case 'tmp36': return d.flip ? [['VS', `${row}${c + 2}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c}`]] : [['VS', `${row}${c}`], ['OUT', `${row}${c + 1}`], ['GND', `${row}${c + 2}`]];
     case 'sht31': return [['VIN', `${row}${c}`], ['GND', `${row}${c + 1}`], ['SCL', `${row}${c + 2}`], ['SDA', `${row}${c + 3}`], ['ADDR', `${row}${c + 4}`], ['RST', `${row}${c + 5}`], ['ALRT', `${row}${c + 6}`]];
+    case 'thermo': case 'pixels': return [['QA', `${d.id}.QA`], ['QB', `${d.id}.QB`]];
     case 'l293d': { const out = []; for (let i = 1; i <= 16; i++) out.push([`p${i}`, i <= 8 ? `f${c + i - 1}` : `e${c + 16 - i}`]); return out; }
     case 'motor': return [['M1', `${d.id}.M1`], ['M2', `${d.id}.M2`]];
     case 'relay': return [['DCP', `${d.id}.DCP`], ['DCN', `${d.id}.DCN`], ['IN', `${d.id}.IN`], ['NO', `${d.id}.NO`], ['COM', `${d.id}.COM`], ['NC', `${d.id}.NC`]];
@@ -47,7 +48,7 @@ export function terminals(d) {
     case 'hcsr04': return [['VCC', `${row}${c}`], ['TRIG', `${row}${c + 1}`], ['ECHO', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'servo': return [['GND', `${row}${c}`], ['V', `${row}${c + 1}`], ['SIG', `${row}${c + 2}`]];
     case 'pir': return [['VCC', `${d.id}.VCC`], ['OUT', `${d.id}.OUT`], ['GND', `${d.id}.GND`]];
-    case 'wire': case 'fwire': case 'lead': return [['from', d.from], ['to', d.to]];
+    case 'wire': case 'fwire': case 'lead': case 'qwiic': return [['from', d.from], ['to', d.to]];
     default: return [];
   }
 }
@@ -158,7 +159,8 @@ export function evaluate(model) {
   const T = (d, name) => nodeOfRef(terminals(d).find(([n]) => n === name)[1]);
   for (const d of parts) {
     for (const [, ref] of terminals(d)) find(nodeOfRef(ref));
-    if (d.type === 'wire' || d.type === 'fwire' || d.type === 'lead') union(nodeOfRef(d.from), nodeOfRef(d.to));
+    if (d.type === 'wire' || d.type === 'fwire' || d.type === 'lead' || d.type === 'qwiic') union(nodeOfRef(d.from), nodeOfRef(d.to));
+    if (d.type === 'thermo' || d.type === 'pixels') union(T(d, 'QA'), T(d, 'QB'));   // the two Qwiic sockets of a module are the same bus
     if (d.type === 'button') { union(T(d, 'e1'), T(d, 'e2')); union(T(d, 'f1'), T(d, 'f2')); }
     if (d.type === 'l293d') { union(T(d, 'p4'), T(d, 'p5')); union(T(d, 'p4'), T(d, 'p12')); union(T(d, 'p4'), T(d, 'p13')); }   // the four middle pins are one ground   // the two legs on one side of a tactile switch are joined inside it
   }
@@ -167,7 +169,7 @@ export function evaluate(model) {
   const nodeOf = ref => nid(nodeOfRef(ref));
 
   const usedPins = new Map();
-  for (const d of parts) if (d.type === 'wire' || d.type === 'fwire' || d.type === 'lead') for (const ref of [d.from, d.to]) if (!isHoleRef(ref) && !isModRef(ref)) usedPins.set(ref, pinKind(boardKind, ref, pinInfo(ref)));
+  for (const d of parts) if (d.type === 'wire' || d.type === 'fwire' || d.type === 'lead' || d.type === 'qwiic') for (const ref of [d.from, d.to]) if (!isHoleRef(ref) && !isModRef(ref) && ref !== 'QWIIC') usedPins.set(ref, pinKind(boardKind, ref, pinInfo(ref)));
   for (const [id] of usedPins) nodeOf(id);
   for (const d of parts) for (const [, ref] of terminals(d)) nodeOf(ref);
   const n = ids.size;
@@ -376,6 +378,18 @@ export function evaluate(model) {
     } else if (d.type === 'ldr') {
       if (dangling(d, 'a') || dangling(d, 'b')) { R.status = 'warn'; note('warn', `${label}: one leg is not connected to anything.`, d.id); }
       R.msg = `${(LDR_OHMS(env.lux) / 1000).toFixed(1)} kΩ at ${env.lux < 1 ? 'under 1' : Math.round(env.lux)} lux`;
+    } else if (d.type === 'thermo' || d.type === 'pixels') {
+      const bus = find(nodeOfRef('QWIIC')), on = find(T(d, 'QA')) === bus, dangling2 = !on;
+      const same = parts.filter(p => p.type === d.type && find(T(p, 'QA')) === bus), thermo = parts.find(p => p.type === 'thermo' && find(T(p, 'QA')) === bus);
+      R.onBus = on && powered;
+      if (!powered) R.status = 'off';
+      else if (dangling2) { R.status = 'off'; R.msg = 'Not on the Qwiic bus.'; note('bad', `${label} gets no power and no data: it is not joined to the board's Qwiic port by a Qwiic cable (directly or through another module).`, d.id); }
+      else if (same.length > 1) { R.status = 'warn'; R.msg = 'Address clash.'; note('bad', `${label}: two ${d.type === 'thermo' ? 'Thermo' : 'Pixels'} modules on one bus answer at the same address (${d.type === 'thermo' ? '0x45' : '0x6C'}), so the board cannot tell them apart. Use only one of each (or change an address in software).`, d.id); }
+      else if (d.type === 'thermo') { R.msg = `Answers at 0x45: ${(env.tempC ?? 25).toFixed(1)} °C, ${(env.hum ?? 45).toFixed(0)} %RH.`; note('ok', `${label}: ${R.msg}`, d.id); }
+      else {
+        if (thermo) { const t = env.tempC ?? 25, n = Math.max(0, Math.min(8, Math.floor((t - 15) / 2))); R.colors = Array.from({ length: 8 }, (_, i) => (i < n ? (i < 2 ? [20, 80, 255, 1] : i < 5 ? [20, 220, 60, 1] : [255, 40, 20, 1]) : [0, 0, 0, 0])); R.msg = `Answers at 0x6C. Example sketch: thermometer bar, ${n} of 8 LEDs (1 LED per 2 °C above 15 °C).`; note('ok', `${label}: ${R.msg}`, d.id); }
+        else { R.msg = 'Answers at 0x6C, nothing to show (no Thermo on the bus).'; note('info', `${label} is on the bus, but there is no sensor to show: the example sketch draws the Thermo temperature as a bar. Add a Modulino Thermo.`, d.id); }
+      }
     } else if (d.type === 'motor') {
       const V = s.V ?? 0, sp = Math.max(-1, Math.min(1, V / 3.4)); R.speed = Math.abs(V) < 0.6 ? 0 : sp;
       const dn = dangling(d, 'M1') || dangling(d, 'M2');
@@ -505,7 +519,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }
