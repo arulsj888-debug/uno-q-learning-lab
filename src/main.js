@@ -24,6 +24,8 @@ const VIEWS = {
   bottom: { t: new THREE.Vector3(0, -1, 0), d: new THREE.Vector3(0, -1, -0.02), dist: 132 },
   bench: { t: new THREE.Vector3(0, 0, 30), d: new THREE.Vector3(-0.28, 0.82, 0.5), dist: 235 },
   breadboard: { t: new THREE.Vector3(4, 2.4, 60), d: new THREE.Vector3(-0.1, 0.86, 0.5), dist: 115 },
+  motor: { t: new THREE.Vector3(0, 0, 90), d: new THREE.Vector3(-0.06, 0.9, 0.43), dist: 285 },
+  drvclose: { t: new THREE.Vector3(0, 3, 71), d: new THREE.Vector3(-0.22, 0.86, 0.46), dist: 78 },
   sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
 };
 const BOTTOM_PARTS = new Set(['mcu', 'emmc', 'jmisc', 'jmedia']);
@@ -272,6 +274,7 @@ class App {
   tick(dt = 0.016) {
     this.pirTick(Math.min(dt, 0.1));
     this.servoTick(Math.min(dt, 0.1));
+    this.motorTick(Math.min(dt, 0.1));
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -604,7 +607,7 @@ class App {
     this.hideFloat(); this.clearTemp(); this.hideCallout();
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
     if (mode === 'explore') {
-      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false);
+      this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false);
       this.lesson = null;
       this.renderSide();
       this.select(null, { card: false });
@@ -635,7 +638,7 @@ class App {
     this.sim.stop(); this.stopSound(); this.outputsOff();
     this.lesson = L; this.stepIdx = 0; this.inQuiz = false;
     this.board.setMatrix(null);
-    this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false);
+    this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false);
     if (L.circuit) { this.bench.setDefs(L.circuit); this.bb.group.visible = true; }
     else { this.bench.clear(); this.bench.setDefs([]); this.bb.group.visible = false; this.strips.visible = false; }
     if (L.id === 'l1' && this.usbPlugged) await this.plug(false);
@@ -673,6 +676,10 @@ class App {
         <div class="io-tools"><button id="pir-wave" class="hold">👋 Wave hand</button><button id="pir-still" class="lvl">✋ Hold hand still</button></div></div>
         <div class="io-block pirstat"><div><span>Sensor</span><b id="ps-sensor">—</b></div><div class="arrow">→</div><div><span>OUT → D2</span><b id="ps-out">—</b></div><div class="arrow">→</div><div><span>Alarm LED (D5)</span><b id="ps-led">—</b></div></div>
         <div id="ps-note" class="io-note"></div>`;
+    if (w.includes('motor')) h += `<div class="io-block pirstat"><div><span>D7 → 1A</span><b id="mt-in1">—</b></div><div><span>D8 → 2A</span><b id="mt-in2">—</b></div><div><span>D5 → EN</span><b id="mt-en">—</b></div><div class="arrow">→</div><div><span>Motor</span><b id="mt-mot">—</b></div></div>
+        <table class="kv mtable"><tr><th>EN</th><th>1A</th><th>2A</th><th>Motor (L293D datasheet)</th></tr>
+        <tr data-r="d1"><td>on</td><td>HIGH</td><td>LOW</td><td>turns · direction 1</td></tr><tr data-r="d2"><td>on</td><td>LOW</td><td>HIGH</td><td>turns · direction 2</td></tr>
+        <tr data-r="brake"><td>on</td><td colspan="2">same level</td><td>fast stop (brake)</td></tr><tr data-r="coast"><td>LOW</td><td colspan="2">any</td><td>coasts (free-running stop)</td></tr></table>`;
     if (w.includes('servo')) h += `<div class="io-block pirstat"><div><span>Sketch</span><b id="sv-cmd">—</b></div><div class="arrow">→</div><div><span>Pulse on D9</span><b id="sv-us">—</b></div><div class="arrow">→</div><div><span>Arm angle</span><b id="sv-ang">—</b></div></div>
         <div id="sv-note" class="io-note"></div>
         <div class="io-block"><div class="io-title">Oscilloscope · D9 <span class="io-note">(simulated)</span></div><canvas id="scope" width="560" height="150"></canvas><div id="scope-info" class="io-val"></div></div>`;
@@ -762,6 +769,7 @@ class App {
       this.refreshPickTargets();
       if ($('#dist')) this.setDist(this.distCm, S.view === 'sonar');
       this.showRoom(!!(L.widgets && L.widgets.includes('pir')) && !!this.pirSensor());
+      this.showMotor(!!(L.widgets && L.widgets.includes('motor')) && !!this.bench.get('mot1'));
       if (S.view === 'room') this.frameRoom();
       if (S.view === 'pirfront' || S.view === 'pirback' || S.view === 'servo' || S.view === 'servoclose') this.view(S.view);
       if (S.labels) for (const [id, text] of S.labels) {
@@ -1053,6 +1061,38 @@ class App {
     this.pirFan.position.set(L.x, DESK_Y + 2, L.z); this.pirFan.scale.set(r, r, 1);
   }
   // ---- Lesson 15: SG90 servo ------------------------------------------------------------------------
+  // ---- Lesson 16: L293D + DC motor -------------------------------------------------------------------
+  motorIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'motor'); }
+  showMotor(on) {
+    if (this.motTags) { this.motTags.forEach(t => { t.parent && t.parent.remove(t); t.element.remove(); }); this.motTags = null; }
+    this.mot = { en: 0, in1: 0, in2: 0 };
+    const m = this.bench.get('mot1'); if (m) { m.speed = 0; m.spin(0); }
+    if (!on || !m) return;
+    const el = document.createElement('div'); el.className = 'part-label pirtag'; const t = new CSS2DObject(el);
+    const p = this.bench.items.mot1.group.position; t.position.set(p.x, 72, p.z); this.viewer.scene.add(t);
+    this.motTags = [t];
+  }
+  motorTick(dt) {
+    const m = this.bench.get('mot1'), io = this.motorIo(); if (!m || !io || !this.mot) return;
+    const S = this.mot, ok = this.wired(io) && this.board.powered && this.sim.running;
+    let target = 0, tau = 0.9, row = 'coast';
+    if (ok && S.en > 0) {
+      if (S.in1 !== S.in2) { target = (S.in1 ? 1 : -1) * S.en; tau = 0.25; row = S.in1 ? 'd1' : 'd2'; }
+      else { tau = 0.12; row = 'brake'; }
+    }
+    m.speed += (target - m.speed) * Math.min(1, dt / tau);
+    if (target === 0 && Math.abs(m.speed) < 0.003) m.speed = 0;
+    m.spin(dt);
+    const s = Math.abs(m.speed);
+    const state = !ok ? (s > 0 ? 'Coasting' : 'Stopped') : s < 0.01 && target === 0 ? 'Stopped' : row === 'brake' ? 'Braking' : row === 'coast' ? 'Coasting' : `${m.speed > 0 ? '⟳ Direction 1' : '⟲ Direction 2'} · ${Math.round(s * 100)} %`;
+    const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; e.className = cls; } };
+    set('#mt-in1', S.in1 ? 'HIGH' : 'LOW', S.in1 ? 'on' : 'off');
+    set('#mt-in2', S.in2 ? 'HIGH' : 'LOW', S.in2 ? 'on' : 'off');
+    set('#mt-en', S.en > 0 ? `PWM ${Math.round(S.en * 100)} %` : 'LOW', S.en > 0 ? 'on' : 'off');
+    set('#mt-mot', state, s > 0.01 && row !== 'brake' && row !== 'coast' ? 'on' : 'off');
+    document.querySelectorAll('.mtable tr[data-r]').forEach(tr => tr.classList.toggle('hit', ok && tr.dataset.r === (S.en > 0 ? (S.in1 !== S.in2 ? (S.in1 ? 'd1' : 'd2') : 'brake') : 'coast')));
+    if (this.motTags) { const e = this.motTags[0].element, txt = state; if (e.textContent !== txt) { e.textContent = txt; e.className = 'part-label pirtag ' + (s > 0.01 && row !== 'brake' && row !== 'coast' ? 'on' : ''); } }
+  }
   servoObj() { return this.bench.get('sv1'); }
   frameServo(close, ms = 1000) {
     const sv = this.servoObj(); if (!sv) return this.viewer.flyTo(new THREE.Vector3(40, 0, 60), 260, new THREE.Vector3(-0.3, 0.8, 0.5), ms);
@@ -1263,6 +1303,7 @@ class App {
       return;
     }
     if (pin === 'D5' && this.pir) this.pir.ledOn = !!(level && this.board.powered);
+    { const mio = this.motorIo(); if (mio && this.mot && (pin === mio.in1 || pin === mio.in2)) this.mot[pin === mio.in1 ? 'in1' : 'in2'] = level; }
     { const us = this.ioFor('D8'); if (pin === 'D7' && level && us && us.kind === 'hcsr04' && this.wired(us) && this.board.powered) this.sonarBurst(); }
     const L = this.ledFor(pin);
     const on = !!(L && L.led && level && this.board.powered && this.wired(L.io));
@@ -1272,6 +1313,7 @@ class App {
   }
 
   onPwm(pin, duty, raw) {
+    { const mio = this.motorIo(); if (mio && pin === mio.en && this.mot) this.mot.en = duty; }
     const L = this.ledFor(pin);
     const on = !!(L && L.led && this.board.powered && this.wired(L.io));
     if (L && L.led) L.led.set(on && duty > 0, duty);

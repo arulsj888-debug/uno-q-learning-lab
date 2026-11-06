@@ -194,7 +194,7 @@ export class Resistor {
 }
 
 // ---------------------------------------------------------------- jumper wire (male-male)
-const WIRE = { red: 0xd8261e, black: 0x1b1b1b, yellow: 0xf2c21b, blue: 0x2369d6, green: 0x23a046, orange: 0xf07a16, white: 0xeeeeee };
+const WIRE = { red: 0xd8261e, black: 0x1b1b1b, yellow: 0xf2c21b, blue: 0x2369d6, green: 0x23a046, orange: 0xf07a16, white: 0xeeeeee, gray: 0x8a8f96 };
 export class JumperWire {
   /** a, b: world points at the top of the socket/hole; depthA/B: how deep the pin goes in */
   constructor(a, b, color = 'yellow', { lift = 26, depthA = 6, depthB = 6, id = 'jumper' } = {}) {
@@ -710,6 +710,173 @@ export class ServoMotor {
   hornTip() { this.group.updateMatrixWorld(true); return this.horn.localToWorld(new THREE.Vector3(15.5, 2, 0)); }
 }
 
+// ---------------------------------------------------------------- L293D H-bridge in a 16-pin DIP
+// TI L293x datasheet (SLRS008D): PDIP-16 body 19.80 × 6.35 mm; pin 1 = 1,2EN … pin 16 = VCC1.
+// Local frame: notch toward −x; pins 1–8 along +z (row f), pins 16–9 along −z (row e), 2.54 mm pitch, rows 7.62 mm apart.
+export const L293_PINS = ['1,2EN', '1A', '1Y', 'GND', 'GND', '2Y', '2A', 'VCC2', '3,4EN', '3A', '3Y', 'GND', 'GND', '4Y', '4A', 'VCC1'];
+export class L293D {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const top = canvasTex(792, 254, (c, w, h) => {
+      c.fillStyle = '#1d1e20'; c.fillRect(0, 0, w, h); noise(c, w, h, 7);
+      c.fillStyle = '#0c0c0d'; c.beginPath(); c.arc(0, h / 2, 34, -Math.PI / 2, Math.PI / 2); c.fill();      // notch
+      c.fillStyle = '#0f0f10'; c.beginPath(); c.arc(70, h - 52, 16, 0, Math.PI * 2); c.fill();             // pin-1 dot
+      c.fillStyle = 'rgba(210,214,218,0.82)'; c.font = '700 64px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText('L293DNE', w / 2 + 30, h / 2 - 2);
+    });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.55 });
+    const body = new THREE.Mesh(new RoundedBoxGeometry(19.8, 3.3, 6.35, 2, 0.35), [dark, dark, new THREE.MeshStandardMaterial({ map: top, roughness: 0.5 }), dark, dark, dark]);
+    body.position.y = 2.2 + 1.65; g.add(sub(body, 'drv:chip'));
+    // 16 legs: shoulder out of the body, bend down into the breadboard
+    for (let i = 0; i < 16; i++) {
+      const front = i < 8, k = front ? i : 15 - i;
+      const x = -8.89 + k * 2.54, s = front ? 1 : -1;
+      const leg = new THREE.Group();
+      const sh = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.25, 0.9), M.tin); sh.position.set(x, 3.2, s * 3.55); leg.add(sh);
+      const v1 = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.6, 0.25), M.tin); v1.position.set(x, 2.45, s * 3.85); leg.add(v1);
+      const v2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 5.2, 0.25), M.tin); v2.position.set(x, -0.95, s * 3.81); leg.add(v2);
+      g.add(sub(leg, 'drv:p' + (i + 1)));
+    }
+    tagHW(g, 'l293d');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+  }
+}
+
+// ---------------------------------------------------------------- 4 × AA battery holder (≈ 6 V)
+// Local frame: cells along z; red (+) and black (−) leads leave the −z end.
+export class BatteryPack {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const blk = new THREE.MeshStandardMaterial({ color: 0x18191b, roughness: 0.6 });
+    const base = new THREE.Mesh(new RoundedBoxGeometry(62, 7, 58, 2, 1.2), blk); base.position.y = 3.5; g.add(sub(base, 'bat:holder'));
+    for (const x of [-30.2, 30.2]) { const w = new THREE.Mesh(new THREE.BoxGeometry(1.6, 13, 58), blk); w.position.set(x, 6.5, 0); g.add(sub(w, 'bat:holder')); }
+    for (const z of [-28.2, 28.2]) { const w = new THREE.Mesh(new THREE.BoxGeometry(62, 13, 1.6), blk); w.position.set(0, 6.5, z); g.add(sub(w, 'bat:holder')); }
+    // cylinder UVs: u runs around the cell, v along it (canvas top = + end) → band and text run along the length
+    const wrap = canvasTex(256, 1024, (c, w, h) => {
+      const gr = c.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#1f3f8f'); gr.addColorStop(0.5, '#3d68cf'); gr.addColorStop(1, '#1f3f8f');
+      c.fillStyle = gr; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#c9a43a'; c.fillRect(0, 0, w, h * 0.16);
+      c.save(); c.translate(w * 0.5, h * 0.55); c.rotate(Math.PI / 2);
+      c.fillStyle = '#ffffff'; c.font = '700 120px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('AA  1.5V', 0, 0);
+      c.restore();
+    });
+    const cellMat = new THREE.MeshPhysicalMaterial({ map: wrap, roughness: 0.3, clearcoat: 0.6 });
+    for (let i = 0; i < 4; i++) {
+      const x = -21.75 + i * 14.5, flip = i % 2 ? 1 : -1;
+      const cell = new THREE.Mesh(new THREE.CylinderGeometry(7.1, 7.1, 50.5, 32), cellMat);
+      cell.rotation.x = Math.PI / 2 * flip; cell.position.set(x, 7 + 7.1, 0); g.add(sub(cell, 'bat:cell'));
+      const nub = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 1.2, 16), M.steelSatin); nub.rotation.x = Math.PI / 2; nub.position.set(x, 14.1, flip * 25.85); g.add(sub(nub, 'bat:cell'));
+      const spring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.5, 6, 20), M.steelSatin); spring.position.set(x, 14.1, -flip * 26.6); g.add(sub(spring, 'bat:holder'));
+    }
+    this.pins = { POS: new THREE.Vector3(8, 4, -29.2), NEG: new THREE.Vector3(-8, 4, -29.2) };
+    tagHW(g, 'battery');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    const pos = this.group.localToWorld(this.pins[name].clone());
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion()));
+    return { pos, dir };
+  }
+}
+
+// ---------------------------------------------------------------- "130"-size DC hobby motor with a propeller
+// Adafruit #711 spec: body 27.5 × 20 × 15 mm, shaft 8 mm × Ø2 mm, rated 6 V, no-load 70 mA max,
+// loaded 250 mA max, stall 500 mA max. Standing upright in a small clip, shaft up, terminals at the bottom.
+export class HobbyMotor {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const lift = 12;                                             // bottom of the motor above the desk
+    // stand: base plate + C-clip around the can
+    const standM = new THREE.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.65 });
+    const base = new THREE.Mesh(new RoundedBoxGeometry(34, 3, 30, 2, 1), standM); base.position.y = 1.5; g.add(sub(base, 'mot:stand'));
+    const post = new THREE.Mesh(new RoundedBoxGeometry(6, lift + 14, 22, 2, 1), standM); post.position.set(-13.5, (lift + 14) / 2, 0); g.add(sub(post, 'mot:stand'));
+    const clip = new THREE.Mesh(new THREE.CylinderGeometry(11.3, 11.3, 8, 40, 1, true, -Math.PI * 0.75, Math.PI * 1.5), new THREE.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.65, side: THREE.DoubleSide }));
+    clip.rotation.y = Math.PI; clip.position.set(0, lift + 12, 0); g.add(sub(clip, 'mot:stand'));
+    // can (Ø20 with two flats 15 mm apart) + end bell
+    const sh = new THREE.Shape(); const r = 10, f = 7.5, a = Math.acos(f / r);
+    sh.absarc(0, 0, r, -Math.PI / 2 + a, Math.PI / 2 - a, false); sh.absarc(0, 0, r, Math.PI / 2 + a, Math.PI * 1.5 - a, false);
+    const canGeo = new THREE.ExtrudeGeometry(sh, { depth: 20, bevelEnabled: true, bevelSize: 0.4, bevelThickness: 0.4, bevelSegments: 2, curveSegments: 40 }); canGeo.rotateX(-Math.PI / 2);
+    const can = new THREE.Mesh(canGeo, new THREE.MeshStandardMaterial({ color: 0xd9dadc, metalness: 1, roughness: 0.22 })); can.position.y = lift + 7.5; g.add(sub(can, 'mot:can'));
+    const bellGeo = new THREE.ExtrudeGeometry(sh, { depth: 7.5, bevelEnabled: false, curveSegments: 40 }); bellGeo.rotateX(-Math.PI / 2);
+    const bell = new THREE.Mesh(bellGeo, new THREE.MeshStandardMaterial({ color: 0xece9e0, roughness: 0.5 })); bell.position.y = lift; g.add(sub(bell, 'mot:bell'));
+    const boss = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 1.6, 24), M.steelSatin); boss.position.y = lift + 27.5 + 0.8; g.add(sub(boss, 'mot:can'));
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 8, 16), M.steel); shaft.position.y = lift + 27.5 + 4; g.add(sub(shaft, 'mot:shaft'));
+    // two brass terminals on the end bell (wires are soldered to them)
+    this.pins = {};
+    for (const [n, x] of [['M1', -5], ['M2', 5]]) {
+      const t = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.4, 4.5), M.gold); t.position.set(x, lift + 2, 8.2); g.add(sub(t, 'mot:term'));
+      this.pins[n] = new THREE.Vector3(x, lift + 2, 10.2);
+    }
+    // propeller (rotates about y)
+    const prop = this.prop = new THREE.Group(); prop.position.y = lift + 27.5 + 6.5; g.add(prop);
+    const pm = new THREE.MeshPhysicalMaterial({ color: 0xe8541c, roughness: 0.35, clearcoat: 0.4, side: THREE.DoubleSide });
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 5, 24), pm); prop.add(sub(hub, 'mot:prop'));
+    for (let i = 0; i < 3; i++) {
+      const bs = new THREE.Shape(); bs.moveTo(2, -2.6); bs.quadraticCurveTo(11, -6.2, 19.5, -3); bs.quadraticCurveTo(21.5, 0, 19.5, 3); bs.quadraticCurveTo(11, 4.3, 2, 2.6); bs.lineTo(2, -2.6);
+      const bg = new THREE.ExtrudeGeometry(bs, { depth: 0.8, bevelEnabled: false }); bg.rotateX(-Math.PI / 2);
+      const blade = new THREE.Mesh(bg, i === 0 ? new THREE.MeshPhysicalMaterial({ color: 0xf6d04d, roughness: 0.35, side: THREE.DoubleSide }) : pm);
+      blade.rotation.set(0, i * Math.PI * 2 / 3, 0); blade.rotateX(0.32); prop.add(sub(blade, 'mot:prop'));
+    }
+    // motion blur disc (shown when it spins fast)
+    this.blur = new THREE.Mesh(new THREE.CircleGeometry(20.5, 48), new THREE.MeshBasicMaterial({ color: 0xf08a4a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    this.blur.rotation.x = -Math.PI / 2; this.blur.position.y = lift + 27.5 + 6.6; this.blur.raycast = () => {}; g.add(this.blur);
+    // direction arrow ring above the propeller
+    this.arrow = new THREE.Group(); this.arrow.position.y = lift + 27.5 + 15; g.add(this.arrow);
+    const am = new THREE.MeshBasicMaterial({ color: 0x46d37e, toneMapped: false });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(24, 0.9, 8, 64, Math.PI * 1.5), am); ring.rotation.x = Math.PI / 2; this.arrow.add(ring);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(3.2, 7, 16), am); tip.position.set(0, 0, -24); tip.rotation.z = -Math.PI / 2; this.arrow.add(tip);
+    this.arrow.visible = false; this.arrow.traverse(o => { o.raycast = () => {}; });
+    this.arrowMat = am;
+    tagHW(g, 'motor');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+    this.angle = 0; this.speed = 0;
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    const pos = this.group.localToWorld(this.pins[name].clone());
+    const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion()));
+    return { pos, dir };
+  }
+  /** speed: −1 … +1 (+ = clockwise seen from above); dt in s */
+  spin(dt) {
+    this.angle -= this.speed * dt * 2 * Math.PI * 3.2;            // drawn at ≤ 3.2 rev/s (a real 130 motor spins thousands of rpm)
+    this.prop.rotation.y = this.angle;
+    const s = Math.abs(this.speed);
+    this.blur.material.opacity = Math.max(0, (s - 0.35) * 0.5);
+    this.arrow.visible = s > 0.04;
+    if (this.arrow.visible) {
+      this.arrow.rotation.y = this.angle * 0.12;
+      this.arrow.scale.set(1, 1, this.speed > 0 ? 1 : -1);
+      this.arrowMat.color.set(this.speed > 0 ? 0x46d37e : 0x4fb4ff);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- component lead wire (stranded, tinned end into a hole)
+export class LeadWire {
+  constructor(a, dir, b, color = 'red', { lift = 18, id = 'lead' } = {}) {
+    const g = this.group = new THREE.Group();
+    const ins = new THREE.MeshPhysicalMaterial({ color: WIRE[color] || color, roughness: 0.4, clearcoat: 0.4 });
+    const up = new THREE.Vector3(0, 1, 0);
+    const p1 = a.clone().addScaledVector(dir, 10), top = b.clone().addScaledVector(up, 7);
+    const mid = p1.clone().lerp(top, 0.5); mid.y = Math.max(p1.y, top.y) + lift;
+    this.tubeGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a, p1, mid, top.clone().addScaledVector(up, 6), top], false, 'centripetal'), 120, 0.7, 10, false);
+    g.add(new THREE.Mesh(this.tubeGeo, ins));
+    const tin = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 12, 8), M.tin); tin.position.copy(b).addScaledVector(up, 1); this.tip = tin; g.add(tin);
+    const solder = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8), M.solder); solder.position.copy(a); g.add(solder);
+    tagHW(g, id);
+  }
+  async grow(ms = 1000) {
+    const total = this.tubeGeo.index.count; this.tip.visible = false;
+    await tween(ms, e => { this.tubeGeo.setDrawRange(0, Math.floor(total * e / 3) * 3); });
+    this.tubeGeo.setDrawRange(0, Infinity); this.tip.visible = true;
+  }
+}
+
 export async function dropIn(obj, from = 30, ms = 700) {
   const y = obj.position.y;
   obj.visible = true;
@@ -873,6 +1040,35 @@ export const HW_INFO = {
   'sv:tabs': { name: 'Mounting tabs', tag: 'SG90', summary: 'Two tabs with screw holes to fix the servo to your project.', src: 'SG90 datasheet' },
   'sv:cable': { name: 'Servo cable', tag: 'Brown · Red · Orange', summary: 'Brown = GND, red = +5 V, orange = signal (the pulses).', src: 'SG90 datasheet' },
   'sv:plug': { name: '3-pin plug on a header', tag: '2.54 mm', summary: 'The servo’s female plug sits on a 3-pin male header pushed into the breadboard (holes j11–j13).', src: '—' },
+  'drv:p1': { name: 'Pin 1 · 1,2EN (enable)', tag: 'L293D', summary: 'Turns outputs 1Y and 2Y on (HIGH) or off (LOW). Here: D5 — a PWM signal sets the motor speed.', src: 'TI L293x datasheet' },
+  'drv:p2': { name: 'Pin 2 · 1A (input)', tag: 'L293D', summary: 'Sets output 1Y HIGH or LOW. Here: D7.', src: 'TI L293x datasheet' },
+  'drv:p3': { name: 'Pin 3 · 1Y (output)', tag: 'L293D', summary: 'Drives one motor wire. Here: the motor’s white wire.', src: 'TI L293x datasheet' },
+  'drv:p4': { name: 'Pin 4 · ground', tag: 'L293D', summary: 'Ground and heat-sink pin. Pins 4, 5, 12 and 13 are all ground.', src: 'TI L293x datasheet' },
+  'drv:p5': { name: 'Pin 5 · ground', tag: 'L293D', summary: 'Ground and heat-sink pin. Here: battery − and (via i16) the UNO Q GND.', src: 'TI L293x datasheet' },
+  'drv:p6': { name: 'Pin 6 · 2Y (output)', tag: 'L293D', summary: 'Drives the other motor wire. Here: the motor’s green wire.', src: 'TI L293x datasheet' },
+  'drv:p7': { name: 'Pin 7 · 2A (input)', tag: 'L293D', summary: 'Sets output 2Y HIGH or LOW. Here: D8.', src: 'TI L293x datasheet' },
+  'drv:p8': { name: 'Pin 8 · VCC2 (motor power)', tag: 'L293D', summary: 'Power for the outputs, VCC1 … 36 V. Here: battery + (4 × AA ≈ 6 V).', src: 'TI L293x datasheet' },
+  'drv:p9': { name: 'Pin 9 · 3,4EN', tag: 'L293D', summary: 'Enable for the second channel (3Y, 4Y) — a second motor could go here. Not used.', src: 'TI L293x datasheet' },
+  'drv:p10': { name: 'Pin 10 · 3A', tag: 'L293D', summary: 'Input of channel 3. Not used.', src: 'TI L293x datasheet' },
+  'drv:p11': { name: 'Pin 11 · 3Y', tag: 'L293D', summary: 'Output of channel 3. Not used.', src: 'TI L293x datasheet' },
+  'drv:p12': { name: 'Pin 12 · ground', tag: 'L293D', summary: 'Ground and heat-sink pin.', src: 'TI L293x datasheet' },
+  'drv:p13': { name: 'Pin 13 · ground', tag: 'L293D', summary: 'Ground and heat-sink pin. Here: UNO Q GND.', src: 'TI L293x datasheet' },
+  'drv:p14': { name: 'Pin 14 · 4Y', tag: 'L293D', summary: 'Output of channel 4. Not used.', src: 'TI L293x datasheet' },
+  'drv:p15': { name: 'Pin 15 · 4A', tag: 'L293D', summary: 'Input of channel 4. Not used.', src: 'TI L293x datasheet' },
+  'drv:p16': { name: 'Pin 16 · VCC1 (logic power)', tag: 'L293D', summary: '5 V supply for the chip’s logic (4.5–7 V). Here: UNO Q 5V.', src: 'TI L293x datasheet' },
+  l293d: { name: 'L293D motor driver', tag: 'H-bridge · 600 mA/channel', summary: 'Four half-H drivers in one chip. Two of them form an H-bridge that can drive one DC motor in both directions.', src: 'TI L293x datasheet' },
+  'drv:chip': { name: 'L293D (DIP-16 package)', tag: '19.8 × 6.35 mm', summary: 'Small signals on EN, 1A and 2A switch up to 600 mA per output (1.2 A peak) from VCC2. The “D” version has built-in clamp diodes against motor voltage spikes.', points: ['The half-moon notch marks the pin-1 end.'], src: 'TI L293x datasheet' },
+  battery: { name: '4 × AA battery holder', tag: '≈ 6 V for the motor', summary: 'Four 1.5 V cells in series ≈ 6 V. Red lead = +, black lead = −.', src: '—' },
+  'bat:holder': { name: 'Battery holder', tag: '4 × AA in series', summary: 'Springs and contacts connect the four cells one after another, so their voltages add up: 4 × 1.5 V ≈ 6 V.', src: '—' },
+  'bat:cell': { name: 'AA cell', tag: '1.5 V', summary: 'One AA cell gives about 1.5 V when new.', src: '—' },
+  motor: { name: '“130” DC hobby motor', tag: '6 V rated', summary: 'A small brushed DC motor. Current through it in one direction → it spins one way; reverse the current → the other way.', src: 'Adafruit #711 spec' },
+  'mot:can': { name: 'Motor can', tag: '27.5 × 20 × 15 mm', summary: 'Steel housing with the magnets; the rotor with its coils turns inside.', src: 'Adafruit #711 spec' },
+  'mot:bell': { name: 'End cap', tag: 'Brushes inside', summary: 'Holds the brushes that feed current to the spinning rotor coils.', src: '—' },
+  'mot:shaft': { name: 'Shaft', tag: 'Ø 2 mm × 8 mm', summary: 'The propeller is pressed onto it.', src: 'Adafruit #711 spec' },
+  'mot:term': { name: 'Motor terminals', tag: '2 tabs', summary: 'The two wires are soldered here. A DC motor has no + or −: swapping the wires reverses the direction.', src: '—' },
+  'mot:prop': { name: 'Propeller', tag: 'Shows speed and direction', summary: 'Makes the rotation easy to see. The yellow blade helps you follow it.', src: '—' },
+  'mot:stand': { name: 'Motor stand', tag: 'Holds the motor', summary: 'Keeps the motor upright so the propeller can spin freely.', src: '—' },
+  lead: { name: 'Lead wire', tag: 'Stranded, tinned end', summary: 'The tinned end is pushed straight into a breadboard hole.', src: '—' },
   obstacle: {
     name: 'Obstacle', tag: 'Drag it closer or farther',
     summary: 'A flat object in front of the sensor. Drag it in the 3D view or use the slider; the label shows the real distance.',

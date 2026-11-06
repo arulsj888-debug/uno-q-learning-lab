@@ -9,7 +9,7 @@
 //   { id:'t1', type:'tmp36', row:'e', col:18 }        legs +VS e18, VOUT e19, GND e20 (flat face toward +z)
 //   { id:'w1', type:'wire', from:'D5', to:'a10', color:'yellow' }
 import * as THREE from 'three';
-import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, DESK_Y } from './hardware.js';
+import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, DESK_Y } from './hardware.js';
 
 const HOLE = /^([a-j])(\d{1,2})$/;
 
@@ -24,7 +24,7 @@ export class Bench {
   point(ref) {
     const m = HOLE.exec(ref);
     if (m) return this.bb.hole(m[1], +m[2]);
-    const mp = /^(\w+)\.(VCC|OUT|GND)$/.exec(ref);
+    const mp = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2)$/.exec(ref);
     if (mp && this.items[mp[1]]) return this.items[mp[1]].obj.pin(mp[2]).pos;
     const p = this.board.pins[ref];
     if (!p) throw new Error('unknown endpoint ' + ref);
@@ -53,7 +53,7 @@ export class Bench {
     let k = 0;
     this.tray = [];
     for (const d of this.defs) {
-      if ((d.type === 'wire' || d.type === 'fwire') || placedIds.includes(d.id) || this.items[d.id]) continue;
+      if ((d.type === 'wire' || d.type === 'fwire' || d.type === 'lead') || placedIds.includes(d.id) || this.items[d.id]) continue;
       const { obj } = this.create(d);
       const g = obj.group;
       g.position.set(52 + (k % 2) * 13, DESK_Y + 3.0, 50 + Math.floor(k / 2) * 16);
@@ -74,6 +74,10 @@ export class Bench {
       case 'tmp36': obj = new TMP36(); break;
       case 'hcsr04': obj = new HCSR04(); break;
       case 'pir': obj = new PIRModule(); break;
+      case 'l293d': obj = new L293D(); break;
+      case 'battery': obj = new BatteryPack(); break;
+      case 'motor': obj = new HobbyMotor(); break;
+      case 'lead': { const [pid, pn] = d.from.split('.'); const p = this.items[pid].obj.pin(pn); obj = new LeadWire(p.pos, p.dir, this.point(d.to), d.color, { lift: d.lift ?? 16, id: 'lead' }); break; }
       case 'servo': obj = new ServoMotor(new THREE.Vector3(d.bx, DESK_Y, d.bz).sub(this.bb.hole(d.row, d.col + 1))); break;
       case 'fwire': { const [pid, pn] = d.from.split('.'); const p = this.items[pid].obj.pin(pn); obj = new FemaleJumper(p.pos, p.dir, this.point(d.to), d.color, { lift: d.lift ?? 30, id: 'jumper' }); break; }
       case 'led': obj = new LED5mm(d.color); break;
@@ -98,6 +102,8 @@ export class Bench {
       case 'tmp36': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
       case 'pir': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
       case 'servo': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
+      case 'l293d': return { pos: this.bb.hole('e', d.col).lerp(this.bb.hole('f', d.col + 7), 0.5), rotY: 0 };
+      case 'battery': case 'motor': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
       case 'hcsr04': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       default: return null;
     }
@@ -110,7 +116,7 @@ export class Bench {
     const obj = fromTray ? fromTray.obj : this.create(d).obj;
     const g = obj.group;
     this.items[d.id] = { def: d, obj, group: g };
-    if ((d.type === 'wire' || d.type === 'fwire')) {
+    if ((d.type === 'wire' || d.type === 'fwire' || d.type === 'lead')) {
       this.scene.add(g);
       if (animate) await obj.grow(1100);
       return;

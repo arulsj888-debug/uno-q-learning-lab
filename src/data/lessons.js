@@ -1,7 +1,7 @@
 // Lessons — ordered from the very basics upward.
 // Facts: Arduino UNO Q datasheet (DS), UNO Q user manual (UM), full pinout (PIN), ST STM32U585 datasheet (ST),
 // Arduino Zephyr core source (CORE) for API defaults. Code listings live in data/code.js.
-import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE } from './code.js';
+import { BLINK, EXT_LED, BUTTON, POT, FADE, DIMMER, BUZZER, NIGHT_LIGHT, TMP36_CODE, ULTRASONIC, PIR_CODE, SERVO_CODE, MOTOR_CODE } from './code.js';
 
 const SRC = {
   ds: { t: 'Arduino UNO Q datasheet (ABX00162-ABX00173)', u: 'https://docs.arduino.cc/hardware/uno-q/' },
@@ -18,6 +18,8 @@ const SRC = {
   sr501guide: { t: 'Handson Technology: HC-SR501 PIR user guide', u: 'https://handsontec.com/dataspecs/sensor/PIR%20SR501%20Motion%20Sensor.pdf' },
   sg90: { t: 'TowerPro SG90 micro servo datasheet', u: 'https://www.friendlywire.com/projects/ne555-servo-safe/SG90-datasheet.pdf' },
   servolib: { t: 'Arduino Servo library (source, incl. Zephyr support)', u: 'https://github.com/arduino-libraries/Servo' },
+  l293: { t: 'Texas Instruments L293x quadruple half-H drivers datasheet (SLRS008D)', u: 'https://www.ti.com/lit/ds/symlink/l293.pdf' },
+  motor130: { t: 'Adafruit #711 DC toy/hobby motor (130 size) — specifications', u: 'https://www.adafruit.com/product/711' },
   dhtforum: { t: 'Arduino Forum: “DHT11 and UNO Q”', u: 'https://forum.arduino.cc/t/dht11-and-uno-q/1416409' },
 };
 
@@ -86,6 +88,24 @@ const SERVO_PARTS = [
   { id: 'w25', type: 'wire', from: 'f13', to: 'D9', color: 'orange', lift: 16 },
 ];
 const SERVO_IDS = SERVO_PARTS.map(d => d.id);
+const MOTOR_PARTS = [
+  { id: 'u1', type: 'l293d', col: 12 },
+  { id: 'bat1', type: 'battery', x: 45, z: 120 },
+  { id: 'mot1', type: 'motor', x: -40, z: 116, rotY: Math.PI },
+  { id: 'w26', type: 'wire', from: '5V', to: 'a12', color: 'red', lift: 10 },
+  { id: 'w27', type: 'wire', from: 'GND3', to: 'a15', color: 'black', lift: 13 },
+  { id: 'w28', type: 'wire', from: 'D5', to: 'j12', color: 'orange', lift: 14 },
+  { id: 'w29', type: 'wire', from: 'D7', to: 'j13', color: 'yellow', lift: 18 },
+  { id: 'w30', type: 'wire', from: 'D8', to: 'j18', color: 'blue', lift: 22 },
+  { id: 'w31', type: 'wire', from: 'GND2', to: 'i16', color: 'black', lift: 8 },
+  { id: 'l1', type: 'lead', from: 'bat1.POS', to: 'j19', color: 'red', lift: 14 },
+  { id: 'l2', type: 'lead', from: 'bat1.NEG', to: 'j16', color: 'black', lift: 18 },
+  { id: 'l3', type: 'lead', from: 'mot1.M1', to: 'j14', color: 'white', lift: 12 },
+  { id: 'l4', type: 'lead', from: 'mot1.M2', to: 'j17', color: 'green', lift: 16 },
+];
+const MOTOR_IDS = MOTOR_PARTS.map(d => d.id);
+const MOTOR_LOGIC = ['w26', 'w27', 'w28', 'w29', 'w30'];
+const MOTOR_IO = { kind: 'motor', item: 'mot1', drv: 'u1', bat: 'bat1', en: 'D5', in1: 'D7', in2: 'D8', needs: MOTOR_IDS };
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
 
 const BLINK_CODE = BLINK;
@@ -1334,12 +1354,120 @@ export const LESSONS = [
     ],
     sources: [SRC.sg90, SRC.servolib, SRC.ds],
   },
+
+  // ================================================================== 16
+  {
+    id: 'l16', num: 16, module: 5, title: 'Drive a DC motor with an L293D', level: 'Intermediate', time: '25 min',
+    goal: 'Control a DC motor’s direction and speed with an H-bridge driver, a battery and PWM.',
+    hardware: ['Arduino UNO Q', 'Breadboard', 'L293D motor driver (DIP-16)', '“130” DC hobby motor + propeller', '4 × AA battery holder', '6 × jumper wires'],
+    code: MOTOR_CODE, program: 'motor', fast: true, widgets: ['motor'],
+    circuit: MOTOR_PARTS, io: { D5: MOTOR_IO },
+    explain: {
+      2: '<b>D5 → L293D pin 1 (1,2EN)</b>. EN switches outputs 1Y/2Y on or off. D5 is a PWM pin, so we can also set the <b>speed</b>.',
+      3: '<b>D7 → pin 2 (1A)</b>: input for output 1Y.',
+      4: '<b>D8 → pin 7 (2A)</b>: input for output 2Y.',
+      7: 'All three are outputs.',
+      14: '1A HIGH …',
+      15: '… 2A LOW → current flows 1Y → motor → 2Y: <b>direction 1</b>.',
+      16: '<b>analogWrite(EN, 255)</b> = EN always on → full speed.',
+      17: 'Run for 2 s.',
+      20: '<b>analogWrite(EN, 128)</b> ≈ 50 % PWM → EN is on half of the time → slower.',
+      24: '<b>EN = 0</b> → the outputs switch off (datasheet: “free-running motor stop”) → the motor <b>coasts</b> to a stop.',
+      28: 'Swap the inputs: 1A LOW …',
+      29: '… 2A HIGH → current flows the other way → <b>direction 2</b>.',
+      30: 'Full speed again.',
+      34: '1A = 2A (both LOW) with EN on → both motor wires are held at the same level → <b>fast stop</b> (brake).',
+    },
+    steps: [
+      {
+        title: 'What we build', view: 'motor', have: MOTOR_IDS, power: false,
+        labels: [['u1', 'L293D motor driver'], ['mot1', 'DC motor'], ['bat1', 'Battery 4 × AA'], ['board', 'UNO Q']],
+        body: `<p>The UNO Q will make a small motor (with a propeller) spin <b>one way</b>, <b>slower</b>, <b>stop</b>, then the <b>other way</b>.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">UNO Q pins D5 · D7 · D8 (small signals)</span></div><div class="pt-arrow">↓</div>
+        <div class="pt-row"><span class="pt">L293D driver switches the big current</span><span class="pt in">from the battery</span></div><div class="pt-arrow">↓</div>
+        <div class="pt-row"><span class="pt bus">motor spins</span></div></div>
+        <p>The UNO Q <b>decides</b>; the L293D <b>does the heavy work</b>; the battery <b>gives the energy</b>.</p>`,
+      },
+      {
+        title: 'Why not connect the motor to a pin?', view: 'motor',
+        body: `<table class="kv"><tr><th></th><th>Current</th></tr>
+        <tr><td>UNO Q pin (STM32U585)</td><td><b>20 mA</b> absolute max</td></tr>
+        <tr><td>This motor, no load</td><td>up to 70 mA</td></tr><tr><td>This motor, working</td><td>up to 250 mA</td></tr>
+        <tr><td>This motor, blocked (stall)</td><td>up to <b>500 mA</b></td></tr></table>
+        <p>A pin can’t give that much — it would be damaged. A <b>motor driver</b> is an electronic switch: a tiny signal from the pin controls a big current from the battery.</p>
+        <p class="tip">We use a small “130” motor because even when blocked (500 mA) it stays under the L293D’s limit of <b>600 mA</b> per channel. The popular yellow gear motors can draw over 1 A when blocked — too much for an L293D.</p>`,
+      },
+      {
+        title: 'How the L293D works (H-bridge)', view: 'drvclose',
+        body: `<p>Inside are switches arranged like the letter <b>H</b>, with the motor in the middle. Closing one pair or the other makes current flow through the motor <b>one way or the other way</b>.</p>
+        <table class="kv"><tr><th>EN</th><th>1A</th><th>2A</th><th>Motor (datasheet)</th></tr>
+        <tr><td>HIGH</td><td>HIGH</td><td>LOW</td><td>turns one way</td></tr><tr><td>HIGH</td><td>LOW</td><td>HIGH</td><td>turns the other way</td></tr>
+        <tr><td>HIGH</td><td colspan="2">same level</td><td>fast stop (brake)</td></tr><tr><td>LOW</td><td colspan="2">any</td><td>free-running stop (coasts)</td></tr></table>
+        <p><b>Speed</b>: give EN a PWM signal (<code>analogWrite</code>, Lesson 7) — the outputs are on only part of the time, so the motor turns slower.</p>
+        <p>The <b>D</b> in L293<b>D</b>: it has built-in diodes that absorb the voltage spike a motor makes when it is switched off.</p>`,
+      },
+      {
+        title: 'Two power supplies, one ground', view: 'motor', pins: ['5V', 'GND2', 'GND3'],
+        body: `<table class="kv"><tr><th>L293D pin</th><th>Needs</th><th>From</th></tr>
+        <tr><td>16 · VCC1 (logic)</td><td>4.5–7 V</td><td>UNO Q <b>5V</b></td></tr>
+        <tr><td>8 · VCC2 (motor)</td><td>VCC1 … 36 V</td><td><b>battery +</b> (4 × AA ≈ 6 V)</td></tr>
+        <tr><td>4, 5, 12, 13</td><td>ground</td><td>UNO Q GND <b>and</b> battery −</td></tr></table>
+        <ul><li>The motor gets its power from the <b>battery</b>, not from the UNO Q. Motors cause electrical noise and current peaks that could disturb the board.</li>
+        <li><b>Common ground</b>: battery − and UNO Q GND must be connected, otherwise the L293D can’t “see” the 3.3 V signals.</li>
+        <li>3.3 V signals are enough: the L293D needs only <b>2.3 V</b> for a HIGH (datasheet).</li></ul>
+        <p class="warn">Never connect the battery + to the UNO Q 5V or 3V3 pin.</p>`,
+      },
+      {
+        title: 'Step 1 — insert the L293D', view: 'drvclose', have: ['u1'], holes: ['f12 · pin 1 (EN)', 'e12 · pin 16 (VCC1)', 'f19 · pin 8 (VCC2)', 'f15 · pin 4 (ground)'],
+        body: `<p>Push the chip across the centre gap, legs in columns <b>12–19</b>.</p>
+        <p>The <b>notch</b> (half-moon) points left. Pin 1 is at the bottom-left (next to the dot), then the numbers go <b>anticlockwise</b> around the chip: 1–8 along the bottom, 9–16 along the top (16 above pin 1).</p>`,
+      },
+      {
+        title: 'Step 2 — power and signal wires', view: 'motor', have: ['u1', ...MOTOR_LOGIC], pins: ['5V', 'GND3', 'D5', 'D7', 'D8'],
+        body: `<ul><li>Red: <b>5V → a12</b> (pin 16, VCC1)</li><li>Black: <b>GND → a15</b> (pin 13, ground)</li>
+        <li>Orange: <b>D5 → j12</b> (pin 1, EN)</li><li>Yellow: <b>D7 → j13</b> (pin 2, 1A)</li><li>Blue: <b>D8 → j18</b> (pin 7, 2A)</li></ul>`,
+      },
+      {
+        title: 'Step 3 — motor and battery', view: 'motor', have: MOTOR_IDS, pins: ['GND2'],
+        body: `<ul><li>Motor wires → <b>j14</b> (pin 3, 1Y) and <b>j17</b> (pin 6, 2Y)</li>
+        <li>Battery <b>red (+)</b> → <b>j19</b> (pin 8, VCC2) · battery <b>black (−)</b> → <b>j16</b> (pin 5, ground)</li>
+        <li>Black jumper: <b>GND → i16</b> — this joins battery − and UNO Q GND (<b>common ground</b>)</li></ul>
+        <p class="tip">Swapping the two motor wires swaps the direction.</p>`,
+      },
+      {
+        title: 'Get to know the parts', view: 'drvclose',
+        body: `<p><b>Click</b> the chip and each of its legs to see its name and where it is connected. Zoom out to click the motor (can, shaft, terminals, propeller) and the battery holder.</p>`,
+      },
+      { title: 'The code', view: 'motor', showCode: true, body: `<p>Two pins set the <b>direction</b> (D7, D8), one PWM pin sets the <b>speed</b> (D5). Click any line to see what it does.</p>` },
+      {
+        title: 'Run it', view: 'motor', showCode: true, power: true, action: 'run',
+        body: `<p>Watch the boxes below and the motor:</p>
+        <ol><li>Direction 1, <b>100 %</b> (2 s)</li><li>Direction 1, <b>50 %</b> (2 s)</li><li>EN LOW → <b>coasts</b> to a stop</li><li>Direction 2, <b>100 %</b> (2 s)</li><li>1A = 2A → <b>brakes</b> quickly</li></ol>
+        <p>The highlighted row of the table shows which datasheet case is active.</p>
+        <p class="sim">Simulated: speed is drawn as proportional to the PWM duty and much slower than reality (a 130 motor runs at thousands of rpm). Direction 1 is drawn clockwise — with the wires the other way round it would be anticlockwise.</p>`,
+      },
+      {
+        title: 'Summary', view: 'motor',
+        body: `<ul><li>A motor needs far more current than a pin can give → use a <b>driver</b> (L293D: 600 mA per channel).</li>
+        <li><b>1A / 2A</b> choose the direction, <b>EN</b> with PWM sets the speed; EN LOW = coast, 1A = 2A = brake.</li>
+        <li>VCC1 = 5 V logic, VCC2 = battery for the motor, and a <b>common ground</b>.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Why can’t the motor be connected straight to a UNO Q pin?', a: ['The pin is too fast', 'A pin gives at most 20 mA; the motor needs up to hundreds of mA', 'The motor needs 3.3 V only', 'It would turn backwards'], c: 1, why: 'STM32U585 pins: 20 mA absolute max. This motor: up to 250 mA working, 500 mA blocked.' },
+      { q: 'EN HIGH, 1A LOW, 2A HIGH. What does the motor do?', a: ['Stops', 'Turns the opposite way to 1A HIGH / 2A LOW', 'Coasts', 'Nothing — EN must be LOW'], c: 1, why: 'Swapping 1A and 2A reverses the current through the motor.' },
+      { q: 'analogWrite(enablePin, 128) makes the motor…', a: ['Run backwards', 'Run at about half speed', 'Brake', 'Run at double speed'], c: 1, why: '128/255 ≈ 50 % PWM on EN: the outputs are on half of the time.' },
+      { q: 'Why must battery − be connected to the UNO Q GND?', a: ['To charge the battery', 'So both share the same 0 V reference and the L293D understands the signals', 'To make the motor faster', 'It is not needed'], c: 1, why: 'Voltages are always measured against a reference — both circuits need the same ground.' },
+      { q: 'What does EN LOW do (datasheet)?', a: ['Fast stop (brake)', 'Free-running stop — the motor coasts', 'Full speed', 'Reverses the motor'], c: 1, why: 'TI datasheet: EN low → free-running motor stop.' },
+    ],
+    sources: [SRC.l293, SRC.motor130, SRC.st, SRC.ds],
+  },
 ];
 
 export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion' };
 
 export const COMING_SOON = [
-  'DC motor with a driver', 'Relay module',
+  'Relay module',
   'I²C & Qwiic: Modulino® Thermo (temperature + humidity)', 'I²C displays',
   'Linux side: Python + Bridge', 'Wi-Fi web dashboard', 'Final IoT project',
 ];

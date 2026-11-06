@@ -11,9 +11,9 @@ import { JDIGITAL, JANALOG, JSPI } from '../src/data/pins.js';
 const PINS = new Set([...JDIGITAL.pins, ...JANALOG.pins, ...JSPI.pins].map(p => p.id));
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
-const MOD = /^(\w+)\.(VCC|OUT|GND)$/;          // pin of an off-board module, e.g. pir1.OUT
+const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2)$/;          // pin of an off-board module, e.g. pir1.OUT
 const isMod = r => MOD.test(r);
-const isWire = d => d.type === 'wire' || d.type === 'fwire';
+const isWire = d => d.type === 'wire' || d.type === 'fwire' || d.type === 'lead';
 const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
 const sigOf = r => (/^GND\d?$|^SPI_GND$/.test(r) ? 'GND' : r);            // all GND pins are one net
 const colNet = h => { const [, row, c] = HOLE.exec(h); return `col${c}${'abcde'.includes(row) ? 'top' : 'bot'}`; };
@@ -30,6 +30,7 @@ function legs(d) {
     case 'ldr': return { [d.id + '.1']: d.a, [d.id + '.2']: d.b };
     case 'hcsr04': return { [d.id + '.VCC']: `${d.row}${d.col}`, [d.id + '.TRIG']: `${d.row}${d.col + 1}`, [d.id + '.ECHO']: `${d.row}${d.col + 2}`, [d.id + '.GND']: `${d.row}${d.col + 3}` };
     case 'servo': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.SIG']: `${d.row}${d.col + 2}` };
+    case 'l293d': { const o = {}; for (let i = 1; i <= 8; i++) { o[`${d.id}.p${i}`] = `f${d.col + i - 1}`; o[`${d.id}.p${17 - i}`] = `e${d.col + i - 1}`; } return o; }
     case 'tmp36': return { [d.id + '.VS']: `${d.row}${d.col}`, [d.id + '.VO']: `${d.row}${d.col + 1}`, [d.id + '.GND']: `${d.row}${d.col + 2}` };
     default: return {};
   }
@@ -42,6 +43,7 @@ function nets(defs, pressed = false) {
   for (const d of defs) {
     if (isWire(d)) { u(node(d.from), node(d.to)); continue; }
     for (const [leg, h] of Object.entries(legs(d))) u(leg, colNet(h));
+    if (d.type === 'l293d') { for (const k of [5, 12, 13]) u(d.id + '.p4', d.id + '.p' + k); }   // TI block diagram: pins 4, 5, 12, 13 = one ground
     if (d.type === 'button') { u(d.id + '.1', d.id + '.2'); u(d.id + '.3', d.id + '.4'); if (pressed) u(d.id + '.1', d.id + '.3'); }
   }
   return { same: (a, b) => f(a) === f(b), f };
@@ -57,7 +59,7 @@ for (const L of LESSONS) {
     const ends = isWire(d) ? [d.from, d.to] : Object.values(legs(d));
     for (const e of ends) {
       if (isHole(e)) { const [, , c] = HOLE.exec(e); if (+c < 1 || +c > 30) bad(L, `${d.id}: hole ${e} out of range`); (used[e] ??= []).push(d.id); }
-      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || byId[pid].type !== 'pir') bad(L, `${d.id}: unknown module pin ${e}`); }
+      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
       else if (!PINS.has(e)) bad(L, `${d.id}: unknown header pin ${e}`);
     }
   }
@@ -133,6 +135,19 @@ for (const L of LESSONS) {
       if (!N.same(id + '.VCC', 'PIN:5V')) bad(L, `${pin}: servo + (red) not on 5V (SG90: 4.8 V)`);
       if (!N.same(id + '.GND', G)) bad(L, `${pin}: servo brown not on GND`);
       if (!N.same(id + '.SIG', P)) bad(L, `${pin}: servo signal not on ${pin}`);
+    }
+    if (io.kind === 'motor') {
+      const u1 = io.drv, P_ = n => `${u1}.p${n}`;
+      if (!N.same(P_(16), 'PIN:5V')) bad(L, `L293D VCC1 (pin 16) not on 5V`);
+      if (!N.same(P_(8), io.bat + '.POS')) bad(L, `L293D VCC2 (pin 8) not on battery +`);
+      if (!N.same(P_(4), G)) bad(L, `L293D ground not on UNO Q GND`);
+      if (!N.same(io.bat + '.NEG', G)) bad(L, `battery − not on UNO Q GND (no common ground)`);
+      if (!N.same(P_(1), 'PIN:' + io.en)) bad(L, `L293D EN (pin 1) not on ${io.en}`);
+      if (!['D3', 'D5', 'D6', 'D9', 'D10', 'D11'].includes(io.en)) bad(L, `EN pin ${io.en} is not a PWM pin`);
+      if (!N.same(P_(2), 'PIN:' + io.in1)) bad(L, `L293D 1A (pin 2) not on ${io.in1}`);
+      if (!N.same(P_(7), 'PIN:' + io.in2)) bad(L, `L293D 2A (pin 7) not on ${io.in2}`);
+      if (!N.same(io.item + '.M1', P_(3)) || !N.same(io.item + '.M2', P_(6))) bad(L, `motor not between 1Y (pin 3) and 2Y (pin 6)`);
+      for (const p of ['5V', '3V3', 'IOREF', 'VIN', 'D5', 'D7', 'D8']) if (N.same(io.bat + '.POS', 'PIN:' + p)) bad(L, `battery + is connected to UNO Q ${p}!`);
     }
     if (io.kind === 'buzzer') {
       const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));

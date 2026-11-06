@@ -295,6 +295,31 @@ export const PROGRAMS = {
     }
   },
 
+  async motor(rt) {
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(8); rt.pinMode('D7', 'OUTPUT');
+    await rt.at(9); rt.pinMode('D8', 'OUTPUT');
+    for (;;) {
+      await rt.at(12);
+      await rt.at(14); rt.digitalWrite('D7', 1);
+      await rt.at(15); rt.digitalWrite('D8', 0);
+      await rt.at(16); rt.analogWrite('D5', 255);
+      await rt.at(17); await rt.delay(2000);
+      await rt.at(20); rt.analogWrite('D5', 128);
+      await rt.at(21); await rt.delay(2000);
+      await rt.at(24); rt.analogWrite('D5', 0);
+      await rt.at(25); await rt.delay(1500);
+      await rt.at(28); rt.digitalWrite('D7', 0);
+      await rt.at(29); rt.digitalWrite('D8', 1);
+      await rt.at(30); rt.analogWrite('D5', 255);
+      await rt.at(31); await rt.delay(2000);
+      await rt.at(34); rt.digitalWrite('D8', 0);
+      await rt.at(35); await rt.delay(1500);
+    }
+  },
+
   async buzzer(rt) {
     const notes = [262, 294, 330, 349, 392, 440, 494, 523];
     await rt.at(2); await rt.at(3);

@@ -296,3 +296,41 @@ void loop() {
   myServo.write(180);   // 180 degrees
   delay(1000);
 }`;
+
+// Lesson 16 — DC motor with an L293D (TI datasheet: EN/1A/2A function table, PWM on EN for speed)
+export const MOTOR_CODE = `// DC motor with an L293D H-bridge
+int enablePin = D5;   // L293D pin 1 (1,2EN): PWM = speed
+int in1Pin = D7;      // L293D pin 2 (1A)
+int in2Pin = D8;      // L293D pin 7 (2A)
+
+void setup() {
+  pinMode(enablePin, OUTPUT);
+  pinMode(in1Pin, OUTPUT);
+  pinMode(in2Pin, OUTPUT);
+}
+
+void loop() {
+  // direction 1, full speed
+  digitalWrite(in1Pin, HIGH);
+  digitalWrite(in2Pin, LOW);
+  analogWrite(enablePin, 255);
+  delay(2000);
+
+  // direction 1, half speed
+  analogWrite(enablePin, 128);
+  delay(2000);
+
+  // EN LOW: the motor coasts to a stop
+  analogWrite(enablePin, 0);
+  delay(1500);
+
+  // direction 2, full speed
+  digitalWrite(in1Pin, LOW);
+  digitalWrite(in2Pin, HIGH);
+  analogWrite(enablePin, 255);
+  delay(2000);
+
+  // 1A = 2A: fast stop (brake)
+  digitalWrite(in2Pin, LOW);
+  delay(1500);
+}`;
