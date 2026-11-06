@@ -107,6 +107,8 @@ To regenerate the PCB textures from Arduino's CAD package (`ABX00162-cad-files.z
 
 ## Licenses
 
+The SHT31-D sensor texture (`assets/sht31_top.jpg`) is straightened from Adafruit's photo `assets/2857.jpg` in the repository github.com/adafruit/Adafruit-SHT31-Sensor-Breakout-PCB, and the 3D shape follows that repository's board file. Designed by Limor Fried/Ladyada for Adafruit Industries, Creative Commons Attribution/Share-Alike. Please support Adafruit and open-source hardware by purchasing products from Adafruit.
+
 Raspberry Pi 4 textures (`assets/pi4/`) are derived from photographs on Wikimedia Commons, licensed **CC BY-SA 4.0**: “Raspberry Pi 4 Model B - Top.jpg” by Laserlicht and “Raspberry Pi 4, 2 GB RAM version 3.jpg” by Suyash Dwivedi. The straightened textures are shared under the same licence. Raspberry Pi is a trademark of Raspberry Pi Ltd; this project is not affiliated with Raspberry Pi Ltd.
 
 The board artwork in `assets/` is derived from Arduino's UNO Q CAD files, licensed **CC BY-SA 4.0** (© Arduino). The derived textures are shared under the same license. Arduino®, UNO and Qualcomm® Dragonwing™ are trademarks of their respective owners. This is an independent learning tool, not an official Arduino product.

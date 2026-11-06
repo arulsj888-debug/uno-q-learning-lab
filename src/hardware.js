@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { M, canvasTex, noise } from './materials.js';
 import { P, haloTexture } from './board.js';
+import shtPhoto from '../assets/sht31_top.jpg';
 
 const DESK_Y = -6.05;
 
@@ -1291,44 +1292,62 @@ export class ModulinoPixels {
   }
 }
 
-// ---------------------------------------------------------------- Adafruit SHT31-D breakout (product 2857, STEMMA QT version) with a 7-pin header
-// Look taken from the product photo: black board, white silkscreen "SHT31 Temp & Humidity", sensor with PTFE filter in the middle,
-// two JST SH sockets at the ends, pads in the order VIN GND SCL SDA ADDR RST ALRT. Placed with its header in a breadboard row.
-// (Exact board size is not stated in the sources used, so none is claimed in the lessons.)
+// ---------------------------------------------------------------- Adafruit SHT31-D breakout, STEMMA QT version (product 2857)
+// Geometry: Adafruit's open-source board file "Adafruit SHT31-D STEMMA QT Breakout.brd" (CC BY-SA, github.com/adafruit/
+// Adafruit-SHT31-Sensor-Breakout-PCB): 25.40 x 17.78 mm, 2.54 mm corner arcs, plated mounting holes Ø2.5 at (2.54, 15.24) /
+// (22.86, 15.24), unplated holes Ø2.54 at (2.54, 2.54) / (22.86, 2.54), U-shaped milled slot round the sensor, 7 header pads
+// at y = 2.54 (VIN GND SCL SDA ADDR RST ALRT), JST SH sockets, sensor U2 at (12.76, 10.35).
+// Surface: Adafruit's top photo "assets/2857.jpg" from the same repository (CC BY-SA), straightened onto the board's mm grid
+// with the four holes (tools/pi4/README.md). Board coordinates (bx, by): mm, origin bottom-left, header row along the bottom.
+// Local frame: origin = middle header pin (pad 4 at bx 12.7, by 2.54) at breadboard surface; board lies toward −z.
 export class SHT31Breakout {
   constructor() {
     const g = this.group = new THREE.Group();
     const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
-    const L = 25.4, Wd = 17.8, T = 1.6, y0 = 2.5, top = y0 + T;
-    const pcbTex = canvasTex(Math.round(L * 24), Math.round(Wd * 24), (c, w, h) => {
-      const k = 24; c.fillStyle = '#17181b'; c.fillRect(0, 0, w, h);
-      c.fillStyle = '#e8e8e4'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.font = `700 ${1.7 * k}px Arial`; c.fillText('SHT31', w * 0.5, h * 0.2);
-      c.font = `600 ${1.05 * k}px Arial`; c.fillText('Temp & Humidity', w * 0.5, h * 0.33);
-      const names = ['VIN', 'GND', 'SCL', 'SDA', 'ADDR', 'RST', 'ALRT'];
-      c.font = `700 ${0.95 * k}px Arial`;
-      names.forEach((n, i) => c.fillText(n, w * 0.5 + (i - 3) * 2.54 * k, h * (i % 2 ? 0.66 : 0.77)));
-    });
-    const pcb = new THREE.Mesh(new RoundedBoxGeometry(L, T, Wd, 2, 0.5), [new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 }), new THREE.MeshStandardMaterial({ map: pcbTex, roughness: 0.55 }), new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 })]);
-    pcb.position.set(0, y0 + T / 2, 0); g.add(sub(pcb, 'sht:pcb'));
-    // 7-pin header: black plastic strip under the board, gold pins down into the breadboard and up through the board
-    const strip = new THREE.Mesh(new THREE.BoxGeometry(7 * 2.54, y0, 2.54), M.blackPlastic); strip.position.set(0, y0 / 2, 4.4); g.add(sub(strip, 'sht:pins'));
+    const T = 1.6, y0 = 2.5, top = y0 + T;                  // header plastic 2.5 mm under the board
+    const L = (bx, by, h) => new THREE.Vector3(bx - 12.7, h, -(by - 2.54));
+    const tex = new THREE.TextureLoader().load(shtPhoto); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = M.aniso || 8;
+    const uv = (bx, by) => [(bx + 1.0) / 27.4, (by + 1.0) / 19.78];
+    const photo = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.3, roughness: 0.5 });
+    // ---- PCB outline, holes and slot (board coords; shape is built shifted so the header centre is the origin)
+    const s = new THREE.Shape(), sx = 12.7, sy = 2.54, P2 = (x, y) => [x - sx, y - sy];
+    s.moveTo(...P2(2.54, 0)); s.lineTo(...P2(22.86, 0)); s.absarc(...P2(22.86, 2.54), 2.54, -Math.PI / 2, 0); s.lineTo(...P2(25.4, 15.24));
+    s.absarc(...P2(22.86, 15.24), 2.54, 0, Math.PI / 2); s.lineTo(...P2(2.54, 17.78)); s.absarc(...P2(2.54, 15.24), 2.54, Math.PI / 2, Math.PI);
+    s.lineTo(...P2(0, 2.54)); s.absarc(...P2(2.54, 2.54), 2.54, Math.PI, Math.PI * 1.5);
+    const hole = (x, y, r) => { const p = new THREE.Path(); p.absarc(...P2(x, y), r, 0, Math.PI * 2, true); s.holes.push(p); };
+    hole(2.54, 15.24, 1.25); hole(22.86, 15.24, 1.25); hole(2.54, 2.54, 1.27); hole(22.86, 2.54, 1.27);
+    for (let i = 0; i < 7; i++) hole(5.08 + i * 2.54, 2.54, 0.5);
+    const slot = new THREE.Path(); [[8.4455, 13.1445], [16.9545, 13.1445], [16.9545, 7.1755], [16.0655, 7.1755], [16.0655, 12.192], [9.3345, 12.192], [9.3345, 7.1755], [8.4455, 7.1755]].reverse().forEach(([x, y], i) => i ? slot.lineTo(...P2(x, y)) : slot.moveTo(...P2(x, y))); s.holes.push(slot);
+    const face = new THREE.ShapeGeometry(s, 24), fp = face.attributes.position, fu = face.attributes.uv;
+    for (let i = 0; i < fp.count; i++) { const [u, v] = uv(fp.getX(i) + sx, fp.getY(i) + sy); fu.setXY(i, u, v); }
+    face.rotateX(-Math.PI / 2); face.translate(0, top + 0.001, 0);
+    g.add(sub(new THREE.Mesh(face, photo), 'sht:pcb'));
+    const body = new THREE.ExtrudeGeometry(s, { depth: T, bevelEnabled: false, curveSegments: 24 }); body.rotateX(-Math.PI / 2); body.translate(0, y0, 0);
+    g.add(sub(new THREE.Mesh(body, [new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: 0x2b2b29, roughness: 0.8 })]), 'sht:pcb'));
+    // ---- raised parts: the top face shows the photo at the same place, the sides take the part's real colour
+    const part = (id, x0, by0, x1, by1, h, side, z0 = top) => {
+      const w = x1 - x0, d = by1 - by0, geo = new THREE.BoxGeometry(w, h, d), pa = geo.attributes.position, na = geo.attributes.normal, ua = geo.attributes.uv;
+      const cx = (x0 + x1) / 2, cy = (by0 + by1) / 2;
+      for (let i = 0; i < pa.count; i++) if (na.getY(i) > 0.5) { const [u, v] = uv(cx + pa.getX(i), cy - pa.getZ(i)); ua.setXY(i, u, v); }
+      const m = new THREE.Mesh(geo, [side, side, photo, side, side, side]); m.position.copy(L(cx, cy, z0 + h / 2)); g.add(sub(m, id)); return m;
+    };
+    const nylon = new THREE.MeshStandardMaterial({ color: 0xd8d6cc, roughness: 0.6 }), black = new THREE.MeshStandardMaterial({ color: 0x18181a, roughness: 0.55 });
+    const tan = new THREE.MeshStandardMaterial({ color: 0xc69a6b, roughness: 0.5 }), wh = new THREE.MeshStandardMaterial({ color: 0xe9e9e4, roughness: 0.5 });
+    part('sht:jst', 20.63, 5.89, 24.88, 11.99, 2.9, nylon); part('sht:jst', 0.52, 5.79, 4.77, 11.89, 2.9, nylon);
+    for (const [xo, dir] of [[24.88, 1], [0.52, -1]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.7, 4.4), new THREE.MeshBasicMaterial({ color: 0x0a0a0b })); m.position.copy(L(xo + dir * 0.05, 8.9, top + 1.45)); g.add(sub(m, 'sht:jst')); }
+    part('sht:chip', 11.51, 9.10, 14.01, 11.60, 0.9, wh);                          // SHT31 DFN 2.5 x 2.5
+    part('sht:pcb', 11.2, 5.5, 14.45, 7.1, 0.5, black);                            // R5 resistor pack
+    part('sht:pcb', 6.49, 9.10, 7.74, 11.10, 0.9, tan);                            // C5 0805
+    part('sht:pcb', 17.36, 5.0, 18.96, 5.8, 0.8, tan);                             // C6 0603
+    part('sht:pcb', 5.6, 12.17, 7.2, 12.97, 0.45, black);                          // R1 0603
+    part('sht:led', 2.76, 12.17, 4.36, 12.97, 0.6, new THREE.MeshPhysicalMaterial({ color: 0xdfe8df, roughness: 0.3, clearcoat: 0.6 }));   // D1 green power LED
+    // ---- 7-pin male header soldered in: black spacer under the board, pins into the breadboard, short ends + solder on top
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(7 * 2.54, y0, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0 / 2, 0); g.add(sub(strip, 'sht:pins'));
     for (let i = 0; i < 7; i++) {
       const x = (i - 3) * 2.54;
-      const pin = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11.5, 0.64), M.gold); pin.position.set(x, y0 + 0.6 - 11.5 / 2 + 2.9, 4.4); g.add(sub(pin, 'sht:pins'));
-      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.06, 14), M.gold); ring.position.set(x, top + 0.04, 4.4); g.add(ring);
+      const pin = new THREE.Mesh(new THREE.BoxGeometry(0.64, 6.0 + top + 1.4, 0.64), M.gold); pin.position.set(x, (top + 1.4 - 6.0) / 2, 0); g.add(sub(pin, 'sht:pins'));
+      const sold = new THREE.Mesh(new THREE.ConeGeometry(0.85, 0.9, 16), M.solder); sold.position.set(x, top + 0.45, 0); g.add(sub(sold, 'sht:pins'));
     }
-    // sensor: small package with the round PTFE-filter opening
-    const chip = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.9, 3.0), new THREE.MeshStandardMaterial({ color: 0xd9d9d4, roughness: 0.45 })); chip.position.set(0, top + 0.45, -1.2); g.add(sub(chip, 'sht:chip'));
-    const win = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.06, 18), new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.9 })); win.position.set(0, top + 0.92, -1.2); g.add(sub(win, 'sht:chip'));
-    // two JST SH sockets (STEMMA QT) at the short ends
-    for (const sx of [-1, 1]) {
-      const j = new THREE.Mesh(new RoundedBoxGeometry(4.2, 3.0, 6.2, 1, 0.2), M.whiteNylon); j.position.set(sx * 10.3, top + 1.5, -1.6); g.add(sub(j, 'sht:jst'));
-      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.6, 4.6), new THREE.MeshBasicMaterial({ color: 0x0b0b0c })); mouth.position.set(sx * 12.35, top + 1.5, -1.6); g.add(sub(mouth, 'sht:jst'));
-    }
-    // two mounting holes and a few small SMD parts
-    for (const sx of [-1, 1]) { const h = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, T + 0.05, 20), new THREE.MeshStandardMaterial({ color: 0xd9b25f, roughness: 0.3, metalness: 1 })); h.position.set(sx * 10.6, y0 + T / 2, -6.6); g.add(sub(h, 'sht:pcb')); }
-    for (const [x, z] of [[-4.6, -4.2], [4.2, -3.2], [-5.8, 0.2], [5.6, 0.6]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.4, 0.6), new THREE.MeshStandardMaterial({ color: 0x8c7660, roughness: 0.5 })); r.position.set(x, top + 0.2, z); g.add(sub(r, 'sht:pcb')); }
     tagHW(g, 'sht31');
     for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
   }
@@ -1546,7 +1565,8 @@ export const HW_INFO = {
   'lamp:bulb': { name: 'Bulb with filament', tag: 'E10 screw base', summary: 'The thin tungsten filament heats up and glows when current flows.', src: 'Handsontec 1-channel relay module guide' },
   'lamp:holder': { name: 'Lamp holder', tag: 'E10 socket', summary: 'Holds the bulb and connects it to the two screw terminals.', src: 'Handsontec 1-channel relay module guide' },
   'lamp:term': { name: 'Lamp terminals', tag: '2 screws', summary: 'One goes to the relay NO terminal, the other to battery −.', src: 'Handsontec 1-channel relay module guide' },
-  'sht:pcb': { name: 'SHT31-D breakout board', tag: 'Black PCB · STEMMA QT', summary: 'The small board that carries the sensor chip, two connectors and the pins. Its silkscreen lists the pins: VIN, GND, SCL, SDA, ADDR, RST, ALRT.', src: 'Adafruit SHT31-D guide — Pinouts' },
+  'sht:pcb': { name: 'SHT31-D breakout board', tag: '25.4 × 17.8 mm · STEMMA QT', summary: 'The small black board that carries the sensor, two connectors and the pins. The cut-out slot around the sensor keeps heat from the rest of the board away from it.', points: ['Size from Adafruit’s open-source board file: 25.40 × 17.78 mm.', 'Silkscreen pins: VIN, GND, SCL, SDA, ADDR, RST, ALRT.'], src: 'Adafruit SHT31-D board file (GitHub) and guide' },
+  'sht:led': { name: 'Power LED', tag: 'Marked “on”', summary: 'A small green LED that lights when the board has power.', src: 'Adafruit SHT31-D board file (D1, GREEN)' },
   'sht:chip': { name: 'SHT31-D sensor chip', tag: 'Temperature + humidity', summary: 'A Sensirion sensor that measures both temperature and relative humidity and sends the numbers over I²C. Adafruit gives its accuracy as about ±0.3 °C and ±2 %RH.', points: ['A PTFE filter keeps it clean while still letting humidity through.', 'Default I²C address 0x44; 0x45 if ADDR is tied to VIN.'], src: 'Adafruit SHT31-D product page and guide' },
   'sht:pins': { name: 'Header pins', tag: 'VIN · GND · SCL · SDA …', summary: 'Seven pins plugged into the breadboard. We use four: VIN (3.3 V power), GND, SCL (clock) and SDA (data). ADDR, RST and ALRT stay unconnected.', warn: 'On a Raspberry Pi power VIN from 3V3 (pin 1), not from 5 V.', src: 'Adafruit SHT31-D guide — Pinouts, Python wiring' },
   'sht:jst': { name: 'STEMMA QT sockets', tag: '2 × JST SH', summary: 'Two identical sockets for a Qwiic / STEMMA QT cable (as in Lessons 18–19 of the UNO Q course). The Raspberry Pi 4 has no such socket, so here we use the header pins instead.', src: 'Adafruit SHT31-D product page' },

@@ -17,3 +17,6 @@ The Pi 4 has no official Gerber/STEP files, so the model combines:
 
 Output files: `assets/pi4/pi4_top.jpg`, `assets/pi4/pi4_bottom.jpg` (CC BY-SA 4.0, derived from the photos above).
 Python needs numpy, scipy, Pillow, scikit-image, PyMuPDF. Run with `python -I` from a work folder.
+
+## SHT31-D breakout (Pi lesson 9)
+Shape from Adafruit's board file `Adafruit SHT31-D STEMMA QT Breakout.brd`; surface from `assets/2857.jpg` (both CC BY-SA, github.com/adafruit/Adafruit-SHT31-Sensor-Breakout-PCB). Hole centres found with `find_holes_hough.py`, then `rectify_sht31.py` straightens the photo to x −1…26.4, y −1…18.78 mm at 60 px/mm and writes an overlay check.
