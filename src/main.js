@@ -325,7 +325,7 @@ class App {
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
     if (this.acc && this.acc.monitor.group.visible) this.acc.monitor.draw({ ...this.pios, mode: this.board.powered ? this.pios.mode : 'off' });
-    this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick();
+    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -774,6 +774,8 @@ class App {
         <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="h-sk">—</b></div><div class="arrow">→</div><div><span>Python · decides</span><b id="h-py">—</b></div><div class="arrow">→</div><div><span>Relay → Lamp</span><b id="h-rl">—</b></div></div><div id="h-note" class="io-note"></div>`;
     if (w.includes('dash')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div><div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
         <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="d-sk">—</b></div><div class="arrow">→</div><div><span>Python · Web UI</span><b id="d-py">—</b></div><div class="arrow">→</div><div><span>Browser</span><b id="d-br">—</b></div></div><div id="d-note" class="io-note"></div>`;
+    if (w.includes('pisens')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="-10" max="60" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div><div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
+        <div class="io-tools"><button id="th-plug" class="hold small">🔌 Unplug the SDA wire</button></div><div id="ps-note" class="io-note"></div>`;
     if (w.includes('bridge2')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div></div>
         <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="b2-sk">—</b></div><div class="arrow">→</div><div><span>Bridge</span><b id="b2-br">—</b></div><div class="arrow">→</div><div><span>Python · decides</span><b id="b2-py">—</b></div><div class="arrow">→</div><div><span>RGB LED 3</span><b id="b2-led">—</b></div></div><div id="b2-note" class="io-note"></div>`;
     if (w.includes('bridge')) h += `<div class="io-block pirstat tight"><div><span>Python · main.py</span><b id="br-py">—</b></div><div class="arrow">→</div><div><span>Bridge (router · UART)</span><b id="br-rt">—</b></div><div class="arrow">→</div><div><span>Sketch · set_led()</span><b id="br-sk">—</b></div><div class="arrow">→</div><div><span>RGB LED 3</span><b id="br-led">—</b></div></div><div id="br-note" class="io-note"></div>`;
@@ -1388,6 +1390,12 @@ class App {
     if (t) t.textContent = `${this.th.t.toFixed(1)} °C  (${(this.th.t * 9 / 5 + 32).toFixed(1)} °F)`;
     if (h) h.textContent = `${Math.round(this.th.h)} %RH`;
   }
+  pisensTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('pisens')) return;
+    const run = this.sim.running, w = this.bench.get('w4'); if (w) w.group.visible = !this.th.unplug;
+    const b = $('#th-plug'); if (b) { b.disabled = run; b.textContent = this.th.unplug ? '🔌 Plug the SDA wire back in' : '🔌 Unplug the SDA wire'; b.classList.toggle('on', this.th.unplug); }
+    const n = $('#ps-note'); if (n) { const h = !this.board.powered ? 'USB-C is not plugged in — the Raspberry Pi has no power.' : this.th.unplug ? 'The SDA wire is out: nobody answers at 0x44.' : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : 'The sensor answers at address 0x44; the program reads it every 2 seconds.'; if (n.innerHTML !== h) n.innerHTML = h; }
+  }
   thermoTick() {
     const io = this.thermoIo(); if (!io) return;
     const ok = this.thermoOk(), m = this.bench.get('th1');
@@ -1698,6 +1706,10 @@ class App {
       bridge: ev => { this.br.stage = ev.stage; if (ev.val && typeof ev.val === 'object') { Object.assign(this.br, { c: ev.val.c, rh: ev.val.rh, hot: ev.val.hot, auto: ev.val.auto, lamp: ev.val.lamp }); if (ev.stage === 'render') this.phone = { c: ev.val.c, rh: ev.val.rh, auto: ev.val.auto, lamp: ev.val.lamp }; } else this.br.arg = ev.val; },
       ui: () => { const q = this.uiq || []; this.uiq = []; return q; },
       pixels: arr => { this.pxArr = arr; },
+      sensor: () => {
+        const io = this.ioFor('p3'), ok = io && io.kind === 'i2c' && this.wired(io) && this.board.powered && !this.th.unplug;
+        return ok ? { found: true, c: this.th.t + (Math.random() - 0.5) * 0.1, rh: Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3)) } : { found: false };
+      },
       mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {
         const io = this.ioFor(pin);

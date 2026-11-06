@@ -10,11 +10,14 @@ export const SRC_PI = {
   power: { t: 'Raspberry Pi documentation — Power supply', u: 'https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#power-supply' },
   leds: { t: 'Raspberry Pi documentation — LED warning flash codes', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#led-warning-flash-codes' },
   bcm: { t: 'Raspberry Pi documentation — BCM2711', u: 'https://www.raspberrypi.com/documentation/computers/processors.html#bcm2711' },
+  cfg: { t: 'Raspberry Pi documentation — Configuration: enable or disable I2C', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#i2c' },
   remote: { t: 'Raspberry Pi documentation — Remote access (find your IP address, SSH)', u: 'https://www.raspberrypi.com/documentation/computers/remote-access.html' },
   kernel: { t: 'Raspberry Pi documentation — Linux kernel (check your kernel)', u: 'https://www.raspberrypi.com/documentation/computers/linux_kernel.html' },
   osupdate: { t: 'Raspberry Pi documentation — Update Raspberry Pi OS', u: 'https://www.raspberrypi.com/documentation/computers/os.html#update-software' },
   users: { t: 'Raspberry Pi documentation — Manage users', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#users' },
   thermal: { t: 'Raspberry Pi documentation — Frequency management and thermal control', u: 'https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#frequency-management-and-thermal-control' },
+  sht31: { t: 'Adafruit SHT31-D Temperature & Humidity Sensor Breakout (product page and guide)', u: 'https://learn.adafruit.com/adafruit-sht31-d-temperature-and-humidity-sensor-breakout' },
+  sht31lib: { t: 'Adafruit CircuitPython SHT31D library (README, example, source)', u: 'https://github.com/adafruit/Adafruit_CircuitPython_SHT31D' },
   usegpio: { t: 'Raspberry Pi documentation — Use GPIO from Python', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-gpio-from-python' },
   python: { t: 'Raspberry Pi documentation — Use Python on a Raspberry Pi', u: 'https://www.raspberrypi.com/documentation/computers/os.html#use-python-on-a-raspberry-pi' },
   gpiozero: { t: 'GPIO Zero documentation (recipes, LED, Button, pin numbering)', u: 'https://gpiozero.readthedocs.io/' },
@@ -57,6 +60,18 @@ while True:
     led.value = 1  # full brightness
     sleep(1)`;
 
+export const PI_I2C = `import time
+import board
+import adafruit_sht31d
+
+i2c = board.I2C()  # uses board.SCL and board.SDA
+sensor = adafruit_sht31d.SHT31D(i2c)
+
+while True:
+    print(f"\\nTemperature: {sensor.temperature:0.1f} C")
+    print(f"Humidity: {sensor.relative_humidity:0.1f} %")
+    time.sleep(2)`;
+
 export const PI_BUTTON_LED = `from gpiozero import LED, Button
 
 led = LED(17)
@@ -86,6 +101,15 @@ export const PI_BTN_PARTS = [
 ];
 const BTN_IDS = PI_BTN_PARTS.map(d => d.id);
 const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
+export const PI_I2C_PARTS = [
+  { id: 'sen1', type: 'sht31', row: 'g', col: 10 },
+  { id: 'w1', type: 'fwire', from: 'p1', to: 'j10', color: 'red', lift: 24 },
+  { id: 'w2', type: 'fwire', from: 'p6', to: 'j11', color: 'black', lift: 34 },
+  { id: 'w3', type: 'fwire', from: 'p5', to: 'j12', color: 'yellow', lift: 44 },
+  { id: 'w4', type: 'fwire', from: 'p3', to: 'j13', color: 'blue', lift: 54 },
+];
+const I2C_IDS = PI_I2C_PARTS.map(d => d.id);
+const IO_I2C = { kind: 'i2c', item: 'sen1', needs: I2C_IDS };
 const IO_BTN = { kind: 'button', item: 'btn1', needs: BTN_IDS };
 
 // Practice terminal (Lesson 8). Each meaning is taken from the official Raspberry Pi documentation (see 'src').
@@ -122,7 +146,7 @@ export const TERM_CMDS = [
   { g: 'Python', cmd: 'python3', does: 'Starts Python 3, which comes pre-installed with Raspberry Pi OS.', src: 'Using Python' },
 ];
 
-export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi' };
+export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors' };
 
 export const PI_LESSONS = [
   // ================================================================== P1
@@ -593,6 +617,86 @@ pause()</pre>
     ],
     sources: [SRC_PI.setup, SRC_PI.osupdate, SRC_PI.users, SRC_PI.thermal, SRC_PI.gpio, SRC_PI.python, SRC_PI.leds, SRC_PI.remote, SRC_PI.kernel],
   },
+  // ================================================================== P9
+  {
+    id: 'p9', num: 9, module: 4, title: 'Read an I²C sensor: temperature and humidity', level: 'Intermediate', time: '25 min',
+    goal: 'Wire a digital I²C sensor with four wires, turn I²C on, and read temperature and humidity with Python.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'Breadboard', 'Adafruit SHT31-D breakout with header pins', '4 × female–male jumper wires'],
+    code: PI_I2C, file: 'sht31.py', program: 'pi_i2c', fast: true, widgets: ['pisens'],
+    circuit: PI_I2C_PARTS, io: { p3: IO_I2C },
+    explain: {
+      1: 'The <b>time</b> library, for <code>sleep</code>.',
+      2: '<b>board</b> (from Adafruit Blinka) knows the Raspberry Pi’s pin names, such as <code>board.SCL</code> and <code>board.SDA</code>.',
+      3: 'The <b>driver</b> for the SHT31-D sensor.',
+      5: '<b>board.I2C()</b> opens the I²C bus on the pins <b>SCL (pin 5)</b> and <b>SDA (pin 3)</b>.',
+      6: 'Create the sensor object. It looks for the sensor at I²C address <b>0x44</b> (the default). If nobody answers, Python raises an error.',
+      8: 'Repeat forever.',
+      9: '<b>sensor.temperature</b> asks the sensor for a measurement and returns the temperature in °C. <code>:0.1f</code> prints one decimal; <code>\\n</code> starts with a blank line.',
+      10: '<b>sensor.relative_humidity</b>: relative humidity in %.',
+      11: 'Wait 2 seconds, then measure again.',
+    },
+    steps: [
+      {
+        title: 'What is I²C?', view: 'pibench', have: [], power: false,
+        body: `<p><b>I²C</b> (“eye-squared-see”) lets the Raspberry Pi talk to sensors with <b>two signal wires</b>:</p>
+        <table class="kv"><tr><th>Wire</th><th>Job</th><th>Raspberry Pi pin</th></tr><tr><td><b>SDA</b></td><td>the <b>data</b></td><td>pin 3 (GPIO2)</td></tr><tr><td><b>SCL</b></td><td>the <b>clock</b></td><td>pin 5 (GPIO3)</td></tr></table>
+        <p>Each device has its own <b>address</b>. The Raspberry Pi calls an address and only that device answers. These two pins already have <b>1.8 kΩ pull-up resistors</b> to 3.3 V on the Raspberry Pi board.</p>
+        <p class="tip">You met the same idea on the UNO Q with Qwiic. Here we wire the four wires ourselves.</p>`,
+      },
+      {
+        title: 'The sensor: SHT31-D', view: 'pibb', have: ['sen1'], power: false, holes: ['g10 · VIN', 'g11 · GND', 'g12 · SCL', 'g13 · SDA'],
+        body: `<p>The <b>Adafruit SHT31-D</b> breakout carries a Sensirion sensor that measures <b>temperature and humidity</b> and sends finished numbers over I²C. <b>Click its parts</b> in the 3D view.</p>
+        <ul><li>Accuracy (Adafruit): about <b>±0.3 °C</b> and <b>±2 %RH</b>.</li><li>Power: <b>2.5–5 V</b>. On a Raspberry Pi we use <b>3.3 V</b> (Adafruit’s wiring for the Pi).</li><li>I²C address <b>0x44</b>; tying ADDR to VIN changes it to 0x45.</li></ul>
+        <p>Its pads are in this order: <b>VIN, GND, SCL, SDA, ADDR, RST, ALRT</b>. We use the first four.</p>`,
+      },
+      {
+        title: 'Turn I²C on first', view: 'home', acc: [],
+        body: `<p>On Raspberry Pi OS the I²C interface may be switched off. Turn it on once (Raspberry Pi documentation):</p>
+        <ul><li><b>Desktop:</b> Raspberry Pi menu → <b>Preferences → Control Centre → Interfaces</b> → switch <b>I2C</b> on.</li><li><b>Terminal:</b> <code>sudo raspi-config</code> → <code>3 Interface Options</code> → <code>I5 I2C</code> → <b>Yes</b> → <b>Finish</b>.</li></ul>
+        <p>This turns on the I²C interface and loads the I²C kernel module at boot.</p>`,
+      },
+      {
+        title: 'Step 1 — put the sensor on the breadboard', view: 'pibb', have: ['sen1'], power: false, holes: ['g10 · VIN', 'g11 · GND', 'g12 · SCL', 'g13 · SDA'],
+        body: `<p>Push the sensor’s header pins into row <b>g</b>: <b>VIN in g10, GND in g11, SCL in g12, SDA in g13</b>. (ADDR, RST and ALRT go into g14–g16 and stay unconnected.) Holes g–j of one column are connected inside the breadboard.</p>`,
+      },
+      {
+        title: 'Step 2 — four wires to the Raspberry Pi', view: 'pibench', have: I2C_IDS, pins: ['p1', 'p6', 'p5', 'p3'],
+        body: `<ul><li>Red: <b>pin 1 (3V3) → j10</b> (VIN)</li><li>Black: <b>pin 6 (GND) → j11</b></li><li>Yellow: <b>pin 5 (SCL) → j12</b></li><li>Blue: <b>pin 3 (SDA) → j13</b></li></ul>
+        <p class="warn"><b>Power from 3V3 (pin 1), never from 5V.</b> The GPIO pins, including SDA and SCL, are 3.3 V only.</p>
+        <p class="tip">The wires match Adafruit’s Raspberry Pi wiring: Pi 3V3 → VIN, Pi GND → GND, Pi SCL → SCL, Pi SDA → SDA.</p>`,
+      },
+      {
+        title: 'Install the library', view: 'home', acc: [],
+        body: `<p>The program uses Adafruit’s library. In the Terminal:</p>
+        <pre class="tree">pip3 install adafruit-circuitpython-sht31d</pre>
+        <p>The library needs <b>Adafruit Blinka</b> (it provides <code>import board</code> on a Raspberry Pi). Raspberry Pi OS asks you to install extra Python packages inside a <b>virtual environment</b> — see Lesson 8 — and Adafruit’s “CircuitPython on Linux” guide shows the steps for a fresh Raspberry Pi.</p>`,
+      },
+      { title: 'The program', view: 'pibench', have: I2C_IDS, showCode: true, power: true, body: `<p>Adafruit’s example program, shortened to the two readings. Click any line.</p>` },
+      {
+        title: 'Run it', view: 'pibench', have: I2C_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Every two seconds the Shell prints the temperature and humidity. <b>Move the sliders</b> (the air around the sensor) and watch the numbers follow.</p>
+        <p class="sim">Simulated values. The program line that reads the sensor is highlighted while it runs.</p>`,
+      },
+      {
+        title: 'What if a wire is loose?', view: 'pibench', have: I2C_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Unplug the SDA wire”</b> and run it again. Nobody answers at address 0x44, so Python stops with:</p>
+        <pre class="tree">ValueError: No I2C device at address: 0x44</pre>
+        <p>(Python prints more lines before it, the “traceback”.) This message is the first thing to look for when a sensor does not work: check the four wires, and that I²C is turned on.</p>`,
+      },
+      {
+        title: 'Summary', view: 'pibench', have: I2C_IDS, power: true,
+        body: `<ul><li>I²C = two wires, <b>SDA</b> (pin 3) and <b>SCL</b> (pin 5), plus power (3V3) and ground; devices have addresses (SHT31-D: 0x44).</li><li>Turn I²C on in Control Centre or <code>sudo raspi-config</code>.</li><li><code>board.I2C()</code> + <code>adafruit_sht31d.SHT31D(i2c)</code>, then <code>sensor.temperature</code> and <code>sensor.relative_humidity</code>.</li><li>3.3 V only; “No I2C device at address” = check wiring.</li></ul>`,
+      },
+    ],
+    quiz: [
+      { q: 'Which two Raspberry Pi pins are SDA and SCL?', a: ['Pins 3 and 5', 'Pins 8 and 10', 'Pins 11 and 12', 'Pins 2 and 4'], c: 0, why: 'SDA1 = GPIO2 = pin 3; SCL1 = GPIO3 = pin 5.' },
+      { q: 'Where do you connect the sensor’s VIN on a Raspberry Pi?', a: ['5V (pin 2)', '3V3 (pin 1)', 'GPIO17', 'SDA'], c: 1, why: 'Adafruit’s Pi wiring uses 3V3; the GPIO pins are 3.3 V only.' },
+      { q: 'Default I²C address of the SHT31-D?', a: ['0x10', '0x44', '0x6C', '0xFF'], c: 1, why: 'Default 0x44; 0x45 when ADDR is tied to VIN.' },
+      { q: 'Python says “ValueError: No I2C device at address: 0x44”. What do you check?', a: ['The monitor', 'The four wires and that I²C is turned on', 'The microSD card size', 'The keyboard'], c: 1, why: 'Nobody answered the address — a loose wire or I²C switched off.' },
+      { q: 'How do you turn I²C on?', a: ['It is always on', 'Control Centre → Interfaces, or sudo raspi-config → Interface Options → I2C', 'Edit the sensor', 'Press the ACT LED'], c: 1, why: 'Raspberry Pi documentation: enable I2C in Control Centre or raspi-config.' },
+    ],
+    sources: [SRC_PI.sht31, SRC_PI.sht31lib, SRC_PI.cfg, SRC_PI.gpio, SRC_PI.ds, SRC_PI.python],
+  },
 ];
 
-export const PI_COMING = ['Buzzer', 'An I²C sensor', 'Camera module', 'A web page served by the Pi', 'Final project'];
+export const PI_COMING = ['Buzzer', 'Camera module', 'A web page served by the Pi', 'Final project'];

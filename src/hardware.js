@@ -1291,6 +1291,49 @@ export class ModulinoPixels {
   }
 }
 
+// ---------------------------------------------------------------- Adafruit SHT31-D breakout (product 2857, STEMMA QT version) with a 7-pin header
+// Look taken from the product photo: black board, white silkscreen "SHT31 Temp & Humidity", sensor with PTFE filter in the middle,
+// two JST SH sockets at the ends, pads in the order VIN GND SCL SDA ADDR RST ALRT. Placed with its header in a breadboard row.
+// (Exact board size is not stated in the sources used, so none is claimed in the lessons.)
+export class SHT31Breakout {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const L = 25.4, Wd = 17.8, T = 1.6, y0 = 2.5, top = y0 + T;
+    const pcbTex = canvasTex(Math.round(L * 24), Math.round(Wd * 24), (c, w, h) => {
+      const k = 24; c.fillStyle = '#17181b'; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#e8e8e4'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.font = `700 ${1.7 * k}px Arial`; c.fillText('SHT31', w * 0.5, h * 0.2);
+      c.font = `600 ${1.05 * k}px Arial`; c.fillText('Temp & Humidity', w * 0.5, h * 0.33);
+      const names = ['VIN', 'GND', 'SCL', 'SDA', 'ADDR', 'RST', 'ALRT'];
+      c.font = `700 ${0.95 * k}px Arial`;
+      names.forEach((n, i) => c.fillText(n, w * 0.5 + (i - 3) * 2.54 * k, h * (i % 2 ? 0.66 : 0.77)));
+    });
+    const pcb = new THREE.Mesh(new RoundedBoxGeometry(L, T, Wd, 2, 0.5), [new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 }), new THREE.MeshStandardMaterial({ map: pcbTex, roughness: 0.55 }), new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.6 })]);
+    pcb.position.set(0, y0 + T / 2, 0); g.add(sub(pcb, 'sht:pcb'));
+    // 7-pin header: black plastic strip under the board, gold pins down into the breadboard and up through the board
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(7 * 2.54, y0, 2.54), M.blackPlastic); strip.position.set(0, y0 / 2, 4.4); g.add(sub(strip, 'sht:pins'));
+    for (let i = 0; i < 7; i++) {
+      const x = (i - 3) * 2.54;
+      const pin = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11.5, 0.64), M.gold); pin.position.set(x, y0 + 0.6 - 11.5 / 2 + 2.9, 4.4); g.add(sub(pin, 'sht:pins'));
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.06, 14), M.gold); ring.position.set(x, top + 0.04, 4.4); g.add(ring);
+    }
+    // sensor: small package with the round PTFE-filter opening
+    const chip = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.9, 3.0), new THREE.MeshStandardMaterial({ color: 0xd9d9d4, roughness: 0.45 })); chip.position.set(0, top + 0.45, -1.2); g.add(sub(chip, 'sht:chip'));
+    const win = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.06, 18), new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.9 })); win.position.set(0, top + 0.92, -1.2); g.add(sub(win, 'sht:chip'));
+    // two JST SH sockets (STEMMA QT) at the short ends
+    for (const sx of [-1, 1]) {
+      const j = new THREE.Mesh(new RoundedBoxGeometry(4.2, 3.0, 6.2, 1, 0.2), M.whiteNylon); j.position.set(sx * 10.3, top + 1.5, -1.6); g.add(sub(j, 'sht:jst'));
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.6, 4.6), new THREE.MeshBasicMaterial({ color: 0x0b0b0c })); mouth.position.set(sx * 12.35, top + 1.5, -1.6); g.add(sub(mouth, 'sht:jst'));
+    }
+    // two mounting holes and a few small SMD parts
+    for (const sx of [-1, 1]) { const h = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, T + 0.05, 20), new THREE.MeshStandardMaterial({ color: 0xd9b25f, roughness: 0.3, metalness: 1 })); h.position.set(sx * 10.6, y0 + T / 2, -6.6); g.add(sub(h, 'sht:pcb')); }
+    for (const [x, z] of [[-4.6, -4.2], [4.2, -3.2], [-5.8, 0.2], [5.6, 0.6]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.4, 0.6), new THREE.MeshStandardMaterial({ color: 0x8c7660, roughness: 0.5 })); r.position.set(x, top + 0.2, z); g.add(sub(r, 'sht:pcb')); }
+    tagHW(g, 'sht31');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+  }
+}
+
 export const HW_INFO = {
   usbcable: {
     name: 'USB-C® cable', tag: 'Power + data',
@@ -1503,6 +1546,11 @@ export const HW_INFO = {
   'lamp:bulb': { name: 'Bulb with filament', tag: 'E10 screw base', summary: 'The thin tungsten filament heats up and glows when current flows.', src: 'Handsontec 1-channel relay module guide' },
   'lamp:holder': { name: 'Lamp holder', tag: 'E10 socket', summary: 'Holds the bulb and connects it to the two screw terminals.', src: 'Handsontec 1-channel relay module guide' },
   'lamp:term': { name: 'Lamp terminals', tag: '2 screws', summary: 'One goes to the relay NO terminal, the other to battery −.', src: 'Handsontec 1-channel relay module guide' },
+  'sht:pcb': { name: 'SHT31-D breakout board', tag: 'Black PCB · STEMMA QT', summary: 'The small board that carries the sensor chip, two connectors and the pins. Its silkscreen lists the pins: VIN, GND, SCL, SDA, ADDR, RST, ALRT.', src: 'Adafruit SHT31-D guide — Pinouts' },
+  'sht:chip': { name: 'SHT31-D sensor chip', tag: 'Temperature + humidity', summary: 'A Sensirion sensor that measures both temperature and relative humidity and sends the numbers over I²C. Adafruit gives its accuracy as about ±0.3 °C and ±2 %RH.', points: ['A PTFE filter keeps it clean while still letting humidity through.', 'Default I²C address 0x44; 0x45 if ADDR is tied to VIN.'], src: 'Adafruit SHT31-D product page and guide' },
+  'sht:pins': { name: 'Header pins', tag: 'VIN · GND · SCL · SDA …', summary: 'Seven pins plugged into the breadboard. We use four: VIN (3.3 V power), GND, SCL (clock) and SDA (data). ADDR, RST and ALRT stay unconnected.', warn: 'On a Raspberry Pi power VIN from 3V3 (pin 1), not from 5 V.', src: 'Adafruit SHT31-D guide — Pinouts, Python wiring' },
+  'sht:jst': { name: 'STEMMA QT sockets', tag: '2 × JST SH', summary: 'Two identical sockets for a Qwiic / STEMMA QT cable (as in Lessons 18–19 of the UNO Q course). The Raspberry Pi 4 has no such socket, so here we use the header pins instead.', src: 'Adafruit SHT31-D product page' },
+  'sht31': { name: 'Adafruit SHT31-D breakout', tag: 'I²C temperature + humidity', summary: 'A digital temperature and humidity sensor on a breakout board. It talks to the Raspberry Pi over I²C with just four wires: power, ground, clock and data.', points: ['Powered with 2.5–5 V; on a Raspberry Pi use 3.3 V.', 'SCL and SDA have 10 kΩ pull-ups on the board.'], src: 'Adafruit SHT31-D product page and guide' },
   'th:pcb': { name: 'Modulino Thermo circuit board', tag: '41 × 25.36 mm · 1.6 mm thick', summary: 'The blue board that carries everything. Four Ø3.2 mm mounting holes are spaced 16 mm × 32 mm.', points: ['Hardware version V0.5 or later has the black GXHT30C sensor; earlier boards have a silver HS3003.'], src: 'Modulino Thermo datasheet §2.1, §2.3, §6.1' },
   'th:sensor': { name: 'GXHT30C sensor', tag: 'Temp + humidity', summary: 'A single chip that measures both temperature and relative humidity and sends the numbers over I²C (address 0x45).', points: ['The black film is a dustproof, breathable cover — it must not be removed.', 'Datasheet: −45…+130 °C (±0.3 °C typ.), 0…100 %RH (±3 %RH typ.). Recommended use: 5…60 °C and 20…80 %RH.'], src: 'Modulino Thermo datasheet §2.2' },
   'th:qwiic': { name: 'Qwiic connector (J1 / J2)', tag: 'SM04B-SRSS-TB · 4 pins', summary: 'Two identical connectors wired in parallel: one goes to the UNO Q, the other lets you daisy-chain another module.', points: ['The four pins are GND, +3.3 V, SDA and SCL.'], warn: 'Power the module with 3.3 V only — never 5 V.', src: 'Modulino Thermo datasheet §4.4' },

@@ -71,6 +71,7 @@ export class Sim {
       delayMicroseconds: async () => { if (slow) await frame(); },
       uiEvents: () => (H.ui ? H.ui() : []),
       bridge: (stage, val) => { if (H.bridge) H.bridge({ stage, val }); },
+      sensor: () => (H.sensor ? H.sensor() : { found: false }),
       thermo: () => (H.thermo ? H.thermo() : { found: false }),
       pxSet: (i, rgb, br) => { if (i < 8) pxBuf[i] = [rgb[0], rgb[1], rgb[2], Math.trunc(br * 31 / 100) / 31]; },   // library: map(brightness, 0, 100, 0, 0x1F)
       pxClear: (i) => { if (i < 8) pxBuf[i] = [0, 0, 0, 0]; },
@@ -396,6 +397,19 @@ export const PROGRAMS = {
       await rt.at(8); await rt.delay(1000);
       await rt.at(9); rt.digitalWrite('p11', 0);
       await rt.at(10); await rt.delay(1000);
+    }
+  },
+  async pi_i2c(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(3);
+    await rt.at(5);
+    await rt.at(6);
+    if (!rt.sensor().found) { rt.println('ValueError: No I2C device at address: 0x44'); for (;;) await rt.delay(1000); }
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); const r = rt.sensor(); rt.println(''); rt.println(`Temperature: ${r.c.toFixed(1)} C`);
+      await rt.at(10); rt.println(`Humidity: ${r.rh.toFixed(1)} %`);
+      await rt.at(11); await rt.delay(2000);
     }
   },
   async pi_pwm(rt) {

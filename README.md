@@ -58,6 +58,8 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
     7. Fade an LED with PWM (`PWMLED`, value 0–1, duty cycle, default 100 Hz)
   - **Module 3: Working on the Pi**
     8. The Terminal: type commands, see the board react (3D monitor with a desktop and Terminal window; the ACT LED flickers during updates, `sudo poweroff` / `sudo reboot` shut down and restart the board; results simulated, commands real). 26 practice commands in four groups (System, Files and folders, Network, Python), each checked against the official documentation; a small in-memory file system makes `mkdir` / `touch` / `cp` / `rm` / `ls` / `cd` consistent
+  - **Module 4: Sensors**
+    9. Read an I²C sensor (Adafruit SHT31-D on a breadboard, SDA pin 3 / SCL pin 5 / 3V3, enabling I²C, Adafruit library, loose-wire error `No I2C device at address: 0x44`)
 
 ## Works on every screen
 

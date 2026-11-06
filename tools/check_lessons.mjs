@@ -37,6 +37,7 @@ function legs(d) {
     case 'hcsr04': return { [d.id + '.VCC']: `${d.row}${d.col}`, [d.id + '.TRIG']: `${d.row}${d.col + 1}`, [d.id + '.ECHO']: `${d.row}${d.col + 2}`, [d.id + '.GND']: `${d.row}${d.col + 3}` };
     case 'servo': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.SIG']: `${d.row}${d.col + 2}` };
     case 'l293d': { const o = {}; for (let i = 1; i <= 8; i++) { o[`${d.id}.p${i}`] = `f${d.col + i - 1}`; o[`${d.id}.p${17 - i}`] = `e${d.col + i - 1}`; } return o; }
+    case 'sht31': return { [d.id + '.VIN']: `${d.row}${d.col}`, [d.id + '.GND']: `${d.row}${d.col + 1}`, [d.id + '.SCL']: `${d.row}${d.col + 2}`, [d.id + '.SDA']: `${d.row}${d.col + 3}`, [d.id + '.ADDR']: `${d.row}${d.col + 4}`, [d.id + '.RST']: `${d.row}${d.col + 5}`, [d.id + '.ALRT']: `${d.row}${d.col + 6}` };
     case 'tmp36': return { [d.id + '.VS']: `${d.row}${d.col}`, [d.id + '.VO']: `${d.row}${d.col + 1}`, [d.id + '.GND']: `${d.row}${d.col + 2}` };
     default: return {};
   }
@@ -189,6 +190,16 @@ for (const L of list) {
         if (!N.same(io.pix + '.QA', P)) bad(L, `pixels: module is not on the UNO Q Qwiic bus`);
         if (cab && c2 && cab.to === c2.from) bad(L, `pixels: both cables use the same Thermo connector`);
       }
+    }
+    if (io.kind === 'i2c') {                       // Raspberry Pi I2C sensor: SDA1 = pin 3 (GPIO2), SCL1 = pin 5 (GPIO3), 3.3 V only
+      const id = io.item;
+      if (!N.same(id + '.VIN', 'PIN:3V3')) bad(L, `sensor VIN is not on 3V3 (the Pi GPIO is 3.3 V only)`);
+      if (N.same(id + '.VIN', 'PIN:5V')) bad(L, `sensor VIN is on 5V`);
+      if (!N.same(id + '.GND', G)) bad(L, `sensor GND is not on GND`);
+      if (!N.same(id + '.SDA', 'PIN:p3')) bad(L, `sensor SDA is not on pin 3 (GPIO2 / SDA1)`);
+      if (!N.same(id + '.SCL', 'PIN:p5')) bad(L, `sensor SCL is not on pin 5 (GPIO3 / SCL1)`);
+      for (const nm of ['SDA', 'SCL']) if (N.same(id + '.' + nm, 'PIN:5V')) bad(L, `${nm} is connected to 5V`);
+      if (N.same(id + '.SDA', id + '.SCL')) bad(L, `SDA and SCL are shorted`);
     }
     if (io.kind === 'buzzer') {
       const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));

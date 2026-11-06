@@ -9,7 +9,7 @@
 //   { id:'t1', type:'tmp36', row:'e', col:18 }        legs +VS e18, VOUT e19, GND e20 (flat face toward +z)
 //   { id:'w1', type:'wire', from:'D5', to:'a10', color:'yellow' }
 import * as THREE from 'three';
-import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, DESK_Y } from './hardware.js';
+import { Resistor, LED5mm, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
 
 const HOLE = /^([a-j])(\d{1,2})$/;
 
@@ -80,6 +80,7 @@ export class Bench {
       case 'resistor': obj = new Resistor(d.bands, this.point(d.a).distanceTo(this.point(d.b)), d.hw || 'resistor'); break;
       case 'ldr': obj = new LDR(); break;
       case 'tmp36': obj = new TMP36(); break;
+      case 'sht31': obj = new SHT31Breakout(); break;
       case 'hcsr04': obj = new HCSR04(); break;
       case 'pir': obj = new PIRModule(); break;
       case 'l293d': obj = new L293D(); break;
@@ -113,6 +114,7 @@ export class Bench {
       case 'buzzer': { const p = P(d.plus), m = P(d.minus); return { pos: p.clone().lerp(m, 0.5), rotY: Math.atan2(-(m.z - p.z), m.x - p.x) }; }
       case 'ldr': { const a = P(d.a), b = P(d.b); return { pos: a.clone().lerp(b, 0.5), rotY: Math.atan2(-(b.z - a.z), b.x - a.x) }; }
       case 'tmp36': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
+      case 'sht31': return { pos: this.bb.hole(d.row, d.col + 3), rotY: 0 };   // 7 pins in columns col … col+6
       case 'pir': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
       case 'servo': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
       case 'l293d': return { pos: this.bb.hole('e', d.col).lerp(this.bb.hole('f', d.col + 7), 0.5), rotY: 0 };
