@@ -7,6 +7,8 @@ import { initMaterials, canvasTex, noise } from './materials.js';
 import { UnoQBoard } from './board.js';
 import { Pi4Board } from './pi4/board.js';
 import { PARTS_PI, CATEGORIES_PI, BOARD_FACTS_PI, J8_HEADER, findPinPi } from './pi4/data.js';
+import { PI_LESSONS, PI_MODULES, PI_COMING } from './pi4/lessons.js';
+import { makePiAccessories, PI_ACC_INFO } from './pi4/peripherals.js';
 import uqThumb from '../assets/pcb_top_albedo.jpg';
 import piThumb from '../assets/pi4/pi4_top.jpg';
 import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, HandModel } from './hardware.js';
@@ -23,9 +25,10 @@ const CATEGORIES = IS_PI ? CATEGORIES_PI : UQ_CATEGORIES;
 const BOARD_FACTS = IS_PI ? BOARD_FACTS_PI : UQ_FACTS;
 const findPin = IS_PI ? findPinPi : uqFindPin;
 const PIN_HEADERS = IS_PI ? [J8_HEADER] : [JDIGITAL, JANALOG, JSPI];
-const LESSONS = IS_PI ? [] : UQ_LESSONS;
-const MODULES = IS_PI ? {} : UQ_MODULES;
-const COMING_SOON = IS_PI ? ['Meet the Raspberry Pi 4', 'Power supply, microSD card and the operating system', 'First boot, desktop and the terminal', 'The 40-pin GPIO header and 3.3 V safety', 'Blink an LED with Python', 'Read a push button', 'PWM: fade an LED', 'An I²C sensor', 'Camera module', 'A web page served by the Pi', 'Final project'] : UQ_SOON;
+const LESSONS = IS_PI ? PI_LESSONS : UQ_LESSONS;
+const MODULES = IS_PI ? PI_MODULES : UQ_MODULES;
+const COMING_SOON = IS_PI ? PI_COMING : UQ_SOON;
+const pinName = pin => { if (!IS_PI) return pin; const p = findPin(pin); return p ? (p.gpio !== null ? `GPIO${p.gpio} (pin ${p.pin})` : `${p.label} (pin ${p.pin})`) : pin; };
 import { LOGO_ARRAY, SHADES_ARRAY, matrixCode } from './data/code.js';
 import { Sim, blinkCode, VREF } from './sim.js';
 import { Scope } from './scope.js';
@@ -46,6 +49,10 @@ const VIEWS = {
   thermo2: { t: new THREE.Vector3(95, 0, 6), d: new THREE.Vector3(-0.08, 0.92, 0.38), dist: 270 },
   pixclose: { t: new THREE.Vector3(170, -4, 6), d: new THREE.Vector3(-0.06, 0.93, 0.36), dist: 62 },
   smart: { t: new THREE.Vector3(95, 0, 8), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 430 },
+  pibench: { t: new THREE.Vector3(-4, 0, -30), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 235 },
+  pibb: { t: new THREE.Vector3(-6, 2, -57), d: new THREE.Vector3(-0.08, 0.88, 0.47), dist: 118 },
+  pifront: { t: new THREE.Vector3(-4, 0, 26), d: new THREE.Vector3(-0.25, 0.55, 0.8), dist: 125 },
+  piports: { t: new THREE.Vector3(42, 4, -2), d: new THREE.Vector3(0.78, 0.48, 0.4), dist: 150 },
   motor: { t: new THREE.Vector3(0, 0, 90), d: new THREE.Vector3(-0.06, 0.9, 0.43), dist: 285 },
   drvclose: { t: new THREE.Vector3(0, 3, 71), d: new THREE.Vector3(-0.22, 0.86, 0.46), dist: 78 },
   sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
@@ -97,8 +104,9 @@ class App {
     const s = this.viewer.scene;
     this.cable = makeUsbCable(); this.cable.visible = false; s.add(this.cable);
     this.usbPlugged = false;
-    this.bb = new Breadboard(new THREE.Vector3(0, DESK_Y + 8.5, 68)); this.bb.group.visible = false; s.add(this.bb.group);
+    this.bb = new Breadboard(new THREE.Vector3(0, DESK_Y + 8.5, IS_PI ? -62 : 68)); this.bb.group.visible = false; s.add(this.bb.group);
     this.bench = new Bench(s, this.board, this.bb);
+    if (IS_PI) { this.acc = makePiAccessories(this.board); for (const a of this.acc.all) { a.on = false; s.add(a.group); } Object.assign(HW_INFO, PI_ACC_INFO); }
     this.strips = new THREE.Group(); this.strips.visible = false; s.add(this.strips);
     // desk lamp over the light sensor (Lesson 11): brightness follows the simulated light level
     this.lamp = new THREE.SpotLight(0xfff1d8, 0, 160, 0.5, 0.75, 1.6);
@@ -213,6 +221,7 @@ class App {
     if (this.bb.group.visible) t.push(this.bb.group);
     if (this.bb.group.visible || (this.lesson && this.lesson.noBreadboard)) t.push(...this.bench.pickables());
     if (this.obstacle && this.obstacle.visible) t.push(this.obstacle);
+    if (this.acc) for (const a of this.acc.all) if (a.group.visible) t.push(a.group);
     this.viewer.pickTargets = t;
   }
 
@@ -226,6 +235,7 @@ class App {
   powerOn() { this.board.powered = true; this.board.setPowerLed(true); this.pirPowered(); }
   powerOff() {
     this.sim.stop(); this.board.powered = false; this.bootToken = null;
+    if (IS_PI) this.board.setLed('act', false);
     this.board.setPowerLed(false); this.board.setMatrix(null);
     for (const id of ['rgb1', 'rgb2', 'rgb3', 'rgb4']) this.board.setLed(id, 0, 0, 0);
     this.outputsOff();
@@ -248,6 +258,11 @@ class App {
   }
 
   async bootAnimation(ms = 5200) {
+    if (IS_PI) {
+      const tok = this.bootToken = {}, t0 = performance.now();
+      while (performance.now() - t0 < ms) { if (this.bootToken !== tok || !this.board.powered) return; this.board.setLed('act', Math.random() < 0.45); await sleep(60 + Math.random() * 140); }
+      this.board.setLed('act', false); return;
+    }
     const tok = this.bootToken = {};
     const t0 = performance.now();
     while (performance.now() - t0 < ms) {
@@ -663,7 +678,7 @@ class App {
         h += `<button class="lesson-card ${this.lesson && this.lesson.id === L.id ? 'on' : ''} ${done ? 'done' : ''}" data-lesson="${L.id}">
           <span class="num">${done ? '✓' : L.num}</span><b>${L.title}</b><p>${L.goal}</p><div class="meta">${L.level} · ${L.time}${done ? ' · completed' : ''}</div></button>`;
       }
-      if (COMING_SOON.length) h += `<h3>${IS_PI ? 'Raspberry Pi 4 lessons — coming next' : 'Coming next (stage 3)'}</h3>` + COMING_SOON.map(s => `<div class="soon">${s}</div>`).join('');
+      if (COMING_SOON.length) h += `<h3>${IS_PI ? 'Coming next' : 'Coming next (stage 3)'}</h3>` + COMING_SOON.map(s => `<div class="soon">${s}</div>`).join('');
       side.innerHTML = h;
       side.querySelectorAll('[data-lesson]').forEach(b => b.onclick = () => this.startLesson(b.dataset.lesson));
       const on = side.querySelector('.lesson-card.on'); if (on) on.scrollIntoView({ block: 'nearest' });
@@ -678,7 +693,7 @@ class App {
     this.pulseObjs = null; this.viewer.outline.edgeStrength = 4;
     if (mode === 'explore') {
       this.sim.stop(); this.stopSound(); this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false); this.showRelay(false); this.showThermo(false); this.showPhone(false);
-      this.lesson = null;
+      this.lesson = null; this.hideAcc();
       this.renderSide();
       this.select(null, { card: false });
       this.showWelcome();
@@ -689,15 +704,8 @@ class App {
   }
 
   lessonHome() {
-    if (IS_PI) {
-      $('#panel').innerHTML = `<div class="card"><div class="lesson-head">Course</div><h2>Raspberry Pi 4 lessons</h2>
-        <p>The Raspberry Pi 4 course is being built. Each lesson will show the real hardware and every connection in 3D, step by step, with verified facts — like the UNO Q course.</p>
-        <ol>${COMING_SOON.map(t => `<li>${t}</li>`).join('')}</ol>
-        <p class="tip">Meanwhile, explore the board: open <b>Explore the board</b> and click any part or GPIO pin.</p></div>`;
-      return;
-    }
-    $('#panel').innerHTML = `<div class="card"><div class="lesson-head">Course</div><h2>Learn the UNO Q step by step</h2>
-      <p>The lessons go in order, from the very basics to circuits with inputs, outputs, light and sound. Each step moves the 3D board, highlights the parts and explains them.</p>
+    $('#panel').innerHTML = `<div class="card"><div class="lesson-head">Course</div><h2>Learn the ${IS_PI ? 'Raspberry Pi 4' : 'UNO Q'} step by step</h2>
+      <p>The lessons go in order, ${IS_PI ? 'from setting up the board to Python programs that control electronics' : 'from the very basics to circuits with inputs, outputs, light and sound'}. Each step moves the 3D board, highlights the parts and explains them.</p>
       ${Object.entries(MODULES).map(([m, name]) => `<p><b>${name}</b></p><ol start="${LESSONS.find(l => l.module === +m).num}">${LESSONS.filter(l => l.module === +m).map(L => `<li>${L.title} — ${L.time}</li>`).join('')}</ol>`).join('')}
       <p class="tip">Start with <b>Lesson 1</b> on the left.</p>
       <p class="sim">Purple notes mark things that are <b>simulated</b> in this app (for example shortened boot times or ADC noise).</p></div>`;
@@ -714,6 +722,7 @@ class App {
     const L = LESSONS.find(l => l.id === id);
     this.sim.stop(); this.stopSound(); this.outputsOff();
     this.lesson = L; this.stepIdx = 0; this.inQuiz = false;
+    this.hideAcc();
     this.board.setMatrix(null);
     this.lamp.intensity = 0; this.hideSonar(); this.showRoom(false); this.showMotor(false); this.showRelay(false);
     if (L.circuit) { this.bench.setDefs(L.circuit); this.bb.group.visible = !L.noBreadboard; }
@@ -732,6 +741,8 @@ class App {
     if (!has) return;
     this.blinkDelay = 1000; $('#speed').value = 1000; $('#speed-val').textContent = '1000 ms';
     if (L.code) this.renderCode(L.code, L.explain, L.code2, L.code3);
+    document.querySelector('.dock-code .file').textContent = L.file || (IS_PI ? 'program.py' : 'sketch.ino');
+    document.querySelector('.dock-serial .file').textContent = IS_PI ? 'Shell (program output)' : 'Serial Monitor';
     $('#serial').innerHTML = '';
     $('#slider-wrap').classList.remove('on');
     this.setPinLevel('');
@@ -745,7 +756,7 @@ class App {
     $('#dock').classList.toggle('with-io', w.length > 0);
     $('#dock').classList.toggle('no-serial', L.id === 'l9');
     let h = '';
-    if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on D4</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
+    if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on ${IS_PI ? 'GPIO2 (pin 3)' : 'D4'}</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
     if (w.includes('light')) h += `<div class="io-block"><div class="io-title">Light on the sensor <span class="io-note">(simulated)</span></div><input id="lux" type="range" min="0" max="1000" value="${Math.round(this.luxToSlider(this.lux))}"><div class="io-tools">${[['Dark', 0.01], ['Dim', 10], ['Room light', 300], ['Torch', 2000]].map(([t, v]) => `<button class="lvl" data-lux="${v}">${t}</button>`).join('')}</div><div id="lux-val" class="io-val"></div></div>`;
     if (w.includes('temp')) h += `<div class="io-block"><div class="io-title">Temperature around the TMP36 <span class="io-note">(simulated)</span></div><input id="tempc" type="range" min="-40" max="125" step="0.5" value="${this.tempC}"><div id="temp-val" class="io-val"></div></div>`;
     if (w.includes('distance')) h += `<div class="io-block"><div class="io-title">Obstacle in front of the sensor <span class="io-note">(simulated)</span></div><input id="dist" type="range" min="2" max="400" step="0.5" value="${this.distCm}"><div class="io-tools">${[5, 20, 40, 100, 250, 400].map(v => `<button class="lvl" data-dist="${v}">${v} cm</button>`).join('')}</div><div id="dist-val" class="io-val"></div><div class="io-note">or drag the obstacle in the 3D view</div></div><div class="io-block"><div class="io-title">Timing (HC-SR04 datasheet) · animation slowed down</div><canvas id="sonar-timing" width="560" height="112"></canvas></div>`;
@@ -823,6 +834,19 @@ class App {
     $('#explain').innerHTML = 'Click a line to see what it does.';
   }
 
+  hideAcc() { if (this.acc) for (const a of this.acc.all) { a.set(false); a.on = false; } }
+  async applyAcc(i, prev, alive) {
+    const L = this.lesson; let list = null;
+    for (let k = 0; k <= i; k++) if (L.steps[k].acc) list = L.steps[k].acc;
+    if (!list) { this.hideAcc(); return; }
+    for (const [key, a] of Object.entries(this.acc)) {
+      if (key === 'all') continue;
+      const want = list.includes(key);
+      if (want && !a.on) { a.on = true; if (i === prev + 1 && alive()) await (a.insert ? a.insert(true) : a.connect(true)); else a.set(true); }
+      else if (!want && a.on) { a.on = false; a.set(false); }
+    }
+    this.refreshPickTargets();
+  }
   async goStep(i) {
     const L = this.lesson; if (!L) return;
     i = Math.max(0, Math.min(L.steps.length - 1, i));
@@ -885,7 +909,9 @@ class App {
       if (S.holes) this.holeLabels(S.holes);
       if (S.trace) { const objs = this.bench.groups(S.trace); this.setOutline(objs); this.pulseObjs = objs; }
     }
+    if (this.acc) { await this.applyAcc(i, prev, alive); if (!alive()) return; }
     const st = L.steps.some(x => x.power !== undefined) ? this.stepState(i) : {};
+    if (IS_PI && st.power === false && this.usbPlugged && !L.circuit) await this.plug(false);
     if (st.power === true) await this.ensurePower();
     if (!alive()) return;
     await this.doAction(S.action, tok);
@@ -895,6 +921,7 @@ class App {
     const alive = () => tok === this.stepTok;
     switch (a) {
       case 'plugUsb': await sleep(700); if (!alive()) return; await this.plug(true); this.toast('Power LED on — the board is starting.'); this.bootAnimation(9000); break;
+      case 'piboot': await this.ensurePower(); if (!alive()) return; this.toast('Red PWR LED on — the Raspberry Pi is starting.'); this.bootAnimation(14000); break;
       case 'boot': await this.ensurePower(); if (!alive()) return; this.bootAnimation(9000); break;
       case 'longPress': {
         await this.ensurePower(); if (!alive()) return;
@@ -1015,7 +1042,7 @@ class App {
     if (b && b.setPressed) b.setPressed(down);
     this.buttonDown = down;
     const s = $('#btn-state');
-    if (s) s.innerHTML = down ? '<b class="lo">Pressed</b> → D4 connected to GND → reads LOW' : 'Released → D4 reads HIGH (pull-up)';
+    if (s) s.innerHTML = IS_PI ? (down ? '<b class="lo">Pressed</b> → GPIO2 connected to GND → LOW → is_pressed = True' : 'Released → GPIO2 reads HIGH (pull-up) → is_pressed = False') : down ? '<b class="lo">Pressed</b> → D4 connected to GND → reads LOW' : 'Released → D4 reads HIGH (pull-up)';
   }
   // ---- light sensor model: typical GL5528 (datasheet: 10–20 kΩ at 10 lux, γ = 0.6, dark ≥ 1 MΩ) — 15 kΩ at 10 lux
   ldrOhms(lux = this.lux) { return 15000 * Math.pow(Math.max(lux, 0.001) / 10, -0.6); }
@@ -1594,7 +1621,7 @@ class App {
     const on = !!(L && L.led && level && this.board.powered && this.wired(L.io));
     if (L && L.led) L.led.set(on);
     if (this.scope && (this.lesson.scopePin || 'D5') === pin) this.scope.set({ type: 'dc', level });
-    this.setPinLevel(`${pin}: <span class="${level ? 'hi' : 'lo'}">${level ? 'HIGH · 3.3 V' : 'LOW · 0 V'}</span>${L ? ` → <span class="${on ? 'led-on' : 'led-off'}">LED ${on ? 'ON' : 'OFF'}</span>` : ''}`);
+    this.setPinLevel(`${pinName(pin)}: <span class="${level ? 'hi' : 'lo'}">${level ? 'HIGH · 3.3 V' : 'LOW · 0 V'}</span>${L ? ` → <span class="${on ? 'led-on' : 'led-off'}">LED ${on ? 'ON' : 'OFF'}</span>` : ''}`);
   }
 
   onPwm(pin, duty, raw) {
@@ -1714,7 +1741,7 @@ class App {
 }
 
 // ------------------------------------------------------------------ tiny C++ highlighter
-const KW = new Set(['void', 'int', 'const', 'float', 'uint8_t', 'uint16_t', 'uint32_t', 'bool', 'byte', 'char', 'for', 'while', 'if', 'else', 'return', 'static', 'unsigned', 'long', 'true', 'false', 'String']);
+const KW = new Set(['from', 'import', 'def', 'True', 'False', 'None', 'not', 'and', 'or', 'pass', 'global', 'void', 'int', 'const', 'float', 'uint8_t', 'uint16_t', 'uint32_t', 'bool', 'byte', 'char', 'for', 'while', 'if', 'else', 'return', 'static', 'unsigned', 'long', 'true', 'false', 'String']);
 const CONST = new Set(['HIGH', 'LOW', 'OUTPUT', 'INPUT', 'INPUT_PULLUP', 'LED_BUILTIN', 'D2', 'D4', 'D5', 'D7', 'D8', 'D9', 'A0', 'LED3_R', 'LED3_G', 'LED3_B']);
 function highlight(line) {
   if (/^\s*#include/.test(line)) return `<span class="tk-kw">${esc(line)}</span>`;

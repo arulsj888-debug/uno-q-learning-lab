@@ -6,9 +6,14 @@
 //  - every hole label shown in a step is a leg of a part that is on the breadboard in that step
 //  - header print (what is written on the 3D headers) matches the pin data
 import { LESSONS } from '../src/data/lessons.js';
+import { PI_LESSONS } from '../src/pi4/lessons.js';
 import { JDIGITAL, JANALOG, JSPI } from '../src/data/pins.js';
 
-const PINS = new Set([...JDIGITAL.pins, ...JANALOG.pins, ...JSPI.pins].map(p => p.id));
+const UQ_PINS = new Set([...JDIGITAL.pins, ...JANALOG.pins, ...JSPI.pins].map(p => p.id));
+// Raspberry Pi 4 J8: physical pins p1..p40; power/ground per the datasheet pinout (Figure 3)
+const PI_PINS = new Set(Array.from({ length: 40 }, (_, i) => 'p' + (i + 1)));
+const PI_SIG = { p1: '3V3', p17: '3V3', p2: '5V', p4: '5V', p6: 'GND', p9: 'GND', p14: 'GND', p20: 'GND', p25: 'GND', p30: 'GND', p34: 'GND', p39: 'GND' };
+let PINS = UQ_PINS, PI = false;
 PINS.add('QWIIC');                                         // the UNO Q Qwiic connector (I2C4 / Wire1)
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
@@ -16,10 +21,10 @@ const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2|QA|QB
 const isMod = r => MOD.test(r);
 const isWire = d => d.type === 'wire' || d.type === 'fwire' || d.type === 'lead' || d.type === 'qwiic';
 const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
-const sigOf = r => (/^GND\d?$|^SPI_GND$/.test(r) ? 'GND' : r);            // all GND pins are one net
+const sigOf = r => (PI ? (PI_SIG[r] || r) : (/^GND\d?$|^SPI_GND$/.test(r) ? 'GND' : r));            // all GND pins are one net
 const colNet = h => { const [, row, c] = HOLE.exec(h); return `col${c}${'abcde'.includes(row) ? 'top' : 'bot'}`; };
 let problems = 0;
-const bad = (L, msg) => { problems++; console.log(`✗ Lesson ${L.num}: ${msg}`); };
+const bad = (L, msg) => { problems++; console.log(`✗ ${PI ? 'Pi 4 ' : ''}Lesson ${L.num}: ${msg}`); };
 
 function legs(d) {
   switch (d.type) {
@@ -52,7 +57,9 @@ function nets(defs, pressed = false) {
   return { same: (a, b) => f(a) === f(b), f };
 }
 
-for (const L of LESSONS) {
+for (const [boardName, list] of [['UNO Q', LESSONS], ['Pi 4', PI_LESSONS]]) {
+PI = boardName === 'Pi 4'; PINS = PI ? PI_PINS : UQ_PINS;
+for (const L of list) {
   if (!L.circuit) continue;
   const all = L.circuit;
   const byId = Object.fromEntries(all.map(d => [d.id, d]));
@@ -195,9 +202,11 @@ for (const L of LESSONS) {
   const wires = all.filter(isWire);
   const hasWire = (a, b) => wires.some(w => [[w.from, w.to], [w.to, w.from]].some(([x, y]) => sigOf(x) === sigOf(a) && y === b));
   L.steps.forEach((S, k) => {
-    const txt = S.body.replace(/<[^>]+>/g, '');
+    const txt = S.body.replace(/<[^>]+>/g, ' ').replace(/[ 	]+/g, ' ');   // tags become spaces so words never glue together
     for (const m of txt.matchAll(/\b(D\d{1,2}|A[0-5]|3V3|5V|VIN|GND)\b(?: on [A-Z]+)?\s*→\s*(?:hole\s+)?([a-j]\d{1,2})\b/g))
       if (!hasWire(m[1], m[2])) bad(L, `step ${k + 1}: text says "${m[1]} → ${m[2]}" but no such wire`);
+    if (PI) for (const m of txt.matchAll(/\bpin (\d{1,2})\b[^→\n]{0,24}→\s*([a-j]\d{1,2})\b/g))
+      if (!hasWire('p' + m[1], m[2])) bad(L, `step ${k + 1}: text says "pin ${m[1]} → ${m[2]}" but no such wire`);
     for (const m of txt.matchAll(/\b(?:hole\s+)?([a-j]\d{1,2})\s*→\s*(D\d{1,2}|A[0-5]|3V3|5V|VIN|GND)\b/g))
       if (!hasWire(m[2], m[1])) bad(L, `step ${k + 1}: text says "${m[1]} → ${m[2]}" but no such wire`);
     // hole labels must be legs of parts present in this step
@@ -224,7 +233,8 @@ for (const L of LESSONS) {
     for (const p of S.pins || []) if (!PINS.has(p)) bad(L, `step ${k + 1}: marker for unknown pin ${p}`);
     for (const id of S.have || []) if (!byId[id]) bad(L, `step ${k + 1}: unknown part ${id}`);
   });
-  console.log(`✓ Lesson ${L.num} circuit checked (${all.length} items)`);
+  console.log(`✓ ${PI ? 'Pi 4 ' : ''}Lesson ${L.num} circuit checked (${all.length} items)`);
+}
 }
 console.log(problems ? `\n${problems} PROBLEM(S) FOUND` : '\nAll lesson circuits and texts are consistent.');
 process.exit(problems ? 1 : 0);

@@ -384,6 +384,44 @@ export const PROGRAMS = {
     }
   },
 
+  // ---- Raspberry Pi 4 (Python, GPIO Zero). Pins are physical header pins: p11 = GPIO17, p3 = GPIO2.
+  async pi_blink(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2);
+    await rt.at(4); rt.pinMode('p11', 'OUTPUT'); rt.digitalWrite('p11', 0);      // LED(17): output, initially off
+    for (;;) {
+      await rt.at(6);
+      await rt.at(7); rt.digitalWrite('p11', 1);
+      await rt.at(8); await rt.delay(1000);
+      await rt.at(9); rt.digitalWrite('p11', 0);
+      await rt.at(10); await rt.delay(1000);
+    }
+  },
+  async pi_button(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2);
+    await rt.at(4); rt.pinMode('p3', 'INPUT_PULLUP');                              // Button(2): pull_up=True by default
+    for (;;) {
+      await rt.at(6);
+      await rt.at(7); const pressed = rt.digitalRead('p3') === 0;
+      if (pressed) { await rt.at(8); rt.println('Pressed'); }
+      else { await rt.at(9); await rt.at(10); rt.println('Released'); }
+      await rt.at(11); await rt.delay(1000);
+    }
+  },
+  async pi_button_led(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1);
+    await rt.at(3); rt.pinMode('p11', 'OUTPUT'); rt.digitalWrite('p11', 0);
+    await rt.at(4); rt.pinMode('p3', 'INPUT_PULLUP');
+    for (;;) {
+      await rt.at(6);
+      await rt.at(7);
+      if (rt.digitalRead('p3') === 0) { await rt.at(8); rt.digitalWrite('p11', 1); }
+      else { await rt.at(9); await rt.at(10); rt.digitalWrite('p11', 0); }
+    }
+  },
+
   async tmp36(rt) {
     await rt.at(2);
     await rt.at(4);

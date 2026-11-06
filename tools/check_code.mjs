@@ -1,5 +1,6 @@
 // Verifies that every line number used by the simulator points at the right source line.
 import * as C from '../src/data/code.js';
+import * as PI from '../src/pi4/lessons.js';
 const L = (code, n) => code.split('\n')[n - 1] || '';
 const checks = {
   BLINK: [C.BLINK, [[1, 'void setup'], [2, 'Serial.begin'], [4, 'pinMode(LED_BUILTIN'], [8, 'void loop'], [9, 'HIGH'], [10, 'delay(1000)'], [11, 'LOW'], [12, 'delay(1000)'], [14, 'Serial.println']]],
@@ -28,6 +29,9 @@ const checks = {
   HOME_INO: [C.HOME_INO, [[1, 'Arduino_RouterBridge.h'], [2, 'Arduino_Modulino.h'], [4, 'ModulinoThermo thermo'], [5, 'relayPin = D4'], [7, 'bool set_lamp'], [8, 'if (on)'], [9, 'pinMode(relayPin, OUTPUT)'], [10, 'digitalWrite(relayPin, LOW)'], [11, '} else {'], [12, 'pinMode(relayPin, INPUT)'], [14, 'return on'], [17, 'void setup'], [18, 'pinMode(relayPin, INPUT)'], [19, 'Bridge.begin()'], [20, 'Bridge.provide("set_lamp", set_lamp)'], [21, 'Modulino.begin()'], [22, 'thermo.begin()'], [25, 'void loop'], [26, 'getTemperature()'], [27, 'getHumidity()'], [28, 'Bridge.notify("on_reading"'], [29, 'delay(500)']]],
   HOME_PY: [C.HOME_PY, [[1, 'from arduino.app_utils import *'], [2, 'WebUI'], [3, 'import time'], [5, 'ui = WebUI()'], [7, 'latest = None'], [8, 'auto = True'], [9, 'lamp_on = False'], [10, 'want_lamp = False'], [12, 'def on_reading'], [13, 'global latest'], [14, 'latest = (celsius, humidity)'], [15, 'ui.send_message("reading"'], [17, 'def on_toggle_mode'], [18, 'global auto'], [19, 'auto = not auto'], [21, 'def on_toggle_lamp'], [22, 'global want_lamp'], [23, 'if not auto'], [24, 'want_lamp = not lamp_on'], [26, 'Bridge.provide("on_reading", on_reading)'], [27, 'ui.on_message("toggle_mode", on_toggle_mode)'], [28, 'ui.on_message("toggle_lamp", on_toggle_lamp)'], [30, 'def loop'], [31, 'global lamp_on, want_lamp'], [32, 'latest is not None'], [33, 'if auto'], [34, 'want_lamp = latest[0] > 28'], [35, 'if want_lamp != lamp_on'], [36, 'lamp_on = want_lamp'], [37, 'Bridge.call("set_lamp", lamp_on)'], [38, 'time.sleep(0.5)'], [40, 'App.run(user_loop=loop)']]],
   HOME_JS: [C.HOME_JS, [[1, 'new WebUI()'], [3, "ui.on_message('reading'"], [4, '#temp'], [5, '#lamp'], [6, '#mode'], [7, '});'], [9, "'toggle_mode'"], [10, "'toggle_lamp'"]]],
+  PI_BLINK: [PI.PI_BLINK, [[1, 'from gpiozero import LED'], [2, 'from time import sleep'], [4, 'led = LED(17)'], [6, 'while True:'], [7, 'led.on()'], [8, 'sleep(1)'], [9, 'led.off()'], [10, 'sleep(1)']]],
+  PI_BUTTON: [PI.PI_BUTTON, [[1, 'from gpiozero import Button'], [2, 'from time import sleep'], [4, 'button = Button(2)'], [6, 'while True:'], [7, 'if button.is_pressed:'], [8, 'print("Pressed")'], [9, 'else:'], [10, 'print("Released")'], [11, 'sleep(1)']]],
+  PI_BUTTON_LED: [PI.PI_BUTTON_LED, [[1, 'from gpiozero import LED, Button'], [3, 'led = LED(17)'], [4, 'button = Button(2)'], [6, 'while True:'], [7, 'if button.is_pressed:'], [8, 'led.on()'], [9, 'else:'], [10, 'led.off()']]],
   BUZZER: [C.BUZZER, [[2, 'buzzerPin = D9'], [3, 'int notes[]'], [5, 'void setup'], [8, 'void loop'], [9, 'for (int i'], [10, 'tone(buzzerPin'], [11, 'delay(300)'], [13, 'noTone'], [14, 'delay(1000)']]],
 };
 let bad = 0;

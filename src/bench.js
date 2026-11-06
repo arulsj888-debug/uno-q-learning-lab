@@ -92,7 +92,7 @@ export class Bench {
       case 'qwiic': obj = new QwiicCable(this.point(d.from), this.termDir(d.from), this.point(d.to), this.termDir(d.to), { lift: d.lift ?? 5 }); break;
       case 'lamp': obj = new MiniLamp(); break;
       case 'servo': obj = new ServoMotor(new THREE.Vector3(d.bx, DESK_Y, d.bz).sub(this.bb.hole(d.row, d.col + 1))); break;
-      case 'fwire': { const [pid, pn] = d.from.split('.'); const p = this.items[pid].obj.pin(pn); obj = new FemaleJumper(p.pos, p.dir, this.point(d.to), d.color, { lift: d.lift ?? 30, id: 'jumper' }); break; }
+      case 'fwire': { const bp = this.board.pins[d.from]; const p = bp && bp.female ? { pos: bp.female.clone(), dir: new THREE.Vector3(0, 1, 0) } : (([pid, pn]) => this.items[pid].obj.pin(pn))(d.from.split('.')); obj = new FemaleJumper(p.pos, p.dir, this.point(d.to), d.color, { lift: d.lift ?? 30, id: 'jumper' }); break; }
       case 'led': obj = new LED5mm(d.color); break;
       case 'button': obj = new PushButton(); break;
       case 'pot': obj = new Potentiometer(); break;

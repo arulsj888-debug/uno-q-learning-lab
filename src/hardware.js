@@ -49,8 +49,9 @@ export function makeUsbCable() {
 
 export async function plugUsb(cable, board, insert = true, ms = 1400) {
   const mouth = board.usbMouth;        // receptacle opening (world)
-  cable.position.copy(mouth);
-  cable.position.x += 6.2;             // plug tip seated inside the receptacle
+  const rot = board.usbRotY || 0;      // UNO Q: opening faces −x (0); Raspberry Pi 4: faces +z
+  cable.rotation.y = rot;
+  cable.position.copy(mouth).add(new THREE.Vector3(6.2, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), rot));   // plug tip seated inside the receptacle
   const out = -26;
   const plug = cable.userData.plug;
   if (insert) {

@@ -71,6 +71,7 @@ export class Pi4Board {
     this.group = new THREE.Group(); this.group.name = 'Raspberry Pi 4';
     this.parts = {}; this.proxies = []; this.pins = {}; this.leds = {};
     this.powered = false;
+    this.usbMouth = P(11.21, -1.26, 1.6); this.usbRotY = Math.PI / 2;   // USB-C opening faces −y (board edge)
     this.build();
   }
   part(id) { if (!this.parts[id]) { const g = new THREE.Group(); g.name = id; g.userData.part = id; this.parts[id] = g; this.group.add(g); } return this.parts[id]; }
@@ -155,7 +156,7 @@ export class Pi4Board {
     for (const p of J8) {
       const col = Math.floor((p.pin - 1) / 2), x = 32.515 + (col - 9.5) * 2.54, y = 52.48 + (p.pin % 2 ? -1.27 : 1.27);
       pinsXY.push([x, y]);
-      this.pins[p.id] = { pos: P(x, y, top + 0.2), x, y, header: 'J8' };
+      this.pins[p.id] = { pos: P(x, y, top + 0.2), female: P(x, y, base + 3.0), x, y, header: 'J8' };
       const pr = this.proxy('pin:' + p.id, x, y, top - 1.2, 2.2, 2.2, 1.6); pr.userData.pin = p.id;
     }
     addPins('gpio', pinsXY);

@@ -46,7 +46,15 @@ Purple notes in the lessons mark behavior that is only **simulated** in the app,
 
 - **Explore the board** is ready: a 360° Raspberry Pi 4 at exact size, with every chip, port, LED and all 40 GPIO pins clickable (pin card: physical pin, GPIO number, 3.3 V level, typical use, default pull and ALT0–ALT5 functions from the datasheet).
 - How it is built: geometry (board outline, holes, every connector's position, size and height) from Raspberry Pi's **official mechanical drawing**, read from its vector data; surface from **real CC BY-SA photographs** of the board, straightened onto the exact millimetre grid with the four mounting holes. Connectors are real 3D shapes with hollow openings (USB tongues and contacts, RJ45 contacts and LED lenses, USB-C and micro-HDMI shells). Details and every source: [`docs/pi4-source-notes.md`](docs/pi4-source-notes.md), pipeline: [`tools/pi4/`](tools/pi4/README.md).
-- Lessons for the Pi 4 are next (listed in the app under *Lessons*).
+- **Lessons** (Python with GPIO Zero; programs are the official examples from the Raspberry Pi documentation):
+  - **Module 1: Getting started**
+    1. Meet the Raspberry Pi 4 (guided tour of every part)
+    2. Set up: microSD (Raspberry Pi Imager), monitor on HDMI0, keyboard/mouse on USB 2.0, power last, safe shutdown — all connections shown in 3D
+    3. The 40-pin GPIO header and 3.3 V safety (physical pin vs GPIO number, power/ground pins, 16 mA / 50 mA limits)
+  - **Module 2: GPIO with Python**
+    4. Blink an LED (`LED(17)`, female–male jumpers from the header to a breadboard)
+    5. Read a push button (`Button(2)`, pull-up)
+    6. The button controls the LED
 
 ## Works on every screen
 
