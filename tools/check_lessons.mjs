@@ -9,6 +9,8 @@ import { LESSONS } from '../src/data/lessons.js';
 import { PI_LESSONS } from '../src/pi4/lessons.js';
 import { U3_LESSONS } from '../src/uno3/lessons.js';
 import { U3_PINS } from '../src/uno3/data.js';
+import { E32_LESSONS } from '../src/esp32/lessons.js';
+import { E32_PINS } from '../src/esp32/data.js';
 import { JDIGITAL, JANALOG, JSPI } from '../src/data/pins.js';
 
 const UQ_PINS = new Set([...JDIGITAL.pins, ...JANALOG.pins, ...JSPI.pins].map(p => p.id));
@@ -16,7 +18,8 @@ const UQ_PINS = new Set([...JDIGITAL.pins, ...JANALOG.pins, ...JSPI.pins].map(p 
 const PI_PINS = new Set(Array.from({ length: 40 }, (_, i) => 'p' + (i + 1)));
 const PI_SIG = { p1: '3V3', p17: '3V3', p2: '5V', p4: '5V', p6: 'GND', p9: 'GND', p14: 'GND', p20: 'GND', p25: 'GND', p30: 'GND', p34: 'GND', p39: 'GND' };
 const U3_SET = new Set(U3_PINS.map(p => p.id));
-let PINS = UQ_PINS, PI = false, U3 = false, SUP = '3V3';    // SUP = the supply pin the analog sensors are fed from
+const E32_SET = new Set(E32_PINS.map(p => p.id));
+let PINS = UQ_PINS, PI = false, U3 = false, E32 = false, SUP = '3V3';    // SUP = the supply pin the analog sensors are fed from
 PINS.add('QWIIC');                                         // the UNO Q Qwiic connector (I2C4 / Wire1)
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
@@ -27,7 +30,7 @@ const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
 const sigOf = r => (PI ? (PI_SIG[r] || r) : (/^GND\d?$|^SPI_GND$/.test(r) ? 'GND' : r));            // all GND pins are one net
 const colNet = h => { const [, row, c] = HOLE.exec(h); return `col${c}${'abcde'.includes(row) ? 'top' : 'bot'}`; };
 let problems = 0;
-const bad = (L, msg) => { problems++; console.log(`✗ ${PI ? 'Pi 4 ' : U3 ? 'UNO R3 ' : ''}Lesson ${L.num}: ${msg}`); };
+const bad = (L, msg) => { problems++; console.log(`✗ ${PI ? 'Pi 4 ' : U3 ? 'UNO R3 ' : E32 ? 'ESP32 ' : ''}Lesson ${L.num}: ${msg}`); };
 
 function legs(d) {
   switch (d.type) {
@@ -61,8 +64,8 @@ function nets(defs, pressed = false) {
   return { same: (a, b) => f(a) === f(b), f };
 }
 
-for (const [boardName, list] of [['UNO Q', LESSONS], ['Pi 4', PI_LESSONS], ['UNO R3', U3_LESSONS]]) {
-PI = boardName === 'Pi 4'; U3 = boardName === 'UNO R3'; SUP = U3 ? '5V' : '3V3'; PINS = PI ? PI_PINS : U3 ? U3_SET : UQ_PINS;
+for (const [boardName, list] of [['UNO Q', LESSONS], ['Pi 4', PI_LESSONS], ['UNO R3', U3_LESSONS], ['ESP32', E32_LESSONS]]) {
+PI = boardName === 'Pi 4'; U3 = boardName === 'UNO R3'; E32 = boardName === 'ESP32'; SUP = U3 ? '5V' : '3V3'; PINS = PI ? PI_PINS : U3 ? U3_SET : E32 ? E32_SET : UQ_PINS;
 for (const L of list) {
   if (!L.circuit) continue;
   const all = L.circuit;
@@ -253,7 +256,7 @@ for (const L of list) {
     for (const p of S.pins || []) if (!PINS.has(p)) bad(L, `step ${k + 1}: marker for unknown pin ${p}`);
     for (const id of S.have || []) if (!byId[id]) bad(L, `step ${k + 1}: unknown part ${id}`);
   });
-  console.log(`✓ ${PI ? 'Pi 4 ' : U3 ? 'UNO R3 ' : ''}Lesson ${L.num} circuit checked (${all.length} items)`);
+  console.log(`✓ ${PI ? 'Pi 4 ' : U3 ? 'UNO R3 ' : E32 ? 'ESP32 ' : ''}Lesson ${L.num} circuit checked (${all.length} items)`);
 }
 }
 console.log(problems ? `\n${problems} PROBLEM(S) FOUND` : '\nAll lesson circuits and texts are consistent.');

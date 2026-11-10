@@ -37,7 +37,7 @@ export class Sim {
     const H = this.h;
     const check = () => { if (tok.stopped) throw new Stop(); };
     const pins = {};
-    let readBits = 10, writeBits = 8, serialOn = false, gray = 1, lineBuf = '';
+    let readBits = H.adcBits || 10, writeBits = 8, serialOn = false, gray = 1, lineBuf = '';
     // Arduino Print::print(float, digits): fixed number of decimals (default 2)
     const fmt = (v, digits) => (typeof v === 'number' && digits !== undefined ? v.toFixed(digits) : String(v));
     const slow = opts.slow !== false;
@@ -64,6 +64,9 @@ export class Sim {
         const noise = (Math.random() - 0.5) * 4 * 2 ** (readBits - 14);
         return Math.min(max, Math.max(0, Math.round(v / vref * max + noise)));
       },
+      // Arduino-ESP32 core 3.x LEDC: ledcAttach(pin, freq, resolution) then ledcWrite(pin, duty), duty = 0 ... 2^resolution - 1
+      ledcAttach: (pin, freq, bits) => { pins[pin] = { mode: 'OUTPUT', ledc: bits }; },
+      ledcWrite: (pin, duty) => { const bits = pins[pin] && pins[pin].ledc; if (!bits) return; const max = 2 ** bits - 1; H.pwm(pin, Math.min(max, Math.max(0, duty)) / max, duty); },
       analogWriteResolution: (b) => { writeBits = Math.min(31, Math.max(1, b)); },
       analogWrite: (pin, value) => {
         const max = 2 ** writeBits - 1;
@@ -315,6 +318,84 @@ export const PROGRAMS = {
       await rt.at(21); rt.print(h, 1);
       await rt.at(22); rt.println(' %');
       await rt.at(23); await rt.delay(2000);
+    }
+  },
+
+  // ---- ESP32 DevKit V1 programs (listings in src/esp32/code.js); pins are GPIO ids G2, G16 ...
+  async e_blink(rt, o) {
+    const d = () => (o.getDelay ? o.getDelay() : 1000);
+    await rt.at(2);
+    await rt.at(4);
+    await rt.at(5); rt.serialBegin(115200);
+    await rt.at(6); rt.pinMode('G2', 'OUTPUT');
+    for (;;) {
+      await rt.at(9);
+      await rt.at(10); rt.digitalWrite('G2', 1);
+      await rt.at(11); await rt.delay(d());
+      await rt.at(12); rt.digitalWrite('G2', 0);
+      await rt.at(13); await rt.delay(d());
+      await rt.at(14); rt.println('Hello World');
+    }
+  },
+
+  async e_extled(rt) {
+    await rt.at(2);
+    await rt.at(4);
+    await rt.at(5); rt.pinMode('G16', 'OUTPUT');
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); rt.digitalWrite('G16', 1);
+      await rt.at(10); await rt.delay(1000);
+      await rt.at(11); rt.digitalWrite('G16', 0);
+      await rt.at(12); await rt.delay(1000);
+    }
+  },
+
+  async e_button(rt) {
+    await rt.at(2); await rt.at(3);
+    await rt.at(5);
+    await rt.at(6); rt.serialBegin(115200);
+    await rt.at(7); rt.pinMode('G17', 'INPUT_PULLUP');
+    await rt.at(8); rt.pinMode('G16', 'OUTPUT');
+    for (;;) {
+      await rt.at(11);
+      await rt.at(12); const state = rt.digitalRead('G17');
+      await rt.at(13);
+      if (state === 0) {
+        await rt.at(14); rt.digitalWrite('G16', 1);
+        await rt.at(15); rt.println('Button is pressed. LED is on.');
+      } else {
+        await rt.at(17); rt.digitalWrite('G16', 0);
+        await rt.at(18); rt.println('Button is not pressed. LED is off.');
+      }
+      await rt.at(20); await rt.delay(200);
+    }
+  },
+
+  async e_pot(rt) {
+    await rt.at(2);
+    await rt.at(4);
+    await rt.at(5); rt.serialBegin(115200);
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); const v = rt.analogRead('G34');
+      await rt.at(10); rt.println(v);
+      await rt.at(11); await rt.delay(100);
+    }
+  },
+
+  async e_fade(rt) {
+    let brightness = 0, fadeAmount = 5;
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.ledcAttach('G16', 5000, 8);
+    for (;;) {
+      await rt.at(10);
+      await rt.at(11); rt.ledcWrite('G16', brightness);
+      await rt.at(12); brightness = brightness + fadeAmount;
+      await rt.at(13);
+      if (brightness <= 0 || brightness >= 255) { await rt.at(14); fadeAmount = -fadeAmount; }
+      await rt.at(16); await rt.delay(30);
     }
   },
 

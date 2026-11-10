@@ -15,6 +15,9 @@ import u3Thumb from '../assets/uno3/pcb_top_albedo.jpg';
 import { Uno3Board } from './uno3/board.js';
 import { U3_LESSONS, U3_MODULES, U3_COMING } from './uno3/lessons.js';
 import { PARTS_U3, CATEGORIES_U3, BOARD_FACTS_U3, U3_HEADERS, findPinU3 } from './uno3/data.js';
+import { Esp32Board, boardThumb as e32ThumbFn } from './esp32/board.js';
+import { E32_LESSONS, E32_MODULES, E32_COMING } from './esp32/lessons.js';
+import { PARTS_E32, CATEGORIES_E32, BOARD_FACTS_E32, E32_HEADERS, findPinE32 } from './esp32/data.js';
 import piThumb from '../assets/pi4/pi4_top.jpg';
 import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, HandModel } from './hardware.js';
 import { Bench } from './bench.js';
@@ -24,23 +27,24 @@ import { JDIGITAL, JANALOG, JSPI, JCTL, findPin as uqFindPin } from './data/pins
 import { LESSONS as UQ_LESSONS, COMING_SOON as UQ_SOON, MODULES as UQ_MODULES } from './data/lessons.js';
 
 // ------------------------------------------------------------------ board profile
-const BOARD = { pi4: 'pi4', uno3: 'uno3' }[new URLSearchParams(location.search).get('board')] || 'unoq';
-const IS_PI = BOARD === 'pi4', IS_U3 = BOARD === 'uno3';
-const PARTS = IS_PI ? PARTS_PI : IS_U3 ? PARTS_U3 : UQ_PARTS;
-const CATEGORIES = IS_PI ? CATEGORIES_PI : IS_U3 ? CATEGORIES_U3 : UQ_CATEGORIES;
-const BOARD_FACTS = IS_PI ? BOARD_FACTS_PI : IS_U3 ? BOARD_FACTS_U3 : UQ_FACTS;
-const findPin = IS_PI ? findPinPi : IS_U3 ? findPinU3 : uqFindPin;
-const PIN_HEADERS = IS_PI ? [J8_HEADER] : IS_U3 ? U3_HEADERS : [JDIGITAL, JANALOG, JSPI];
-const LESSONS = IS_PI ? PI_LESSONS : IS_U3 ? U3_LESSONS : UQ_LESSONS;
-const MODULES = IS_PI ? PI_MODULES : IS_U3 ? U3_MODULES : UQ_MODULES;
-const COMING_SOON = IS_PI ? PI_COMING : IS_U3 ? U3_COMING : UQ_SOON;
+const BOARD = { pi4: 'pi4', uno3: 'uno3', esp32: 'esp32' }[new URLSearchParams(location.search).get('board')] || 'unoq';
+const IS_PI = BOARD === 'pi4', IS_U3 = BOARD === 'uno3', IS_E32 = BOARD === 'esp32';
+const PARTS = IS_PI ? PARTS_PI : IS_U3 ? PARTS_U3 : IS_E32 ? PARTS_E32 : UQ_PARTS;
+const CATEGORIES = IS_PI ? CATEGORIES_PI : IS_U3 ? CATEGORIES_U3 : IS_E32 ? CATEGORIES_E32 : UQ_CATEGORIES;
+const BOARD_FACTS = IS_PI ? BOARD_FACTS_PI : IS_U3 ? BOARD_FACTS_U3 : IS_E32 ? BOARD_FACTS_E32 : UQ_FACTS;
+const findPin = IS_PI ? findPinPi : IS_U3 ? findPinU3 : IS_E32 ? findPinE32 : uqFindPin;
+const PIN_HEADERS = IS_PI ? [J8_HEADER] : IS_U3 ? U3_HEADERS : IS_E32 ? E32_HEADERS : [JDIGITAL, JANALOG, JSPI];
+const LESSONS = IS_PI ? PI_LESSONS : IS_U3 ? U3_LESSONS : IS_E32 ? E32_LESSONS : UQ_LESSONS;
+const MODULES = IS_PI ? PI_MODULES : IS_U3 ? U3_MODULES : IS_E32 ? E32_MODULES : UQ_MODULES;
+const COMING_SOON = IS_PI ? PI_COMING : IS_U3 ? U3_COMING : IS_E32 ? E32_COMING : UQ_SOON;
 const LOGIC_V = IS_U3 ? 5 : 3.3;      // I/O voltage of the board
-const BOARD_NAME = IS_PI ? 'Raspberry Pi 4' : IS_U3 ? 'Arduino UNO R3' : 'Arduino UNO Q';
-const USB_NAME = IS_U3 ? 'USB' : 'USB-C';
+const BOARD_NAME = IS_PI ? 'Raspberry Pi 4' : IS_U3 ? 'Arduino UNO R3' : IS_E32 ? 'ESP32 DevKit V1' : 'Arduino UNO Q';
+const BTN_PIN = IS_E32 ? 'GPIO17' : IS_U3 ? 'pin 4' : 'D4';   // pin the push-button lessons use
+const USB_NAME = IS_U3 || IS_E32 ? 'USB' : 'USB-C';
 // what analogRead() returns for a voltage: UNO R3 = 10 bit (ATmega328P: Vin x 1024 / Vref, max 1023), UNO Q lessons = 14 bit
-const adcCount = v => IS_U3 ? Math.min(1023, Math.max(0, Math.floor(v / LOGIC_V * 1024))) : Math.round(v / VREF * 16383);
-const ADC_BITS = IS_U3 ? '10-bit' : '14-bit';
-const pinName = pin => { if (IS_U3) return /^D\d+$/.test(pin) ? 'pin ' + pin.slice(1) : pin; if (!IS_PI) return pin; const p = findPin(pin); return p ? (p.gpio !== null ? `GPIO${p.gpio} (pin ${p.pin})` : `${p.label} (pin ${p.pin})`) : pin; };
+const adcCount = v => IS_U3 ? Math.min(1023, Math.max(0, Math.floor(v / LOGIC_V * 1024))) : IS_E32 ? Math.min(4095, Math.max(0, Math.floor(v / LOGIC_V * 4096))) : Math.round(v / VREF * 16383);
+const ADC_BITS = IS_U3 ? '10-bit' : IS_E32 ? '12-bit' : '14-bit';
+const pinName = pin => { if (IS_E32) return /^G\d+$/.test(pin) ? 'GPIO' + pin.slice(1) : pin; if (IS_U3) return /^D\d+$/.test(pin) ? 'pin ' + pin.slice(1) : pin; if (!IS_PI) return pin; const p = findPin(pin); return p ? (p.gpio !== null ? `GPIO${p.gpio} (pin ${p.pin})` : `${p.label} (pin ${p.pin})`) : pin; };
 import { LOGO_ARRAY, SHADES_ARRAY, matrixCode } from './data/code.js';
 import { Sim, blinkCode, VREF } from './sim.js';
 import { Scope } from './scope.js';
@@ -76,7 +80,7 @@ const VIEWS = {
   drvclose: { t: new THREE.Vector3(0, 3, 71), d: new THREE.Vector3(-0.22, 0.86, 0.46), dist: 78 },
   sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
 };
-const BOTTOM_PARTS = new Set(IS_PI ? ['sdcard'] : IS_U3 ? [] : ['mcu', 'emmc', 'jmisc', 'jmedia']);
+const BOTTOM_PARTS = new Set(IS_PI ? ['sdcard'] : IS_U3 || IS_E32 ? [] : ['mcu', 'emmc', 'jmisc', 'jmedia']);
 const shortName = n => n.replace(/^(Qualcomm Dragonwing™|STMicroelectronics|Qualcomm) /, '');
 
 class App {
@@ -87,13 +91,13 @@ class App {
 
     this.viewer = new Viewer($('#stage'));
     initMaterials(this.viewer.renderer);
-    this.board = IS_PI ? new Pi4Board() : IS_U3 ? new Uno3Board() : new UnoQBoard();
+    this.board = IS_PI ? new Pi4Board() : IS_U3 ? new Uno3Board() : IS_E32 ? new Esp32Board() : new UnoQBoard();
     this.applyBoardBranding();
     this.viewer.scene.add(this.board.group);
     this.mode = 'explore';
     this.selected = null; this.hovered = null;
     this.tempObjs = []; this.partLabels = [];
-    this.progress = JSON.parse(localStorage.getItem(IS_PI ? 'pi4-lab-progress' : IS_U3 ? 'uno3-lab-progress' : 'unoq-lab-progress') || '{}');
+    this.progress = JSON.parse(localStorage.getItem(IS_PI ? 'pi4-lab-progress' : IS_U3 ? 'uno3-lab-progress' : IS_E32 ? 'esp32-lab-progress' : 'unoq-lab-progress') || '{}');
     this.blinkDelay = 1000;
     this.soundOn = true;
     this.editorFrame = LOGO_ARRAY.map(v => v * 7);
@@ -121,11 +125,11 @@ class App {
   // ------------------------------------------------------------------ hardware
   setupHardware() {
     const s = this.viewer.scene;
-    this.cable = makeUsbCable(IS_U3 ? 'usbb' : 'usbc'); this.cable.visible = false; s.add(this.cable);
+    this.cable = makeUsbCable(IS_U3 ? 'usbb' : IS_E32 ? 'micro' : 'usbc'); this.cable.visible = false; s.add(this.cable);
     this.usbPlugged = false;
     this.bb = new Breadboard(new THREE.Vector3(0, DESK_Y + 8.5, IS_PI ? -62 : 68)); this.bb.group.visible = false; s.add(this.bb.group);
     this.bench = new Bench(s, this.board, this.bb);
-    this.fb = new FreeBuild(this, { isPi: IS_PI, boardKind: BOARD, pinInfo: findPin });
+    this.fb = IS_E32 ? null : new FreeBuild(this, { isPi: IS_PI, boardKind: BOARD, pinInfo: findPin });   // free build for the ESP32 is not ready yet
     this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2, fs: {} };
     if (IS_PI) { this.acc = makePiAccessories(this.board); for (const a of this.acc.all) { a.on = false; s.add(a.group); } Object.assign(HW_INFO, PI_ACC_INFO); }
     this.strips = new THREE.Group(); this.strips.visible = false; s.add(this.strips);
@@ -280,7 +284,7 @@ class App {
   }
 
   async bootAnimation(ms = 5200) {
-    if (IS_U3) return;      // the UNO R3 has no start-up animation: the sketch simply runs
+    if (IS_U3 || IS_E32) return;      // the UNO R3 and the ESP32 board have no start-up animation: the sketch simply runs
     if (IS_PI) {
       const tok = this.bootToken = {}, t0 = performance.now(); this.pios.mode = 'boot';
       while (performance.now() - t0 < ms) { if (this.bootToken !== tok || !this.board.powered) return; this.board.setLed('act', Math.random() < 0.45); await sleep(60 + Math.random() * 140); }
@@ -446,7 +450,8 @@ class App {
     h += `<p>${info.summary}</p>`;
     if (info.specs) h += `<table class="kv">${info.specs.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>`;
     if (info.points) h += `<ul>${info.points.map(p => `<li>${p}</li>`).join('')}</ul>`;
-    if (IS_U3 && U3_HEADERS.find(hd => hd.id === id)) { const hd = U3_HEADERS.find(x => x.id === id); h += `<div class="pingrid">${hd.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b> · pin ${p.pin}</button>`).join('')}</div>`; }
+    if (IS_E32 && E32_HEADERS.find(hd => hd.id === id)) { const hd = E32_HEADERS.find(x => x.id === id); h += `<div class="pingrid">${hd.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b> · ${p.gpio !== undefined ? 'GPIO' + p.gpio : 'pin ' + p.pin}</button>`).join('')}</div>`; }
+    else if (IS_U3 && U3_HEADERS.find(hd => hd.id === id)) { const hd = U3_HEADERS.find(x => x.id === id); h += `<div class="pingrid">${hd.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b> · pin ${p.pin}</button>`).join('')}</div>`; }
     else if (id === 'jdigital' || id === 'janalog' || id === 'jspi') {
       const hdr = id === 'jdigital' ? JDIGITAL : id === 'janalog' ? JANALOG : JSPI;
       h += `<div class="pingrid">${hdr.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b> · pin ${p.pin}</button>`).join('')}</div>`;
@@ -625,6 +630,13 @@ class App {
 
   pinCard(pinId) {
     if (IS_PI) return this.pinCardPi(pinId);
+    if (IS_E32) {
+      const p = findPin(pinId), hd = E32_HEADERS.find(x => x.pins.includes(p));
+      let h = `<div class="card"><h2><span class="pinchip">${p.label}</span></h2><div class="ref">${hd.name} · pin ${p.pin}</div>`;
+      h += `<table class="kv">${p.gpio !== undefined ? `<tr><td>In code</td><td><b>GPIO${p.gpio}</b> — write ${p.gpio} in pinMode(${p.gpio}, …)</td></tr>` : ''}<tr><td>Functions</td><td>${p.fn.join('<br>')}</td></tr><tr><td>Level</td><td>${p.v}</td></tr></table>`;
+      h += `<p class="${p.strap || p.inOnly ? 'warn' : ''}">${p.note}</p><p class="tip">${hd.common}</p><p><button class="item" data-part="${hd.id}">← About the ${hd.name}</button></p>`;
+      return h + `<div class="src">Sources: Espressif ESP32 datasheet v5.3 · ESP32-WROOM-32 datasheet · Random Nerd Tutorials pinout reference · espboards.dev (silkscreen order)</div></div>`;
+    }
     if (IS_U3) {
       const p = findPin(pinId), hd = U3_HEADERS.find(x => x.pins.includes(p));
       let h = `<div class="card"><h2><span class="pinchip">${p.label}</span> ${p.id !== p.label && !/^GND/.test(p.id) ? p.id : ''}</h2><div class="ref">${hd.name} · pin ${p.pin}</div>`;
@@ -657,11 +669,12 @@ class App {
   applyBoardBranding() {
     if (IS_PI) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'Raspberry Pi 4'; const lg = document.querySelector('.brand .logo'); if (lg) lg.style.display = 'none'; }
     if (IS_U3) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'Arduino UNO R3'; }
+    if (IS_E32) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'ESP32 DevKit V1'; const bt = document.querySelector('.modes [data-mode="build"]'); if (bt) bt.style.display = 'none'; }
     document.title = BOARD_NAME + ' · 3D Learning Lab';
     const ch = $('#chooser');
     if (ch) {
       const cards = ch.querySelectorAll('[data-board]');
-      cards.forEach(c => { const im = c.querySelector('.ch-img'); if (im && !im.firstChild) { const img = new Image(); img.alt = ''; img.src = c.dataset.board === 'pi4' ? piThumb : c.dataset.board === 'uno3' ? u3Thumb : uqThumb; im.appendChild(img); } c.classList.toggle('cur', c.dataset.board === BOARD); });
+      cards.forEach(c => { const im = c.querySelector('.ch-img'); if (im && !im.firstChild) { const img = new Image(); img.alt = ''; img.src = c.dataset.board === 'pi4' ? piThumb : c.dataset.board === 'uno3' ? u3Thumb : c.dataset.board === 'esp32' ? e32ThumbFn() : uqThumb; im.appendChild(img); } c.classList.toggle('cur', c.dataset.board === BOARD); });
       const go = b => { if (b === BOARD) { ch.classList.remove('on'); history.replaceState(null, '', '?board=' + b); } else location.search = '?board=' + b; };
       cards.forEach(c => c.onclick = () => go(c.dataset.board));
       if (!new URLSearchParams(location.search).get('board')) ch.classList.add('on');
@@ -672,6 +685,16 @@ class App {
     }
   }
   showWelcome() {
+    if (IS_E32) {
+      $('#panel').innerHTML = `<div class="card welcome"><h2>${BOARD_FACTS.name}</h2><span class="tag">Interactive 3D model</span>
+        <p>The popular <b>ESP32 DevKit V1</b> (DOIT-style) board: an <b>ESP32-WROOM-32</b> module with Wi-Fi and Bluetooth, a USB-to-serial chip, a 3.3 V regulator and two rows of pins.</p>
+        <div class="facts"><span>Module</span><span>${BOARD_FACTS.skus}</span><span>Board size</span><span>${BOARD_FACTS.size}</span><span>Operating temp.</span><span>${BOARD_FACTS.temp}</span></div>
+        <p class="warn"><b>3.3 V only.</b> Every ESP32 pin works at 3.3 V; 5 V on a pin can damage the chip.</p>
+        <p class="tip"><b>Click any part</b> on the board — or choose one on the left — to learn what it does. Click a single header pin to see its function.</p>
+        <p class="sim">This 3D model is <b>stylised</b>: there is no official CAD file for this board. The module size and the order of the 30 pins are the real ones; the positions of the small parts are close, not measured. Boards from different sellers can differ (30, 36 or 38 pins, other USB chip, other regulator).</p>
+        <div class="src">Sources: Espressif ESP32 datasheet v5.3 and ESP32-WROOM-32 datasheet v3.8 · Random Nerd Tutorials · espboards.dev</div></div>`;
+      return;
+    }
     if (IS_U3) {
       $('#panel').innerHTML = `<div class="card welcome"><h2>${BOARD_FACTS.name}</h2><span class="tag">Interactive 3D model</span>
         <p>This model is built from Arduino’s <b>official open-source board file</b> of the UNO R3: the real outline and mounting holes, every copper track, pad and silkscreen label, and the exact position of every part.</p>
@@ -732,6 +755,7 @@ class App {
   }
 
   setMode(mode) {
+    if (mode === 'build' && !this.fb) mode = 'explore';
     if (this.mode === 'build' && mode !== 'build') this.fb.deactivate();
     this.mode = mode;
     $('#app').className = 'mode-' + mode;
@@ -752,7 +776,7 @@ class App {
   }
 
   lessonHome() {
-    $('#panel').innerHTML = `<div class="card"><div class="lesson-head">Course</div><h2>Learn the ${IS_PI ? 'Raspberry Pi 4' : IS_U3 ? 'UNO R3' : 'UNO Q'} step by step</h2>
+    $('#panel').innerHTML = `<div class="card"><div class="lesson-head">Course</div><h2>Learn the ${IS_PI ? 'Raspberry Pi 4' : IS_U3 ? 'UNO R3' : IS_E32 ? 'ESP32' : 'UNO Q'} step by step</h2>
       <p>The lessons go in order, ${IS_PI ? 'from setting up the board to Python programs that control electronics' : 'from the very basics to circuits with inputs, outputs, light and sound'}. Each step moves the 3D board, highlights the parts and explains them.</p>
       ${Object.entries(MODULES).map(([m, name]) => `<p><b>${name}</b></p><ol start="${LESSONS.find(l => l.module === +m).num}">${LESSONS.filter(l => l.module === +m).map(L => `<li>${L.title} — ${L.time}</li>`).join('')}</ol>`).join('')}
       <p class="tip">Start with <b>Lesson 1</b> on the left.</p>
@@ -844,6 +868,7 @@ class App {
     if (w.includes('scope')) h += `<div class="io-block"><div class="io-title">Oscilloscope · ${L.scopePin || 'D5'} <span class="io-note">(simulated)</span></div><canvas id="scope" width="560" height="170"></canvas><div id="scope-info" class="io-val"></div></div>`;
     if (w.includes('audio')) h += `<div class="io-block"><button id="sound" class="hold small">${this.soundOn ? '🔊 Sound on' : '🔇 Sound off'}</button></div>`;
     if (w.includes('editor')) h += this.editorHTML();
+    if (IS_E32) h = h.replace(/D4/g, 'GPIO17').replace(/D5/g, 'GPIO16').replace(/Pin D(\d+)/g, 'Pin GPIO$1').replace(/\(D(\d+)/g, '(GPIO$1').replace(/\bD(\d+)\b/g, 'GPIO$1');
     if (IS_U3) h = h.replace(/Pin D(\d+)/g, 'Pin $1').replace(/\(D(\d+)/g, '($1').replace(/\bD(\d+)\b/g, 'pin $1');
     io.innerHTML = h;
     if ($('#hold')) {
@@ -1230,7 +1255,7 @@ class App {
     if (b && b.setPressed) b.setPressed(down);
     this.buttonDown = down;
     const s = $('#btn-state');
-    if (s) s.innerHTML = IS_PI ? (down ? '<b class="lo">Pressed</b> → GPIO2 connected to GND → LOW → is_pressed = True' : 'Released → GPIO2 reads HIGH (pull-up) → is_pressed = False') : down ? '<b class="lo">Pressed</b> → D4 connected to GND → reads LOW' : 'Released → D4 reads HIGH (pull-up)';
+    if (s) s.innerHTML = IS_PI ? (down ? '<b class="lo">Pressed</b> → GPIO2 connected to GND → LOW → is_pressed = True' : 'Released → GPIO2 reads HIGH (pull-up) → is_pressed = False') : down ? `<b class="lo">Pressed</b> → ${BTN_PIN} connected to GND → reads LOW` : `Released → ${BTN_PIN} reads HIGH (pull-up)`;
   }
   // ---- light sensor model: typical GL5528 (datasheet: 10–20 kΩ at 10 lux, γ = 0.6, dark ≥ 1 MΩ) — 15 kΩ at 10 lux
   ldrOhms(lux = this.lux) { return 15000 * Math.pow(Math.max(lux, 0.001) / 10, -0.6); }
@@ -1785,6 +1810,7 @@ class App {
       },
       vref: () => LOGIC_V,
       avr: IS_U3,                       // ATmega328P ADC model
+      adcBits: IS_E32 ? 12 : 0,         // ESP32: analogRead() is 12-bit by default (0 ... 4095)
       servoStep: IS_U3 ? 1 : 4,         // Servo library timer resolution in µs (AVR: 0.5 µs ticks -> whole µs; Zephyr: 4 µs)
       pin: (pin, level) => this.onDigital(pin, level),
       pwm: (pin, duty, raw) => this.onPwm(pin, duty, raw),
@@ -1842,6 +1868,7 @@ class App {
   ledFor(pin) { const io = this.ioFor(pin); return io && io.kind === 'led' ? { io, led: this.bench.get(io.item) } : null; }
 
   onDigital(pin, level) {
+    if (IS_E32 && pin === 'G2') { this.br.led = !!level; if (this.board.powered) this.board.setLed('blue', !!level); }   // the blue LED is on GPIO2 (active high)
     if (IS_U3 && pin === 'LED_BUILTIN') {        // the yellow L LED on pin 13 is active-high
       this.br.led = !!level;
       if (this.board.powered) this.board.setLed('l', !!level);

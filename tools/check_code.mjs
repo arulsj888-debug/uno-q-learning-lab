@@ -2,6 +2,7 @@
 import * as C from '../src/data/code.js';
 import * as PI from '../src/pi4/lessons.js';
 import * as U3 from '../src/uno3/code.js';
+import * as E32 from '../src/esp32/code.js';
 const L = (code, n) => code.split('\n')[n - 1] || '';
 const checks = {
   BLINK: [C.BLINK, [[1, 'void setup'], [2, 'Serial.begin'], [4, 'pinMode(LED_BUILTIN'], [8, 'void loop'], [9, 'HIGH'], [10, 'delay(1000)'], [11, 'LOW'], [12, 'delay(1000)'], [14, 'Serial.println']]],
@@ -52,6 +53,11 @@ const checks = {
   U3_MOTOR: [U3.U3_MOTOR, [[2, 'enablePin = 5'], [3, 'in1Pin = 7'], [4, 'in2Pin = 8'], [6, 'void setup'], [7, 'pinMode(enablePin'], [8, 'pinMode(in1Pin'], [9, 'pinMode(in2Pin'], [12, 'void loop'], [14, 'digitalWrite(in1Pin, HIGH)'], [15, 'digitalWrite(in2Pin, LOW)'], [16, 'analogWrite(enablePin, 255)'], [17, 'delay(2000)'], [20, 'analogWrite(enablePin, 128)'], [21, 'delay(2000)'], [24, 'analogWrite(enablePin, 0)'], [25, 'delay(1500)'], [28, 'digitalWrite(in1Pin, LOW)'], [29, 'digitalWrite(in2Pin, HIGH)'], [30, 'analogWrite(enablePin, 255)'], [31, 'delay(2000)'], [34, 'digitalWrite(in2Pin, LOW)'], [35, 'delay(1500)']]],
   U3_RELAY: [U3.U3_RELAY, [[2, 'relayPin = 4'], [4, 'void relayOn'], [5, 'digitalWrite(relayPin, LOW)'], [8, 'void relayOff'], [9, 'digitalWrite(relayPin, HIGH)'], [12, 'void setup'], [13, 'pinMode(relayPin, OUTPUT)'], [14, 'relayOff()'], [15, 'Serial.begin'], [18, 'void loop'], [19, 'relayOn()'], [20, 'Relay ON'], [21, 'delay(3000)'], [22, 'relayOff()'], [23, 'Relay OFF'], [24, 'delay(3000)']]],
   U3_SHT31: [U3.U3_SHT31, [[1, '#include <Wire.h>'], [2, 'Adafruit_SHT31.h'], [4, 'Adafruit_SHT31 sht31'], [6, 'void setup'], [7, 'Serial.begin'], [8, 'sht31.begin(0x44)'], [9, "Couldn't find"], [10, 'while (1)'], [14, 'void loop'], [15, 'readTemperature()'], [16, 'readHumidity()'], [17, 'Serial.print("Temperature: ")'], [18, 'Serial.print(t, 1)'], [19, 'Serial.println(" C")'], [20, 'Serial.print("Humidity: ")'], [21, 'Serial.print(h, 1)'], [22, 'Serial.println(" %")'], [23, 'delay(2000)']]],
+  E32_BLINK: [E32.E32_BLINK, [[2, 'ledPin = 2'], [4, 'void setup'], [5, 'Serial.begin(115200)'], [6, 'pinMode(ledPin'], [9, 'void loop'], [10, 'HIGH'], [11, 'delay(1000)'], [12, 'LOW'], [13, 'delay(1000)'], [14, 'Serial.println']]],
+  E32_EXT_LED: [E32.E32_EXT_LED, [[2, 'ledPin = 16'], [4, 'void setup'], [5, 'pinMode(ledPin'], [8, 'void loop'], [9, 'HIGH'], [10, 'delay'], [11, 'LOW'], [12, 'delay']]],
+  E32_BUTTON: [E32.E32_BUTTON, [[2, 'buttonPin = 17'], [3, 'ledPin = 16'], [5, 'void setup'], [6, 'Serial.begin(115200)'], [7, 'INPUT_PULLUP'], [8, 'pinMode(ledPin, OUTPUT)'], [11, 'void loop'], [12, 'digitalRead(buttonPin)'], [13, 'buttonState == LOW'], [14, 'HIGH'], [15, 'Serial.println'], [17, 'LOW'], [18, 'Serial.println'], [20, 'delay(200)']]],
+  E32_POT: [E32.E32_POT, [[2, 'potPin = 34'], [4, 'void setup'], [5, 'Serial.begin(115200)'], [8, 'void loop'], [9, 'analogRead(potPin)'], [10, 'Serial.println'], [11, 'delay(100)']]],
+  E32_FADE: [E32.E32_FADE, [[2, 'ledPin = 16'], [3, 'brightness = 0'], [4, 'fadeAmount = 5'], [6, 'void setup'], [7, 'ledcAttach(ledPin, 5000, 8)'], [10, 'void loop'], [11, 'ledcWrite(ledPin, brightness)'], [12, 'brightness + fadeAmount'], [13, 'brightness <= 0'], [14, '-fadeAmount'], [16, 'delay(30)']]],
   BUZZER: [C.BUZZER, [[2, 'buzzerPin = D9'], [3, 'int notes[]'], [5, 'void setup'], [8, 'void loop'], [9, 'for (int i'], [10, 'tone(buzzerPin'], [11, 'delay(300)'], [13, 'noTone'], [14, 'delay(1000)']]],
 };
 let bad = 0;

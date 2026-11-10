@@ -39,15 +39,16 @@ export function makeUsbCable(kind = 'usbc') {
   }
   // metal plug (8.25 x 2.4 mm), 6.6 mm long, tip at local x = 0
   const sh = new THREE.Shape();
-  const w = 8.25, h = 2.4, r = 1.15;
+  const micro = kind === 'micro';                      // micro-B plug: metal shell about 6.9 x 1.8 mm, 5.6 mm long
+  const w = micro ? 6.9 : 8.25, h = micro ? 1.8 : 2.4, r = micro ? 0.8 : 1.15, plugLen = micro ? 5.6 : 6.6;
   sh.moveTo(-w / 2 + r, -h / 2); sh.lineTo(w / 2 - r, -h / 2); sh.absarc(w / 2 - r, 0, r, -Math.PI / 2, Math.PI / 2); sh.lineTo(-w / 2 + r, h / 2); sh.absarc(-w / 2 + r, 0, r, Math.PI / 2, Math.PI * 1.5);
-  const metal = new THREE.ExtrudeGeometry(sh, { depth: 6.6, bevelEnabled: true, bevelSize: 0.08, bevelThickness: 0.08, bevelSegments: 2, curveSegments: 16 });
+  const metal = new THREE.ExtrudeGeometry(sh, { depth: plugLen, bevelEnabled: true, bevelSize: 0.08, bevelThickness: 0.08, bevelSegments: 2, curveSegments: 16 });
   metal.rotateY(-Math.PI / 2); // extrude along -x
   plug.add(new THREE.Mesh(metal, M.steel));
   const mold = new THREE.Mesh(new RoundedBoxGeometry(19, 5.6, 11.6, 4, 2.2), rubber);
-  mold.position.set(-6.6 - 9.5, 0, 0); plug.add(mold);
+  mold.position.set(-plugLen - 9.5, 0, 0); plug.add(mold);
   const relief = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.9, 7, 24), rubber);
-  relief.rotation.z = Math.PI / 2; relief.position.set(-6.6 - 19 - 3.2, 0, 0); plug.add(relief);
+  relief.rotation.z = Math.PI / 2; relief.position.set(-plugLen - 19 - 3.2, 0, 0); plug.add(relief);
   const curve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(-32, 0, 0), new THREE.Vector3(-52, -1.2, 3), new THREE.Vector3(-80, -4.6, 16),
     new THREE.Vector3(-125, -5.5, 40), new THREE.Vector3(-200, -5.5, 58), new THREE.Vector3(-320, -5.5, 70),
@@ -57,6 +58,7 @@ export function makeUsbCable(kind = 'usbc') {
   g.add(plug);
   tagHW(g, 'usbcable');
   g.userData.plug = plug;
+  if (micro) g.userData.depth = 4.6;
   return g;
 }
 
