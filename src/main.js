@@ -129,7 +129,7 @@ class App {
     this.usbPlugged = false;
     this.bb = new Breadboard(new THREE.Vector3(0, DESK_Y + 8.5, IS_PI ? -62 : 68)); this.bb.group.visible = false; s.add(this.bb.group);
     this.bench = new Bench(s, this.board, this.bb);
-    this.fb = IS_E32 ? null : new FreeBuild(this, { isPi: IS_PI, boardKind: BOARD, pinInfo: findPin });   // free build for the ESP32 is not ready yet
+    this.fb = new FreeBuild(this, { isPi: IS_PI, boardKind: BOARD, pinInfo: findPin });
     this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2, fs: {} };
     if (IS_PI) { this.acc = makePiAccessories(this.board); for (const a of this.acc.all) { a.on = false; s.add(a.group); } Object.assign(HW_INFO, PI_ACC_INFO); }
     this.strips = new THREE.Group(); this.strips.visible = false; s.add(this.strips);
@@ -669,7 +669,7 @@ class App {
   applyBoardBranding() {
     if (IS_PI) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'Raspberry Pi 4'; const lg = document.querySelector('.brand .logo'); if (lg) lg.style.display = 'none'; }
     if (IS_U3) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'Arduino UNO R3'; }
-    if (IS_E32) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'ESP32 DevKit V1'; const bt = document.querySelector('.modes [data-mode="build"]'); if (bt) bt.style.display = 'none'; }
+    if (IS_E32) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'ESP32 DevKit V1'; }
     document.title = BOARD_NAME + ' · 3D Learning Lab';
     const ch = $('#chooser');
     if (ch) {

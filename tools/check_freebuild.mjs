@@ -107,6 +107,17 @@ ok(Math.abs(r.pins.A0.adc - 512) < 3, 'UNO R3: pot in the middle on 5 V reads ab
 r = evaluate(b3({ parts: [W('w1', '5V', 'a10'), W('w2', 'D2', 'b10')], pinCfg: { D2: { mode: 'in' } } })); ok(!r.newDamage.size && r.pins.D2.read === 1, 'UNO R3: 5 V on an input is fine and reads HIGH');
 r = evaluate(b3({ parts: [{ id: 'sen1', type: 'sht31', row: 'g', col: 10 }, W('w1', '5V', 'j10'), W('w2', 'GND2', 'j11'), W('w3', 'A5', 'j12'), W('w4', 'SDA', 'j13')], pinCfg: { A5: { mode: 'i2c' }, SDA: { mode: 'i2c' } } }));
 ok(r.parts.sen1.status === 'ok', 'UNO R3: SHT31 on SDA (= A4) and A5 works');
+// ---- ESP32 DevKit V1 (3.3 V logic, 12-bit ADC)
+import { findPinE32 } from '../src/esp32/data.js';
+import { EXAMPLES } from '../src/freebuild/examples.js';
+const e32 = o => ({ boardKind: 'esp32', pinInfo: findPinE32, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
+r = evaluate(e32({ parts: [W('w1', 'G16', 'a10'), res('r1', 'b10', 'b14', 220), led('l1', 'c14', 'c15'), W('w2', 'GND2', 'd15')], pinCfg: { G16: { mode: 'out1' } } }));
+ok(r.parts.l1.status === 'ok' && r.parts.l1.I > 0.004 && r.parts.l1.I < 0.008, 'ESP32: 3.3 V pin + 220 ohm + LED gives about 6 mA');
+r = evaluate(e32({ parts: [W('w1', 'VIN', 'a10'), W('w2', 'G17', 'b10')], pinCfg: { G17: { mode: 'in' } } })); ok(r.newDamage.has('G17'), 'ESP32: 5 V (VIN) on a GPIO pin damages it');
+r = evaluate(e32({ parts: [{ id: 'p1', type: 'pot', row: 'e', col: 10 }, W('w1', '3V3', 'a10'), W('w2', 'GND2', 'a14'), W('w3', 'G34', 'a12')], pinCfg: { G34: { mode: 'analog' } }, env: { ...env, pot: { p1: 0.5 } } }));
+ok(Math.abs(r.pins.G34.adc - 2048) < 8, 'ESP32: pot in the middle reads about 2048 (12-bit)');
+r = evaluate(e32({ parts: [{ id: 'sw1', type: 'button', col: 10 }, W('w1', 'G17', 'a10'), W('w2', 'GND2', 'j12')], pinCfg: { G17: { mode: 'up' } } })); ok(r.pins.G17.read === 1, 'ESP32: pull-up input reads HIGH when released');
+for (const x of EXAMPLES('esp32')) { r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r && r.pins, 'ESP32 example evaluates: ' + x.title); }
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

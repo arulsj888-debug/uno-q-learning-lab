@@ -123,6 +123,16 @@ export function pinKind(boardKind, id, info) {
     if (info.label === 'GND') return { k: 'gnd', name: 'GND' };
     return { k: 'nc', name: info.label || id };
   }
+  if (boardKind === 'esp32') {
+    if (info.kind === 'gnd') return { k: 'gnd', name: 'GND' };
+    if (id === 'VIN') return { k: '5v', name: 'VIN (5 V from USB)' };
+    if (id === '3V3') return { k: '3v3', name: '3V3' };
+    if (info.gpio !== undefined && info.gpio !== null) {
+      // ESP32 datasheet v5.3: VIH 0.75 VDD, VIL 0.25 VDD, internal pull resistors about 45 kOhm (none on GPIO34-39), IOH 40 mA / IOL 28 mA at the strongest drive setting, pins accept up to 3.6 V
+      return { k: 'gpio', name: 'GPIO' + info.gpio, pwm: !info.inOnly, analog: !!info.adc, adcMax: 4095, inOnly: !!info.inOnly, vil: 0.25 * 3.3, vih: 0.75 * 3.3, imax: 28, limitText: '28 mA sink / 40 mA source at the strongest drive setting', pull: 45000, vmax: 3.6 };
+    }
+    return { k: 'nc', name: info.label || id };
+  }
   if (boardKind === 'uno3') {
     if (info.kind === 'gnd') return { k: 'gnd', name: 'GND' };
     if (id === '5V' || id === 'IOREF') return { k: '5v', name: id === 'IOREF' ? 'IOREF (5 V)' : '5V' };
@@ -511,9 +521,9 @@ export function evaluate(model) {
     if (!isOut && cfg.mode === 'i2c') { o.read = undefined; if (!k.i2c) note('warn', `${k.name} cannot be an I²C pin on this board.`, id); }
     else if (!isOut) {
       o.read = o.floating ? 'floating' : V >= k.vih ? 1 : V <= k.vil ? 0 : 'undefined';
-      if (cfg.mode === 'analog') o.adc = Math.round(Math.min(1, Math.max(0, V / (k.vref || 3.3))) * 1023);
+      if (cfg.mode === 'analog') o.adc = Math.round(Math.min(1, Math.max(0, V / (k.vref || 3.3))) * (k.adcMax || 1023));
     }
-    if (V > (k.vmax || 3.6) && (k.v3 || isOut || boardKind === 'pi4' || boardKind === 'uno3')) { newDamage.add(id); o.status = 'bad'; note('bad', `${k.name} sees ${V.toFixed(1)} V. ${boardKind === 'uno3' ? 'An ATmega328P pin must stay below 5.5 V (VCC + 0.5 V)' : boardKind === 'pi4' ? 'Raspberry Pi GPIO pins are 3.3 V only (not 5 V tolerant)' : k.v3 ? 'This pin tolerates at most 3.6 V' : 'An output pin must not be forced above 3.3 V'}: the board can be damaged. Never connect 5 V to it.`, id); }
+    if (V > (k.vmax || 3.6) && (k.v3 || isOut || boardKind === 'pi4' || boardKind === 'uno3' || boardKind === 'esp32')) { newDamage.add(id); o.status = 'bad'; note('bad', `${k.name} sees ${V.toFixed(1)} V. ${boardKind === 'esp32' ? 'ESP32 GPIO pins are 3.3 V only (3.6 V at most)' : boardKind === 'uno3' ? 'An ATmega328P pin must stay below 5.5 V (VCC + 0.5 V)' : boardKind === 'pi4' ? 'Raspberry Pi GPIO pins are 3.3 V only (not 5 V tolerant)' : k.v3 ? 'This pin tolerates at most 3.6 V' : 'An output pin must not be forced above 3.3 V'}: the board can be damaged. Never connect 5 V to it.`, id); }
     else if (isOut && mA > k.imax * 2) { newDamage.add(id); o.status = 'bad'; note('bad', `${k.name} has to deliver ${mA.toFixed(0)} mA, far above its ${k.limitText || k.imax + ' mA limit'}, and would be damaged (in this simulation: more than twice the limit damages the pin).`, id); }
     else if (isOut && mA > k.imax) { o.status = 'warn'; note('warn', `${k.name} delivers ${mA.toFixed(1)} mA, above the ${k.limitText || k.imax + ' mA limit'} of one pin. Use a larger resistor.`, id); }
     else if (isOut && mA > 0.1) o.msg = `${mA.toFixed(1)} mA`;

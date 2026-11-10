@@ -2,6 +2,7 @@
 import { isHoleRef } from './circuit.js';
 
 export function EXAMPLES(boardKind) {
+  if (boardKind === 'esp32') return EXAMPLES_E32();
   const pi = boardKind === 'pi4', u3 = boardKind === 'uno3';
   const P = pi
     ? { sig: 'p11', btn: 'p13', gnd: 'p9', v3: 'p1', v5: 'p2', bad5: 'p13', name: 'GPIO17 (pin 11)' }
@@ -59,4 +60,23 @@ export function EXAMPLES(boardKind) {
     { title: '✖ Short circuit', parts: [w('w1', P.v5, 'r:top+:3', 'red'), w('w2', P.gnd, 'r:top+:4', 'black')], pins: {}, note: 'The 5 V pin and a GND pin are joined by the same power rail. Nothing limits the current, so the power would be cut (here the cable pops out).' },
   ];
   return list;
+}
+
+// ESP32 DevKit V1: 3.3 V logic, pins are written by GPIO number (G16 = GPIO16). Pin wires are female–male (fwire).
+function EXAMPLES_E32() {
+  const w = (id, from, to, color) => ({ id, type: isHoleRef(from) ? 'wire' : 'fwire', from, to, color, lift: isHoleRef(from) && isHoleRef(to) ? 12 : 26 });
+  const led = (id, anode, cathode, color = 'red') => ({ id, type: 'led', anode, cathode, color });
+  const res = (id, a, b, ohms) => ({ id, type: 'resistor', a, b, ohms });
+  const ledCircuit = (flip, ohms = 220) => [w('w1', 'G16', 'a10', 'yellow'), res('r1', 'b10', 'b14', ohms), flip ? led('led1', 'c15', 'c14') : led('led1', 'c14', 'c15'), w('w2', 'GND2', 'd15', 'black')];
+  return [
+    { title: '✔ LED with a resistor (works)', parts: ledCircuit(false), pins: { G16: { mode: 'out1' } }, note: 'GPIO16 is set to <b>Output HIGH</b> (3.3 V), the 220 Ω resistor limits the current to about 5 mA, and the LED’s long leg (+) faces the pin. Try changing the pin to <b>Input</b>, or the resistor to 100 kΩ.' },
+    { title: '✖ LED the wrong way round', parts: ledCircuit(true), pins: { G16: { mode: 'out1' } }, note: 'Everything is right except the LED: its long leg (anode) faces GND. An LED only conducts one way. Select the LED, read the reason, then place it the other way round.' },
+    { title: '✔ Button on a digital input (pull-up)', parts: [{ id: 'sw1', type: 'button', col: 10 }, w('w1', 'G17', 'a10', 'blue'), w('w2', 'GND2', 'j12', 'black')], pins: { G17: { mode: 'up' } }, note: 'GPIO17 has its internal pull-up (about 45 kΩ) on, so it reads <b>HIGH</b> when nothing is pressed. Pressing the button connects the pin to GND and it reads <b>LOW</b>. Change the mode to “Input (no pull resistor)” and the pin floats.' },
+    { title: '✖ Button on GPIO34 with pull-up', parts: [{ id: 'sw1', type: 'button', col: 10 }, w('w1', 'G34', 'a10', 'blue'), w('w2', 'GND2', 'j12', 'black')], pins: { G34: { mode: 'in' } }, note: 'GPIO34 is input only and has <b>no internal pull-up</b>, so it floats until the button is pressed. Move the wire to GPIO17 (which has a pull-up) or add an external resistor from the pin to 3V3.' },
+    { title: '✔ Buzzer with a tone', parts: [{ id: 'bz1', type: 'buzzer', plus: 'e10', minus: 'e13' }, w('w1', 'G16', 'a10', 'yellow'), w('w2', 'GND2', 'a13', 'black')], pins: { G16: { mode: 'tone', freq: 440 } }, note: 'A passive buzzer sounds when the voltage across it changes quickly. The pin is set to <b>Tone</b>, 440 Hz. (Turn the sound on in your browser.)' },
+    { title: '✔ Potentiometer on an analog input', parts: [{ id: 'pot1', type: 'pot', row: 'e', col: 10 }, w('w1', '3V3', 'a10', 'orange'), w('w2', 'GND2', 'a14', 'black'), w('w3', 'G34', 'a12', 'yellow')], pins: { G34: { mode: 'analog' } }, note: 'The potentiometer is a voltage divider: the wiper (middle leg) outputs 0 V to 3.3 V. The ESP32’s ADC gives 0 … 4095. Turn the knob (drag it in 3D or use the slider).' },
+    { title: '✔ TMP36 temperature sensor', parts: [{ id: 'tmp1', type: 'tmp36', row: 'e', col: 10 }, w('w1', '3V3', 'a10', 'orange'), w('w2', 'G34', 'a11', 'yellow'), w('w3', 'GND2', 'a12', 'black')], pins: { G34: { mode: 'analog' } }, note: 'The TMP36 puts out 0.5 V + 10 mV per °C. Tick “turn round” in the left column and place it the other way: +VS and GND swap and the sensor is connected backwards.' },
+    { title: '✖ 5 V on a 3.3 V pin', parts: [w('w1', 'VIN', 'a10', 'red'), w('w2', 'G17', 'b10', 'yellow')], pins: { G17: { mode: 'in' } }, note: 'VIN carries the 5 V from USB. ESP32 pins are 3.3 V only (3.6 V at most), so 5 V on a GPIO pin can damage the chip. Press “Replace broken parts”.' },
+    { title: '✖ LED without a resistor', parts: [w('w1', 'VIN', 'a10', 'red'), led('led1', 'c10', 'c11'), w('w2', 'GND2', 'd11', 'black')], pins: {}, note: 'The LED is connected straight to the 5 V pin with no resistor. Nothing limits the current, so it burns out in a moment. Press “Replace broken parts”, then put a resistor in the path.' },
+  ];
 }
