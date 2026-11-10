@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -15,6 +15,8 @@ const SRC = {
   wifihello: { t: 'Arduino-ESP32 library: WebServer HelloServer example (WiFi.begin, status, localIP)', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/WebServer/examples/HelloServer/HelloServer.ino' },
   webserver: { t: 'Arduino-ESP32 library: WebServer.h (on, begin, handleClient, send, sendHeader)', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/WebServer/src/WebServer.h' },
   rnttouch: { t: 'Random Nerd Tutorials: ESP32 Touch Pins (touchRead)', u: 'https://randomnerdtutorials.com/esp32-touch-pins-arduino-ide/' },
+  rntsleep: { t: 'Random Nerd Tutorials: ESP32 Deep Sleep and wake-up sources', u: 'https://randomnerdtutorials.com/esp32-deep-sleep-arduino-ide-wake-up-sources/' },
+  sleepex: { t: 'Arduino-ESP32 library: DeepSleep TimerWakeUp example', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/ESP32/examples/DeepSleep/TimerWakeUp/TimerWakeUp.ino' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -42,8 +44,8 @@ const POT_IDS = POT_PARTS.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
-export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch' };
-export const E32_COMING = ['Bluetooth LE', 'Deep sleep'];
+export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power' };
+export const E32_COMING = ['Bluetooth LE'];
 
 export const E32_LESSONS = [
   // ================================================================== 1
@@ -570,5 +572,58 @@ export const E32_LESSONS = [
       { q: 'Why not use GPIO0 for touch?', a: ['It has no pin', 'It is pulled high on the board and can read a constant value', 'It is 5 V', 'It is output only'], c: 1, why: 'RNT recommends another touch pin.' },
     ],
     sources: [SRC.rnttouch, SRC.rntpin, SRC.ds],
+  },
+
+  // ================================================================== 12
+  {
+    id: 'e12', num: 12, module: 5, title: 'Deep sleep: save power and wake up on a timer', level: 'Intermediate', time: '15 min',
+    goal: 'Put the ESP32 into deep sleep, wake it with a timer, and keep a counter across the sleep.',
+    hardware: ['Lesson 4 LED circuit (LED on GPIO16)'],
+    code: E32_SLEEP, file: 'TimerWakeUp.ino', program: 'e_sleep', widgets: ['sleep'],
+    circuit: LED_CIRCUIT, io: { G16: IO_LED },
+    explain: {
+      2: 'A <b>conversion factor</b>: the sleep time is given in <b>microseconds</b>.',
+      3: 'Sleep for 5 seconds.',
+      4: 'The LED shows when the ESP32 is awake.',
+      5: '<b>RTC_DATA_ATTR</b> puts the variable in <b>RTC memory</b>. That memory stays powered during deep sleep, so the number survives. A normal variable would start from 0 again.',
+      7: 'After every wake-up the program starts again here, as after a reset.',
+      8: 'Serial output on (115200).',
+      9: 'GPIO16 drives the LED.',
+      10: 'Awake: LED on.',
+      11: 'Count the starts.',
+      12: 'Print the boot number.',
+      13: 'Ask why the chip started. If it was the timer, the answer is ESP_SLEEP_WAKEUP_TIMER.',
+      14: 'Printed only after a timer wake-up, not after the first start.',
+      16: 'Stay awake for 2 seconds so you can see the LED.',
+      17: 'Tell the chip to wake up after 5 seconds (5 × 1 000 000 µs).',
+      18: 'Say goodbye.',
+      19: 'Wait until all the text has left the serial port.',
+      20: '<b>esp_deep_sleep_start()</b>: the CPU, most of the RAM and the digital peripherals are powered off. Only the RTC controller, RTC peripherals and RTC memory stay on. Nothing after this line runs.',
+    },
+    steps: [
+      { title: 'What you need', view: 'bench', have: LED_IDS,
+        body: `<p>The LED circuit from Lesson 4 (LED on GPIO16). The LED will show <b>when the ESP32 is awake</b>.</p>` },
+      { title: 'Why deep sleep?', view: 'bench',
+        body: `<p>A board on a battery cannot run at full speed all day. In <b>deep sleep</b> the CPU, most of the RAM and all the digital peripherals are <b>powered off</b>. Only the RTC controller, the RTC peripherals and the RTC memory stay on (Arduino-ESP32 example).</p>
+        <p>The ESP32 datasheet lists about <b>10 µA</b> for the chip in deep sleep with RTC memory on. That is the chip alone: a <b>complete DevKit board uses more</b> (USB chip, voltage regulator, power LED), so a battery project usually needs a bare module or a low-power board.</p>
+        <p class="warn">After a deep sleep the program starts again at the beginning of <code>setup()</code>, like after a reset. <code>loop()</code> is never reached in this sketch.</p>` },
+      { title: 'How the ESP32 wakes up', view: 'bench',
+        body: `<ul><li><b>Timer</b> — after a set time (this lesson)</li><li><b>Touch pin</b> — a finger on a touch pad (Lesson 11)</li><li><b>External pin</b> — ext0 / ext1: a level on RTC GPIOs</li><li><b>ULP co-processor</b></li></ul>
+        <p>Only <b>RTC GPIOs</b> can wake the chip from an external pin.</p>` },
+      { title: 'The code', view: 'bench', showCode: true, have: LED_IDS,
+        body: `<p>Click lines 5, 13, 17 and 20 to see what they do. <b>RTC_DATA_ATTR</b> is the important trick: it keeps the boot counter alive during the sleep.</p>` },
+      { title: 'Run it and watch it sleep', view: 'bench', showCode: true, power: true, action: 'run', have: LED_IDS,
+        body: `<p>Press <b>▶ Run</b>. The LED lights for 2 seconds, then the ESP32 sleeps for 5 seconds (LED off), wakes up and prints a higher <b>Boot number</b>.</p>
+        <p class="sim">In deep sleep the digital pins are powered down, so the LED goes dark. The simulation shows the timing; the real board’s USB serial connection may behave differently when the chip wakes up.</p>` },
+      { title: 'Summary', view: 'bench', have: LED_IDS, power: true,
+        body: `<ul><li><code>esp_sleep_enable_timer_wakeup(µs)</code> + <code>esp_deep_sleep_start()</code>.</li><li>After wake-up, <code>setup()</code> runs again.</li><li><code>RTC_DATA_ATTR</code> variables survive; normal variables do not.</li><li>Pressing the EN (reset) button clears RTC memory.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What runs after the ESP32 wakes up from deep sleep?', a: ['loop() continues where it stopped', 'setup() runs again from the start', 'Nothing, it stays asleep', 'The next line after esp_deep_sleep_start()'], c: 1, why: 'Deep sleep powers off the CPU and most RAM: the program restarts like after a reset.' },
+      { q: 'How do you keep a counter across deep sleep?', a: ['int count = 0;', 'RTC_DATA_ATTR int count = 0;', 'const int count = 0;', 'It is impossible'], c: 1, why: 'RTC memory stays powered during deep sleep.' },
+      { q: 'esp_sleep_enable_timer_wakeup() takes the time in…', a: ['seconds', 'milliseconds', 'microseconds', 'minutes'], c: 2, why: 'That is why the sketch multiplies seconds by 1 000 000.' },
+      { q: 'Why does a whole DevKit board use more current than the chip’s datasheet value?', a: ['The chip lies', 'The board also has a USB chip, regulator and LED that stay powered', 'Wi-Fi is always on', 'The antenna'], c: 1, why: 'Only the chip is switched down; the other parts on the board are not.' },
+    ],
+    sources: [SRC.rntsleep, SRC.sleepex, SRC.ds],
   },
 ];

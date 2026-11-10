@@ -53,6 +53,8 @@ export class Sim {
       pinMode: (pin, mode) => { pins[pin] = { mode }; if (H.mode) H.mode(pin, mode); },
       digitalWrite: (pin, level) => { if (!pins[pin] || pins[pin].mode !== 'OUTPUT') return; H.pin(pin, level); },
       digitalRead: (pin) => H.read(pin, pins[pin] ? pins[pin].mode : 'INPUT'),
+      // deep sleep: the CPU and digital pins are powered off (outputs go low), then the timer wakes the chip and the program restarts
+      deepSleep: async (ms) => { for (const k of Object.keys(pins)) if (pins[k] && pins[k].mode === 'OUTPUT') H.pin(k, 0); for (const k of Object.keys(pins)) delete pins[k]; if (H.sleep) H.sleep(true, ms); await rt.delay(ms); if (H.sleep) H.sleep(false, ms); },
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
       analogReadResolution: (b) => { readBits = Math.min(31, Math.max(1, b)); },
       analogRead: (pin) => {
@@ -490,6 +492,24 @@ export const PROGRAMS = {
       if (v < 20) { await rt.at(15); rt.digitalWrite('G16', 1); }
       else { await rt.at(17); rt.digitalWrite('G16', 0); }
       await rt.at(19); await rt.delay(500);
+    }
+  },
+
+  async e_sleep(rt) {
+    let boot = 0, woke = false;
+    await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5);
+    for (;;) {
+      await rt.at(7);
+      await rt.at(8); rt.serialBegin(115200);
+      await rt.at(9); rt.pinMode('G16', 'OUTPUT');
+      await rt.at(10); rt.digitalWrite('G16', 1);
+      await rt.at(11); boot++;
+      await rt.at(12); rt.println('Boot number: ' + boot);
+      await rt.at(13);
+      if (woke) { await rt.at(14); rt.println('Wakeup caused by timer'); }
+      await rt.at(16); await rt.delay(2000);
+      await rt.at(17); await rt.at(18); rt.println('Going to sleep now');
+      await rt.at(19); await rt.at(20); await rt.deepSleep(5000); woke = true;
     }
   },
 

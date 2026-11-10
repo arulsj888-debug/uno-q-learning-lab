@@ -350,7 +350,7 @@ class App {
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
     if (this.acc && this.acc.monitor.group.visible) this.acc.monitor.draw({ ...this.pios, mode: this.board.powered ? this.pios.mode : 'off' });
-    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick(); this.wifiTick();
+    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick(); this.wifiTick(); this.sleepTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -828,6 +828,7 @@ class App {
     $('#dock').classList.toggle('with-io', w.length > 0);
     $('#dock').classList.toggle('no-serial', L.id === 'l9');
     let h = ''; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
+    if (w.includes('sleep')) h += `<div class="io-block pirstat tight"><div><span>ESP32</span><b id="sl-st">—</b></div><div class="arrow">→</div><div><span>Wake-up in</span><b id="sl-t">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="sl-led">—</b></div></div><div class="io-note">In deep sleep only the RTC controller, RTC peripherals and RTC memory stay powered.</div>`;
     if (w.includes('touch')) h += `<div class="io-block"><div class="io-title">Touch pad: the wire on GPIO4 (T0)</div><button id="tch" class="hold">Touch the wire</button><div id="tch-state" class="io-val">Not touched</div><div class="io-note">touchRead() values are illustrative: your board and wire will give different numbers.</div></div>`;
     if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on ${IS_PI ? 'GPIO2 (pin 3)' : 'D4'}</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
     if (w.includes('light')) h += `<div class="io-block"><div class="io-title">Light on the sensor <span class="io-note">(simulated)</span></div><input id="lux" type="range" min="0" max="1000" value="${Math.round(this.luxToSlider(this.lux))}"><div class="io-tools">${[['Dark', 0.01], ['Dim', 10], ['Room light', 300], ['Torch', 2000]].map(([t, v]) => `<button class="lvl" data-lux="${v}">${t}</button>`).join('')}</div><div id="lux-val" class="io-val"></div></div>`;
@@ -1475,6 +1476,13 @@ class App {
     document.querySelectorAll('.pkey').forEach(b => b.classList.toggle('on', !!f && Math.abs(+b.dataset.hz - f) < 0.05));
     const n = $('#pk-note'); if (n) { const k = f && [...document.querySelectorAll('.pkey')].find(b => Math.abs(+b.dataset.hz - f) < 0.05); const h = !this.board.powered ? 'USB-C is not plugged in — the Raspberry Pi has no power.' : k ? `Playing <b>${k.dataset.n}</b> · ${(+k.dataset.hz).toFixed(1)} Hz` : 'Silent. Press <b>▶ Run</b> or click a key.'; if (n.innerHTML !== h) n.innerHTML = h; }
   }
+  sleepTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('sleep')) return;
+    const run = this.sim.running; if (!run) this.slp = false; const sl = run && this.slp, set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; if (cls !== undefined) e.className = cls; } };
+    set('#sl-st', !run ? 'off' : sl ? 'deep sleep' : 'awake', run && !sl ? 'on' : 'off');
+    set('#sl-t', sl ? Math.max(0, (this.slpEnd - performance.now()) / 1000).toFixed(1) + ' s' : '—', sl ? 'on' : 'off');
+    set('#sl-led', run && !sl ? 'on' : 'off', run && !sl ? 'on' : 'off');
+  }
   wifiTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('wifirouter')) return;
     const run = this.sim.running, W = this.wf, set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; if (cls !== undefined) e.className = cls; } };
@@ -1867,6 +1875,7 @@ class App {
         const io = this.ioFor(IS_U3 ? 'A4' : 'p3'), ok = io && io.kind === 'i2c' && this.wired(io) && this.board.powered && !this.th.unplug;
         return ok ? { found: true, c: this.th.t + (Math.random() - 0.5) * 0.1, rh: Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3)) } : { found: false };
       },
+      sleep: (on, ms) => { this.slp = on; if (on) this.slpEnd = performance.now() + ms; },
       wifiScan: () => {
         const W = this.wf, list = [{ ssid: 'CoffeeShop-Free', rssi: -67, open: true }, { ssid: 'Workshop', rssi: -78, open: false }, { ssid: 'Neighbour-2G', rssi: -84, open: false }];
         if (W.router) list.push({ ssid: 'HomeNet', rssi: W.rssi, open: false });

@@ -202,3 +202,29 @@ void loop() {
   }
   delay(500);
 }`;
+
+// Lesson 12 — deep sleep with a timer wake-up (simplified from the TimerWakeUp example of the Arduino-ESP32 library)
+export const E32_SLEEP = `// Deep sleep with a timer wake-up (the LED on GPIO16 shows when the ESP32 is awake)
+#define uS_TO_S_FACTOR 1000000ULL   // microseconds per second
+#define TIME_TO_SLEEP 5             // sleep for 5 seconds
+const int ledPin = 16;
+RTC_DATA_ATTR int bootCount = 0;    // kept in RTC memory during deep sleep
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, HIGH);       // awake: LED on
+  ++bootCount;
+  Serial.println("Boot number: " + String(bootCount));
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
+    Serial.println("Wakeup caused by timer");
+  }
+  delay(2000);                      // stay awake for 2 seconds
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  Serial.println("Going to sleep now");
+  Serial.flush();                   // finish sending the text
+  esp_deep_sleep_start();           // nothing after this line runs
+}
+
+void loop() {
+}`;
