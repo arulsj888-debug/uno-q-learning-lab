@@ -107,6 +107,10 @@ for (const L of list) {
       if (N.same(io.item + '.A', io.item + '.K')) bad(L, `${pin}: LED is shorted`);
       if (N.same(P, io.item + '.A')) bad(L, `${pin}: LED anode connects to the pin without the resistor`);
     }
+    if (io.kind === 'touch') {
+      const w = byId[io.item];
+      if (!w || w.type !== 'fwire' || w.from !== pin) bad(L, `${pin}: touch pad wire is not connected to the pin`);
+    }
     if (io.kind === 'button') {
       if (N.same(P, G)) bad(L, `${pin}: pin is on GND even when the button is NOT pressed`);
       if (!nets(all, true).same(P, G)) bad(L, `${pin}: pressing the button does not connect the pin to GND`);

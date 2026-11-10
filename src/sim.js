@@ -53,6 +53,7 @@ export class Sim {
       pinMode: (pin, mode) => { pins[pin] = { mode }; if (H.mode) H.mode(pin, mode); },
       digitalWrite: (pin, level) => { if (!pins[pin] || pins[pin].mode !== 'OUTPUT') return; H.pin(pin, level); },
       digitalRead: (pin) => H.read(pin, pins[pin] ? pins[pin].mode : 'INPUT'),
+      touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
       analogReadResolution: (b) => { readBits = Math.min(31, Math.max(1, b)); },
       analogRead: (pin) => {
         const max = 2 ** readBits - 1;
@@ -473,6 +474,22 @@ export const PROGRAMS = {
         else if (evn === 'off') { rt.println('[simulated] browser asked for /off'); await rt.at(23); await rt.at(24); ledOn = false; await rt.at(25); rt.digitalWrite('G16', 0); await rt.at(26); await rt.at(27); await page(); }
       }
       await rt.delay(120);
+    }
+  },
+
+  async e_touch(rt) {
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.serialBegin(115200);
+    await rt.at(8); rt.pinMode('G16', 'OUTPUT');
+    for (;;) {
+      await rt.at(11);
+      await rt.at(12); const v = rt.touchRead('G4');
+      await rt.at(13); rt.println(v);
+      await rt.at(14);
+      if (v < 20) { await rt.at(15); rt.digitalWrite('G16', 1); }
+      else { await rt.at(17); rt.digitalWrite('G16', 0); }
+      await rt.at(19); await rt.delay(500);
     }
   },
 

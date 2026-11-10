@@ -828,6 +828,7 @@ class App {
     $('#dock').classList.toggle('with-io', w.length > 0);
     $('#dock').classList.toggle('no-serial', L.id === 'l9');
     let h = ''; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
+    if (w.includes('touch')) h += `<div class="io-block"><div class="io-title">Touch pad: the wire on GPIO4 (T0)</div><button id="tch" class="hold">Touch the wire</button><div id="tch-state" class="io-val">Not touched</div><div class="io-note">touchRead() values are illustrative: your board and wire will give different numbers.</div></div>`;
     if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on ${IS_PI ? 'GPIO2 (pin 3)' : 'D4'}</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
     if (w.includes('light')) h += `<div class="io-block"><div class="io-title">Light on the sensor <span class="io-note">(simulated)</span></div><input id="lux" type="range" min="0" max="1000" value="${Math.round(this.luxToSlider(this.lux))}"><div class="io-tools">${[['Dark', 0.01], ['Dim', 10], ['Room light', 300], ['Torch', 2000]].map(([t, v]) => `<button class="lvl" data-lux="${v}">${t}</button>`).join('')}</div><div id="lux-val" class="io-val"></div></div>`;
     if (w.includes('temp')) h += `<div class="io-block"><div class="io-title">Temperature around the TMP36 <span class="io-note">(simulated)</span></div><input id="tempc" type="range" min="-40" max="125" step="0.5" value="${this.tempC}"><div id="temp-val" class="io-val"></div></div>`;
@@ -874,6 +875,7 @@ class App {
     if (IS_E32) h = h.replace(/D4/g, 'GPIO17').replace(/D5/g, 'GPIO16').replace(/Pin D(\d+)/g, 'Pin GPIO$1').replace(/\(D(\d+)/g, '(GPIO$1').replace(/\bD(\d+)\b/g, 'GPIO$1');
     if (IS_U3) h = h.replace(/Pin D(\d+)/g, 'Pin $1').replace(/\(D(\d+)/g, '($1').replace(/\bD(\d+)\b/g, 'pin $1');
     io.innerHTML = h;
+    if ($('#tch')) { const t = $('#tch'), set = d => { this.touchDown = d; const s = $('#tch-state'); if (s) s.innerHTML = d ? '<b class="lo">Touched</b> → reading drops below the threshold' : 'Not touched'; }; set(false); t.addEventListener('pointerdown', e => { e.preventDefault(); set(true); }); t.addEventListener('pointerup', () => set(false)); t.addEventListener('pointerleave', () => set(false)); }
     if ($('#hold')) {
       const hold = $('#hold');
       const dn = e => { e.preventDefault(); this.pressButton(true); }, up = () => this.pressButton(false);
@@ -1826,6 +1828,7 @@ class App {
         if (n) { const el = $('#code').querySelector(`.ln[data-n="${n}"]`); if (el) { el.classList.add('exec'); el.scrollIntoView({ block: 'nearest' }); } }
       },
       vref: () => LOGIC_V,
+      touch: pin => { const io = this.ioFor(pin); if (io && io.kind === 'touch' && this.wired(io)) return this.touchDown ? 4 + Math.random() * 5 : 68 + Math.random() * 8; return 60 + Math.random() * 12; },
       avr: IS_U3,                       // ATmega328P ADC model
       adcBits: IS_E32 ? 12 : 0,         // ESP32: analogRead() is 12-bit by default (0 ... 4095)
       servoStep: IS_U3 ? 1 : 4,         // Servo library timer resolution in µs (AVR: 0.5 µs ticks -> whole µs; Zephyr: 4 µs)

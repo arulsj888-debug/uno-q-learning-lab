@@ -180,3 +180,25 @@ void setup() {
 void loop() {
   server.handleClient();     // answer waiting browser requests
 }`;
+
+// Lesson 11 — capacitive touch (touchRead on T0 = GPIO4; threshold pattern of the Random Nerd Tutorials touch example)
+export const E32_TOUCH = `// Touch sensor on GPIO4 (T0), LED on GPIO16
+const int touchPin = 4;
+const int ledPin = 16;
+const int threshold = 20;          // below this = touched
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+  int touchValue = touchRead(touchPin);   // smaller number = finger closer
+  Serial.println(touchValue);
+  if (touchValue < threshold) {
+    digitalWrite(ledPin, HIGH);          // touched: LED on
+  } else {
+    digitalWrite(ledPin, LOW);           // not touched: LED off
+  }
+  delay(500);
+}`;

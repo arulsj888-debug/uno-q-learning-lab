@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -14,6 +14,7 @@ const SRC = {
   wifiscan: { t: 'Arduino-ESP32 library: WiFiScan example', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFi/examples/WiFiScan/WiFiScan.ino' },
   wifihello: { t: 'Arduino-ESP32 library: WebServer HelloServer example (WiFi.begin, status, localIP)', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/WebServer/examples/HelloServer/HelloServer.ino' },
   webserver: { t: 'Arduino-ESP32 library: WebServer.h (on, begin, handleClient, send, sendHeader)', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/WebServer/src/WebServer.h' },
+  rnttouch: { t: 'Random Nerd Tutorials: ESP32 Touch Pins (touchRead)', u: 'https://randomnerdtutorials.com/esp32-touch-pins-arduino-ide/' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -38,9 +39,11 @@ const POT_PARTS = [
   { id: 'w7', type: 'fwire', from: 'GND2', to: 'a28', color: 'black', lift: 22 },
 ];
 const POT_IDS = POT_PARTS.map(d => d.id);
+const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
+const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
-export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi' };
-export const E32_COMING = ['Touch sensor', 'Bluetooth LE', 'Deep sleep'];
+export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch' };
+export const E32_COMING = ['Bluetooth LE', 'Deep sleep'];
 
 export const E32_LESSONS = [
   // ================================================================== 1
@@ -520,5 +523,52 @@ export const E32_LESSONS = [
       { q: 'What should you avoid?', a: ['Using the page on your home Wi-Fi', 'Exposing it to the Internet or using it for dangerous loads', 'Using GPIO16', 'Using the Serial Monitor'], c: 1, why: 'The page has no password: anyone who can reach it can use it.' },
     ],
     sources: [SRC.wifihello, SRC.webserver, SRC.rnt, SRC.ds],
+  },
+
+  // ================================================================== 11
+  {
+    id: 'e11', num: 11, module: 4, title: 'Touch sensor: switch an LED by touching a wire', level: 'Beginner', time: '15 min',
+    goal: 'Use the ESP32’s built-in capacitive touch input with touchRead() and a threshold.',
+    hardware: ['Lesson 4 LED circuit (LED on GPIO16)', '1 × female–male jumper wire (the touch pad)'],
+    code: E32_TOUCH, file: 'TouchRead.ino', program: 'e_touch', widgets: ['touch'],
+    circuit: TOUCH_PARTS, io: { G16: IO_LED, G4: { kind: 'touch', item: 'w8', needs: TOUCH_IDS } },
+    explain: {
+      2: '<b>touchPin = 4</b>: GPIO4 is the touch input <b>T0</b>. Other touch pins: see the next steps.',
+      3: 'The LED from Lesson 4 on GPIO16.',
+      4: 'The threshold. Below this number the sketch says “touched”. Tune it for your own wire.',
+      7: 'Serial output on (115200).',
+      8: 'GPIO16 drives the LED.',
+      11: '<b>loop()</b> repeats forever.',
+      12: '<b>touchRead(4)</b> measures how easily the pin charges. A finger on the wire adds capacitance, and the number goes <b>down</b>.',
+      13: 'Print the number so you can see it change.',
+      14: 'Smaller than the threshold → a finger is touching.',
+      15: 'Touched → LED on.',
+      17: 'Not touched → LED off.',
+      19: 'Read twice per second.',
+    },
+    steps: [
+      { title: 'What you need', view: 'bench', have: LED_IDS,
+        body: `<p>Keep the LED circuit from Lesson 4. Add <b>one jumper wire</b> from <b>GPIO4</b> to an empty breadboard hole. The wire itself is your touch pad.</p>` },
+      { title: 'Touch without a button', view: 'bench', pins: ['G4'],
+        body: `<p>Some ESP32 pins can sense a <b>finger</b> with no button at all. The chip measures the pin’s <b>capacitance</b>: a finger near or on the wire changes it, and <code>touchRead()</code> returns a smaller number.</p>
+        <p>The original ESP32 has <b>10</b> touch inputs, <b>T0 – T9</b>. GPIO4 is <b>T0</b> and GPIO2 is <b>T2</b>.</p>
+        <p class="warn">In the Arduino IDE, <b>GPIO32 and GPIO33 are swapped</b>: T8 is GPIO32 and T9 is GPIO33 (Random Nerd Tutorials). Avoid <b>GPIO0</b> for touch: it is pulled high on the board and can read a constant value.</p>` },
+      { title: 'Step 1 — wire the touch pad', view: 'bench', power: false, have: [...LED_IDS, 'w8'], pins: ['G4'],
+        body: `<p>Green wire: pin <b>D4</b> (GPIO4, right row) → <b>a30</b>. The free end in the board is just a bare metal contact: touch the wire.</p>` },
+      { title: 'The code', view: 'bench', showCode: true, have: [...LED_IDS, 'w8'],
+        body: `<p>Read the touch value; if it is below the <b>threshold</b>, switch the LED on.</p>` },
+      { title: 'Run it & touch the wire', view: 'bench', showCode: true, power: true, action: 'run', have: [...LED_IDS, 'w8'],
+        body: `<p>Press <b>▶ Run</b>, then hold <b>Touch the wire</b> in the panel. The number drops and the LED switches on.</p>
+        <p class="sim">The numbers are <b>illustrative</b>. Random Nerd Tutorials reports above 70 untouched and below 10 touched on their board; your board and wire will differ, so always print the values first and choose your own threshold.</p>` },
+      { title: 'Summary', view: 'bench', have: [...LED_IDS, 'w8'], power: true,
+        body: `<ul><li><code>touchRead(pin)</code>: <b>smaller</b> = closer finger.</li><li>Choose the threshold by printing the values with and without a touch.</li><li>Touch pins can also wake the ESP32 from deep sleep.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'A finger touches the wire. touchRead() returns…', a: ['A bigger number', 'A smaller number', 'Always 0', 'HIGH'], c: 1, why: 'A finger adds capacitance and the reading goes down.' },
+      { q: 'Which pin is T0?', a: ['GPIO0', 'GPIO2', 'GPIO4', 'GPIO16'], c: 2, why: 'T0 is GPIO4 and T2 is GPIO2.' },
+      { q: 'How do you choose the threshold?', a: ['Always 20', 'Print values with and without a touch, then pick a number between', 'Always 100', 'Use analogRead'], c: 1, why: 'Every board and wire gives different numbers.' },
+      { q: 'Why not use GPIO0 for touch?', a: ['It has no pin', 'It is pulled high on the board and can read a constant value', 'It is 5 V', 'It is output only'], c: 1, why: 'RNT recommends another touch pin.' },
+    ],
+    sources: [SRC.rnttouch, SRC.rntpin, SRC.ds],
   },
 ];
