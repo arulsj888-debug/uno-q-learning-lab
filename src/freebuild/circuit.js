@@ -123,6 +123,18 @@ export function pinKind(boardKind, id, info) {
     if (info.label === 'GND') return { k: 'gnd', name: 'GND' };
     return { k: 'nc', name: info.label || id };
   }
+  if (boardKind === 'uno3') {
+    if (info.kind === 'gnd') return { k: 'gnd', name: 'GND' };
+    if (id === '5V' || id === 'IOREF') return { k: '5v', name: id === 'IOREF' ? 'IOREF (5 V)' : '5V' };
+    if (id === '3V3') return { k: '3v3', name: '3.3V' };
+    if (/^D\d+$/.test(id) || /^A\d$/.test(id) || id === 'SDA' || id === 'SCL') {
+      const i2c = { A4: 'sda', SDA: 'sda', A5: 'scl', SCL: 'scl' }[id];
+      // ATmega328P at 5 V: VIL 0.3 VCC, VIH 0.6 VCC, pull-up 20–50 kOhm, 40 mA absolute maximum per pin (20 mA recommended)
+      return { k: 'gpio', name: id === 'SDA' ? 'SDA (A4)' : id === 'SCL' ? 'SCL (A5)' : id, pwm: !!info.pwm, analog: /^A\d$/.test(id), i2c, bus: i2c ? 'wire' : undefined,
+        vdd: 5, vref: 5, vil: 1.5, vih: 3.0, imax: 20, limitText: '20 mA recommended (40 mA absolute maximum)', pull: 35000, vmax: 5.5, rout: 40 };
+    }
+    return { k: 'nc', name: info.label || id };
+  }
   if (info.kind === 'gnd') return { k: 'gnd', name: 'GND' };
   if (id === '5V' || id === 'SPI_5V') return { k: '5v', name: '5V' };
   if (id === '3V3') return { k: '3v3', name: '3V3' };
@@ -164,6 +176,7 @@ export function evaluate(model) {
     if (d.type === 'button') { union(T(d, 'e1'), T(d, 'e2')); union(T(d, 'f1'), T(d, 'f2')); }
     if (d.type === 'l293d') { union(T(d, 'p4'), T(d, 'p5')); union(T(d, 'p4'), T(d, 'p12')); union(T(d, 'p4'), T(d, 'p13')); }   // the four middle pins are one ground   // the two legs on one side of a tactile switch are joined inside it
   }
+  if (boardKind === 'uno3') { union('pin:SDA', 'pin:A4'); union('pin:SCL', 'pin:A5'); }   // the top-header SDA/SCL pins are the same signals as A4/A5
   const ids = new Map([['GROUND', 0]]);
   const nid = key => { const r = find(key); if (!ids.has(r)) ids.set(r, ids.size); return ids.get(r); };
   const nodeOf = ref => nid(nodeOfRef(ref));
@@ -205,8 +218,8 @@ export function evaluate(model) {
         else if (k.k === 'gpio') {
           const cfg = pinCfg[id] || { mode: 'in' };
           if (!damaged.has(id)) {
-            if (OUTPUT_MODES.includes(cfg.mode)) { const lv = level(cfg); src(node, lv ? 3.3 : 0, 50, { id, gpioOut: true }); }
-            else if (cfg.mode === 'up') src(node, 3.3, k.pull, { id, pull: true });
+            if (OUTPUT_MODES.includes(cfg.mode)) { const lv = level(cfg); src(node, lv ? (k.vdd || 3.3) : 0, k.rout || 50, { id, gpioOut: true }); }
+            else if (cfg.mode === 'up') src(node, k.vdd || 3.3, k.pull, { id, pull: true });
             else if (cfg.mode === 'down') src(node, 0, k.pull, { id, pull: true });
           }
           if (boardKind === 'pi4' && (k.gpio === 2 || k.gpio === 3)) src(node, 3.3, 1800, { id, pull: true });   // fixed 1.8 kOhm pull-up on the board
@@ -433,7 +446,7 @@ export function evaluate(model) {
       }
     } else if (d.type === 'sht31') {
       const vs = s.Vs ?? 0, sda = gpioOn(d, 'SDA'), scl = gpioOn(d, 'SCL'), kind = id => usedPins.get(id) || {};
-      const where = boardKind === 'pi4' ? 'SDA must go to GPIO2 (pin 3) and SCL to GPIO3 (pin 5)' : 'SDA must go to D20 (or A4) and SCL to D21 (or A5)';
+      const where = boardKind === 'pi4' ? 'SDA must go to GPIO2 (pin 3) and SCL to GPIO3 (pin 5)' : boardKind === 'uno3' ? 'SDA must go to A4 (or SDA) and SCL to A5 (or SCL)' : 'SDA must go to D20 (or A4) and SCL to D21 (or A5)';
       let bad = null;
       if (!powered) R.status = 'off';
       else if (vs < -0.5) { R.status = 'bad'; bad = 'it is connected backwards (VIN and GND swapped)'; }
@@ -498,11 +511,11 @@ export function evaluate(model) {
     if (!isOut && cfg.mode === 'i2c') { o.read = undefined; if (!k.i2c) note('warn', `${k.name} cannot be an I²C pin on this board.`, id); }
     else if (!isOut) {
       o.read = o.floating ? 'floating' : V >= k.vih ? 1 : V <= k.vil ? 0 : 'undefined';
-      if (cfg.mode === 'analog') o.adc = Math.round(Math.min(1, Math.max(0, V / 3.3)) * 1023);
+      if (cfg.mode === 'analog') o.adc = Math.round(Math.min(1, Math.max(0, V / (k.vref || 3.3))) * 1023);
     }
-    if (V > 3.6 && (k.v3 || isOut || boardKind === 'pi4')) { newDamage.add(id); o.status = 'bad'; note('bad', `${k.name} sees ${V.toFixed(1)} V. ${boardKind === 'pi4' ? 'Raspberry Pi GPIO pins are 3.3 V only (not 5 V tolerant)' : k.v3 ? 'This pin tolerates at most 3.6 V' : 'An output pin must not be forced above 3.3 V'}: the board can be damaged. Never connect 5 V to it.`, id); }
-    else if (isOut && mA > k.imax * 2) { newDamage.add(id); o.status = 'bad'; note('bad', `${k.name} has to deliver ${mA.toFixed(0)} mA, far above its ${k.imax} mA limit, and would be damaged (in this simulation: more than twice the limit damages the pin).`, id); }
-    else if (isOut && mA > k.imax) { o.status = 'warn'; note('warn', `${k.name} delivers ${mA.toFixed(1)} mA, above the ${k.imax} mA limit of one pin. Use a larger resistor.`, id); }
+    if (V > (k.vmax || 3.6) && (k.v3 || isOut || boardKind === 'pi4' || boardKind === 'uno3')) { newDamage.add(id); o.status = 'bad'; note('bad', `${k.name} sees ${V.toFixed(1)} V. ${boardKind === 'uno3' ? 'An ATmega328P pin must stay below 5.5 V (VCC + 0.5 V)' : boardKind === 'pi4' ? 'Raspberry Pi GPIO pins are 3.3 V only (not 5 V tolerant)' : k.v3 ? 'This pin tolerates at most 3.6 V' : 'An output pin must not be forced above 3.3 V'}: the board can be damaged. Never connect 5 V to it.`, id); }
+    else if (isOut && mA > k.imax * 2) { newDamage.add(id); o.status = 'bad'; note('bad', `${k.name} has to deliver ${mA.toFixed(0)} mA, far above its ${k.limitText || k.imax + ' mA limit'}, and would be damaged (in this simulation: more than twice the limit damages the pin).`, id); }
+    else if (isOut && mA > k.imax) { o.status = 'warn'; note('warn', `${k.name} delivers ${mA.toFixed(1)} mA, above the ${k.limitText || k.imax + ' mA limit'} of one pin. Use a larger resistor.`, id); }
     else if (isOut && mA > 0.1) o.msg = `${mA.toFixed(1)} mA`;
     if (!isOut && cfg.mode === 'in' && o.floating && !k.i2c) note('warn', `${k.name} is an input with nothing driving it (it “floats”) and reads random values. Use a pull-up or pull-down (set the pin to “Input with pull-up”), or connect it to 3.3 V or GND through a button.`, id);
     if (!isOut && cfg.mode === 'analog' && boardKind === 'pi4') note('warn', 'The Raspberry Pi has no analog inputs (no ADC). Analog sensors need an extra ADC chip.', id);
@@ -516,7 +529,7 @@ export function evaluate(model) {
   if (powered && parts.length && !notes.some(x => x.lvl === 'bad' || x.lvl === 'warn' || x.lvl === 'ok')) note('info', 'Nothing is wrong, but nothing is happening yet: add a part, wire it to a pin and give the pin a job.');
   // ---- wiring checklist: for every part, which board pin each leg should go to, and what it is connected to now
   {
-    const pi = boardKind === 'pi4';
+    const pi = boardKind === 'pi4', u3 = boardKind === 'uno3';
     const name = { '5v': pi ? '5V (pin 2 or 4)' : '5V', '3v3': pi ? '3V3 (pin 1 or 17)' : '3V3', gnd: pi ? 'GND (for example pin 6)' : 'GND', gpio: 'a signal pin' };
     const reachPins = (d, term) => {
       const start = find(T(d, term)), seen = new Set([start]), q = [start], out = [];
@@ -540,10 +553,10 @@ export function evaluate(model) {
       buzzer: d => [item(d, 'plus', ['gpio'], sig), item(d, 'minus', ['gnd'], name.gnd)],
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], pi ? 'a GPIO pin' : 'an analog pin A0–A5', pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], pi ? 'a GPIO pin' : 'an analog pin A0–A5', pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
-      hcsr04: d => [item(d, 'VCC', ['5v'], name['5v'], 'The HC-SR04 is made for 5 V'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'TRIG', ['gpio'], sig), item(d, 'ECHO', ['gpio'], pi ? 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider' : 'D8 (a 5 V-tolerant pin)', pi ? 'Its 5 V echo would damage the pin directly' : 'Not D3 or A0–A5: they are 3.3 V only', (k, id) => !pi ? !k.v3 : true)],
+      hcsr04: d => [item(d, 'VCC', ['5v'], name['5v'], 'The HC-SR04 is made for 5 V'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'TRIG', ['gpio'], sig), item(d, 'ECHO', ['gpio'], pi ? 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider' : u3 ? 'a digital pin (for example D8)' : 'D8 (a 5 V-tolerant pin)', pi ? 'Its 5 V echo would damage the pin directly' : u3 ? '' : 'Not D3 or A0–A5: they are 3.3 V only', (k, id) => !pi ? !k.v3 : true)],
       pir: d => [item(d, 'VCC', ['5v'], name['5v']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], sig)],
       servo: d => [item(d, 'GND', ['gnd'], name.gnd + ' (brown wire, first pin)'), item(d, 'V', ['5v'], name['5v'] + ' (red wire, middle pin)'), item(d, 'SIG', ['gpio'], sig + ' (orange wire)')],
-      sht31: d => [item(d, 'VIN', ['3v3'], name['3v3'], pi ? 'On a Raspberry Pi use 3.3 V, not 5 V' : ''), item(d, 'GND', ['gnd'], name.gnd), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda')],
+      sht31: d => [item(d, 'VIN', ['3v3'], name['3v3'], pi ? 'On a Raspberry Pi use 3.3 V, not 5 V' : ''), item(d, 'GND', ['gnd'], name.gnd), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : u3 ? 'A5 (or SCL), the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : u3 ? 'A4 (or SDA), the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda')],
       relay: d => [item(d, 'DCP', ['5v'], name['5v']), item(d, 'DCN', ['gnd'], name.gnd), item(d, 'IN', ['gpio'], sig, 'Pulling IN LOW switches it on')],
       l293d: d => [item(d, 'p16', ['5v'], name['5v'] + ' (pin 16, logic supply)'), item(d, 'p4', ['gnd'], name.gnd + ' (one of the GND pins 4, 5, 12, 13)'), item(d, 'p1', ['gpio'], sig + ' (pin 1, enable)'), item(d, 'p2', ['gpio'], sig + ' (pin 2, input 1)'), item(d, 'p7', ['gpio'], sig + ' (pin 7, input 2)')],
     };

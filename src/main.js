@@ -11,6 +11,9 @@ import { PI_LESSONS, PI_MODULES, PI_COMING, TERM_CMDS } from './pi4/lessons.js';
 import { J8 } from './pi4/data.js';
 import { makePiAccessories, PI_ACC_INFO } from './pi4/peripherals.js';
 import uqThumb from '../assets/pcb_top_albedo.jpg';
+import u3Thumb from '../assets/uno3/pcb_top_albedo.jpg';
+import { Uno3Board } from './uno3/board.js';
+import { PARTS_U3, CATEGORIES_U3, BOARD_FACTS_U3, U3_HEADERS, findPinU3 } from './uno3/data.js';
 import piThumb from '../assets/pi4/pi4_top.jpg';
 import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, HandModel } from './hardware.js';
 import { Bench } from './bench.js';
@@ -20,16 +23,17 @@ import { JDIGITAL, JANALOG, JSPI, JCTL, findPin as uqFindPin } from './data/pins
 import { LESSONS as UQ_LESSONS, COMING_SOON as UQ_SOON, MODULES as UQ_MODULES } from './data/lessons.js';
 
 // ------------------------------------------------------------------ board profile
-const BOARD = new URLSearchParams(location.search).get('board') === 'pi4' ? 'pi4' : 'unoq';
-const IS_PI = BOARD === 'pi4';
-const PARTS = IS_PI ? PARTS_PI : UQ_PARTS;
-const CATEGORIES = IS_PI ? CATEGORIES_PI : UQ_CATEGORIES;
-const BOARD_FACTS = IS_PI ? BOARD_FACTS_PI : UQ_FACTS;
-const findPin = IS_PI ? findPinPi : uqFindPin;
-const PIN_HEADERS = IS_PI ? [J8_HEADER] : [JDIGITAL, JANALOG, JSPI];
-const LESSONS = IS_PI ? PI_LESSONS : UQ_LESSONS;
-const MODULES = IS_PI ? PI_MODULES : UQ_MODULES;
-const COMING_SOON = IS_PI ? PI_COMING : UQ_SOON;
+const BOARD = { pi4: 'pi4', uno3: 'uno3' }[new URLSearchParams(location.search).get('board')] || 'unoq';
+const IS_PI = BOARD === 'pi4', IS_U3 = BOARD === 'uno3';
+const PARTS = IS_PI ? PARTS_PI : IS_U3 ? PARTS_U3 : UQ_PARTS;
+const CATEGORIES = IS_PI ? CATEGORIES_PI : IS_U3 ? CATEGORIES_U3 : UQ_CATEGORIES;
+const BOARD_FACTS = IS_PI ? BOARD_FACTS_PI : IS_U3 ? BOARD_FACTS_U3 : UQ_FACTS;
+const findPin = IS_PI ? findPinPi : IS_U3 ? findPinU3 : uqFindPin;
+const PIN_HEADERS = IS_PI ? [J8_HEADER] : IS_U3 ? U3_HEADERS : [JDIGITAL, JANALOG, JSPI];
+const LESSONS = IS_PI ? PI_LESSONS : IS_U3 ? [] : UQ_LESSONS;
+const MODULES = IS_PI ? PI_MODULES : IS_U3 ? {} : UQ_MODULES;
+const COMING_SOON = IS_PI ? PI_COMING : IS_U3 ? ['Lesson 1 — Meet the UNO R3', 'Blink the L LED', 'LED + resistor on a breadboard', 'Push button', 'Potentiometer (analogRead)', 'PWM fade', 'Buzzer', 'Sensors and modules'] : UQ_SOON;
+const BOARD_NAME = IS_PI ? 'Raspberry Pi 4' : IS_U3 ? 'Arduino UNO R3' : 'Arduino UNO Q';
 const pinName = pin => { if (!IS_PI) return pin; const p = findPin(pin); return p ? (p.gpio !== null ? `GPIO${p.gpio} (pin ${p.pin})` : `${p.label} (pin ${p.pin})`) : pin; };
 import { LOGO_ARRAY, SHADES_ARRAY, matrixCode } from './data/code.js';
 import { Sim, blinkCode, VREF } from './sim.js';
@@ -66,7 +70,7 @@ const VIEWS = {
   drvclose: { t: new THREE.Vector3(0, 3, 71), d: new THREE.Vector3(-0.22, 0.86, 0.46), dist: 78 },
   sonar: { t: new THREE.Vector3(-10, 0, 175), d: new THREE.Vector3(-0.62, 0.6, 0.5), dist: 360 },
 };
-const BOTTOM_PARTS = new Set(IS_PI ? ['sdcard'] : ['mcu', 'emmc', 'jmisc', 'jmedia']);
+const BOTTOM_PARTS = new Set(IS_PI ? ['sdcard'] : IS_U3 ? [] : ['mcu', 'emmc', 'jmisc', 'jmedia']);
 const shortName = n => n.replace(/^(Qualcomm Dragonwing™|STMicroelectronics|Qualcomm) /, '');
 
 class App {
@@ -77,13 +81,13 @@ class App {
 
     this.viewer = new Viewer($('#stage'));
     initMaterials(this.viewer.renderer);
-    this.board = IS_PI ? new Pi4Board() : new UnoQBoard();
+    this.board = IS_PI ? new Pi4Board() : IS_U3 ? new Uno3Board() : new UnoQBoard();
     this.applyBoardBranding();
     this.viewer.scene.add(this.board.group);
     this.mode = 'explore';
     this.selected = null; this.hovered = null;
     this.tempObjs = []; this.partLabels = [];
-    this.progress = JSON.parse(localStorage.getItem(IS_PI ? 'pi4-lab-progress' : 'unoq-lab-progress') || '{}');
+    this.progress = JSON.parse(localStorage.getItem(IS_PI ? 'pi4-lab-progress' : IS_U3 ? 'uno3-lab-progress' : 'unoq-lab-progress') || '{}');
     this.blinkDelay = 1000;
     this.soundOn = true;
     this.editorFrame = LOGO_ARRAY.map(v => v * 7);
@@ -111,11 +115,11 @@ class App {
   // ------------------------------------------------------------------ hardware
   setupHardware() {
     const s = this.viewer.scene;
-    this.cable = makeUsbCable(); this.cable.visible = false; s.add(this.cable);
+    this.cable = makeUsbCable(IS_U3 ? 'usbb' : 'usbc'); this.cable.visible = false; s.add(this.cable);
     this.usbPlugged = false;
     this.bb = new Breadboard(new THREE.Vector3(0, DESK_Y + 8.5, IS_PI ? -62 : 68)); this.bb.group.visible = false; s.add(this.bb.group);
     this.bench = new Bench(s, this.board, this.bb);
-    this.fb = new FreeBuild(this, { isPi: IS_PI, pinInfo: findPin });
+    this.fb = new FreeBuild(this, { isPi: IS_PI, boardKind: BOARD, pinInfo: findPin });
     this.pios = { mode: 'on', lines: [], cwd: '~', cur: '', busy: false, temp: 46.2, fs: {} };
     if (IS_PI) { this.acc = makePiAccessories(this.board); for (const a of this.acc.all) { a.on = false; s.add(a.group); } Object.assign(HW_INFO, PI_ACC_INFO); }
     this.strips = new THREE.Group(); this.strips.visible = false; s.add(this.strips);
@@ -435,7 +439,8 @@ class App {
     h += `<p>${info.summary}</p>`;
     if (info.specs) h += `<table class="kv">${info.specs.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>`;
     if (info.points) h += `<ul>${info.points.map(p => `<li>${p}</li>`).join('')}</ul>`;
-    if (id === 'jdigital' || id === 'janalog' || id === 'jspi') {
+    if (IS_U3 && U3_HEADERS.find(hd => hd.id === id)) { const hd = U3_HEADERS.find(x => x.id === id); h += `<div class="pingrid">${hd.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b> · pin ${p.pin}</button>`).join('')}</div>`; }
+    else if (id === 'jdigital' || id === 'janalog' || id === 'jspi') {
       const hdr = id === 'jdigital' ? JDIGITAL : id === 'janalog' ? JANALOG : JSPI;
       h += `<div class="pingrid">${hdr.pins.map(p => `<button data-pin="${p.id}"><b>${p.label}</b> · pin ${p.pin}</button>`).join('')}</div>`;
     }
@@ -472,7 +477,7 @@ class App {
       const info = findPin(pinId);
       title = info ? `Pin ${info.label}` : `Pin ${pinId}`;
       ref = info && info.mcu && info.mcu !== '—' ? info.mcu : `${info ? info.header : 'Header'}`;
-      tag = info && info.v ? info.v : '3.3V';
+      tag = info && info.v ? info.v : (IS_U3 ? '5V' : '3.3V');
       const fns = info && info.fn ? (IS_PI ? info.fn[0] : info.fn.join(', ')) : '';
       line1 = fns ? (IS_PI ? fns + '.' : `Functions: ${fns}`) : 'Direct microcontroller input/output pin.';
       line2 = info && info.note ? info.note : 'Connect sensors, actuators, or test probes here.';
@@ -613,6 +618,13 @@ class App {
 
   pinCard(pinId) {
     if (IS_PI) return this.pinCardPi(pinId);
+    if (IS_U3) {
+      const p = findPin(pinId), hd = U3_HEADERS.find(x => x.pins.includes(p));
+      let h = `<div class="card"><h2><span class="pinchip">${p.label}</span> ${p.id !== p.label && !/^GND/.test(p.id) ? p.id : ''}</h2><div class="ref">${hd.name} · pin ${p.pin}</div>`;
+      h += `<table class="kv"><tr><td>MCU pin</td><td>${p.mcu}</td></tr><tr><td>Functions</td><td>${p.fn.join('<br>')}</td></tr><tr><td>Level</td><td>${p.v}</td></tr></table>`;
+      h += `<p>${p.note}</p><p class="tip">${hd.common}</p><p><button class="item" data-part="${hd.id}">← About the ${hd.name}</button></p>`;
+      return h + `<div class="src">Source: Arduino UNO R3 datasheet A000066 §5.1–5.2 · board file UNO-TH_Rev3e · ATmega328P datasheet</div></div>`;
+    }
     const p = findPin(pinId);
     const hdr = p.header === 'JDIGITAL' ? JDIGITAL : p.header === 'JANALOG' ? JANALOG : JSPI;
     let h = `<div class="card"><h2><span class="pinchip">${p.label}</span> ${p.id !== p.label && !/^(GND|SPI_)/.test(p.id) ? p.id : ''}</h2>`;
@@ -637,11 +649,12 @@ class App {
   }
   applyBoardBranding() {
     if (IS_PI) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'Raspberry Pi 4'; const lg = document.querySelector('.brand .logo'); if (lg) lg.style.display = 'none'; }
-    document.title = (IS_PI ? 'Raspberry Pi 4' : 'Arduino UNO Q') + ' · 3D Learning Lab';
+    if (IS_U3) { const b = document.querySelector('.brand b'); if (b) b.textContent = 'Arduino UNO R3'; }
+    document.title = BOARD_NAME + ' · 3D Learning Lab';
     const ch = $('#chooser');
     if (ch) {
       const cards = ch.querySelectorAll('[data-board]');
-      cards.forEach(c => { const im = c.querySelector('.ch-img'); if (im && !im.firstChild) { const img = new Image(); img.alt = ''; img.src = c.dataset.board === 'pi4' ? piThumb : uqThumb; im.appendChild(img); } c.classList.toggle('cur', c.dataset.board === BOARD); });
+      cards.forEach(c => { const im = c.querySelector('.ch-img'); if (im && !im.firstChild) { const img = new Image(); img.alt = ''; img.src = c.dataset.board === 'pi4' ? piThumb : c.dataset.board === 'uno3' ? u3Thumb : uqThumb; im.appendChild(img); } c.classList.toggle('cur', c.dataset.board === BOARD); });
       const go = b => { if (b === BOARD) { ch.classList.remove('on'); history.replaceState(null, '', '?board=' + b); } else location.search = '?board=' + b; };
       cards.forEach(c => c.onclick = () => go(c.dataset.board));
       if (!new URLSearchParams(location.search).get('board')) ch.classList.add('on');
@@ -652,6 +665,15 @@ class App {
     }
   }
   showWelcome() {
+    if (IS_U3) {
+      $('#panel').innerHTML = `<div class="card welcome"><h2>${BOARD_FACTS.name}</h2><span class="tag">Interactive 3D model</span>
+        <p>This model is built from Arduino’s <b>official open-source board file</b> of the UNO R3: the real outline and mounting holes, every copper track, pad and silkscreen label, and the exact position of every part.</p>
+        <div class="facts"><span>Version</span><span>${BOARD_FACTS.skus}</span><span>Size</span><span>${BOARD_FACTS.size}</span><span>Operating temp.</span><span>${BOARD_FACTS.temp}</span></div>
+        <p class="tip"><b>Click any part</b> on the board — or choose one on the left — to learn what it does. Click a single header pin to see its function.</p>
+        <p>Use <b>Top</b> / <b>Bottom</b> to turn the board over, and <b>360°</b> to spin it. Try the <b>Build</b> tab to wire circuits.</p>
+        <div class="src">Sources: Arduino UNO R3 datasheet A000066 · board file UNO-TH_Rev3e.brd © Arduino, CC BY-SA 4.0. The Arduino logo in the silkscreen is drawn by the app (it is a bitmap that is not part of the CAD file).</div></div>`;
+      return;
+    }
     if (IS_PI) {
       $('#panel').innerHTML = `<div class="card welcome"><h2>${BOARD_FACTS.name}</h2><span class="tag">Interactive 3D model</span>
         <p>This model is built from Raspberry Pi’s <b>official mechanical drawing</b> (exact size, hole and connector positions and heights) with the surface taken from <b>real photographs</b> of the board, straightened to the exact millimetre grid.</p>
@@ -723,7 +745,7 @@ class App {
   }
 
   lessonHome() {
-    $('#panel').innerHTML = `<div class="card"><div class="lesson-head">Course</div><h2>Learn the ${IS_PI ? 'Raspberry Pi 4' : 'UNO Q'} step by step</h2>
+    $('#panel').innerHTML = `<div class="card"><div class="lesson-head">Course</div><h2>Learn the ${IS_PI ? 'Raspberry Pi 4' : IS_U3 ? 'UNO R3' : 'UNO Q'} step by step</h2>
       <p>The lessons go in order, ${IS_PI ? 'from setting up the board to Python programs that control electronics' : 'from the very basics to circuits with inputs, outputs, light and sound'}. Each step moves the 3D board, highlights the parts and explains them.</p>
       ${Object.entries(MODULES).map(([m, name]) => `<p><b>${name}</b></p><ol start="${LESSONS.find(l => l.module === +m).num}">${LESSONS.filter(l => l.module === +m).map(L => `<li>${L.title} — ${L.time}</li>`).join('')}</ol>`).join('')}
       <p class="tip">Start with <b>Lesson 1</b> on the left.</p>

@@ -18,8 +18,8 @@ const MOVABLE = new Set(['resistor', 'led', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
 
 export class FreeBuild {
-  constructor(app, { isPi, pinInfo }) {
-    this.app = app; this.isPi = isPi; this.boardKind = isPi ? 'pi4' : 'unoq'; this.pinInfo = pinInfo;
+  constructor(app, { isPi, boardKind, pinInfo }) {
+    this.app = app; this.isPi = isPi; this.boardKind = boardKind || (isPi ? 'pi4' : 'unoq'); this.isU3 = this.boardKind === 'uno3'; this.pinInfo = pinInfo;
     this.active = false;
     this.parts = []; this.pinCfg = {}; this.burnt = new Set(); this.damaged = new Set(); this.burnWhy = {};
     this.env = { lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: true, touched: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
@@ -483,6 +483,7 @@ export class FreeBuild {
       else if (d.type === 'servo') { const tgt = R && R.angle !== undefined ? R.angle : (this.servoNow[d.id] ?? 90), cur = this.servoNow[d.id] ?? 90; const nx = cur + Math.max(-9, Math.min(9, tgt - cur)); this.servoNow[d.id] = nx; it.obj.setAngle(nx); }
       else if (d.type === 'buzzer') { const on = !!R && R.loud > 0.05; it.obj.vibrate(on); if (on) buzz = true; }
     }
+    if (this.isU3) { const o = res.pins.D13, c = this.pinCfg.D13 || {}; this.app.board.setLed('l', this.powered() && !this.damaged.has('D13') && ['out1', 'blink', 'pwm', 'tone', 'servo', 'pulse'].includes(c.mode) && (c.mode !== 'blink' || Math.floor((performance.now() - this.t0) / 500) % 2 === 0)); }
     // sound: the passive buzzer follows the pin that is in tone mode
     const tonePin = Object.entries(this.pinCfg).find(([id, c]) => c.mode === 'tone' && !this.damaged.has(id));
     const hz = buzz && tonePin && this.powered() ? Math.round(tonePin[1].freq || 440) : 0;
@@ -518,13 +519,14 @@ export class FreeBuild {
         down: `from gpiozero import Button\nbutton = Button(${n}, pull_up=False)   # internal pull-down\nprint(button.is_pressed)`,
       })[c.mode] || '';
     }
+    if (this.isU3) id = /^D\d+$/.test(id) ? id.slice(1) : id;
     return ({
       out1: `pinMode(${id}, OUTPUT);\ndigitalWrite(${id}, HIGH);`, out0: `pinMode(${id}, OUTPUT);\ndigitalWrite(${id}, LOW);`,
       blink: `pinMode(${id}, OUTPUT);\n// in loop():\ndigitalWrite(${id}, HIGH); delay(500);\ndigitalWrite(${id}, LOW);  delay(500);`,
       servo: `#include <Servo.h>\nServo s;\n// in setup():\ns.attach(${id});\ns.write(${Math.round(c.angle ?? 90)});   // degrees`,
       pulse: `pinMode(${id}, OUTPUT);\ndigitalWrite(${id}, LOW);  delayMicroseconds(2);\ndigitalWrite(${id}, HIGH); delayMicroseconds(10);   // 10 µs trigger pulse\ndigitalWrite(${id}, LOW);`,
       pwm: `pinMode(${id}, OUTPUT);\nanalogWrite(${id}, ${Math.round(duty * 255)});   // 0 … 255`, tone: `tone(${id}, ${f});   // Hz`,
-      i2c: `#include <Wire.h>\n// in setup():\nWire.begin();   // I²C bus (SDA D20 / SCL D21; A4 / A5 use Wire2)`,
+      i2c: `#include <Wire.h>\n// in setup():\nWire.begin();   // ${this.isU3 ? 'I²C bus: SDA = A4, SCL = A5' : 'I²C bus (SDA D20 / SCL D21; A4 / A5 use Wire2)'}`,
       in: `pinMode(${id}, INPUT);\nint v = digitalRead(${id});`, up: `pinMode(${id}, INPUT_PULLUP);\nint v = digitalRead(${id});   // pressed = LOW`,
       analog: `int v = analogRead(${id});   // 0 … 1023 (10-bit default)`,
     })[c.mode] || '';
@@ -551,7 +553,7 @@ export class FreeBuild {
       ${this.isPi ? this.piSideHtml() : ''}
       <h3>Power</h3>
       <button class="fb-btn big${this.powered() ? ' on' : ''}" data-act="power">${this.powered() ? '🔌 Unplug the power' : '🔌 Plug in the power'}</button>
-      <div class="fb-small">${this.isPi ? 'The Raspberry Pi is already running its operating system.' : 'The UNO Q is powered over USB-C.'} Wire first, then plug in: that is the safe order.</div>
+      <div class="fb-small">${this.isPi ? 'The Raspberry Pi is already running its operating system.' : this.isU3 ? 'The UNO R3 is powered over its USB-B cable.' : 'The UNO Q is powered over USB-C.'} Wire first, then plug in: that is the safe order.</div>
       <h3>Parts</h3>
       <div class="fb-row"><button class="fb-btn${on('resistor')}" data-tool="resistor">Resistor</button><select data-opt="ohms">${ohmOpts}</select></div>
       <div class="fb-row"><button class="fb-btn${on('led')}" data-tool="led">LED</button><select data-opt="color">${ledOpts}</select></div>
@@ -570,7 +572,7 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('l293d')}" data-tool="l293d">L293D motor driver (chip)</button></div>
       <div class="fb-row"><button class="fb-btn" data-tool="motor">DC motor 130 with propeller</button></div>
       <div class="fb-row"><button class="fb-btn${on('sht31')}" data-tool="sht31">SHT31-D temperature + humidity (I²C)</button></div>
-      ${this.isPi ? '' : `<div class="fb-row"><button class="fb-btn" data-tool="thermo">Modulino Thermo (Qwiic)</button></div><div class="fb-row"><button class="fb-btn" data-tool="pixels">Modulino Pixels (Qwiic)</button></div><div class="fb-row"><button class="fb-btn${on('qwiic')}" data-tool="qwiic">Qwiic cable</button></div>`}
+      ${this.isPi || this.isU3 ? '' : `<div class="fb-row"><button class="fb-btn" data-tool="thermo">Modulino Thermo (Qwiic)</button></div><div class="fb-row"><button class="fb-btn" data-tool="pixels">Modulino Pixels (Qwiic)</button></div><div class="fb-row"><button class="fb-btn${on('qwiic')}" data-tool="qwiic">Qwiic cable</button></div>`}
       <h3>Wires</h3>
       <button class="fb-btn${on('wire')}" data-tool="wire">${wireName}</button>
       <div class="fb-sws">${sw}</div>
@@ -635,11 +637,11 @@ export class FreeBuild {
   renderPanel() {
     if (!this.active) return;
     const pins = this.usedPins(), sel = this.parts.find(p => p.id === this.selected);
-    let h = `<div class="card fb-card"><div class="lesson-head">Free build · ${this.isPi ? 'Raspberry Pi 4' : 'Arduino UNO Q'}</div><h2>Build it. Break it. Fix it.</h2>`;
+    let h = `<div class="card fb-card"><div class="lesson-head">Free build · ${this.isPi ? 'Raspberry Pi 4' : this.isU3 ? 'Arduino UNO R3' : 'Arduino UNO Q'}</div><h2>Build it. Break it. Fix it.</h2>`;
     if (this.exNote) h += `<div class="fb-note ok"><span class="ic">✎</span><span>${this.exNote}</span></div>`;
     if (this.tripMsg) h += `<div class="fb-note bad"><span class="ic">⚡</span><span>${esc(this.tripMsg)} The power was cut. Fix the circuit, then plug the power in again.</span></div>`;
     h += `<div id="fb-status"></div>`;
-    if (!this.parts.length) h += `<p>Place parts on the breadboard, connect them with wires to the board's pins, give every pin a job, and the app tells you whether it works, and if not, why. It follows real rules: LEDs need resistors and the right direction, a button input needs a pull-up, a passive buzzer needs a tone, and ${this.isPi ? '5 V on a GPIO pin damages the Raspberry Pi' : '5 V on D3 or the analog pins damages the UNO Q'}.</p><p class="tip">New here? Try an <b>example</b> on the left, then change it and watch what happens.</p>`;
+    if (!this.parts.length) h += `<p>Place parts on the breadboard, connect them with wires to the board's pins, give every pin a job, and the app tells you whether it works, and if not, why. It follows real rules: LEDs need resistors and the right direction, a button input needs a pull-up, a passive buzzer needs a tone, and ${this.isPi ? '5 V on a GPIO pin damages the Raspberry Pi' : this.isU3 ? 'an output pin wired straight to GND is overloaded' : '5 V on D3 or the analog pins damages the UNO Q'}.</p><p class="tip">New here? Try an <b>example</b> on the left, then change it and watch what happens.</p>`;
     if (pins.size) {
       h += `<h3>Pins</h3><div class="fb-pins">`;
       for (const [id, k] of pins) {
@@ -667,7 +669,7 @@ export class FreeBuild {
       if (hasT || hasSht) h += `<div class="fb-env">Temperature <input type="range" min="-20" max="100" value="${this.env.tempC}" data-env="tempC"><b data-envv="tempC"></b></div>`;
     }
     h += `<h3>Wiring checklist</h3><div id="fb-guide"></div><h3>What the circuit does</h3><div id="fb-notes"></div>
-      <p class="sim">Simplified model: wires have no resistance, LED voltages are typical values, and the board's pin drivers use simulation values. Limits come from the datasheets: ${this.isPi ? 'Raspberry Pi GPIO is 3.3 V only, 16 mA per pin' : 'STM32U585 pins: 20 mA absolute maximum, D3 and A0–A5 are 3.3 V only'}.</p></div>`;
+      <p class="sim">Simplified model: wires have no resistance, LED voltages are typical values, and the board's pin drivers use simulation values. Limits come from the datasheets: ${this.isPi ? 'Raspberry Pi GPIO is 3.3 V only, 16 mA per pin' : this.isU3 ? 'ATmega328P pins: 5 V logic, 40 mA absolute maximum per pin (20 mA recommended)' : 'STM32U585 pins: 20 mA absolute maximum, D3 and A0–A5 are 3.3 V only'}.</p></div>`;
     $('#panel').innerHTML = h; this.lastHtml = {}; this.syncControls(); if (this.result) this.liveText(this.result);
   }
   selectedHtml(d) {

@@ -21,10 +21,22 @@ const tween = (ms, fn) => new Promise(res => {
 });
 
 // ---------------------------------------------------------------- USB-C cable
-export function makeUsbCable() {
+export function makeUsbCable(kind = 'usbc') {
   const g = new THREE.Group();
   const rubber = new THREE.MeshPhysicalMaterial({ color: 0x1c1c1f, roughness: 0.55, clearcoat: 0.2 });
   const plug = new THREE.Group();
+  if (kind === 'usbb') {
+    // USB Type-B plug: square metal shell about 12 x 10.5 mm with bevelled top corners, 9 mm long, tip at local x = 0
+    const sh = new THREE.Shape(), w = 11.8, h = 10.4, c = 2.0;
+    sh.moveTo(-w / 2, -h / 2); sh.lineTo(w / 2, -h / 2); sh.lineTo(w / 2, h / 2 - c); sh.lineTo(w / 2 - c, h / 2); sh.lineTo(-w / 2 + c, h / 2); sh.lineTo(-w / 2, h / 2 - c); sh.closePath();
+    const metal = new THREE.ExtrudeGeometry(sh, { depth: 9, bevelEnabled: true, bevelSize: 0.1, bevelThickness: 0.1, bevelSegments: 2 }); metal.rotateY(-Math.PI / 2);
+    plug.add(new THREE.Mesh(metal, M.steel));
+    const mold = new THREE.Mesh(new RoundedBoxGeometry(24, 13.5, 16, 4, 2.5), rubber); mold.position.set(-9 - 12, 0, 0); plug.add(mold);
+    const relief = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.3, 8, 24), rubber); relief.rotation.z = Math.PI / 2; relief.position.set(-9 - 24 - 3.5, 0, 0); plug.add(relief);
+    const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(-40, 0, 0), new THREE.Vector3(-60, -2, 3), new THREE.Vector3(-90, -8, 16), new THREE.Vector3(-135, -9.5, 40), new THREE.Vector3(-210, -9.5, 58), new THREE.Vector3(-330, -9.5, 70)]);
+    plug.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 120, 2.4, 16, false), rubber));
+    g.add(plug); tagHW(g, 'usbcable'); g.userData.plug = plug; g.userData.depth = 8.5; return g;
+  }
   // metal plug (8.25 x 2.4 mm), 6.6 mm long, tip at local x = 0
   const sh = new THREE.Shape();
   const w = 8.25, h = 2.4, r = 1.15;
@@ -52,7 +64,7 @@ export async function plugUsb(cable, board, insert = true, ms = 1400) {
   const mouth = board.usbMouth;        // receptacle opening (world)
   const rot = board.usbRotY || 0;      // UNO Q: opening faces −x (0); Raspberry Pi 4: faces +z
   cable.rotation.y = rot;
-  cable.position.copy(mouth).add(new THREE.Vector3(6.2, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), rot));   // plug tip seated inside the receptacle
+  cable.position.copy(mouth).add(new THREE.Vector3(cable.userData.depth || 6.2, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), rot));   // plug tip seated inside the receptacle
   const out = -26;
   const plug = cable.userData.plug;
   if (insert) {

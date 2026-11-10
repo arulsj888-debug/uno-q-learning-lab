@@ -96,6 +96,17 @@ r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, Q('c1', 'QWIIC', 'th1
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: 'pixels' }, Q('c1', 'QWIIC', 'th1.QA'), Q('c2', 'th1.QB', 'pix1.QA')], env: { ...env, tempC: 25 } })); ok(r.parts.pix1.colors && r.parts.pix1.colors.filter(c => c[3] > 0).length === 5, 'Pixels bar: 25 C = 5 of 8 LEDs');
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: 'pixels' }, Q('c2', 'th1.QB', 'pix1.QA')] })); ok(r.parts.th1.status === 'off' && r.parts.pix1.status === 'off', 'modules without a cable to the board are off');
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'th2', type: 'thermo' }, Q('c1', 'QWIIC', 'th1.QA'), Q('c2', 'th1.QB', 'th2.QA')] })); ok(r.parts.th1.status === 'warn', 'two Thermos clash');
+// ---- Arduino UNO R3 (5 V logic)
+const u3 = id => ({ D5: { id: 'D5', pwm: true }, D13: { id: 'D13' }, D2: { id: 'D2' }, A0: { id: 'A0' }, A4: { id: 'A4' }, A5: { id: 'A5' }, SDA: { id: 'SDA' }, '5V': { id: '5V', kind: 'pwr' }, '3V3': { id: '3V3', kind: 'pwr' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const b3 = o => ({ boardKind: 'uno3', pinInfo: u3, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
+r = evaluate(b3({ parts: [W('w1', 'D5', 'a10'), res('r1', 'b10', 'b14', 220), led('l1', 'c14', 'c15'), W('w2', 'GND2', 'd15')], pinCfg: { D5: { mode: 'out1' } } }));
+ok(r.parts.l1.status === 'ok' && r.parts.l1.I > 0.010 && r.parts.l1.I < 0.016 && r.pins.D5.V > 4.3, 'UNO R3: 5 V pin + 220 ohm + LED gives about 12 mA');
+r = evaluate(b3({ parts: [W('w1', 'D5', 'a10'), W('w2', 'GND2', 'b10')], pinCfg: { D5: { mode: 'out1' } } })); ok(r.newDamage.has('D5'), 'UNO R3: output HIGH shorted to GND damages the pin');
+r = evaluate(b3({ parts: [{ id: 'p1', type: 'pot', row: 'e', col: 10 }, W('w1', '5V', 'a10'), W('w2', 'GND2', 'a14'), W('w3', 'A0', 'a12')], pinCfg: { A0: { mode: 'analog' } }, env: { ...env, pot: { p1: 0.5 } } }));
+ok(Math.abs(r.pins.A0.adc - 512) < 3, 'UNO R3: pot in the middle on 5 V reads about 512');
+r = evaluate(b3({ parts: [W('w1', '5V', 'a10'), W('w2', 'D2', 'b10')], pinCfg: { D2: { mode: 'in' } } })); ok(!r.newDamage.size && r.pins.D2.read === 1, 'UNO R3: 5 V on an input is fine and reads HIGH');
+r = evaluate(b3({ parts: [{ id: 'sen1', type: 'sht31', row: 'g', col: 10 }, W('w1', '5V', 'j10'), W('w2', 'GND2', 'j11'), W('w3', 'A5', 'j12'), W('w4', 'SDA', 'j13')], pinCfg: { A5: { mode: 'i2c' }, SDA: { mode: 'i2c' } } }));
+ok(r.parts.sen1.status === 'ok', 'UNO R3: SHT31 on SDA (= A4) and A5 works');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);
