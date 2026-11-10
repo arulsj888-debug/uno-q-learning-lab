@@ -51,7 +51,7 @@ export const U3_LESSONS = [
     goal: 'Recognise every important part of the UNO R3 and know what it does.',
     hardware: ['Arduino UNO R3'],
     steps: [
-      { title: 'Welcome to the UNO R3', view: 'home',
+      { title: 'Welcome to the UNO R3', view: 'home', power: false,
         body: `<p>The <b>Arduino UNO R3</b> (A000066) is the classic Arduino board: <b>68.58 mm × 53.34 mm</b>, one microcontroller, <b>5 V</b> logic, <b>14 digital</b> pins and <b>6 analog inputs</b>.</p>
         <p>You write a <b>sketch</b>, upload it over USB, and the board runs it again and again. There is no operating system: the sketch is the only program.</p>
         <p class="tip">Drag to rotate, scroll to zoom, click any part. Press <b>Next</b> for the tour.</p>` },

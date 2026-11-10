@@ -1092,7 +1092,8 @@ class App {
     }
     if (this.acc) { await this.applyAcc(i, prev, alive); if (!alive()) return; }
     const st = L.steps.some(x => x.power !== undefined) ? this.stepState(i) : {};
-    if (IS_PI && st.power === false && this.usbPlugged && !L.circuit) await this.plug(false);
+    if (st.power === false && this.usbPlugged) await this.plug(false);      // going Back to a step where the power is off unplugs the cable again (all boards)
+    if (!alive()) return;
     if (st.power === true) await this.ensurePower();
     if (!alive()) return;
     await this.doAction(S.action, tok);

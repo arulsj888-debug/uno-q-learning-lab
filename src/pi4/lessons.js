@@ -252,7 +252,7 @@ export const PI_LESSONS = [
     hardware: ['Raspberry Pi 4 Model B'],
     steps: [
       {
-        title: 'A complete computer on one board', view: 'home',
+        title: 'A complete computer on one board', view: 'home', power: false,
         body: `<p>The Raspberry Pi 4 is a <b>full computer</b>: it runs an operating system (Raspberry Pi OS, a Linux), has a desktop, USB ports for a keyboard and mouse, screens, network — and <b>40 pins</b> for your own electronics.</p>
         <table class="kv"><tr><th></th><th>Raspberry Pi 4</th></tr><tr><td>Size</td><td>85 × 56 mm</td></tr><tr><td>Processor</td><td>Broadcom BCM2711, 4 × Cortex-A72, 1.5 GHz</td></tr><tr><td>Memory</td><td>1, 2, 4 or 8 GB LPDDR4</td></tr><tr><td>Programs</td><td>written in <b>Python</b> (and many other languages)</td></tr></table>
         <p class="tip">Click any part on the board to read about it. The next steps visit them one by one.</p>`,
