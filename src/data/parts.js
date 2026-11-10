@@ -152,7 +152,7 @@ export const PARTS = {
     ],
     specs: [
       ['Power (sink)', '5 V / 3 A (15 W). USB PD requests the 5 V / 3 A contract only'],
-      ['Data', 'USB 3.1 Gen 1 (5 Gb/s) with role switching'],
+      ['Data', 'USB 3.1 with role switching (the datasheet gives no speed grade)'],
       ['Video', 'DisplayPort Alt-Mode (via ANX7625)'],
       ['With a dongle', 'HDMI, USB camera, audio, Ethernet, keyboard/mouse, storage'],
     ],
@@ -308,7 +308,7 @@ export const PARTS = {
       'Linux debug console (1.8 V UART) plus boot and reset lines.'
     ],
     specs: [
-      ['Console UART', 'SOC_SE4_TX / SOC_SE4_RX, 115200 bps'],
+      ['Console UART', 'SOC_SE4_TX / SOC_SE4_RX (the system console)'],
       ['Other pins', 'USB_BOOT, PMIC_RESET, VBUS_DISABLE, VOL_UP, VOL_DOWN, +1V8 OUT, GND'],
       ['Logic level', '1.8 V'],
     ],

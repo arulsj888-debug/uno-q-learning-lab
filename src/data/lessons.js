@@ -244,7 +244,7 @@ export const LESSONS = [
       {
         title: 'USB-C: power, data and video', focus: 'usbc',
         body: `<p>The <b>USB-C</b> connector does three jobs:</p>
-        <ul><li><b>Power</b>: 5 V / 3 A</li><li><b>Data</b>: USB 3.1 Gen 1 (5 Gb/s)</li>
+        <ul><li><b>Power</b>: 5 V / 3 A</li><li><b>Data</b>: USB 3.1 with role switching</li>
         <li><b>Video</b>: DisplayPort through the <b>ANX7625</b> bridge chip right next to it</li></ul>
         <p>With a USB-C dongle you can attach a monitor, keyboard, mouse and camera and use the UNO Q as a small desktop computer (“single-board computer mode”).</p>`,
       },
