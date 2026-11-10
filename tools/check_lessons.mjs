@@ -7,13 +7,16 @@
 //  - header print (what is written on the 3D headers) matches the pin data
 import { LESSONS } from '../src/data/lessons.js';
 import { PI_LESSONS } from '../src/pi4/lessons.js';
+import { U3_LESSONS } from '../src/uno3/lessons.js';
+import { U3_PINS } from '../src/uno3/data.js';
 import { JDIGITAL, JANALOG, JSPI } from '../src/data/pins.js';
 
 const UQ_PINS = new Set([...JDIGITAL.pins, ...JANALOG.pins, ...JSPI.pins].map(p => p.id));
 // Raspberry Pi 4 J8: physical pins p1..p40; power/ground per the datasheet pinout (Figure 3)
 const PI_PINS = new Set(Array.from({ length: 40 }, (_, i) => 'p' + (i + 1)));
 const PI_SIG = { p1: '3V3', p17: '3V3', p2: '5V', p4: '5V', p6: 'GND', p9: 'GND', p14: 'GND', p20: 'GND', p25: 'GND', p30: 'GND', p34: 'GND', p39: 'GND' };
-let PINS = UQ_PINS, PI = false;
+const U3_SET = new Set(U3_PINS.map(p => p.id));
+let PINS = UQ_PINS, PI = false, U3 = false, SUP = '3V3';    // SUP = the supply pin the analog sensors are fed from
 PINS.add('QWIIC');                                         // the UNO Q Qwiic connector (I2C4 / Wire1)
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
@@ -24,7 +27,7 @@ const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
 const sigOf = r => (PI ? (PI_SIG[r] || r) : (/^GND\d?$|^SPI_GND$/.test(r) ? 'GND' : r));            // all GND pins are one net
 const colNet = h => { const [, row, c] = HOLE.exec(h); return `col${c}${'abcde'.includes(row) ? 'top' : 'bot'}`; };
 let problems = 0;
-const bad = (L, msg) => { problems++; console.log(`✗ ${PI ? 'Pi 4 ' : ''}Lesson ${L.num}: ${msg}`); };
+const bad = (L, msg) => { problems++; console.log(`✗ ${PI ? 'Pi 4 ' : U3 ? 'UNO R3 ' : ''}Lesson ${L.num}: ${msg}`); };
 
 function legs(d) {
   switch (d.type) {
@@ -58,8 +61,8 @@ function nets(defs, pressed = false) {
   return { same: (a, b) => f(a) === f(b), f };
 }
 
-for (const [boardName, list] of [['UNO Q', LESSONS], ['Pi 4', PI_LESSONS]]) {
-PI = boardName === 'Pi 4'; PINS = PI ? PI_PINS : UQ_PINS;
+for (const [boardName, list] of [['UNO Q', LESSONS], ['Pi 4', PI_LESSONS], ['UNO R3', U3_LESSONS]]) {
+PI = boardName === 'Pi 4'; U3 = boardName === 'UNO R3'; SUP = U3 ? '5V' : '3V3'; PINS = PI ? PI_PINS : U3 ? U3_SET : UQ_PINS;
 for (const L of list) {
   if (!L.circuit) continue;
   const all = L.circuit;
@@ -84,7 +87,7 @@ for (const L of list) {
   for (let i = 0; i < sigs.length; i++) for (let j = i + 1; j < sigs.length; j++)
     if (N.same('PIN:' + sigs[i], 'PIN:' + sigs[j])) bad(L, `SHORT: ${sigs[i]} and ${sigs[j]} are connected together`);
   // 2b. 5 V signals must only reach 5 V-tolerant digital pins (UNO Q datasheet §9.6/9.7)
-  for (const d of all.filter(x => x.type === 'hcsr04')) {
+  for (const d of U3 ? [] : all.filter(x => x.type === 'hcsr04')) {
     for (const bad5 of ['D3', 'A0', 'A1', 'A2', 'A3', 'A4', 'A5', '3V3', 'IOREF', 'AREF'])
       if (N.same(d.id + '.ECHO', 'PIN:' + bad5)) bad(L, `5 V ECHO of ${d.id} reaches ${bad5}, which is not 5 V-tolerant`);
   }
@@ -109,22 +112,22 @@ for (const L of list) {
       const id = io.item;
       if (!N.same(id + '.W', P)) bad(L, `${pin}: wiper is not on ${pin}`);
       const ends = [id + '.1', id + '.3'];
-      if (!ends.some(e => N.same(e, 'PIN:3V3'))) bad(L, `${pin}: pot end not on 3V3`);
-      if (ends.some(e => N.same(e, 'PIN:5V'))) bad(L, `${pin}: pot end on 5V (A0 is not 5 V-tolerant)`);
+      if (!ends.some(e => N.same(e, 'PIN:' + SUP))) bad(L, `${pin}: pot end not on ${SUP}`);
+      if (!U3 && ends.some(e => N.same(e, 'PIN:5V'))) bad(L, `${pin}: pot end on 5V (A0 is not 5 V-tolerant)`);
       if (!ends.some(e => N.same(e, G))) bad(L, `${pin}: pot end not on GND`);
     }
     if (io.kind === 'ldr') {
       const id = io.item, legs2 = [id + '.1', id + '.2'];
       if (!legs2.some(l => N.same(l, P))) bad(L, `${pin}: no LDR leg on ${pin}`);
-      if (!legs2.some(l => N.same(l, 'PIN:3V3'))) bad(L, `${pin}: LDR not fed from 3V3`);
-      if (legs2.some(l => N.same(l, 'PIN:5V'))) bad(L, `${pin}: LDR on 5V (A0 is not 5 V-tolerant)`);
+      if (!legs2.some(l => N.same(l, 'PIN:' + SUP))) bad(L, `${pin}: LDR not fed from ${SUP}`);
+      if (!U3 && legs2.some(l => N.same(l, 'PIN:5V'))) bad(L, `${pin}: LDR on 5V (A0 is not 5 V-tolerant)`);
       const r = all.find(d => d.type === 'resistor' && ((N.same(d.id + '.1', P) && N.same(d.id + '.2', G)) || (N.same(d.id + '.2', P) && N.same(d.id + '.1', G))));
       if (!r) bad(L, `${pin}: no fixed resistor from ${pin} to GND (voltage divider incomplete)`);
       else if (r.hw !== 'resistor10k') bad(L, `${pin}: divider resistor ${r.id} is not the 10 kΩ part`);
     }
     if (io.kind === 'tmp36') {
       const id = io.item;
-      if (!N.same(id + '.VS', 'PIN:3V3')) bad(L, `${pin}: TMP36 +VS not on 3V3`);
+      if (!N.same(id + '.VS', 'PIN:' + SUP)) bad(L, `${pin}: TMP36 +VS not on ${SUP}`);
       if (!N.same(id + '.VO', P)) bad(L, `${pin}: TMP36 VOUT not on ${pin}`);
       if (!N.same(id + '.GND', G)) bad(L, `${pin}: TMP36 GND not on GND`);
     }
@@ -193,12 +196,18 @@ for (const L of list) {
     }
     if (io.kind === 'i2c') {                       // Raspberry Pi I2C sensor: SDA1 = pin 3 (GPIO2), SCL1 = pin 5 (GPIO3), 3.3 V only
       const id = io.item;
-      if (!N.same(id + '.VIN', 'PIN:3V3')) bad(L, `sensor VIN is not on 3V3 (the Pi GPIO is 3.3 V only)`);
-      if (N.same(id + '.VIN', 'PIN:5V')) bad(L, `sensor VIN is on 5V`);
+      if (U3) {                                      // UNO R3: 5 V board, SDA = A4, SCL = A5
+        if (!N.same(id + '.VIN', 'PIN:5V')) bad(L, `sensor VIN is not on 5V`);
+        if (!N.same(id + '.SDA', 'PIN:A4')) bad(L, `sensor SDA is not on A4`);
+        if (!N.same(id + '.SCL', 'PIN:A5')) bad(L, `sensor SCL is not on A5`);
+      } else {
+        if (!N.same(id + '.VIN', 'PIN:3V3')) bad(L, `sensor VIN is not on 3V3 (the Pi GPIO is 3.3 V only)`);
+        if (N.same(id + '.VIN', 'PIN:5V')) bad(L, `sensor VIN is on 5V`);
+        if (!N.same(id + '.SDA', 'PIN:p3')) bad(L, `sensor SDA is not on pin 3 (GPIO2 / SDA1)`);
+        if (!N.same(id + '.SCL', 'PIN:p5')) bad(L, `sensor SCL is not on pin 5 (GPIO3 / SCL1)`);
+        for (const nm of ['SDA', 'SCL']) if (N.same(id + '.' + nm, 'PIN:5V')) bad(L, `${nm} is connected to 5V`);
+      }
       if (!N.same(id + '.GND', G)) bad(L, `sensor GND is not on GND`);
-      if (!N.same(id + '.SDA', 'PIN:p3')) bad(L, `sensor SDA is not on pin 3 (GPIO2 / SDA1)`);
-      if (!N.same(id + '.SCL', 'PIN:p5')) bad(L, `sensor SCL is not on pin 5 (GPIO3 / SCL1)`);
-      for (const nm of ['SDA', 'SCL']) if (N.same(id + '.' + nm, 'PIN:5V')) bad(L, `${nm} is connected to 5V`);
       if (N.same(id + '.SDA', id + '.SCL')) bad(L, `SDA and SCL are shorted`);
     }
     if (io.kind === 'buzzer') {
@@ -216,8 +225,8 @@ for (const L of list) {
     const txt = S.body.replace(/<[^>]+>/g, ' ').replace(/[ 	]+/g, ' ');   // tags become spaces so words never glue together
     for (const m of txt.matchAll(/\b(D\d{1,2}|A[0-5]|3V3|5V|VIN|GND)\b(?: on [A-Z]+)?\s*→\s*(?:hole\s+)?([a-j]\d{1,2})\b/g))
       if (!hasWire(m[1], m[2])) bad(L, `step ${k + 1}: text says "${m[1]} → ${m[2]}" but no such wire`);
-    if (PI) for (const m of txt.matchAll(/\bpin (\d{1,2})\b[^→\n]{0,24}→\s*([a-j]\d{1,2})\b/g))
-      if (!hasWire('p' + m[1], m[2])) bad(L, `step ${k + 1}: text says "pin ${m[1]} → ${m[2]}" but no such wire`);
+    if (PI || U3) for (const m of txt.matchAll(/\bpin (\d{1,2})\b[^→\n(),]{0,24}→\s*([a-j]\d{1,2})\b/g))
+      if (!hasWire((PI ? 'p' : 'D') + m[1], m[2])) bad(L, `step ${k + 1}: text says "pin ${m[1]} → ${m[2]}" but no such wire`);
     for (const m of txt.matchAll(/\b(?:hole\s+)?([a-j]\d{1,2})\s*→\s*(D\d{1,2}|A[0-5]|3V3|5V|VIN|GND)\b/g))
       if (!hasWire(m[2], m[1])) bad(L, `step ${k + 1}: text says "${m[1]} → ${m[2]}" but no such wire`);
     // hole labels must be legs of parts present in this step
@@ -244,7 +253,7 @@ for (const L of list) {
     for (const p of S.pins || []) if (!PINS.has(p)) bad(L, `step ${k + 1}: marker for unknown pin ${p}`);
     for (const id of S.have || []) if (!byId[id]) bad(L, `step ${k + 1}: unknown part ${id}`);
   });
-  console.log(`✓ ${PI ? 'Pi 4 ' : ''}Lesson ${L.num} circuit checked (${all.length} items)`);
+  console.log(`✓ ${PI ? 'Pi 4 ' : U3 ? 'UNO R3 ' : ''}Lesson ${L.num} circuit checked (${all.length} items)`);
 }
 }
 console.log(problems ? `\n${problems} PROBLEM(S) FOUND` : '\nAll lesson circuits and texts are consistent.');

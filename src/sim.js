@@ -59,6 +59,8 @@ export class Sim {
         const vref = H.vref ? H.vref() : VREF;
         const v = Math.min(vref, Math.max(0, H.analog(pin)));
         // small conversion noise (about ±2 counts at 14 bits) — real ADC readings jitter slightly
+        // ATmega328P ADC (datasheet): ADC = Vin x 1024 / Vref, rounded down, never above 1023; about +-1 count of noise
+        if (H.avr) return Math.min(1023, Math.max(0, Math.floor(v / vref * 1024 + (Math.random() - 0.5) * 2)));
         const noise = (Math.random() - 0.5) * 4 * 2 ** (readBits - 14);
         return Math.min(max, Math.max(0, Math.round(v / vref * max + noise)));
       },
@@ -81,7 +83,7 @@ export class Sim {
       pulseIn: async (pin, state) => { const us = await H.pulse(pin, state); check(); return us; },
       servoAttach: (pin) => { pins[pin] = { mode: 'OUTPUT' }; H.servo(pin, null); },
       // Servo library (Zephyr): map(angle, 0, 180, 544, 2400) µs, stored in 4 µs timer ticks
-      servoWrite: (pin, angle) => { const a = Math.min(180, Math.max(0, angle)); const us = Math.floor((Math.trunc(a * (2400 - 544) / 180) + 544) / 4) * 4; H.servo(pin, us, a); },
+      servoWrite: (pin, angle) => { const a = Math.min(180, Math.max(0, angle)); const st = H.servoStep || 4; const us = Math.floor((Math.trunc(a * (2400 - 544) / 180) + 544) / st) * st; H.servo(pin, us, a); },
       tone: (pin, f, ms) => { pins[pin] = { mode: 'OUTPUT' }; tok.tonePin = pin; H.tone(pin, f, ms); },
       noTone: (pin) => { H.noTone(pin); },
       playHz: (pin, hz) => { pins[pin] = { mode: 'OUTPUT' }; tok.tonePin = pin; H.tone(pin, hz, 0); },     // GPIO Zero TonalBuzzer.play(): PWM at the note's frequency, 50 % duty
@@ -239,6 +241,80 @@ export const PROGRAMS = {
       if (light < threshold) { await rt.at(16); rt.digitalWrite('D5', 1); }
       else { await rt.at(18); rt.digitalWrite('D5', 0); }
       await rt.at(20); await rt.delay(200);
+    }
+  },
+
+  // ---- UNO R3 programs (listings in src/uno3/code.js)
+  async u3_night(rt) {
+    const threshold = 250;
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(8); rt.serialBegin(9600);
+    for (;;) {
+      await rt.at(11);
+      await rt.at(12); const light = rt.analogRead('A0');
+      await rt.at(13); rt.println(light);
+      await rt.at(14);
+      if (light < threshold) { await rt.at(15); rt.digitalWrite('D5', 1); }
+      else { await rt.at(17); rt.digitalWrite('D5', 0); }
+      await rt.at(19); await rt.delay(200);
+    }
+  },
+
+  async u3_tmp36(rt) {
+    await rt.at(2);
+    await rt.at(4);
+    await rt.at(5); rt.serialBegin(9600);
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); const reading = rt.analogRead('A0');
+      await rt.at(10); const voltage = reading * 5.0 / 1024.0;
+      await rt.at(11); const temperatureC = (voltage - 0.5) * 100.0;
+      await rt.at(12); rt.print(voltage, 3);
+      await rt.at(13); rt.print(' V  ->  ');
+      await rt.at(14); rt.print(temperatureC, 1);
+      await rt.at(15); rt.println(' C');
+      await rt.at(16); await rt.delay(1000);
+    }
+  },
+
+  // low-level-trigger relay module: LOW = relay ON, HIGH = relay OFF
+  async u3_relay(rt) {
+    await rt.at(2);
+    await rt.at(12);
+    await rt.at(13); rt.pinMode('D4', 'OUTPUT');
+    await rt.at(14); await rt.at(9); rt.digitalWrite('D4', 1);
+    await rt.at(15); rt.serialBegin(9600);
+    for (;;) {
+      await rt.at(18);
+      await rt.at(19); await rt.at(5); rt.digitalWrite('D4', 0);
+      await rt.at(20); rt.println('Relay ON  - lamp ON');
+      await rt.at(21); await rt.delay(3000);
+      await rt.at(22); await rt.at(9); rt.digitalWrite('D4', 1);
+      await rt.at(23); rt.println('Relay OFF - lamp OFF');
+      await rt.at(24); await rt.delay(3000);
+    }
+  },
+
+  // Adafruit SHT31 library: begin(0x44), readTemperature(), readHumidity() (NaN when the read fails)
+  async u3_sht31(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.serialBegin(9600);
+    await rt.at(8);
+    if (!rt.sensor().found) { await rt.at(9); rt.println("Couldn't find SHT31"); await rt.at(10); for (;;) await rt.delay(1000); }
+    for (;;) {
+      await rt.at(14);
+      await rt.at(15); const r = rt.sensor();
+      await rt.at(16); const h = r.rh;
+      await rt.at(17); rt.print('Temperature: ');
+      await rt.at(18); rt.print(r.c, 1);
+      await rt.at(19); rt.println(' C');
+      await rt.at(20); rt.print('Humidity: ');
+      await rt.at(21); rt.print(h, 1);
+      await rt.at(22); rt.println(' %');
+      await rt.at(23); await rt.delay(2000);
     }
   },
 

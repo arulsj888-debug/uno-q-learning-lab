@@ -2,49 +2,13 @@
 // the Arduino language reference (REF) and the ATmega328P datasheet (ATM). Code listings: ./code.js.
 import { U3_BLINK, U3_EXT_LED, U3_BUTTON, U3_POT, U3_FADE, U3_BUZZER } from './code.js';
 
-const SRC = {
-  ds: { t: 'Arduino UNO R3 datasheet (A000066)', u: 'https://docs.arduino.cc/hardware/uno-rev3/' },
-  ref: { t: 'Arduino language reference', u: 'https://docs.arduino.cc/language-reference/' },
-  atm: { t: 'Microchip ATmega328P datasheet', u: 'https://ww1.microchip.com/downloads/en/DeviceDoc/ATmega48A-PA-88A-PA-168A-PA-328-P-DS-DS40002061A.pdf' },
-  aw: { t: 'Arduino reference: analogWrite()', u: 'https://docs.arduino.cc/language-reference/en/functions/analog-io/analogWrite/' },
-  ar: { t: 'Arduino reference: analogRead()', u: 'https://docs.arduino.cc/language-reference/en/functions/analog-io/analogRead/' },
-  tone: { t: 'Arduino reference: tone()', u: 'https://docs.arduino.cc/language-reference/en/functions/advanced-io/tone/' },
-  pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
-};
+import { U3_LESSONS_2 } from './lessons2.js';
+import { SRC, LED_CIRCUIT, LED_IDS, IO_LED, BUTTON_PARTS, BUTTON_IDS, POT_PARTS, POT_IDS, BUZZER_PARTS, BUZZER_IDS } from './common.js';
 
-const LED_CIRCUIT = [
-  { id: 'r1', type: 'resistor', a: 'c10', b: 'c14' },
-  { id: 'led1', type: 'led', anode: 'd14', cathode: 'd15' },
-  { id: 'w1', type: 'wire', from: 'D5', to: 'a10', color: 'yellow', lift: 12 },
-  { id: 'w2', type: 'wire', from: 'a15', to: 'GND2', color: 'black', lift: 9 },
-];
-const LED_IDS = LED_CIRCUIT.map(d => d.id);
-const IO_LED = { kind: 'led', item: 'led1', needs: LED_IDS };
-const BUTTON_PARTS = [
-  { id: 'btn1', type: 'button', col: 20 },
-  { id: 'w3', type: 'wire', from: 'D4', to: 'a20', color: 'blue', lift: 12 },
-  { id: 'w4', type: 'wire', from: 'j22', to: 'GND3', color: 'black', lift: 14 },
-];
-const BUTTON_IDS = BUTTON_PARTS.map(d => d.id);
-const POT_PARTS = [
-  { id: 'pot1', type: 'pot', row: 'e', col: 24 },
-  { id: 'w5', type: 'wire', from: '5V', to: 'a24', color: 'red', lift: 8 },
-  { id: 'w6', type: 'wire', from: 'A0', to: 'a26', color: 'green', lift: 11 },
-  { id: 'w7', type: 'wire', from: 'GND3', to: 'a28', color: 'black', lift: 15 },
-];
-const POT_IDS = POT_PARTS.map(d => d.id);
-const BUZZER_PARTS = [
-  { id: 'r2', type: 'resistor', a: 'c19', b: 'c23' },
-  { id: 'bz1', type: 'buzzer', plus: 'e23', minus: 'e26' },
-  { id: 'w8', type: 'wire', from: 'D9', to: 'a19', color: 'orange', lift: 12 },
-  { id: 'w9', type: 'wire', from: 'a26', to: 'GND3', color: 'black', lift: 9 },
-];
-const BUZZER_IDS = BUZZER_PARTS.map(d => d.id);
+export const U3_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion and power', 6: 'Module 6 — Digital sensors (I²C)' };
+export const U3_COMING = [];
 
-export const U3_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Sound' };
-export const U3_COMING = ['Light sensor night light', 'TMP36 temperature', 'Ultrasonic distance', 'PIR motion', 'Servo', 'DC motor + L293D', 'Relay', 'I²C sensor'];
-
-export const U3_LESSONS = [
+const U3_BASE = [
   // ================================================================== 1
   {
     id: 'u1', num: 1, module: 1, title: 'Meet the Arduino UNO R3', level: 'Start here', time: '10 min',
@@ -381,3 +345,5 @@ export const U3_LESSONS = [
     sources: [SRC.tone, SRC.ds],
   },
 ];
+
+export const U3_LESSONS = [...U3_BASE, ...U3_LESSONS_2];

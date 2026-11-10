@@ -36,7 +36,11 @@ const MODULES = IS_PI ? PI_MODULES : IS_U3 ? U3_MODULES : UQ_MODULES;
 const COMING_SOON = IS_PI ? PI_COMING : IS_U3 ? U3_COMING : UQ_SOON;
 const LOGIC_V = IS_U3 ? 5 : 3.3;      // I/O voltage of the board
 const BOARD_NAME = IS_PI ? 'Raspberry Pi 4' : IS_U3 ? 'Arduino UNO R3' : 'Arduino UNO Q';
-const pinName = pin => { if (!IS_PI) return pin; const p = findPin(pin); return p ? (p.gpio !== null ? `GPIO${p.gpio} (pin ${p.pin})` : `${p.label} (pin ${p.pin})`) : pin; };
+const USB_NAME = IS_U3 ? 'USB' : 'USB-C';
+// what analogRead() returns for a voltage: UNO R3 = 10 bit (ATmega328P: Vin x 1024 / Vref, max 1023), UNO Q lessons = 14 bit
+const adcCount = v => IS_U3 ? Math.min(1023, Math.max(0, Math.floor(v / LOGIC_V * 1024))) : Math.round(v / VREF * 16383);
+const ADC_BITS = IS_U3 ? '10-bit' : '14-bit';
+const pinName = pin => { if (IS_U3) return /^D\d+$/.test(pin) ? 'pin ' + pin.slice(1) : pin; if (!IS_PI) return pin; const p = findPin(pin); return p ? (p.gpio !== null ? `GPIO${p.gpio} (pin ${p.pin})` : `${p.label} (pin ${p.pin})`) : pin; };
 import { LOGO_ARRAY, SHADES_ARRAY, matrixCode } from './data/code.js';
 import { Sim, blinkCode, VREF } from './sim.js';
 import { Scope } from './scope.js';
@@ -827,7 +831,7 @@ class App {
     if (w.includes('relay')) h += `<div class="io-block pirstat"><div><span>D4 → IN</span><b id="rl-pin">—</b></div><div class="arrow">→</div><div><span>Relay</span><b id="rl-rel">—</b></div><div class="arrow">→</div><div><span>Lamp</span><b id="rl-lamp">—</b></div></div>
         <div class="io-tools"><button id="rl-manual" class="hold small">⚡ Energise the coil</button></div><div id="rl-note" class="io-note"></div>
         <table class="kv rtable"><tr><th>Pin D4</th><th>Relay (low-level trigger)</th></tr>
-        <tr data-r="low"><td>LOW (0 V)</td><td>ON · COM connected to NO · lamp ON</td></tr><tr data-r="off"><td>released (INPUT)</td><td>OFF · COM connected to NC · lamp OFF</td></tr></table>`;
+        <tr data-r="low"><td>LOW (0 V)</td><td>ON · COM connected to NO · lamp ON</td></tr><tr data-r="off"><td>${IS_U3 ? 'HIGH (5 V)' : 'released (INPUT)'}</td><td>OFF · COM connected to NC · lamp OFF</td></tr></table>`;
     if (w.includes('motor')) h += `<div class="io-block pirstat"><div><span>D7 → 1A</span><b id="mt-in1">—</b></div><div><span>D8 → 2A</span><b id="mt-in2">—</b></div><div><span>D5 → EN</span><b id="mt-en">—</b></div><div class="arrow">→</div><div><span>Motor</span><b id="mt-mot">—</b></div></div>
         <table class="kv mtable"><tr><th>EN</th><th>1A</th><th>2A</th><th>Motor (L293D datasheet)</th></tr>
         <tr data-r="d1"><td>on</td><td>HIGH</td><td>LOW</td><td>turns · direction 1</td></tr><tr data-r="d2"><td>on</td><td>LOW</td><td>HIGH</td><td>turns · direction 2</td></tr>
@@ -840,6 +844,7 @@ class App {
     if (w.includes('scope')) h += `<div class="io-block"><div class="io-title">Oscilloscope · ${L.scopePin || 'D5'} <span class="io-note">(simulated)</span></div><canvas id="scope" width="560" height="170"></canvas><div id="scope-info" class="io-val"></div></div>`;
     if (w.includes('audio')) h += `<div class="io-block"><button id="sound" class="hold small">${this.soundOn ? '🔊 Sound on' : '🔇 Sound off'}</button></div>`;
     if (w.includes('editor')) h += this.editorHTML();
+    if (IS_U3) h = h.replace(/Pin D(\d+)/g, 'Pin $1').replace(/\(D(\d+)/g, '($1').replace(/\bD(\d+)\b/g, 'pin $1');
     io.innerHTML = h;
     if ($('#hold')) {
       const hold = $('#hold');
@@ -1229,7 +1234,7 @@ class App {
   }
   // ---- light sensor model: typical GL5528 (datasheet: 10–20 kΩ at 10 lux, γ = 0.6, dark ≥ 1 MΩ) — 15 kΩ at 10 lux
   ldrOhms(lux = this.lux) { return 15000 * Math.pow(Math.max(lux, 0.001) / 10, -0.6); }
-  ldrVolts() { return VREF * 10000 / (this.ldrOhms() + 10000); }
+  ldrVolts() { return LOGIC_V * 10000 / (this.ldrOhms() + 10000); }
   sliderToLux(v) { return Math.pow(10, -2 + v * 5.3 / 1000); }            // 0.01 … 2000 lux, logarithmic
   luxToSlider(l) { return (Math.log10(l) + 2) * 1000 / 5.3; }
   lampIntensity() { const k = Math.min(1, Math.max(0, (Math.log10(this.lux) + 2) / 5.3)); return 14000 * k * k; }
@@ -1240,11 +1245,11 @@ class App {
     const R = this.ldrOhms(), V = this.ldrVolts();
     const fmtR = R >= 1e6 ? (R / 1e6).toFixed(2) + ' MΩ' : R >= 1000 ? (R / 1000).toFixed(1) + ' kΩ' : Math.round(R) + ' Ω';
     const lx = this.lux < 1 ? this.lux.toFixed(2) : this.lux < 100 ? this.lux.toFixed(1) : Math.round(this.lux);
-    const el = $('#lux-val'); if (el) el.innerHTML = `≈ <b>${lx} lux</b> → LDR ≈ <b>${fmtR}</b> → A0 ≈ <b>${V.toFixed(2)} V</b> → 14-bit ≈ <b>${Math.round(V / VREF * 16383)}</b>`;
+    const el = $('#lux-val'); if (el) el.innerHTML = `≈ <b>${lx} lux</b> → LDR ≈ <b>${fmtR}</b> → A0 ≈ <b>${V.toFixed(2)} V</b> → ${ADC_BITS} ≈ <b>${adcCount(V)}</b>`;
   }
   // ---- HC-SR04 model: datasheet µs = cm × 58; UNO Q pulseIn() resolves 100 µs (Zephyr tick, see Lesson 13)
   echoUs() { return this.distCm * 58; }
-  pulseInUs() { return Math.floor(this.echoUs() / 100) * 100; }
+  pulseInUs() { return IS_U3 ? Math.floor(this.echoUs()) : Math.floor(this.echoUs() / 100) * 100; }   // UNO R3 (AVR core): 16 clock cycles per count = 1 µs
   // ---- Lesson 13: true-scale sonar ------------------------------------------------------------------
   sonarGeom() {
     const us = this.bench.get('us1'); if (!us) return null;
@@ -1268,7 +1273,7 @@ class App {
       if (reframe) this.frameSonar(800);
     }
     const e = this.echoUs(), q = this.pulseInUs(), el = $('#dist-val');
-    if (el) el.innerHTML = `Obstacle <b>${this.distCm.toFixed(1)} cm</b> → ECHO HIGH ≈ <b>${Math.round(e)} µs</b> → pulseIn() on UNO Q ≈ <b>${q} µs</b> → <b>${(q / 58).toFixed(1)} cm</b>`;
+    if (el) el.innerHTML = `Obstacle <b>${this.distCm.toFixed(1)} cm</b> → ECHO HIGH ≈ <b>${Math.round(e)} µs</b> → pulseIn() on ${IS_U3 ? 'UNO R3' : 'UNO Q'} ≈ <b>${q} µs</b> → <b>${(q / 58).toFixed(1)} cm</b>`;
     if (!this.waves.anim) this.drawTiming(null);
   }
   hideSonar() { this.obstacle.visible = false; this.tape.visible = false; this.tapeHook.visible = false; this.waves.anim = null; this.updateWaves(); }
@@ -1324,7 +1329,7 @@ class App {
     const total = trig + hear + burst + 320, X = ms => 92 + (w - 102) * ms / total;
     g.fillStyle = '#070b0e'; g.fillRect(0, 0, w, h);
     g.font = '12px Consolas, monospace'; g.textBaseline = 'middle';
-    const rows = [['TRIG (D7)', 18], ['Burst from T', 46], ['ECHO (D8)', 74]];
+    const rows = [[IS_U3 ? 'TRIG (pin 7)' : 'TRIG (D7)', 18], ['Burst from T', 46], [IS_U3 ? 'ECHO (pin 8)' : 'ECHO (D8)', 74]];
     for (const [name, y] of rows) { g.fillStyle = '#8fa3b5'; g.fillText(name, 6, y); g.strokeStyle = 'rgba(255,255,255,0.08)'; g.lineWidth = 1; g.beginPath(); g.moveTo(92, y + 8); g.lineTo(w - 10, y + 8); g.stroke(); }
     const step = (y, segs, col) => { g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(92, y + 8); for (const [a, b] of segs) { g.lineTo(X(a), y + 8); g.lineTo(X(a), y - 6); g.lineTo(X(b), y - 6); g.lineTo(X(b), y + 8); } g.lineTo(w - 10, y + 8); g.stroke(); };
     step(18, [[0, trig * 0.8]], '#ffd34d');
@@ -1496,7 +1501,7 @@ class App {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('pisens')) return;
     const run = this.sim.running, w = this.bench.get(L.sdaWire || 'w4'); if (w) w.group.visible = !this.th.unplug;
     const b = $('#th-plug'); if (b) { b.disabled = run; b.textContent = this.th.unplug ? '🔌 Plug the SDA wire back in' : '🔌 Unplug the SDA wire'; b.classList.toggle('on', this.th.unplug); }
-    const n = $('#ps-note'); if (n) { const h = !this.board.powered ? 'USB-C is not plugged in — the Raspberry Pi has no power.' : this.th.unplug ? 'The SDA wire is out: nobody answers at 0x44.' : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : (L.sdaWire ? 'The sensor answers at address 0x44; it is read each time the page is built (every 5 seconds).' : 'The sensor answers at address 0x44; the program reads it every 2 seconds.'); if (n.innerHTML !== h) n.innerHTML = h; }
+    const n = $('#ps-note'); if (n) { const h = !this.board.powered ? (IS_U3 ? 'USB is not plugged in — the board has no power.' : 'USB-C is not plugged in — the Raspberry Pi has no power.') : this.th.unplug ? 'The SDA wire is out: nobody answers at 0x44.' : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : (L.sdaWire && !IS_U3 ? 'The sensor answers at address 0x44; it is read each time the page is built (every 5 seconds).' : 'The sensor answers at address 0x44; the program reads it every 2 seconds.'); if (n.innerHTML !== h) n.innerHTML = h; }
   }
   thermoTick() {
     const io = this.thermoIo(); if (!io) return;
@@ -1516,7 +1521,7 @@ class App {
     } else set('#th-out', !run ? '—' : !ok ? 'not found' : (this.th.last || '…'), run && ok ? 'on' : 'off');
     const cn = io.pix ? 'cable 2' : 'the Qwiic cable';
     const btn = $('#th-plug'); if (btn) { btn.disabled = run; btn.textContent = this.th.unplug ? `🔌 Plug ${cn} back in` : `🔌 Unplug ${cn}`; btn.classList.toggle('on', this.th.unplug); }
-    set('#th-note', !this.board.powered ? 'USB-C is not plugged in — the module has no power.' : this.th.unplug ? (io.pix ? 'Cable 2 is out: nobody answers at 0x6C, so <b>leds.begin()</b> will return false.' : 'The cable is out: nobody answers, so <b>thermo.begin()</b> will return false.') : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : bad ? 'Outside the datasheet’s recommended range (5…60 °C, 20…80 %RH).' : 'The sketch reads the module once per second.', 'io-note');
+    set('#th-note', !this.board.powered ? USB_NAME + ' is not plugged in — the module has no power.' : this.th.unplug ? (io.pix ? 'Cable 2 is out: nobody answers at 0x6C, so <b>leds.begin()</b> will return false.' : 'The cable is out: nobody answers, so <b>thermo.begin()</b> will return false.') : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : bad ? 'Outside the datasheet’s recommended range (5…60 °C, 20…80 %RH).' : 'The sketch reads the module once per second.', 'io-note');
   }
   // ---- Lesson 17: relay module + lamp ---------------------------------------------------------------
   relayIo() { const L = this.lesson; return L && L.io && Object.values(L.io).find(x => x.kind === 'relay'); }
@@ -1543,13 +1548,13 @@ class App {
     const lampOn = coil && m.t > 0.5;
     if (lamp) lamp.set(lampOn);
     const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; e.className = cls; } };
-    const pinTxt = !this.sim.running ? (R.manual ? 'LOW (manual)' : '—') : R.mode === 'INPUT' ? 'released' : R.level === 0 ? 'LOW · 0 V' : '—';
+    const pinTxt = !this.sim.running ? (R.manual ? 'LOW (manual)' : '—') : R.mode === 'INPUT' ? 'released' : R.level === 0 ? 'LOW · 0 V' : R.level === 1 ? 'HIGH · ' + LOGIC_V + ' V' : '—';
     set('#rl-pin', pinTxt, coil ? 'on' : 'off');
     set('#rl-rel', coil ? 'ON · COM–NO' : 'OFF · COM–NC', coil ? 'on' : 'off');
     set('#rl-lamp', lampOn ? 'ON' : 'OFF', lampOn ? 'on' : 'off');
     document.querySelectorAll('.rtable tr[data-r]').forEach(tr => tr.classList.toggle('hit', pwr && ((tr.dataset.r === 'low') === coil)));
     const btn = $('#rl-manual'); if (btn) { btn.disabled = this.sim.running; btn.textContent = R.manual && !this.sim.running ? '⚡ Coil energised — click to release' : '⚡ Energise the coil'; btn.classList.toggle('on', R.manual && !this.sim.running); }
-    set('#rl-note', !this.board.powered ? 'USB-C is not plugged in — the module has no power.' : !this.sim.running ? 'Press <b>▶ Run</b>, or energise the coil by hand.' : coil ? 'Pin LOW → relay <b>clicks ON</b> → lamp circuit closed.' : 'Pin released → relay <b>clicks OFF</b> → lamp circuit open.', 'io-note');
+    set('#rl-note', !this.board.powered ? USB_NAME + ' is not plugged in — the module has no power.' : !this.sim.running ? 'Press <b>▶ Run</b>, or energise the coil by hand.' : coil ? 'Pin LOW → relay <b>clicks ON</b> → lamp circuit closed.' : IS_U3 ? 'Pin HIGH → relay <b>clicks OFF</b> → lamp circuit open.' : 'Pin released → relay <b>clicks OFF</b> → lamp circuit open.', 'io-note');
     if (this.rlyTags) { const [a, b] = this.rlyTags; const t1 = coil ? 'Relay ON' : 'Relay OFF', t2 = lampOn ? 'Lamp ON' : 'Lamp OFF'; if (a.element.textContent !== t1) { a.element.textContent = t1; a.element.className = 'part-label pirtag ' + (coil ? 'on' : ''); } if (b.element.textContent !== t2) { b.element.textContent = t2; b.element.className = 'part-label pirtag ' + (lampOn ? 'on' : ''); } }
   }
   playClick(on) {
@@ -1672,7 +1677,7 @@ class App {
     const g = c.getContext('2d'), w = c.width, h = c.height, P = this.pir, now = performance.now();
     g.fillStyle = '#070b0e'; g.fillRect(0, 0, w, h);
     g.font = '12px Consolas, monospace'; g.textBaseline = 'middle';
-    g.fillStyle = '#8fa3b5'; g.fillText('motion', 6, 22); g.fillText('OUT (D2)', 6, 58);
+    g.fillStyle = '#8fa3b5'; g.fillText('motion', 6, 22); g.fillText(IS_U3 ? 'OUT (pin 2)' : 'OUT (D2)', 6, 58);
     g.fillText('−30 s', 70, h - 8); g.fillText('now', w - 32, h - 8);
     const X = t => 70 + (w - 80) * (1 - (now - t) / 30000);
     g.strokeStyle = 'rgba(255,255,255,0.08)'; for (let s = 0; s <= 30; s += 5) { const x = X(now - s * 1000); g.beginPath(); g.moveTo(x, 8); g.lineTo(x, h - 18); g.stroke(); }
@@ -1683,7 +1688,7 @@ class App {
   setTemp(t) {
     this.tempC = t;
     const V = this.tmp36Volts(), el = $('#temp-val');
-    if (el) el.innerHTML = `<b>${t.toFixed(1)} °C</b> → V<sub>OUT</sub> = 0.5 V + ${t.toFixed(1)} × 10 mV = <b>${V.toFixed(3)} V</b> → 14-bit ≈ <b>${Math.round(V / VREF * 16383)}</b>`;
+    if (el) el.innerHTML = `<b>${t.toFixed(1)} °C</b> → V<sub>OUT</sub> = 0.5 V + ${t.toFixed(1)} × 10 mV = <b>${V.toFixed(3)} V</b> → ${ADC_BITS} ≈ <b>${adcCount(V)}</b>`;
   }
   knobValue() { const p = this.bench.get('pot1'); return p ? p.value : (this.knob ?? 0.5); }
   setKnob(f) {
@@ -1692,7 +1697,7 @@ class App {
     const v = this.knob * LOGIC_V;
     const k = $('#knob'); if (k && document.activeElement !== k) k.value = Math.round(this.knob * 1000);
     const kv = $('#knob-val');
-    if (kv) kv.innerHTML = `Wiper ≈ <b>${v.toFixed(2)} V</b> → ${IS_U3 ? '10-bit' : '14-bit'} reading ≈ <b>${Math.round(v / LOGIC_V * (IS_U3 ? 1023 : 16383))}</b>`;
+    if (kv) kv.innerHTML = `Wiper ≈ <b>${v.toFixed(2)} V</b> → ${ADC_BITS} reading ≈ <b>${adcCount(v)}</b>`;
   }
   bindResponsive() {
     const body = document.body;
@@ -1779,6 +1784,8 @@ class App {
         if (n) { const el = $('#code').querySelector(`.ln[data-n="${n}"]`); if (el) { el.classList.add('exec'); el.scrollIntoView({ block: 'nearest' }); } }
       },
       vref: () => LOGIC_V,
+      avr: IS_U3,                       // ATmega328P ADC model
+      servoStep: IS_U3 ? 1 : 4,         // Servo library timer resolution in µs (AVR: 0.5 µs ticks -> whole µs; Zephyr: 4 µs)
       pin: (pin, level) => this.onDigital(pin, level),
       pwm: (pin, duty, raw) => this.onPwm(pin, duty, raw),
       tone: (pin, f, ms) => this.onTone(pin, f, ms),
@@ -1811,14 +1818,14 @@ class App {
       web: ev => { if (!this.pw) this.pw = { up: false, lit: false }; this.pw.up = true; this.pw.lit = !!ev.val.lit; if (ev.val.c !== undefined) { this.pw.c = ev.val.c; this.pw.rh = ev.val.rh; } this.pwStage = this.pw.lit ? 'on' : 'off'; this.pwRender(); },
       pixels: arr => { this.pxArr = arr; },
       sensor: () => {
-        const io = this.ioFor('p3'), ok = io && io.kind === 'i2c' && this.wired(io) && this.board.powered && !this.th.unplug;
+        const io = this.ioFor(IS_U3 ? 'A4' : 'p3'), ok = io && io.kind === 'i2c' && this.wired(io) && this.board.powered && !this.th.unplug;
         return ok ? { found: true, c: this.th.t + (Math.random() - 0.5) * 0.1, rh: Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3)) } : { found: false };
       },
       mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {
         const io = this.ioFor(pin);
-        if (io && io.kind === 'hcsr04' && this.wired(io) && this.board.powered) { const us = this.pulseInUs(); await sleep(Math.max(1, us / 1000)); this.setPinLevel(`D8 ECHO: HIGH for ${Math.round(this.echoUs())} µs → pulseIn() = ${us} µs`); return us; }
-        await sleep(2000); return 0;
+        if (io && io.kind === 'hcsr04' && this.wired(io) && this.board.powered) { const us = this.pulseInUs(); await sleep(Math.max(1, us / 1000)); this.setPinLevel(`${pinName('D8')} ECHO: HIGH for ${Math.round(this.echoUs())} µs → pulseIn() = ${us} µs`); return us; }
+        await sleep(IS_U3 ? 1000 : 2000); return 0;       // pulseIn() default timeout: 1 s on the UNO R3 (AVR core)
       },
       serial: txt => {
         const s = $('#serial');

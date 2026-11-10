@@ -112,3 +112,213 @@ void loop() {
   noTone(buzzerPin);
   delay(1000);                        // 1 s of silence, then repeat
 }`;
+
+// Lesson 9 — LDR + 10 kOhm divider on 5 V: 10-bit readings, no analogReadResolution() on the UNO R3
+export const U3_NIGHT = `// Night light: the LED turns on when it gets dark
+int ldrPin = A0;       // LDR + 10 kOhm voltage divider
+int ledPin = 5;        // LED from Lesson 4
+int threshold = 250;   // adjust for your room
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int light = analogRead(ldrPin);   // more light -> bigger number
+  Serial.println(light);
+  if (light < threshold) {
+    digitalWrite(ledPin, HIGH);     // dark -> LED on
+  } else {
+    digitalWrite(ledPin, LOW);      // bright -> LED off
+  }
+  delay(200);
+}`;
+
+// Lesson 10 — TMP36 (0.5 V at 0 C, +10 mV per C) read with the 5 V reference; ADC = Vin x 1024 / Vref
+export const U3_TMP36 = `// Measure temperature with a TMP36 on A0
+int sensorPin = A0;
+
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  int reading = analogRead(sensorPin);            // 0 ... 1023
+  float voltage = reading * 5.0 / 1024.0;         // reading -> volts (5 V reference)
+  float temperatureC = (voltage - 0.5) * 100.0;   // TMP36: 0.5 V at 0 C, +10 mV per C
+  Serial.print(voltage, 3);
+  Serial.print(" V  ->  ");
+  Serial.print(temperatureC, 1);
+  Serial.println(" C");
+  delay(1000);
+}`;
+
+// Lesson 11 — HC-SR04 (Elecfreaks datasheet: 10 us trigger, us / 58 = cm, cycle > 60 ms); same line numbers as the UNO Q listing
+export const U3_ULTRASONIC = `// Measure distance with an HC-SR04 ultrasonic sensor
+int trigPin = 7;   // TRIG: a 5 V pin gives a clean TTL pulse
+int echoPin = 8;   // ECHO: 5 V signal, fine for the 5 V UNO R3
+
+void setup() {
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);   // plain INPUT: the module drives the line
+  Serial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);    // 10 us trigger pulse
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  unsigned long duration = pulseIn(echoPin, HIGH);  // echo time in us
+  float distanceCm = duration / 58.0;               // datasheet: us / 58 = cm
+
+  Serial.print(distanceCm, 1);
+  Serial.println(" cm");
+  delay(100);                     // datasheet: wait more than 60 ms
+}`;
+
+// Lesson 12 — HC-SR501 PIR (datasheet: 3.3 V output while motion, ~1 min start-up)
+export const U3_PIR = `// Motion alarm: HC-SR501 PIR on pin 2, LED on pin 5
+int pirPin = 2;      // PIR OUT: 3.3 V while motion is detected
+int ledPin = 5;      // LED from Lesson 4
+int lastState = LOW;
+
+void setup() {
+  pinMode(pirPin, INPUT);
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+  Serial.println("PIR warming up (about 1 minute)...");
+  delay(60000);                      // datasheet: ~1 min to start up
+  Serial.println("Ready");
+}
+
+void loop() {
+  int motion = digitalRead(pirPin);  // HIGH = motion
+  if (motion == HIGH) {
+    digitalWrite(ledPin, HIGH);
+  } else {
+    digitalWrite(ledPin, LOW);
+  }
+  if (motion != lastState) {         // print only when it changes
+    if (motion == HIGH) {
+      Serial.println("Motion detected!");
+    } else {
+      Serial.println("Motion ended");
+    }
+    lastState = motion;
+  }
+  delay(50);
+}`;
+
+// Lesson 13 — SG90 with the Servo library (AVR: defaults 544-2400 us for 0-180 degrees)
+export const U3_SERVO = `#include <Servo.h>
+
+Servo myServo;        // one Servo object per motor
+int servoPin = 9;     // orange signal wire
+
+void setup() {
+  myServo.attach(servoPin);   // start sending a pulse every 20 ms
+}
+
+void loop() {
+  myServo.write(0);     // 0 degrees
+  delay(1000);
+  myServo.write(90);    // 90 degrees (middle)
+  delay(1000);
+  myServo.write(180);   // 180 degrees
+  delay(1000);
+}`;
+
+// Lesson 14 — DC motor with an L293D (TI datasheet: EN/1A/2A function table, PWM on EN for speed)
+export const U3_MOTOR = `// DC motor with an L293D H-bridge
+int enablePin = 5;    // L293D pin 1 (1,2EN): PWM = speed
+int in1Pin = 7;       // L293D pin 2 (1A)
+int in2Pin = 8;       // L293D pin 7 (2A)
+
+void setup() {
+  pinMode(enablePin, OUTPUT);
+  pinMode(in1Pin, OUTPUT);
+  pinMode(in2Pin, OUTPUT);
+}
+
+void loop() {
+  // direction 1, full speed
+  digitalWrite(in1Pin, HIGH);
+  digitalWrite(in2Pin, LOW);
+  analogWrite(enablePin, 255);
+  delay(2000);
+
+  // direction 1, half speed
+  analogWrite(enablePin, 128);
+  delay(2000);
+
+  // EN LOW: the motor coasts to a stop
+  analogWrite(enablePin, 0);
+  delay(1500);
+
+  // direction 2, full speed
+  digitalWrite(in1Pin, LOW);
+  digitalWrite(in2Pin, HIGH);
+  analogWrite(enablePin, 255);
+  delay(2000);
+
+  // 1A = 2A: fast stop (brake)
+  digitalWrite(in2Pin, LOW);
+  delay(1500);
+}`;
+
+// Lesson 15 — low-level-trigger relay module on pin 4 (Handsontec: relay actuates when IN is LOW); a 5 V pin can drive HIGH = off
+export const U3_RELAY = `// Relay module (low-level trigger): the relay is ON when the pin is LOW
+int relayPin = 4;
+
+void relayOn() {
+  digitalWrite(relayPin, LOW);    // LOW = relay ON (the lamp lights)
+}
+
+void relayOff() {
+  digitalWrite(relayPin, HIGH);   // HIGH = relay OFF
+}
+
+void setup() {
+  pinMode(relayPin, OUTPUT);
+  relayOff();                     // start with the relay OFF
+  Serial.begin(9600);
+}
+
+void loop() {
+  relayOn();
+  Serial.println("Relay ON  - lamp ON");
+  delay(3000);
+  relayOff();
+  Serial.println("Relay OFF - lamp OFF");
+  delay(3000);
+}`;
+
+// Lesson 16 — Adafruit SHT31 library (begin(0x44), readTemperature(), readHumidity()), shortened from the library example
+export const U3_SHT31 = `#include <Wire.h>
+#include "Adafruit_SHT31.h"
+
+Adafruit_SHT31 sht31 = Adafruit_SHT31();
+
+void setup() {
+  Serial.begin(9600);
+  if (!sht31.begin(0x44)) {          // 0x44 = default I2C address
+    Serial.println("Couldn't find SHT31");
+    while (1) delay(1);              // stop here
+  }
+}
+
+void loop() {
+  float t = sht31.readTemperature();   // degrees C
+  float h = sht31.readHumidity();      // % relative humidity
+  Serial.print("Temperature: ");
+  Serial.print(t, 1);
+  Serial.println(" C");
+  Serial.print("Humidity: ");
+  Serial.print(h, 1);
+  Serial.println(" %");
+  delay(2000);
+}`;
