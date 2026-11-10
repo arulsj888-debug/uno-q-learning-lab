@@ -56,10 +56,11 @@ export class Sim {
       analogReadResolution: (b) => { readBits = Math.min(31, Math.max(1, b)); },
       analogRead: (pin) => {
         const max = 2 ** readBits - 1;
-        const v = Math.min(VREF, Math.max(0, H.analog(pin)));
+        const vref = H.vref ? H.vref() : VREF;
+        const v = Math.min(vref, Math.max(0, H.analog(pin)));
         // small conversion noise (about ±2 counts at 14 bits) — real ADC readings jitter slightly
         const noise = (Math.random() - 0.5) * 4 * 2 ** (readBits - 14);
-        return Math.min(max, Math.max(0, Math.round(v / VREF * max + noise)));
+        return Math.min(max, Math.max(0, Math.round(v / vref * max + noise)));
       },
       analogWriteResolution: (b) => { writeBits = Math.min(31, Math.max(1, b)); },
       analogWrite: (pin, value) => {
@@ -163,6 +164,19 @@ export const PROGRAMS = {
       await rt.at(11); const v = rt.analogRead('A0');
       await rt.at(12); rt.println(v);
       await rt.at(13); await rt.delay(100);
+    }
+  },
+
+  // UNO R3 AnalogReadSerial: no analogReadResolution(), the ADC is 10-bit (src/uno3/code.js U3_POT)
+  async u3_pot(rt) {
+    await rt.at(1); await rt.at(2);
+    await rt.at(4);
+    await rt.at(5); rt.serialBegin(9600);
+    for (;;) {
+      await rt.at(8);
+      await rt.at(10); const v = rt.analogRead('A0');
+      await rt.at(11); rt.println(v);
+      await rt.at(12); await rt.delay(100);
     }
   },
 

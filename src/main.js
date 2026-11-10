@@ -13,6 +13,7 @@ import { makePiAccessories, PI_ACC_INFO } from './pi4/peripherals.js';
 import uqThumb from '../assets/pcb_top_albedo.jpg';
 import u3Thumb from '../assets/uno3/pcb_top_albedo.jpg';
 import { Uno3Board } from './uno3/board.js';
+import { U3_LESSONS, U3_MODULES, U3_COMING } from './uno3/lessons.js';
 import { PARTS_U3, CATEGORIES_U3, BOARD_FACTS_U3, U3_HEADERS, findPinU3 } from './uno3/data.js';
 import piThumb from '../assets/pi4/pi4_top.jpg';
 import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, HandModel } from './hardware.js';
@@ -30,9 +31,10 @@ const CATEGORIES = IS_PI ? CATEGORIES_PI : IS_U3 ? CATEGORIES_U3 : UQ_CATEGORIES
 const BOARD_FACTS = IS_PI ? BOARD_FACTS_PI : IS_U3 ? BOARD_FACTS_U3 : UQ_FACTS;
 const findPin = IS_PI ? findPinPi : IS_U3 ? findPinU3 : uqFindPin;
 const PIN_HEADERS = IS_PI ? [J8_HEADER] : IS_U3 ? U3_HEADERS : [JDIGITAL, JANALOG, JSPI];
-const LESSONS = IS_PI ? PI_LESSONS : IS_U3 ? [] : UQ_LESSONS;
-const MODULES = IS_PI ? PI_MODULES : IS_U3 ? {} : UQ_MODULES;
-const COMING_SOON = IS_PI ? PI_COMING : IS_U3 ? ['Lesson 1 — Meet the UNO R3', 'Blink the L LED', 'LED + resistor on a breadboard', 'Push button', 'Potentiometer (analogRead)', 'PWM fade', 'Buzzer', 'Sensors and modules'] : UQ_SOON;
+const LESSONS = IS_PI ? PI_LESSONS : IS_U3 ? U3_LESSONS : UQ_LESSONS;
+const MODULES = IS_PI ? PI_MODULES : IS_U3 ? U3_MODULES : UQ_MODULES;
+const COMING_SOON = IS_PI ? PI_COMING : IS_U3 ? U3_COMING : UQ_SOON;
+const LOGIC_V = IS_U3 ? 5 : 3.3;      // I/O voltage of the board
 const BOARD_NAME = IS_PI ? 'Raspberry Pi 4' : IS_U3 ? 'Arduino UNO R3' : 'Arduino UNO Q';
 const pinName = pin => { if (!IS_PI) return pin; const p = findPin(pin); return p ? (p.gpio !== null ? `GPIO${p.gpio} (pin ${p.pin})` : `${p.label} (pin ${p.pin})`) : pin; };
 import { LOGO_ARRAY, SHADES_ARRAY, matrixCode } from './data/code.js';
@@ -274,6 +276,7 @@ class App {
   }
 
   async bootAnimation(ms = 5200) {
+    if (IS_U3) return;      // the UNO R3 has no start-up animation: the sketch simply runs
     if (IS_PI) {
       const tok = this.bootToken = {}, t0 = performance.now(); this.pios.mode = 'boot';
       while (performance.now() - t0 < ms) { if (this.bootToken !== tok || !this.board.powered) return; this.board.setLed('act', Math.random() < 0.45); await sleep(60 + Math.random() * 140); }
@@ -1685,10 +1688,10 @@ class App {
   setKnob(f) {
     this.knob = Math.min(1, Math.max(0, f));
     const p = this.bench.get('pot1'); if (p) p.set(this.knob);
-    const v = this.knob * VREF;
+    const v = this.knob * LOGIC_V;
     const k = $('#knob'); if (k && document.activeElement !== k) k.value = Math.round(this.knob * 1000);
     const kv = $('#knob-val');
-    if (kv) kv.innerHTML = `Wiper ≈ <b>${v.toFixed(2)} V</b> → 14-bit reading ≈ <b>${Math.round(v / VREF * 16383)}</b>`;
+    if (kv) kv.innerHTML = `Wiper ≈ <b>${v.toFixed(2)} V</b> → ${IS_U3 ? '10-bit' : '14-bit'} reading ≈ <b>${Math.round(v / LOGIC_V * (IS_U3 ? 1023 : 16383))}</b>`;
   }
   bindResponsive() {
     const body = document.body;
@@ -1774,6 +1777,7 @@ class App {
         $('#code').querySelectorAll('.ln.exec').forEach(x => x.classList.remove('exec'));
         if (n) { const el = $('#code').querySelector(`.ln[data-n="${n}"]`); if (el) { el.classList.add('exec'); el.scrollIntoView({ block: 'nearest' }); } }
       },
+      vref: () => LOGIC_V,
       pin: (pin, level) => this.onDigital(pin, level),
       pwm: (pin, duty, raw) => this.onPwm(pin, duty, raw),
       tone: (pin, f, ms) => this.onTone(pin, f, ms),
@@ -1787,7 +1791,7 @@ class App {
       },
       analog: pin => {
         const io = this.ioFor(pin);
-        if (io && io.kind === 'pot' && this.wired(io)) return this.knobValue() * VREF;
+        if (io && io.kind === 'pot' && this.wired(io)) return this.knobValue() * LOGIC_V;
         if (io && io.kind === 'ldr' && this.wired(io)) return this.ldrVolts();
         if (io && io.kind === 'tmp36' && this.wired(io)) return this.tmp36Volts();
         return 0.4 + Math.random() * 0.3;         // unconnected input floats
@@ -1830,6 +1834,12 @@ class App {
   ledFor(pin) { const io = this.ioFor(pin); return io && io.kind === 'led' ? { io, led: this.bench.get(io.item) } : null; }
 
   onDigital(pin, level) {
+    if (IS_U3 && pin === 'LED_BUILTIN') {        // the yellow L LED on pin 13 is active-high
+      this.br.led = !!level;
+      if (this.board.powered) this.board.setLed('l', !!level);
+      this.setPinLevel(`LED_BUILTIN (pin 13): <span class="${level ? 'hi' : 'lo'}">${level ? 'HIGH · 5 V' : 'LOW · 0 V'}</span> → <span class="${level ? 'led-on' : 'led-off'}">LED ${level ? 'ON' : 'OFF'}</span>`);
+      return;
+    }
     if (pin === 'LED_BUILTIN') {
       const on = level === 0;               // active-low RGB LED
       this.br.led = on;
@@ -1845,7 +1855,7 @@ class App {
     const on = !!(L && L.led && level && this.board.powered && this.wired(L.io));
     if (L && L.led) L.led.set(on);
     if (this.scope && (this.lesson.scopePin || 'D5') === pin) this.scope.set({ type: 'dc', level });
-    this.setPinLevel(`${pinName(pin)}: <span class="${level ? 'hi' : 'lo'}">${level ? 'HIGH · 3.3 V' : 'LOW · 0 V'}</span>${L ? ` → <span class="${on ? 'led-on' : 'led-off'}">LED ${on ? 'ON' : 'OFF'}</span>` : ''}`);
+    this.setPinLevel(`${pinName(pin)}: <span class="${level ? 'hi' : 'lo'}">${level ? 'HIGH · ' + LOGIC_V + ' V' : 'LOW · 0 V'}</span>${L ? ` → <span class="${on ? 'led-on' : 'led-off'}">LED ${on ? 'ON' : 'OFF'}</span>` : ''}`);
   }
 
   onPwm(pin, duty, raw) {
@@ -1854,7 +1864,7 @@ class App {
     const on = !!(L && L.led && this.board.powered && this.wired(L.io));
     if (L && L.led) L.led.set(on && duty > 0, duty);
     if (this.scope && (this.lesson.scopePin || 'D5') === pin) this.scope.set({ type: 'pwm', freq: 500, duty });
-    this.setPinLevel(`${pinName(pin)}: PWM <span class="hi">${(duty * 100).toFixed(0)} %</span> (value ${raw}) · average ≈ ${(duty * VREF).toFixed(2)} V`);
+    this.setPinLevel(`${pinName(pin)}: PWM <span class="hi">${(duty * 100).toFixed(0)} %</span> (value ${raw}) · average ≈ ${(duty * LOGIC_V).toFixed(2)} V`);
   }
 
   onTone(pin, f, ms) {

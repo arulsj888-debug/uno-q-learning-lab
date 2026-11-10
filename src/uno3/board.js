@@ -198,7 +198,7 @@ export class Uno3Board {
     }
   }
   setLed(id, on) { const l = this.leds[id === 'act' ? 'l' : id]; if (l) { const v = typeof on === 'number' ? on > 0 : !!on; l.glow.visible = v; l.halo.visible = v; } }
-  setPowerLed(on) { this.setLed('on', on); }
+  setPowerLed(on) { this.setLed('on', on); if (!on) for (const id of ['l', 'tx', 'rx']) this.setLed(id, false); }
   setMatrix() {}
   pressButton(p) { if (this.resetCap) this.resetCap.position.y = p ? 1.9 : 2.2; }
 

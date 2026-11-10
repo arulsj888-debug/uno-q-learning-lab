@@ -1,6 +1,7 @@
 // Verifies that every line number used by the simulator points at the right source line.
 import * as C from '../src/data/code.js';
 import * as PI from '../src/pi4/lessons.js';
+import * as U3 from '../src/uno3/code.js';
 const L = (code, n) => code.split('\n')[n - 1] || '';
 const checks = {
   BLINK: [C.BLINK, [[1, 'void setup'], [2, 'Serial.begin'], [4, 'pinMode(LED_BUILTIN'], [8, 'void loop'], [9, 'HIGH'], [10, 'delay(1000)'], [11, 'LOW'], [12, 'delay(1000)'], [14, 'Serial.println']]],
@@ -37,6 +38,12 @@ const checks = {
   PI_PWM: [PI.PI_PWM, [[1, 'from gpiozero import PWMLED'], [2, 'from time import sleep'], [4, 'led = PWMLED(17)'], [6, 'while True:'], [7, 'led.value = 0'], [8, 'sleep(1)'], [9, 'led.value = 0.5'], [10, 'sleep(1)'], [11, 'led.value = 1'], [12, 'sleep(1)']]],
   PI_BUTTON: [PI.PI_BUTTON, [[1, 'from gpiozero import Button'], [2, 'from time import sleep'], [4, 'button = Button(2)'], [6, 'while True:'], [7, 'if button.is_pressed:'], [8, 'print("Pressed")'], [9, 'else:'], [10, 'print("Released")'], [11, 'sleep(1)']]],
   PI_BUTTON_LED: [PI.PI_BUTTON_LED, [[1, 'from gpiozero import LED, Button'], [3, 'led = LED(17)'], [4, 'button = Button(2)'], [6, 'while True:'], [7, 'if button.is_pressed:'], [8, 'led.on()'], [9, 'else:'], [10, 'led.off()']]],
+  U3_BLINK: [U3.U3_BLINK, [[1, 'void setup'], [2, 'Serial.begin'], [4, 'pinMode(LED_BUILTIN'], [8, 'void loop'], [9, 'HIGH'], [10, 'delay(1000)'], [11, 'LOW'], [12, 'delay(1000)'], [14, 'Serial.println']]],
+  U3_EXT_LED: [U3.U3_EXT_LED, [[2, 'ledPin = 5'], [4, 'void setup'], [5, 'pinMode(ledPin'], [8, 'void loop'], [9, 'HIGH'], [10, 'delay'], [11, 'LOW'], [12, 'delay']]],
+  U3_BUTTON: [U3.U3_BUTTON, [[2, 'buttonPin = 4'], [3, 'ledPin = 5'], [6, 'buttonState = 0'], [8, 'void setup'], [10, 'INPUT_PULLUP'], [11, 'pinMode(ledPin, OUTPUT)'], [14, 'Serial.begin'], [17, 'void loop'], [19, 'digitalRead(buttonPin)'], [22, 'buttonState == LOW'], [23, 'HIGH'], [24, 'Serial.println'], [27, 'LOW'], [28, 'Serial.println'], [32, 'delay(1000)']]],
+  U3_POT: [U3.U3_POT, [[1, 'sensorPin = A0'], [2, 'sensorValue = 0'], [4, 'void setup'], [5, 'Serial.begin'], [8, 'void loop'], [10, 'analogRead'], [11, 'Serial.println'], [12, 'delay(100)']]],
+  U3_FADE: [U3.U3_FADE, [[2, 'led = 5'], [3, 'brightness = 0'], [4, 'fadeAmount = 5'], [6, 'void setup'], [7, 'pinMode'], [10, 'void loop'], [11, 'analogWrite'], [12, 'brightness + fadeA'], [13, 'brightness <= 0'], [14, '-fadeAmount'], [16, 'delay(30)']]],
+  U3_BUZZER: [U3.U3_BUZZER, [[2, 'buzzerPin = 9'], [3, 'int notes[]'], [5, 'void setup'], [8, 'void loop'], [9, 'for (int i'], [10, 'tone(buzzerPin'], [11, 'delay(300)'], [13, 'noTone']]],
   BUZZER: [C.BUZZER, [[2, 'buzzerPin = D9'], [3, 'int notes[]'], [5, 'void setup'], [8, 'void loop'], [9, 'for (int i'], [10, 'tone(buzzerPin'], [11, 'delay(300)'], [13, 'noTone'], [14, 'delay(1000)']]],
 };
 let bad = 0;

@@ -50,7 +50,7 @@ The **Build** tab (next to Explore and Lessons) is a sandbox: place parts on the
 
 - **Explore the board**: a 3D Arduino UNO R3 (A000066) built from Arduino's official open-source board file `UNO-TH_Rev3e.brd` (CC BY-SA 4.0): exact outline and mounting holes, every copper track, pad, via and silkscreen label (baked into the PCB textures by `tools/uno3/build_uno3_pcb.py`), and every component at its board-file position (ATmega328P in its DIP socket, ATmega16U2, USB-B, DC jack, regulators, crystal, resonator, capacitors, LEDs, ICSP headers, 8.5 mm female headers). Every part and every header pin is clickable. The Arduino logo is drawn by the app (in production it is a bitmap that is not in the CAD file).
 - **Build** (free build) works with 5 V logic: 5 V outputs, ATmega328P limits (20 mA recommended, 40 mA absolute maximum per pin), 10-bit analog inputs on 0–5 V, I²C on A4/A5 (= SDA/SCL), the L LED follows pin 13.
-- **Lessons**: coming next.
+- **Lessons** (8, `src/uno3/lessons.js`, sketches in `src/uno3/code.js`): 1 Meet the UNO R3 · 2 Power the board safely · 3 Blink the built-in L LED (pin 13) · 4 External LED + 220 Ω resistor on pin 5 (≈13.6 mA at 5 V) · 5 Push button with INPUT_PULLUP · 6 Potentiometer with the 10-bit analogRead (0–1023) · 7 PWM fade (pins 3, 5, 6, 9, 10, 11) · 8 Buzzer with tone(). More (sensors, servo, motor, relay, I²C) are listed as coming next.
 
 ## Raspberry Pi 4 Model B (new)
 
