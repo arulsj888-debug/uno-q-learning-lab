@@ -50,8 +50,8 @@ The **Build** tab (next to Explore and Lessons) is a sandbox: place parts on the
 
 - **Board**: the DOIT-style ESP32 DevKit V1 (30-pin version) from the Random Nerd Tutorials getting-started guide. There is **no official CAD file**, so the 3D model (`src/esp32/board.js`) is stylised: the ESP32-WROOM-32 module size (18 × 25.5 × 3.1 mm, Espressif datasheet) and the silkscreen order of the 30 pins are real; the position of small parts is close, not measured. The chooser and the welcome card say so.
 - **Facts** (`src/esp32/data.js`): Espressif ESP32 datasheet v5.3 (V_IH 0.75 × VDD, V_IL 0.25 × VDD, 40 mA source / 28 mA sink at maximum drive, 45 kΩ pull resistors, 12-bit ADC DNL ±7 / INL ±12 LSB, strapping pins GPIO0/2/12/15/5), ESP32-WROOM-32 datasheet v3.8, Arduino-ESP32 docs (analogRead 12-bit, LEDC `ledcAttach`/`ledcWrite` in core 3.x), ESP-IDF docs (ADC2 is also used by Wi-Fi).
-- **Lessons** (7 so far, `src/esp32/lessons.js`, sketches in `src/esp32/code.js`): 1 Meet the board · 2 Power and the 3.3 V rules (Arduino IDE setup, BOOT button) · 3 Blink the blue LED on GPIO2 · 4 External LED on GPIO16 (≈5.9 mA at 3.3 V) · 5 Push button (GPIO17, INPUT_PULLUP) · 6 Potentiometer on GPIO34 (12-bit ADC, ADC1 vs ADC2) · 7 LEDC PWM fade. Coming: touch sensor, Wi-Fi scan/connect, web page LED, Bluetooth LE, deep sleep.
-- **Not done yet**: Build tab (free build) for the ESP32 (button hidden), Wi-Fi/Bluetooth simulation.
+- **Lessons** (10 so far, `src/esp32/lessons.js`, sketches in `src/esp32/code.js`): 1 Meet the board · 2 Power and the 3.3 V rules (Arduino IDE setup, BOOT button) · 3 Blink the blue LED on GPIO2 · 4 External LED on GPIO16 (≈5.9 mA at 3.3 V) · 5 Push button (GPIO17, INPUT_PULLUP) · 6 Potentiometer on GPIO34 (12-bit ADC, ADC1 vs ADC2) · 7 LEDC PWM fade · 8 Wi-Fi scan (simulated networks, RSSI slider) · 9 Connect to Wi-Fi (simulated router: off / wrong password) · 10 Web server that switches the LED from a simulated phone (WebServer library). Coming: touch sensor, Bluetooth LE, deep sleep.
+- **Not done yet**: Build tab (free build) for the ESP32 (button hidden), Bluetooth simulation.
 
 ## Arduino UNO R3 (new, `?board=uno3`)
 

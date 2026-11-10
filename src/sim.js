@@ -79,6 +79,11 @@ export class Sim {
       uiEvents: () => (H.ui ? H.ui() : []),
       bridge: (stage, val) => { if (H.bridge) H.bridge({ stage, val }); },
       sensor: () => (H.sensor ? H.sensor() : { found: false }),
+      // ESP32 Wi-Fi (simulated router): a scan takes about 1.5 s; WiFi.status() becomes 'connected' after the router accepts us
+      scanNetworks: async () => { await rt.delay(1500); return H.wifiScan ? H.wifiScan() : []; },
+      wifiBegin: () => { if (H.wifiBegin) H.wifiBegin(); },
+      wifiStatus: () => (H.wifiStatus ? H.wifiStatus() : 'idle'),
+      wifiIP: () => (H.wifiIP ? H.wifiIP() : '0.0.0.0'),
       thermo: () => (H.thermo ? H.thermo() : { found: false }),
       pxSet: (i, rgb, br) => { if (i < 8) pxBuf[i] = [rgb[0], rgb[1], rgb[2], Math.trunc(br * 31 / 100) / 31]; },   // library: map(brightness, 0, 100, 0, 0x1F)
       pxClear: (i) => { if (i < 8) pxBuf[i] = [0, 0, 0, 0]; },
@@ -396,6 +401,78 @@ export const PROGRAMS = {
       await rt.at(13);
       if (brightness <= 0 || brightness >= 255) { await rt.at(14); fadeAmount = -fadeAmount; }
       await rt.at(16); await rt.delay(30);
+    }
+  },
+
+  // ---- ESP32 Wi-Fi programs (listings E32_SCAN, E32_CONNECT, E32_WEB in src/esp32/code.js)
+  async e_scan(rt) {
+    await rt.at(3);
+    await rt.at(4); rt.serialBegin(115200);
+    await rt.at(5);
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); rt.println('Scan start');
+      await rt.at(10); const list = await rt.scanNetworks();
+      await rt.at(11); rt.print(list.length);
+      await rt.at(12); rt.println(' networks found');
+      for (let i = 0; i < list.length; i++) {
+        await rt.at(13);
+        await rt.at(14); rt.print(i + 1);
+        await rt.at(15); rt.print(': ');
+        await rt.at(16); rt.print(list[i].ssid);
+        await rt.at(17); rt.print(' (');
+        await rt.at(18); rt.print(list[i].rssi);
+        await rt.at(19); rt.print(' dBm) ');
+        await rt.at(20); rt.println(list[i].open ? 'open' : 'secured');
+      }
+      await rt.at(22);
+      await rt.at(23); await rt.delay(5000);
+    }
+  },
+
+  async e_connect(rt) {
+    await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.serialBegin(115200);
+    await rt.at(8);
+    await rt.at(9); rt.wifiBegin();
+    await rt.at(10); rt.println('Connecting to Wi-Fi...');
+    while (rt.wifiStatus() !== 'connected') {
+      await rt.at(11);
+      await rt.at(12); await rt.delay(500);
+      await rt.at(13); rt.println('Still connecting...');
+    }
+    await rt.at(11);
+    await rt.at(15); rt.print('Connected! IP address: ');
+    await rt.at(16); rt.println(rt.wifiIP());
+    await rt.at(17);
+    for (;;) { await rt.at(19); await rt.at(20); await rt.delay(1000); }
+  },
+
+  async e_web(rt) {
+    await rt.at(4); await rt.at(5); await rt.at(6); await rt.at(7); await rt.at(9);
+    await rt.at(30);
+    await rt.at(31); rt.pinMode('G16', 'OUTPUT');
+    await rt.at(32); rt.serialBegin(115200);
+    await rt.at(33);
+    await rt.at(34); rt.wifiBegin();
+    while (rt.wifiStatus() !== 'connected') { await rt.at(35); await rt.at(36); await rt.delay(500); }
+    await rt.at(35);
+    await rt.at(38); rt.print('Open http://');
+    await rt.at(39); rt.println(rt.wifiIP());
+    await rt.at(40); await rt.at(41); await rt.at(42);
+    await rt.at(43); rt.web('page', { lit: false });
+    await rt.at(44);
+    let ledOn = false;
+    const page = async () => { await rt.at(11); await rt.at(12); await rt.at(13); rt.web('page', { lit: ledOn }); };
+    for (;;) {
+      await rt.at(46);
+      await rt.at(47);
+      for (const evn of rt.uiEvents()) {
+        if (evn === 'on') { rt.println('[simulated] browser asked for /on'); await rt.at(16); await rt.at(17); ledOn = true; await rt.at(18); rt.digitalWrite('G16', 1); await rt.at(19); await rt.at(20); await page(); }
+        else if (evn === 'off') { rt.println('[simulated] browser asked for /off'); await rt.at(23); await rt.at(24); ledOn = false; await rt.at(25); rt.digitalWrite('G16', 0); await rt.at(26); await rt.at(27); await page(); }
+      }
+      await rt.delay(120);
     }
   },
 

@@ -138,7 +138,7 @@ class App {
     this.lamp.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 70, 6)));
     this.lamp.target.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 0, 0)));
     s.add(this.lamp, this.lamp.target);
-    this.lux = 300; this.tempC = 25; this.distCm = 40; this.th = { t: 22.5, h: 45, unplug: false, last: null }; this.uiq = []; this.br = { stage: 'idle', arg: null, led: null }; this.uiq = [];
+    this.lux = 300; this.tempC = 25; this.distCm = 40; this.th = { t: 22.5, h: 45, unplug: false, last: null }; this.uiq = []; this.wf = { rssi: -48, router: true, passOk: true, t0: 0 }; this.br = { stage: 'idle', arg: null, led: null }; this.uiq = [];
     // ---- Lesson 13 scene, all at true scale (1 unit = 1 mm) -------------------------------------------
     // obstacle: a corrugated cardboard box standing on the desk (flat, hard face — what the datasheet asks for)
     {
@@ -350,7 +350,7 @@ class App {
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
     if (this.acc && this.acc.monitor.group.visible) this.acc.monitor.draw({ ...this.pios, mode: this.board.powered ? this.pios.mode : 'off' });
-    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick();
+    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick(); this.wifiTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -827,7 +827,7 @@ class App {
     const io = $('#dock-io');
     $('#dock').classList.toggle('with-io', w.length > 0);
     $('#dock').classList.toggle('no-serial', L.id === 'l9');
-    let h = '';
+    let h = ''; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
     if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on ${IS_PI ? 'GPIO2 (pin 3)' : 'D4'}</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
     if (w.includes('light')) h += `<div class="io-block"><div class="io-title">Light on the sensor <span class="io-note">(simulated)</span></div><input id="lux" type="range" min="0" max="1000" value="${Math.round(this.luxToSlider(this.lux))}"><div class="io-tools">${[['Dark', 0.01], ['Dim', 10], ['Room light', 300], ['Torch', 2000]].map(([t, v]) => `<button class="lvl" data-lux="${v}">${t}</button>`).join('')}</div><div id="lux-val" class="io-val"></div></div>`;
     if (w.includes('temp')) h += `<div class="io-block"><div class="io-title">Temperature around the TMP36 <span class="io-note">(simulated)</span></div><input id="tempc" type="range" min="-40" max="125" step="0.5" value="${this.tempC}"><div id="temp-val" class="io-val"></div></div>`;
@@ -841,7 +841,10 @@ class App {
     if (w.includes('dash')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div><div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
         <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="d-sk">—</b></div><div class="arrow">→</div><div><span>Python · Web UI</span><b id="d-py">—</b></div><div class="arrow">→</div><div><span>Browser</span><b id="d-br">—</b></div></div><div id="d-note" class="io-note"></div>`;
     if (w.includes('pikeys')) h += `<div class="io-block"><div class="io-title">Keys — click to play <span class="io-note">(GPIO17)</span></div><div class="pkeys">${[['C4', 60], ['D4', 62], ['E4', 64], ['F4', 65], ['G4', 67], ['A4', 69], ['B4', 71]].map(([n, m]) => `<button class="pkey" data-hz="${(440 * Math.pow(2, (m - 69) / 12)).toFixed(3)}" data-n="${n}">${n}</button>`).join('')}</div><div id="pk-note" class="io-note"></div></div>`;
-    if (w.includes('piweb')) h += `<div class="io-block pirstat tight"><div><span>Phone browser</span><b id="w-ph">—</b></div><div class="arrow">→</div><div><span>Flask on the Pi</span><b id="w-fl">—</b></div><div class="arrow">→</div><div><span>LED on GPIO17</span><b id="w-led">—</b></div></div><div id="w-note" class="io-note"></div>`;
+    if (w.includes('piweb')) h += `<div class="io-block pirstat tight"><div><span>Phone browser</span><b id="w-ph">—</b></div><div class="arrow">→</div><div><span>${IS_E32 ? 'WebServer on the ESP32' : 'Flask on the Pi'}</span><b id="w-fl">—</b></div><div class="arrow">→</div><div><span>LED on ${IS_E32 ? 'GPIO16' : 'GPIO17'}</span><b id="w-led">—</b></div></div><div id="w-note" class="io-note"></div>`;
+    if (w.includes('wifiscan')) h += `<div class="io-block"><div class="io-title">Signal of “HomeNet” <span class="io-note">(simulated)</span></div><input id="wf-rssi" type="range" min="-90" max="-30" step="1" value="${this.wf.rssi}"><div id="wf-val" class="io-val"></div><div class="io-note">RSSI = received signal strength in dBm. The closer to 0, the stronger the signal. The other networks are made up for this demo.</div></div>`;
+    if (w.includes('wifirouter')) { this.wf.router = true; this.wf.passOk = true; h += `<div class="io-block"><div class="io-title">Your router <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="wf-router" class="hold small">📶 Router: ON</button><button id="wf-pass" class="hold small">🔑 Password: correct</button></div></div>
+        <div class="io-block pirstat tight"><div><span>WiFi.begin()</span><b id="wf-s1">—</b></div><div class="arrow">→</div><div><span>Router</span><b id="wf-s2">—</b></div><div class="arrow">→</div><div><span>WiFi.status()</span><b id="wf-s3">—</b></div></div><div id="wf-note" class="io-note"></div>`; }
     if (w.includes('pisens')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="-10" max="60" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div><div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
         <div class="io-tools"><button id="th-plug" class="hold small">🔌 Unplug the SDA wire</button></div><div id="ps-note" class="io-note"></div>`;
     if (w.includes('bridge2')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div></div>
@@ -876,6 +879,8 @@ class App {
       const dn = e => { e.preventDefault(); this.pressButton(true); }, up = () => this.pressButton(false);
       hold.addEventListener('pointerdown', dn); hold.addEventListener('pointerup', up); hold.addEventListener('pointerleave', up);
     }
+    if ($('#wf-rssi')) { const upd = () => { $('#wf-val').innerHTML = `<b>${this.wf.rssi} dBm</b>`; }; $('#wf-rssi').oninput = e => { this.wf.rssi = +e.target.value; upd(); }; upd(); }
+    if ($('#wf-router')) { $('#wf-router').onclick = () => { if (!this.sim.running) this.wf.router = !this.wf.router; }; $('#wf-pass').onclick = () => { if (!this.sim.running) this.wf.passOk = !this.wf.passOk; }; }
     if ($('#knob')) { $('#knob').oninput = e => this.setKnob(+e.target.value / 1000); this.setKnob(this.knobValue()); }
     if ($('#lux')) { $('#lux').oninput = e => this.setLux(this.sliderToLux(+e.target.value)); document.querySelectorAll('[data-lux]').forEach(b => b.onclick = () => this.setLux(+b.dataset.lux)); this.setLux(this.lux); }
     if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); $('#dist').onchange = e => this.setDist(+e.target.value, true); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist, true)); this.setDist(this.distCm); }
@@ -1436,7 +1441,7 @@ class App {
     p = document.createElement('div'); p.id = 'phone'; p.dataset.kind = kind;
     if (kind === 'piweb') {
       p.classList.add('live');
-      p.innerHTML = `<div class="ph-cap">Your phone (tap the links)</div><div class="ph-frame"><div class="ph-bar">http://&lt;pi-ip&gt;:5000</div><div class="ph-body" id="pw-body"></div></div>`;
+      p.innerHTML = `<div class="ph-cap">Your phone (tap the links)</div><div class="ph-frame"><div class="ph-bar">${IS_E32 ? 'http://192.168.1.42/' : 'http://&lt;pi-ip&gt;:5000'}</div><div class="ph-body" id="pw-body"></div></div>`;
       $('#stage').appendChild(p);
       this.pw = { up: false, lit: false };
       this.pwRender();
@@ -1459,7 +1464,7 @@ class App {
     const sens = W.c !== undefined ? `<div class="pw-t">Pi control panel</div><div class="pw-r">Temperature: <b>${W.c.toFixed(1)} °C</b></div><div class="pw-r">Humidity: <b>${W.rh.toFixed(1)} %</b></div>` : '';
     b.innerHTML = W.up
       ? `${sens}<div class="pw-h">LED is <b class="${W.lit ? 'on' : ''}">${W.lit ? 'ON' : 'OFF'}</b></div><a class="pw-a" data-r="on">Turn on</a> <a class="pw-a" data-r="off">Turn off</a>`
-      : `<div class="pw-err">This site can’t be reached<small>The Raspberry Pi is not answering. Is the server running?</small></div>`;
+      : `<div class="pw-err">This site can’t be reached<small>${IS_E32 ? 'The ESP32 is not answering. Is the sketch running?' : 'The Raspberry Pi is not answering. Is the server running?'}</small></div>`;
     b.querySelectorAll('.pw-a').forEach(a => a.onclick = () => { if (this.sim.running) this.uiq.push(a.dataset.r); });
   }
   pikeysTick() {
@@ -1468,6 +1473,18 @@ class App {
     document.querySelectorAll('.pkey').forEach(b => b.classList.toggle('on', !!f && Math.abs(+b.dataset.hz - f) < 0.05));
     const n = $('#pk-note'); if (n) { const k = f && [...document.querySelectorAll('.pkey')].find(b => Math.abs(+b.dataset.hz - f) < 0.05); const h = !this.board.powered ? 'USB-C is not plugged in — the Raspberry Pi has no power.' : k ? `Playing <b>${k.dataset.n}</b> · ${(+k.dataset.hz).toFixed(1)} Hz` : 'Silent. Press <b>▶ Run</b> or click a key.'; if (n.innerHTML !== h) n.innerHTML = h; }
   }
+  wifiTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('wifirouter')) return;
+    const run = this.sim.running, W = this.wf, set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; if (cls !== undefined) e.className = cls; } };
+    const ok = W.router && W.passOk, up = run && ok && performance.now() - W.t0 > 2500;
+    const r = $('#wf-router'), q = $('#wf-pass');
+    if (r) { r.disabled = run; r.textContent = `📶 Router: ${W.router ? 'ON' : 'OFF'}`; r.classList.toggle('on', !W.router); }
+    if (q) { q.disabled = run; q.textContent = `🔑 Password: ${W.passOk ? 'correct' : 'wrong'}`; q.classList.toggle('on', !W.passOk); }
+    set('#wf-s1', run ? 'started' : '—', run ? 'on' : 'off');
+    set('#wf-s2', !run ? '—' : !W.router ? 'not found' : !W.passOk ? 'rejects the password' : 'accepts', run && ok ? 'on' : 'off');
+    set('#wf-s3', up ? 'WL_CONNECTED' : run ? 'not connected' : '—', up ? 'on' : 'off');
+    set('#wf-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>. You can switch the router off or give it a wrong password first (stop the sketch to change).' : up ? 'The router accepted the password and gave the ESP32 an <b>IP address</b>. The loop ends.' : !W.router ? 'No network named “HomeNet” is found: the loop never ends.' : !W.passOk ? 'The password is wrong: the ESP32 never reaches WL_CONNECTED and the loop never ends.' : 'Joining the network…', 'io-note');
+  }
   piwebTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('piweb')) return;
     const run = this.sim.running, W = this.pw || (this.pw = { up: false, lit: false });
@@ -1475,9 +1492,9 @@ class App {
     const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; if (cls !== undefined) e.className = cls; } };
     const st = this.pwStage || 'idle';
     set('#w-ph', run && W.up ? 'page shown' : '—', run && W.up ? 'on' : 'off');
-    set('#w-fl', run ? (st === 'on' ? 'route /on' : st === 'off' ? 'route /off' : 'waiting…') : '—', run ? 'on' : 'off');
+    set('#w-fl', run ? (st === 'on' ? 'route /on' : st === 'off' ? 'route /off' : IS_E32 ? 'handleClient()' : 'waiting…') : '—', run ? 'on' : 'off');
     set('#w-led', run ? (this.pw.lit ? 'ON' : 'OFF') : '—', run && this.pw.lit ? 'on' : 'off');
-    set('#w-note', !this.board.powered ? 'USB-C is not plugged in — the Raspberry Pi has no power.' : !run ? 'The server is not running: the phone cannot reach the page. Press <b>▶ Run</b>.' : 'Tap <b>Turn on</b> / <b>Turn off</b> on the phone.', 'io-note');
+    set('#w-note', !this.board.powered ? (IS_E32 ? 'USB is not plugged in — the board has no power.' : 'USB-C is not plugged in — the Raspberry Pi has no power.') : !run ? 'The server is not running: the phone cannot reach the page. Press <b>▶ Run</b>.' : 'Tap <b>Turn on</b> / <b>Turn off</b> on the phone.', 'io-note');
   }
   dashTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('dash')) return;
@@ -1847,6 +1864,14 @@ class App {
         const io = this.ioFor(IS_U3 ? 'A4' : 'p3'), ok = io && io.kind === 'i2c' && this.wired(io) && this.board.powered && !this.th.unplug;
         return ok ? { found: true, c: this.th.t + (Math.random() - 0.5) * 0.1, rh: Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3)) } : { found: false };
       },
+      wifiScan: () => {
+        const W = this.wf, list = [{ ssid: 'CoffeeShop-Free', rssi: -67, open: true }, { ssid: 'Workshop', rssi: -78, open: false }, { ssid: 'Neighbour-2G', rssi: -84, open: false }];
+        if (W.router) list.push({ ssid: 'HomeNet', rssi: W.rssi, open: false });
+        return list.sort((a, b) => b.rssi - a.rssi);
+      },
+      wifiBegin: () => { this.wf.t0 = performance.now(); },
+      wifiStatus: () => (this.wf.router && this.wf.passOk && performance.now() - this.wf.t0 > 2500 ? 'connected' : 'connecting'),
+      wifiIP: () => '192.168.1.42',
       mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {
         const io = this.ioFor(pin);

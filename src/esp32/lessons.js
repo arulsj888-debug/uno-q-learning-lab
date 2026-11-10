@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -11,6 +11,9 @@ const SRC = {
   adc: { t: 'Arduino-ESP32 documentation: ADC (analogRead)', u: 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/adc.html' },
   ledc: { t: 'Arduino-ESP32 documentation: LEDC (PWM)', u: 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/ledc.html' },
   idf: { t: 'ESP-IDF documentation: ADC oneshot mode driver', u: 'https://docs.espressif.com/projects/esp-idf/en/v5.2/esp32/api-reference/peripherals/adc_oneshot.html' },
+  wifiscan: { t: 'Arduino-ESP32 library: WiFiScan example', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/WiFi/examples/WiFiScan/WiFiScan.ino' },
+  wifihello: { t: 'Arduino-ESP32 library: WebServer HelloServer example (WiFi.begin, status, localIP)', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/WebServer/examples/HelloServer/HelloServer.ino' },
+  webserver: { t: 'Arduino-ESP32 library: WebServer.h (on, begin, handleClient, send, sendHeader)', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/WebServer/src/WebServer.h' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -36,8 +39,8 @@ const POT_PARTS = [
 ];
 const POT_IDS = POT_PARTS.map(d => d.id);
 
-export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM' };
-export const E32_COMING = ['Touch sensor', 'Wi-Fi: scan and connect', 'A web page that switches an LED', 'Bluetooth LE', 'Deep sleep'];
+export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi' };
+export const E32_COMING = ['Touch sensor', 'Bluetooth LE', 'Deep sleep'];
 
 export const E32_LESSONS = [
   // ================================================================== 1
@@ -343,5 +346,179 @@ export const E32_LESSONS = [
       { q: 'At 50 % duty, the average voltage on a 3.3 V pin is about…', a: ['0 V', '1.65 V', '3.3 V', '5 V'], c: 1, why: '0.5 × 3.3 V = 1.65 V.' },
     ],
     sources: [SRC.ledc, SRC.ds],
+  },
+  // ================================================================== 8
+  {
+    id: 'e8', num: 8, module: 3, title: 'Scan for Wi-Fi networks', level: 'Beginner', time: '12 min',
+    goal: 'Use the ESP32’s built-in Wi-Fi to list the networks around you with their signal strength.',
+    hardware: ['ESP32 DevKit V1', 'Micro-USB cable'],
+    code: E32_SCAN, file: 'WiFiScan.ino', program: 'e_scan', fast: true, widgets: ['wifiscan'],
+    explain: {
+      3: '<b>setup()</b> runs once.',
+      4: 'Serial output on (115200).',
+      5: '<b>WiFi.mode(WIFI_STA)</b>: <b>station</b> mode. The ESP32 behaves like a phone or laptop: it can join a network. (The other mode, access point, makes a network of its own.)',
+      8: '<b>loop()</b> repeats forever.',
+      9: 'Announce the scan.',
+      10: '<b>WiFi.scanNetworks()</b> listens on the Wi-Fi channels and returns how many networks it heard. It takes a moment.',
+      11: 'Print the count…',
+      12: '…and the word “networks found”.',
+      13: 'Go through the list: network number 0, 1, 2 …',
+      14: 'Print the number in the list (starting at 1).',
+      16: '<b>WiFi.SSID(i)</b>: the <b>name</b> of network number i.',
+      18: '<b>WiFi.RSSI(i)</b>: signal strength in <b>dBm</b>. A number closer to 0 is a stronger signal (−45 is strong, −85 is weak).',
+      20: '<b>WiFi.encryptionType(i)</b> tells how the network is protected. <code>WIFI_AUTH_OPEN</code> means no password.',
+      22: '<b>scanDelete()</b> frees the memory that holds the scan result.',
+      23: 'Wait 5 seconds, then scan again.',
+    },
+    steps: [
+      { title: 'What we do', view: 'home', power: false,
+        body: `<p>The ESP32 has a <b>Wi-Fi radio</b> and an antenna built in. In this lesson it only <b>listens</b>: it scans for networks and prints their names and signal strength. Nothing is wired: just the USB cable.</p>
+        <p class="tip">Random Nerd Tutorials use the same idea as the first test of a new ESP32 (the <b>WiFiScan</b> example). It is a good way to check that the antenna and the radio work.</p>` },
+      { title: 'What the ESP32 can hear', view: 'home', focus: 'antenna',
+        body: `<ul><li>The ESP32-WROOM-32 supports <b>Wi-Fi 802.11 b/g/n</b> in the <b>2.4 GHz</b> band (datasheet: channel centre frequencies 2412–2484 MHz).</li><li>Networks that exist <b>only at 5 GHz</b> are invisible to this board.</li><li>The antenna is the zig-zag track on the module: keep metal away from it.</li></ul>` },
+      { title: 'Plug in and read the sketch', view: 'home', power: true, action: 'ensurePower', showCode: true,
+        body: `<p>Adapted from the <b>WiFiScan</b> example of the Arduino-ESP32 library, shortened. Click any line. Remember: no password and no wiring are needed to <i>scan</i>.</p>` },
+      { title: 'Run it & change the signal', view: 'home', power: true, showCode: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>. Every 5 seconds the Serial Monitor lists the networks. Use the slider to move the signal of <b>HomeNet</b> from strong to weak and see the number change.</p>
+        <p class="sim">The networks are <b>made up</b> for this demo; a real scan shows the networks around <i>you</i>. A scan takes about 1.5 seconds in the simulation.</p>` },
+      { title: 'Reading the results', view: 'home', power: true, showCode: true,
+        body: `<table class="kv"><tr><th>RSSI</th><th>Meaning (rough guide)</th></tr><tr><td>−30 … −55 dBm</td><td>strong</td></tr><tr><td>−55 … −75 dBm</td><td>usable</td></tr><tr><td>−75 … −90 dBm</td><td>weak, connections may drop</td></tr></table>
+        <p>The numbers are a rule of thumb: the exact limits depend on the device.</p>
+        <p><b>open</b> = no password (anyone can join, and anyone nearby can read the traffic). <b>secured</b> = needs a password.</p>` },
+      { title: 'Summary', view: 'home', power: true,
+        body: `<ul><li><code>WiFi.mode(WIFI_STA)</code> = station mode (join networks).</li><li><code>WiFi.scanNetworks()</code> returns the number of networks; <code>SSID(i)</code>, <code>RSSI(i)</code>, <code>encryptionType(i)</code> describe each one.</li><li>The ESP32 hears only 2.4 GHz networks.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'WiFi.mode(WIFI_STA) puts the ESP32 in…', a: ['Access-point mode', 'Station mode: it can join a network', 'Deep sleep', 'Bluetooth mode'], c: 1, why: 'STA = station, like a phone that joins a router.' },
+      { q: 'Which RSSI is the strongest signal?', a: ['−85 dBm', '−60 dBm', '−45 dBm', '−90 dBm'], c: 2, why: 'The closer to 0, the stronger.' },
+      { q: 'Your router only broadcasts at 5 GHz. Will the ESP32-WROOM-32 see it?', a: ['Yes', 'No: the module supports 2.4 GHz only', 'Only with the BOOT button held', 'Only at night'], c: 1, why: 'The module supports 802.11 b/g/n in the 2.4 GHz band.' },
+      { q: 'What does WIFI_AUTH_OPEN mean?', a: ['The network has no password', 'The network is faster', 'The network is hidden', 'The network is 5 GHz'], c: 0, why: 'Open networks need no password.' },
+    ],
+    sources: [SRC.wifiscan, SRC.mod, SRC.ds],
+  },
+  // ================================================================== 9
+  {
+    id: 'e9', num: 9, module: 3, title: 'Connect to your Wi-Fi', level: 'Beginner', time: '15 min',
+    goal: 'Join your router with WiFi.begin(), wait for WL_CONNECTED, and read the IP address the router gives the ESP32.',
+    hardware: ['ESP32 DevKit V1', 'Micro-USB cable', 'Your Wi-Fi name and password'],
+    code: E32_CONNECT, file: 'WiFiConnect.ino', program: 'e_connect', fast: true, widgets: ['wifirouter'],
+    explain: {
+      3: 'The <b>name</b> of your network (SSID).',
+      4: 'The <b>password</b>. Never share a sketch or post it online with your real password in it.',
+      6: '<b>setup()</b> runs once.',
+      7: 'Serial output on (115200).',
+      8: 'Station mode (Lesson 8).',
+      9: '<b>WiFi.begin(ssid, password)</b> starts joining the network. It returns at once: joining takes a moment.',
+      10: 'Tell the user what is going on.',
+      11: '<b>WiFi.status()</b> tells how far the connection is. <code>WL_CONNECTED</code> means we are in. Until then, we wait here.',
+      12: 'Wait half a second, then ask again.',
+      13: 'Show that we are still waiting.',
+      15: 'The loop ended: we are connected.',
+      16: '<b>WiFi.localIP()</b> is the <b>IP address</b> that the router gave to the ESP32. Other devices use it to talk to the ESP32.',
+      19: 'loop() is empty: this sketch only connects.',
+    },
+    steps: [
+      { title: 'What we do', view: 'home', power: false,
+        body: `<p>The ESP32 joins your <b>router</b> like a phone does. Afterwards it has an <b>IP address</b>, and can talk to other devices on your network, or to the Internet.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">ESP32: WiFi.begin(name, password)</span></div><div class="pt-arrow">↓ radio</div><div class="pt-row"><span class="pt">Router checks the password</span></div><div class="pt-arrow">↓ gives an IP address</div><div class="pt-row"><span class="pt bus">ESP32 is on your network</span></div></div>` },
+      { title: 'What the router gives you: an IP address', view: 'home',
+        body: `<p>Every device on a network needs an <b>IP address</b>, like a house number. The router hands one out automatically (this is called <b>DHCP</b>). At home it usually looks like <code>192.168.x.x</code>. The ESP32 prints it with <code>WiFi.localIP()</code>.</p>
+        <p class="sim">In this simulation the router gives <code>192.168.1.42</code>. Yours will be different.</p>` },
+      { title: 'Plug in and read the sketch', view: 'home', power: true, action: 'ensurePower', showCode: true,
+        body: `<p>Click every line. Replace <code>ssid</code> and <code>password</code> with your own values on a real board.</p>
+        <p class="warn">Do not publish sketches that contain your real Wi-Fi password.</p>` },
+      { title: 'Run it: success', view: 'home', power: true, showCode: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>. The ESP32 prints “Still connecting…” while the router accepts it (about 2.5 seconds here), then the IP address.</p>
+        <p class="sim">The router is simulated.</p>` },
+      { title: 'Run it: what can go wrong?', view: 'home', power: true, showCode: true, action: 'ensurePower',
+        body: `<p>First use the buttons in the panel: switch the <b>router OFF</b>, or choose a <b>wrong password</b>. Then press <b>▶ Run</b>. (To change the router again, press <b>■ Stop</b> first.)</p>
+        <ul><li><b>Router off / name wrong:</b> the ESP32 cannot find the network.</li><li><b>Wrong password:</b> the router refuses it.</li></ul>
+        <p>In both cases <code>WiFi.status()</code> never becomes <code>WL_CONNECTED</code>, so <b>this sketch waits forever</b> and keeps printing “Still connecting…”. Real programs add a time limit and print a hint.</p>
+        <p class="tip">Check the name and password letter by letter: capitals matter.</p>` },
+      { title: 'Summary', view: 'home', power: true,
+        body: `<ul><li><code>WiFi.mode(WIFI_STA)</code>, <code>WiFi.begin(ssid, password)</code>, then wait until <code>WiFi.status() == WL_CONNECTED</code>.</li><li><code>WiFi.localIP()</code> is the address the router gave the ESP32.</li><li>Wrong name or password = it never connects.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'WiFi.begin(ssid, password) …', a: ['Waits until the ESP32 is connected', 'Starts joining and returns at once', 'Makes a new network', 'Turns the radio off'], c: 1, why: 'It only starts the connection; the sketch checks WiFi.status() afterwards.' },
+      { q: 'The password is wrong. What happens in this sketch?', a: ['It connects anyway', 'It never reaches WL_CONNECTED and keeps waiting', 'The ESP32 resets', 'It prints the right password'], c: 1, why: 'The while loop ends only when the status is WL_CONNECTED.' },
+      { q: 'What is the IP address for?', a: ['It lets other devices on the network find the ESP32', 'It powers the board', 'It sets the Wi-Fi channel', 'It is the password'], c: 0, why: 'Like a house number: devices use it to send data to the ESP32.' },
+      { q: 'Who gives the ESP32 its IP address at home?', a: ['The router (DHCP)', 'The USB cable', 'The BOOT button', 'The blue LED'], c: 0, why: 'Routers hand out addresses automatically with DHCP.' },
+    ],
+    sources: [SRC.wifihello, SRC.rnt, SRC.ds],
+  },
+  // ================================================================== 10
+  {
+    id: 'e10', num: 10, module: 3, title: 'A web page served by the ESP32: switch the LED from your phone', level: 'Intermediate', time: '25 min',
+    goal: 'Run a small web server on the ESP32 so that a phone on the same Wi-Fi can switch the LED on and off.',
+    hardware: ['ESP32 DevKit V1 with the Lesson 4 LED circuit (GPIO16)', 'A phone or computer on the same Wi-Fi'],
+    code: E32_WEB, file: 'LedServer.ino', program: 'e_web', fast: true, widgets: ['piweb'],
+    circuit: LED_CIRCUIT, io: { G16: IO_LED },
+    explain: {
+      1: '<b>WiFi.h</b>: the Wi-Fi functions of Lesson 9.',
+      2: '<b>WebServer.h</b>: the small web-server library of the ESP32 Arduino core.',
+      4: 'Your network name…',
+      5: '…and password (use your own).',
+      6: 'The LED from Lesson 4 on GPIO16.',
+      7: 'Remembers whether the LED is on, so the page can show it.',
+      9: '<b>WebServer server(80)</b>: a web server that listens on <b>port 80</b>, the standard port of normal web pages. That is why you do not have to type a port in the address.',
+      11: 'The function that builds the <b>main page</b>.',
+      12: 'Turn the true/false value into the word ON or OFF.',
+      13: '<b>server.send(200, "text/html", …)</b> sends the page: status 200 means “OK”, the content is HTML with a heading and two links.',
+      16: 'Called when the browser asks for <b>/on</b>.',
+      17: 'Remember: the LED is on.',
+      18: '<b>digitalWrite(ledPin, HIGH)</b>: GPIO16 to 3.3 V, the real LED lights.',
+      19: 'Tell the browser to go back to the main page (the <b>Location</b> header)…',
+      20: '…with status 303 (“see other”). The page then shows “LED is ON”.',
+      23: 'Called when the browser asks for <b>/off</b>.',
+      24: 'Remember: the LED is off.',
+      25: 'GPIO16 to 0 V: the LED goes out.',
+      26: 'Go back to the main page…',
+      27: '…with status 303.',
+      30: '<b>setup()</b> runs once.',
+      31: 'GPIO16 is an output.',
+      32: 'Serial output on (115200).',
+      33: 'Station mode.',
+      34: 'Start joining the network (Lesson 9).',
+      35: 'Wait here until the router has accepted the ESP32.',
+      36: 'Wait half a second, then check again.',
+      38: 'Tell the user where to point the browser…',
+      39: '…the IP address of the ESP32.',
+      40: '<b>server.on("/", handleRoot)</b>: connect the address <b>/</b> to the function handleRoot.',
+      41: 'Address <b>/on</b> → handleOn.',
+      42: 'Address <b>/off</b> → handleOff.',
+      43: '<b>server.begin()</b> starts the server.',
+      46: '<b>loop()</b> repeats forever.',
+      47: '<b>server.handleClient()</b> checks whether a browser has asked for a page and, if so, runs the matching function. Without this line nothing is answered.',
+    },
+    steps: [
+      { title: 'What we build', view: 'bench', have: LED_IDS, power: false,
+        body: `<p>The ESP32 will <b>serve a web page</b> — like a tiny website. Your phone opens it in its browser and taps a link; the ESP32 switches the real LED.</p>
+        <div class="ptree"><div class="pt-row"><span class="pt in">Phone browser</span></div><div class="pt-arrow">↓ Wi-Fi: “give me /on”</div><div class="pt-row"><span class="pt">ESP32: WebServer</span></div><div class="pt-arrow">↓ digitalWrite(16, HIGH)</div><div class="pt-row"><span class="pt bus">LED on GPIO16</span></div></div>
+        <p>The wiring is the one from Lesson 4. Only the program is new.</p>` },
+      { title: 'Server and browser', view: 'bench', have: LED_IDS,
+        body: `<table class="kv"><tr><th></th><th>Runs on</th><th>Job</th></tr><tr><td><b>Web server</b></td><td>the ESP32</td><td>waits for requests, runs your function, sends back a page</td></tr><tr><td><b>Browser</b></td><td>your phone / computer</td><td>asks for an address, draws the page</td></tr></table>
+        <p>The browser asks for an address like <code>http://&lt;ip-address&gt;/on</code>. After the <b>IP address</b> of the ESP32 (Lesson 9) comes the <b>route</b> (<code>/on</code>). Your sketch decides what each route does.</p>
+        <p class="tip">The ESP32 prints its IP address in the Serial Monitor when it has connected. The phone must be on the <b>same Wi-Fi</b>.</p>` },
+      { title: 'Plug in and read the sketch', view: 'bench', have: LED_IDS, power: true, showCode: true, action: 'ensurePower',
+        body: `<p>Click every line. Each <code>server.on(…)</code> line connects an <b>address</b> to the function that answers it. Put your own network name and password in lines 4–5 on a real board.</p>` },
+      { title: 'Run it', view: 'bench', have: LED_IDS, showCode: true, power: true, action: 'run', phone: true,
+        body: `<p>The <b>phone</b> appears at the bottom right of the 3D view. Press <b>▶ Run</b> (this starts the server), wait for “Open http://…” in the Serial Monitor, then <b>tap “Turn on”</b> and <b>“Turn off”</b>.</p>
+        <ol><li>The tap asks the ESP32 for <code>/on</code>.</li><li><code>handleOn()</code> runs and the real LED lights.</li><li>The ESP32 sends the browser back to the main page, now saying “LED is ON”.</li></ol>
+        <p>Before you press Run the phone shows <b>“can’t reach this page”</b>: nothing answers yet.</p>
+        <p class="sim">Simulated: no real network is used here.</p>` },
+      { title: 'Safety: keep it on your network', view: 'bench', have: LED_IDS, power: true,
+        body: `<p class="warn"><b>Anyone on your Wi-Fi who knows the address can switch the LED.</b> The page has no password.</p>
+        <ul><li>Do not make this page reachable from the Internet.</li><li>Do not use a page like this to control anything dangerous (heaters, mains power).</li><li>Opening a link that changes something is simple but not how professional sites work: anything that opens the link switches the LED, even a browser that pre-loads pages.</li></ul>` },
+      { title: 'Summary', view: 'bench', have: LED_IDS, power: true,
+        body: `<ul><li>A <b>WebServer</b> on the ESP32 answers browsers; <code>server.on("/on", handleOn)</code> connects an address to a function.</li><li><code>server.handleClient()</code> in <code>loop()</code> does the answering.</li><li>Port 80 is the default web port; the IP address comes from the Serial Monitor.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does server.on("/on", handleOn) do?', a: ['Switches the LED on at once', 'Connects the address /on to the function handleOn', 'Starts Wi-Fi', 'Prints the IP address'], c: 1, why: 'It registers which function answers the address /on.' },
+      { q: 'What happens if loop() does not call server.handleClient()?', a: ['Nothing is answered: the page never loads', 'The LED stays on', 'The ESP32 restarts', 'Nothing changes'], c: 0, why: 'handleClient() is what checks for and answers browser requests.' },
+      { q: 'WebServer server(80): what is 80?', a: ['The IP address', 'The port: the standard port for web pages', 'The LED pin', 'The baud rate'], c: 1, why: 'Port 80 is the default for http, so you do not need to type it.' },
+      { q: 'Where do you read the address to type in the phone?', a: ['On the module', 'In the Serial Monitor (WiFi.localIP())', 'On the LED', 'In the Boards Manager'], c: 1, why: 'The sketch prints “Open http://…” with the IP address.' },
+      { q: 'What should you avoid?', a: ['Using the page on your home Wi-Fi', 'Exposing it to the Internet or using it for dangerous loads', 'Using GPIO16', 'Using the Serial Monitor'], c: 1, why: 'The page has no password: anyone who can reach it can use it.' },
+    ],
+    sources: [SRC.wifihello, SRC.webserver, SRC.rnt, SRC.ds],
   },
 ];
