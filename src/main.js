@@ -10,15 +10,15 @@ import { PARTS_PI, CATEGORIES_PI, BOARD_FACTS_PI, J8_HEADER, findPinPi } from '.
 import { PI_LESSONS, PI_MODULES, PI_COMING, TERM_CMDS } from './pi4/lessons.js';
 import { J8 } from './pi4/data.js';
 import { makePiAccessories, PI_ACC_INFO } from './pi4/peripherals.js';
-import uqThumb from '../assets/pcb_top_albedo.jpg';
-import u3Thumb from '../assets/uno3/pcb_top_albedo.jpg';
+import uqThumb from '../assets/thumbs/uq.jpg';
+import u3Thumb from '../assets/thumbs/u3.jpg';
 import { Uno3Board } from './uno3/board.js';
 import { U3_LESSONS, U3_MODULES, U3_COMING } from './uno3/lessons.js';
 import { PARTS_U3, CATEGORIES_U3, BOARD_FACTS_U3, U3_HEADERS, findPinU3 } from './uno3/data.js';
 import { Esp32Board, boardThumb as e32ThumbFn } from './esp32/board.js';
 import { E32_LESSONS, E32_MODULES, E32_COMING } from './esp32/lessons.js';
 import { PARTS_E32, CATEGORIES_E32, BOARD_FACTS_E32, E32_HEADERS, findPinE32 } from './esp32/data.js';
-import piThumb from '../assets/pi4/pi4_top.jpg';
+import piThumb from '../assets/thumbs/pi.jpg';
 import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, HandModel } from './hardware.js';
 import { Bench } from './bench.js';
 import { FreeBuild } from './freebuild/build.js';
