@@ -129,6 +129,19 @@ export class Breadboard {
   rail(name, col) { return this.group.localToWorld(new THREE.Vector3(this.colX(col), 0, this.railZ[name])); }
 }
 
+
+// ---------------------------------------------------------------- helpers for the realistic modules
+const silk = (c, text, x, y, size, color = '#f3f3ee', align = 'center', weight = 700) => { c.fillStyle = color; c.font = `${weight} ${size}px Arial, Helvetica, sans-serif`; c.textAlign = align; c.textBaseline = 'middle'; c.fillText(text, x, y); };
+const FONT5X7 = '00 00 00 00 00|00 00 5F 00 00|00 07 00 07 00|14 7F 14 7F 14|24 2A 7F 2A 12|23 13 08 64 62|36 49 56 20 50|00 08 07 03 00|00 1C 22 41 00|00 41 22 1C 00|2A 1C 7F 1C 2A|08 08 3E 08 08|00 80 70 30 00|08 08 08 08 08|00 00 60 60 00|20 10 08 04 02|3E 51 49 45 3E|00 42 7F 40 00|72 49 49 49 46|21 41 49 4D 33|18 14 12 7F 10|27 45 45 45 39|3C 4A 49 49 31|41 21 11 09 07|36 49 49 49 36|46 49 49 29 1E|00 00 14 00 00|00 40 34 00 00|00 08 14 22 41|14 14 14 14 14|00 41 22 14 08|02 01 59 09 06|3E 41 5D 59 4E|7C 12 11 12 7C|7F 49 49 49 36|3E 41 41 41 22|7F 41 41 41 3E|7F 49 49 49 41|7F 09 09 09 01|3E 41 41 51 73|7F 08 08 08 7F|00 41 7F 41 00|20 40 41 3F 01|7F 08 14 22 41|7F 40 40 40 40|7F 02 1C 02 7F|7F 04 08 10 7F|3E 41 41 41 3E|7F 09 09 09 06|3E 41 51 21 5E|7F 09 19 29 46|26 49 49 49 32|03 01 7F 01 03|3F 40 40 40 3F|1F 20 40 20 1F|3F 40 38 40 3F|63 14 08 14 63|03 04 78 04 03|61 59 49 4D 43|00 7F 41 41 41|02 04 08 10 20|00 41 41 41 7F|04 02 01 02 04|40 40 40 40 40|00 03 07 08 00|20 54 54 78 40|7F 28 44 44 38|38 44 44 44 28|38 44 44 28 7F|38 54 54 54 18|00 08 7E 09 02|18 A4 A4 9C 78|7F 08 04 04 78|00 44 7D 40 00|20 40 40 3D 00|7F 10 28 44 00|00 41 7F 40 00|7C 04 78 04 78|7C 08 04 04 78|38 44 44 44 38|FC 18 24 24 18|18 24 24 18 FC|7C 08 04 04 08|48 54 54 54 24|04 04 3F 44 24|3C 40 40 20 7C|1C 20 40 20 1C|3C 40 30 40 3C|44 28 10 28 44|4C 90 90 90 7C|44 64 54 4C 44|00 08 36 41 00|00 00 77 00 00|00 41 36 08 00|02 01 02 04 02'.split('|').map(r => r.split(' ').map(h => parseInt(h, 16)));
+const glyphCache = {};
+/** the 5 x 8 dot pattern of a character (classic 5 x 7 font plus descender row): rows of 5 booleans */
+function glyph5x8(ch) {
+  if (glyphCache[ch]) return glyphCache[ch];
+  const code = ch.charCodeAt(0) - 32, cols = FONT5X7[code] || FONT5X7[0], out = [];
+  for (let y = 0; y < 8; y++) { const row = []; for (let x = 0; x < 5; x++) row.push(!!((cols[x] >> y) & 1)); out.push(row); }
+  return (glyphCache[ch] = out);
+}
+
 // ---------------------------------------------------------------- 5 mm LED
 export class LED5mm {
   constructor(color = 0xff2a12) {
@@ -217,25 +230,41 @@ export class RGBLED5mm extends LED5mm {
 export class DHTSensor {
   constructor(model = 'dht11') {
     const g = this.group = new THREE.Group();
-    const is22 = model === 'dht22', w = is22 ? 15.1 : 12, h = is22 ? 25 : 15.5, t = is22 ? 7.7 : 5.5;      // body width x height x thickness (mm), approximate
-    const col = is22 ? 0xf0eee6 : 0x2f78c4;
-    const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.55 });
-    const body = new THREE.Mesh(new RoundedBoxGeometry(w, h, t, 2, 0.5), mat);
-    body.position.set(0, 3.0 + h / 2, 0); g.add(body);
-    // grille on the front face: rows of slits
-    const slit = new THREE.MeshStandardMaterial({ color: is22 ? 0x9a998f : 0x174c82, roughness: 0.8 });
-    const rows = is22 ? 9 : 6;
-    for (let i = 0; i < rows; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(w * 0.62, 0.45, 0.2), slit); s.position.set(0, 3.0 + h * 0.52 + (i - (rows - 1) / 2) * (is22 ? 1.9 : 1.5), t / 2 + 0.05); g.add(s); }
-    const mark = canvasTex(256, 128, (c, ww, hh) => {
-      c.clearRect(0, 0, ww, hh); c.fillStyle = is22 ? 'rgba(40,40,40,0.9)' : 'rgba(235,240,250,0.92)'; c.font = '700 64px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.fillText(is22 ? 'DHT22' : 'DHT11', ww / 2, hh / 2);
+    const is22 = model === 'dht22', w = is22 ? 15.1 : 12, h = is22 ? 25 : 15.5, t = is22 ? 7.7 : 5.5;      // body width x height x thickness (mm)
+    const base = is22 ? '#efede4' : '#2a69b5', y0 = 3.0;
+    const mat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(base), roughness: 0.5, clearcoat: 0.25, clearcoatRoughness: 0.45 });
+    const body = new THREE.Mesh(new RoundedBoxGeometry(w, h, t, 6, 0.9), mat);
+    body.position.set(0, y0 + h / 2, 0); g.add(body);
+    // front face: moulded sensing grille (a grid of small square holes) and the printed name, with a bump map so the holes look recessed
+    const PX = 60, cw = Math.round((w - 1.6) * PX), ch = Math.round((h - 1.6) * PX);
+    const cols = is22 ? 9 : 6, rows = is22 ? 11 : 7, pitch = is22 ? 1.38 : 1.42, hole = is22 ? 0.82 : 0.86;
+    const gw = (cols - 1) * pitch, gh = (rows - 1) * pitch, gx0 = (cw / PX - gw) / 2, gy0 = is22 ? 1.9 : 1.5;
+    const cells = (c, fill, inner) => {
+      for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) {
+        const x = (gx0 + i * pitch - hole / 2) * PX, y = (gy0 + r * pitch - hole / 2) * PX, sz = hole * PX;
+        c.fillStyle = fill; c.fillRect(x, y, sz, sz);
+        if (inner) { c.fillStyle = inner; c.fillRect(x + sz * 0.1, y + sz * 0.1, sz * 0.8, sz * 0.8); }
+      }
+    };
+    const faceTex = canvasTex(cw, ch, (c) => {
+      c.fillStyle = base; c.fillRect(0, 0, cw, ch);
+      const shade = c.createLinearGradient(0, 0, cw, 0); shade.addColorStop(0, 'rgba(255,255,255,0.10)'); shade.addColorStop(1, 'rgba(0,0,0,0.10)'); c.fillStyle = shade; c.fillRect(0, 0, cw, ch);
+      cells(c, is22 ? '#7d7c74' : '#123a69', is22 ? '#17171a' : '#06101c');
+      c.fillStyle = is22 ? 'rgba(52,52,50,0.92)' : 'rgba(236,242,250,0.94)'; c.font = `700 ${Math.round(PX * 1.35)}px Arial, Helvetica, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(is22 ? 'DHT22' : 'DHT11', cw / 2, ch - PX * (is22 ? 3.4 : 2.2));
+      c.font = `600 ${Math.round(PX * 0.62)}px Arial, Helvetica, sans-serif`; c.fillStyle = is22 ? 'rgba(52,52,50,0.7)' : 'rgba(236,242,250,0.7)';
+      c.fillText(is22 ? 'AM2302' : '', cw / 2, ch - PX * 1.7);
     });
-    const label = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.8, w * 0.4), new THREE.MeshBasicMaterial({ map: mark, transparent: true, depthWrite: false }));
-    label.position.set(0, 3.0 + h * 0.2, t / 2 + 0.08); g.add(label);
-    // four legs: VCC, DATA, NC, GND (left to right)
+    const bumpTex = canvasTex(cw, ch, (c) => { c.fillStyle = '#fff'; c.fillRect(0, 0, cw, ch); cells(c, '#000'); }, { srgb: false });
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(cw / PX, ch / PX), new THREE.MeshStandardMaterial({ map: faceTex, bumpMap: bumpTex, bumpScale: -2.2, roughness: 0.55 }));
+    face.position.set(0, y0 + h / 2, t / 2 + 0.01); g.add(face);
+    // moulding details on the back: a shallow parting line and an ejector-pin circle
+    const back = new THREE.Mesh(new THREE.CircleGeometry(0.9, 20), new THREE.MeshStandardMaterial({ color: is22 ? 0xdcdad2 : 0x245c9e, roughness: 0.6 }));
+    back.rotation.y = Math.PI; back.position.set(0, y0 + h * 0.62, -t / 2 - 0.01); g.add(back);
+    const seam = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, 0.12, t * 0.35), new THREE.MeshStandardMaterial({ color: is22 ? 0xc9c7be : 0x1f528f, roughness: 0.7 })); seam.position.set(0, y0 + h * 0.5, 0); g.add(seam);
+    // four flat legs: VCC, DATA, NC, GND (left to right, grille facing you), 0.1 inch apart, tinned
     for (const x of [-3.81, -1.27, 1.27, 3.81]) {
-      const path = new THREE.CatmullRomCurve3([new THREE.Vector3(x, 3.2, 0), new THREE.Vector3(x, 0, 0), new THREE.Vector3(x, -3.0, 0)]);
-      g.add(new THREE.Mesh(new THREE.TubeGeometry(path, 16, 0.22, 6, false), M.tin));
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.62, y0 + 3.2, 0.34), M.tin); leg.position.set(x, (y0 + 3.2) / 2 - 3.0 + 0.0, 0); g.add(leg);
     }
     tagHW(g, 'dht');
   }
@@ -246,22 +275,46 @@ export class DHTSensor {
 export class JoystickModule {
   constructor() {
     const g = this.group = new THREE.Group();
-    const y0 = 2.5, T = 1.6, depth = 34, zc = -(depth / 2 - 2.54);
+    const y0 = 2.5, T = 1.6, depth = 34, width = 26, zc = -(depth / 2 - 2.54), top = y0 + T;
+    // header: black plastic strip, gold pins down into the breadboard and the short ends on the board
     const strip = new THREE.Mesh(new RoundedBoxGeometry(5 * 2.54, y0, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0 / 2, 0); g.add(strip);
-    for (let i = 0; i < 5; i++) { const x = (i - 2) * 2.54; const leg = new THREE.Mesh(new THREE.BoxGeometry(0.64, y0 + 4.5, 0.64), M.tin); leg.position.set(x, (y0 + 4.5) / 2 - 3.0 + 0.0, 0); g.add(leg); }
-    const pcb = new THREE.Mesh(new THREE.BoxGeometry(26, T, depth), new THREE.MeshStandardMaterial({ color: 0x17426f, roughness: 0.6 })); pcb.position.set(0, y0 + T / 2, zc); g.add(pcb);
-    const base = new THREE.Mesh(new RoundedBoxGeometry(17, 5, 17, 2, 0.8), new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.55 })); base.position.set(0, y0 + T + 2.5, zc); g.add(base);
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.4, 0.6, 32), new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.7 })); ring.position.set(0, y0 + T + 5.2, zc); g.add(ring);
-    this.stick = new THREE.Group(); this.stick.position.set(0, y0 + T + 5.4, zc); g.add(this.stick);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.0, 9, 16), new THREE.MeshStandardMaterial({ color: 0x202124, roughness: 0.5 })); shaft.position.y = 4.5; this.stick.add(shaft);
-    this.cap = new THREE.Mesh(new THREE.SphereGeometry(6, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2a2b2f, roughness: 0.45 })); this.cap.position.y = 8.5; this.cap.scale.y = 0.75; this.stick.add(this.cap);
+    for (let i = 0; i < 5; i++) { const x = (i - 2) * 2.54; const leg = new THREE.Mesh(new THREE.BoxGeometry(0.64, y0 + 2.8, 0.64), M.tin); leg.position.set(x, (y0 + 2.8) / 2 - 3.0, 0); g.add(leg); const ts = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 0.5, 10), M.solder); ts.position.set(x, top + 0.25, 0); g.add(ts); }
+    // PCB with a solder-mask top and printed silkscreen
+    const mask = new THREE.MeshStandardMaterial({ color: 0x0f3f86, roughness: 0.42, metalness: 0.05 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(width, T, depth), [new THREE.MeshStandardMaterial({ color: 0x7d6c45, roughness: 0.8 }), new THREE.MeshStandardMaterial({ color: 0x7d6c45, roughness: 0.8 }), mask, mask, new THREE.MeshStandardMaterial({ color: 0x7d6c45, roughness: 0.8 }), new THREE.MeshStandardMaterial({ color: 0x7d6c45, roughness: 0.8 })]); pcb.position.set(0, y0 + T / 2, zc); g.add(pcb);
+    const PX = 30, cw = width * PX, ch = depth * PX;
+    const tex = canvasTex(cw, ch, (c) => {
+      c.clearRect(0, 0, cw, ch);
+      c.strokeStyle = 'rgba(245,245,240,0.9)'; c.lineWidth = 4; c.strokeRect(14, 14, cw - 28, ch - 28);
+      for (const [mx, my] of [[3.3, 3.3], [width - 3.3, 3.3], [3.3, depth - 3.3 - 6], [width - 3.3, depth - 3.3 - 6]]) { c.fillStyle = '#c9a44c'; c.beginPath(); c.arc(mx * PX, my * PX, 1.65 * PX, 0, Math.PI * 2); c.fill(); c.fillStyle = '#0a0a0c'; c.beginPath(); c.arc(mx * PX, my * PX, 1.05 * PX, 0, Math.PI * 2); c.fill(); }
+      ['GND', '+5V', 'VRx', 'VRy', 'SW'].forEach((n, i) => { const x = cw / 2 + (i - 2) * 2.54 * PX; silk(c, n, x, ch - 76 - 36, 24); c.fillStyle = '#c9a44c'; c.beginPath(); c.arc(x, ch - 76, 0.95 * PX, 0, Math.PI * 2); c.fill(); c.fillStyle = '#0a0a0c'; c.beginPath(); c.arc(x, ch - 76, 0.5 * PX, 0, Math.PI * 2); c.fill(); });
+      silk(c, 'JOYSTICK', cw / 2, 50, 34, '#f3f3ee', 'center', 700); silk(c, 'X ↔  Y ↕', cw / 2, 92, 22, 'rgba(243,243,238,0.85)', 'center', 600);
+      c.strokeStyle = 'rgba(245,245,240,0.8)'; c.lineWidth = 3; c.beginPath(); c.arc(cw / 2, (depth / 2 - 2.54 + 1.2) * PX + 0 * PX, 9.6 * PX, 0, Math.PI * 2); c.stroke();
+    });
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })); label.rotation.x = -Math.PI / 2; label.position.set(0, top + 0.012, zc); g.add(label);
+    // two potentiometer cans (X and Y) and the switch under the stick: small metal blocks with solder legs
+    const can = new THREE.MeshStandardMaterial({ color: 0xc6c8cc, roughness: 0.3, metalness: 1 });
+    const potX = new THREE.Mesh(new RoundedBoxGeometry(5.6, 4.2, 9, 1, 0.3), can); potX.position.set(-10.6, top + 2.1, zc); g.add(potX);
+    const potY = new THREE.Mesh(new RoundedBoxGeometry(9, 4.2, 5.6, 1, 0.3), can); potY.position.set(0, top + 2.1, zc + 10.6); g.add(potY);
+    for (const [bx, bz] of [[-10.6, zc - 3.2], [-10.6, zc], [-10.6, zc + 3.2], [-3.2, zc + 10.6], [0, zc + 10.6], [3.2, zc + 10.6]]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.2, 8), M.tin); l.position.set(bx, top + 0.6, bz); g.add(l); }
+    // the gimbal housing: black plastic with four metal retaining clips
+    const housing = new THREE.Mesh(new RoundedBoxGeometry(16.8, 7.2, 16.8, 3, 1.0), new THREE.MeshStandardMaterial({ color: 0x151618, roughness: 0.5 })); housing.position.set(0, top + 3.6, zc); g.add(housing);
+    for (const [cx, cz, ry] of [[0, 8.5, 0], [0, -8.5, 0], [8.5, 0, Math.PI / 2], [-8.5, 0, Math.PI / 2]]) { const clip = new THREE.Mesh(new THREE.BoxGeometry(5, 3.4, 0.5), can); clip.position.set(cx, top + 3.4, zc + cz); clip.rotation.y = ry; g.add(clip); }
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(7.0, 7.2, 1.0, 40), new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.6 })); ring.position.set(0, top + 7.5, zc); g.add(ring);
+    const hole = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.2, 32), new THREE.MeshStandardMaterial({ color: 0x050506, roughness: 0.9 })); hole.position.set(0, top + 8.05, zc); g.add(hole);
+    // the stick: a shaft and a rubber thumb cap with a concave top and a ribbed rim
+    this.stick = new THREE.Group(); this.stick.position.set(0, top + 8.0, zc); g.add(this.stick);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.4, 8, 20), new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.45 })); shaft.position.y = 4; this.stick.add(shaft);
+    const prof = [[0, 0], [5.6, 0], [6.3, 0.6], [6.4, 2.4], [6.0, 3.6], [5.0, 4.0], [3.0, 3.5], [0, 3.1]].map(([r, h]) => new THREE.Vector2(r, h));
+    this.cap = new THREE.Mesh(new THREE.LatheGeometry(prof, 48), new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.88 })); this.cap.position.y = 7.2; this.stick.add(this.cap);
+    for (let i = 0; i < 36; i++) { const a = i / 36 * Math.PI * 2, rib = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2.2, 0.5), new THREE.MeshStandardMaterial({ color: 0x232427, roughness: 0.9 })); rib.position.set(Math.cos(a) * 6.3, 8.4, Math.sin(a) * 6.3); rib.rotation.y = -a; this.stick.add(rib); }
     this.capY = this.cap.position.y;
     tagHW(g, 'joystick');
   }
   /** x, y = 0..1 (0.5 = centre); pressed = the stick is pushed down (the switch under it closes) */
   setStick(x, y, pressed = false) {
     this.stick.rotation.z = -(x - 0.5) * 0.9; this.stick.rotation.x = (y - 0.5) * 0.9;
-    this.cap.position.y = this.capY - (pressed ? 0.9 : 0);
+    this.stick.position.y = (this.stick.userData.y0 ??= this.stick.position.y) - (pressed ? 0.9 : 0);
   }
 }
 
@@ -269,15 +322,35 @@ export class JoystickModule {
 export class EncoderModule {
   constructor() {
     const g = this.group = new THREE.Group();
-    const y0 = 2.5, T = 1.6, depth = 22, zc = -(depth / 2 - 2.54);
+    const y0 = 2.5, T = 1.6, depth = 22, width = 26, zc = -(depth / 2 - 2.54), top = y0 + T;
     const strip = new THREE.Mesh(new RoundedBoxGeometry(5 * 2.54, y0, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0 / 2, 0); g.add(strip);
-    for (let i = 0; i < 5; i++) { const x = (i - 2) * 2.54; const leg = new THREE.Mesh(new THREE.BoxGeometry(0.64, y0 + 4.5, 0.64), M.tin); leg.position.set(x, (y0 + 4.5) / 2 - 3.0, 0); g.add(leg); }
-    const pcb = new THREE.Mesh(new THREE.BoxGeometry(26, T, depth), new THREE.MeshStandardMaterial({ color: 0x173f6a, roughness: 0.6 })); pcb.position.set(0, y0 + T / 2, zc); g.add(pcb);
-    const body = new THREE.Mesh(new RoundedBoxGeometry(12, 6.5, 12, 1, 0.4), new THREE.MeshStandardMaterial({ color: 0xb9bcc0, roughness: 0.35, metalness: 0.8 })); body.position.set(0, y0 + T + 3.25, zc); g.add(body);
-    this.knob = new THREE.Group(); this.knob.position.set(0, y0 + T + 6.5, zc); g.add(this.knob);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.1, 7, 24), new THREE.MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.3, metalness: 0.9 })); shaft.position.y = 3.5; this.knob.add(shaft);
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 11, 40), new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5 })); cap.position.y = 12.5; this.knob.add(cap);
-    const mark = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 5), new THREE.MeshStandardMaterial({ color: 0xe8e8e8 })); mark.position.set(0, 18.1, -3); this.knob.add(mark);
+    for (let i = 0; i < 5; i++) { const x = (i - 2) * 2.54; const leg = new THREE.Mesh(new THREE.BoxGeometry(0.64, y0 + 2.8, 0.64), M.tin); leg.position.set(x, (y0 + 2.8) / 2 - 3.0, 0); g.add(leg); const ts = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 0.5, 10), M.solder); ts.position.set(x, top + 0.25, 0); g.add(ts); }
+    const edge = new THREE.MeshStandardMaterial({ color: 0x7d6c45, roughness: 0.8 }), mask = new THREE.MeshStandardMaterial({ color: 0x14407a, roughness: 0.42, metalness: 0.05 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(width, T, depth), [edge, edge, mask, mask, edge, edge]); pcb.position.set(0, y0 + T / 2, zc); g.add(pcb);
+    const PX = 30, cw = width * PX, ch = depth * PX;
+    const tex = canvasTex(cw, ch, (c) => {
+      c.clearRect(0, 0, cw, ch); c.strokeStyle = 'rgba(245,245,240,0.9)'; c.lineWidth = 4; c.strokeRect(14, 14, cw - 28, ch - 28);
+      for (const [mx, my] of [[3.2, 3.2], [width - 3.2, 3.2], [3.2, depth - 3.2 - 5], [width - 3.2, depth - 3.2 - 5]]) { c.fillStyle = '#c9a44c'; c.beginPath(); c.arc(mx * PX, my * PX, 1.5 * PX, 0, Math.PI * 2); c.fill(); c.fillStyle = '#0a0a0c'; c.beginPath(); c.arc(mx * PX, my * PX, 0.95 * PX, 0, Math.PI * 2); c.fill(); }
+      ['CLK', 'DT', 'SW', '+', 'GND'].forEach((n, i) => { const x = cw / 2 + (i - 2) * 2.54 * PX; silk(c, n, x, ch - 76 - 34, 24); c.fillStyle = '#c9a44c'; c.beginPath(); c.arc(x, ch - 76, 0.95 * PX, 0, Math.PI * 2); c.fill(); c.fillStyle = '#0a0a0c'; c.beginPath(); c.arc(x, ch - 76, 0.5 * PX, 0, Math.PI * 2); c.fill(); });
+      silk(c, 'KY-040', cw - 90, 44, 26, '#f3f3ee', 'center', 700);
+      for (let i = 0; i < 3; i++) silk(c, 'R' + (i + 1), 70 + i * 60, ch - 150, 16, 'rgba(243,243,238,0.8)', 'center', 600);
+    });
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })); label.rotation.x = -Math.PI / 2; label.position.set(0, top + 0.012, zc); g.add(label);
+    // three pull-up style SMD resistors (black body, silver ends) and a small capacitor
+    for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.6, 1.2), new THREE.MeshStandardMaterial({ color: 0x151517, roughness: 0.6 })); r.position.set(-8.2 + i * 2.0, top + 0.3, zc + 5.4); g.add(r); for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.62, 1.22), M.tin); e.position.set(-8.2 + i * 2.0 + sx * 0.8, top + 0.31, zc + 5.4); g.add(e); } }
+    // the encoder itself: a steel can with five pins, a threaded bushing with a hex nut, a D-shaft and a fluted knob
+    const steel = new THREE.MeshStandardMaterial({ color: 0xbfc2c6, roughness: 0.32, metalness: 1 });
+    const body = new THREE.Mesh(new RoundedBoxGeometry(12, 6.8, 12, 2, 0.5), steel); body.position.set(0, top + 3.4, zc - 1); g.add(body);
+    const bush = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 6.5, 32), steel); bush.position.set(0, top + 6.8 + 3.0, zc - 1); g.add(bush);
+    for (let i = 0; i < 9; i++) { const th = new THREE.Mesh(new THREE.TorusGeometry(3.7, 0.18, 6, 32), steel); th.rotation.x = Math.PI / 2; th.position.set(0, top + 7.4 + i * 0.65, zc - 1); g.add(th); }
+    const nut = new THREE.Mesh(new THREE.CylinderGeometry(4.9, 4.9, 1.8, 6), new THREE.MeshStandardMaterial({ color: 0xaeb1b5, roughness: 0.38, metalness: 1 })); nut.position.set(0, top + 7.7, zc - 1); g.add(nut);
+    this.knob = new THREE.Group(); this.knob.position.set(0, top + 6.8, zc - 1); g.add(this.knob);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.0, 13, 28), steel); shaft.position.y = 6.5; this.knob.add(shaft);
+    const star = new THREE.Shape(), N = 28; for (let i = 0; i <= N * 2; i++) { const a = i / (N * 2) * Math.PI * 2, r = i % 2 ? 6.5 : 7.2; i ? star.lineTo(Math.cos(a) * r, Math.sin(a) * r) : star.moveTo(r, 0); }
+    const kg = new THREE.ExtrudeGeometry(star, { depth: 10.5, bevelEnabled: true, bevelThickness: 0.5, bevelSize: 0.4, bevelSegments: 3, curveSegments: 4 }); kg.rotateX(-Math.PI / 2);
+    const cap = new THREE.Mesh(kg, new THREE.MeshStandardMaterial({ color: 0x1d1e21, roughness: 0.42, metalness: 0.3 })); cap.position.y = 5.6; this.knob.add(cap);
+    const dish = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 3.4, 0.5, 32), new THREE.MeshStandardMaterial({ color: 0x0e0e10, roughness: 0.5 })); dish.position.y = 16.7; this.knob.add(dish);
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 4.2), new THREE.MeshStandardMaterial({ color: 0xe8e8e4 })); mark.position.set(0, 16.9, -2.3); this.knob.add(mark);
     this.capY = cap.position.y; this.cap = cap;
     tagHW(g, 'encoder');
   }
@@ -291,12 +364,39 @@ export class NeoPixelStrip {
   constructor() {
     const g = this.group = new THREE.Group();
     const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
-    const pcb = new THREE.Mesh(new THREE.BoxGeometry(84, 1.6, 12), new THREE.MeshStandardMaterial({ color: 0xe8e8e2, roughness: 0.5 })); pcb.position.set(14, 0.8, 0); g.add(sub(pcb, 'neo:strip'));
+    // flexible white PCB with printed copper pads, traces, arrows and cut lines
+    const W = 84, D = 12, PX = 20, cx = 14;
+    const fpcMat = new THREE.MeshStandardMaterial({ color: 0xf3f2ec, roughness: 0.55 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(W, 1.2, D), fpcMat); pcb.position.set(cx, 0.6, 0); g.add(sub(pcb, 'neo:strip'));
+    const tex = canvasTex(W * PX, D * PX, (c) => {
+      c.clearRect(0, 0, W * PX, D * PX);
+      for (let i = 0; i < 8; i++) {
+        const x = (3.5 + i * 10 + (i ? 0 : 0)) * PX + 0; const ox = (cx - W / 2 + 0) ;
+      }
+      const X = i => (5 + i * 10) * PX, Y = D / 2 * PX;
+      // copper pads left/right of every pixel and the traces between them
+      c.fillStyle = '#c99a4a';
+      for (let i = 0; i < 8; i++) {
+        for (const dy of [-2.6, -0.9, 0.9, 2.6]) { c.fillRect(X(i) - 4.1 * PX, Y + dy * PX - 0.45 * PX, 1.4 * PX, 0.9 * PX); c.fillRect(X(i) + 2.7 * PX, Y + dy * PX - 0.45 * PX, 1.4 * PX, 0.9 * PX); }
+        if (i < 7) { c.fillRect(X(i) + 4.1 * PX, Y - 2.6 * PX - 0.2 * PX, 1.8 * PX, 0.4 * PX); c.fillRect(X(i) + 4.1 * PX, Y + 2.6 * PX - 0.2 * PX, 1.8 * PX, 0.4 * PX); c.fillRect(X(i) + 4.1 * PX, Y - 0.2 * PX, 1.8 * PX, 0.4 * PX); }
+      }
+      // silkscreen: signal direction arrows, cut lines, power labels
+      c.strokeStyle = 'rgba(40,40,40,0.65)'; c.lineWidth = 2.5; c.setLineDash([6, 5]);
+      for (let i = 0; i < 7; i++) { const cxl = (10 + i * 10) * PX; c.beginPath(); c.moveTo(cxl, 0.6 * PX); c.lineTo(cxl, (D - 0.6) * PX); c.stroke(); }
+      c.setLineDash([]); c.fillStyle = 'rgba(40,40,40,0.8)';
+      for (let i = 0; i < 7; i++) { const ax = (7.6 + i * 10) * PX; c.beginPath(); c.moveTo(ax, 0.9 * PX); c.lineTo(ax + 1.2 * PX, 1.5 * PX); c.lineTo(ax, 2.1 * PX); c.closePath(); c.fill(); }
+      silk(c, 'DIN', 1.7 * PX, Y - 2.6 * PX, 18, 'rgba(40,40,40,0.85)'); silk(c, '5V', 1.7 * PX, Y, 18, 'rgba(40,40,40,0.85)'); silk(c, 'GND', 1.7 * PX, Y + 2.6 * PX, 18, 'rgba(40,40,40,0.85)');
+    });
+    const print = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })); print.rotation.x = -Math.PI / 2; print.position.set(cx, 1.22, 0); g.add(sub(print, 'neo:strip'));
     this.leds = [];
     for (let i = 0; i < 8; i++) {
-      const x = 14 + (i - 3.5) * 10;
-      const body = new THREE.Mesh(new THREE.BoxGeometry(5.4, 1.6, 5.4), new THREE.MeshStandardMaterial({ color: 0xf2f1ea, roughness: 0.4 })); body.position.set(x, 2.4, 0); g.add(sub(body, 'neo:pixel'));
-      const lens = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 0.5, 24), new THREE.MeshStandardMaterial({ color: 0x4a4636, roughness: 0.3, emissive: 0x000000 })); lens.position.set(x, 3.4, 0); g.add(sub(lens, 'neo:pixel'));
+      const x = cx - W / 2 + 5 + i * 10;
+      // 5050 package: white body with chamfered corner, yellowish diffuser dome, four tinned pads; plus the 0.1 uF decoupling capacitor next to it
+      const body = new THREE.Mesh(new RoundedBoxGeometry(5.1, 1.5, 5.1, 2, 0.35), new THREE.MeshStandardMaterial({ color: 0xf6f5ee, roughness: 0.42 })); body.position.set(x, 1.95, 0); g.add(sub(body, 'neo:pixel'));
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(1.95, 2.05, 0.55, 28), new THREE.MeshStandardMaterial({ color: 0xcdbd8c, roughness: 0.25, emissive: 0x000000, transparent: true, opacity: 0.96 })); lens.position.set(x, 2.8, 0); g.add(sub(lens, 'neo:pixel'));
+      for (const sx of [-1, 1]) for (const dz of [-1.6, -0.55, 0.55, 1.6]) { const pad = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.7), M.tin); pad.position.set(x + sx * 2.65, 1.45, dz); g.add(pad); }
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.55, 1.6), new THREE.MeshStandardMaterial({ color: 0xb9955c, roughness: 0.5 })); cap.position.set(x + 4.4, 1.5, 3.6); g.add(sub(cap, 'neo:cap'));
+      for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.57, 1.62), M.tin); e.position.set(x + 4.4 + sx * 0.42, 1.5, 3.6); g.add(e); }
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); halo.scale.set(16, 16, 1); halo.position.set(x, 5, 0); halo.raycast = () => {}; g.add(halo);
       this.leds.push({ lens, halo });
     }
@@ -320,9 +420,9 @@ export class NeoPixelStrip {
   setColors(colors) {
     this.leds.forEach((l, i) => {
       const c = colors && colors[i];
-      if (!c || c[3] <= 0 || (c[0] + c[1] + c[2]) === 0) { l.lens.material.color.set(0x4a4636); l.lens.material.emissive.set(0x000000); l.halo.material.color.set(0x000000); return; }
+      if (!c || c[3] <= 0 || (c[0] + c[1] + c[2]) === 0) { l.lens.material.color.set(0xcdbd8c); l.lens.material.emissive.set(0x000000); l.halo.material.color.set(0x000000); return; }
       const k = 0.35 + 0.65 * c[3];
-      l.lens.material.color.setRGB(Math.min(1, 0.15 + c[0] / 255 * k), Math.min(1, 0.15 + c[1] / 255 * k), Math.min(1, 0.15 + c[2] / 255 * k));
+      l.lens.material.color.setRGB(Math.min(1, 0.25 + c[0] / 255 * k), Math.min(1, 0.25 + c[1] / 255 * k), Math.min(1, 0.25 + c[2] / 255 * k));
       l.lens.material.emissive.setRGB(c[0] / 255 * k * 0.8, c[1] / 255 * k * 0.8, c[2] / 255 * k * 0.8);
       l.halo.material.color.setRGB(c[0] / 255 * k * 0.9, c[1] / 255 * k * 0.9, c[2] / 255 * k * 0.9);
     });
@@ -337,11 +437,12 @@ class I2CDisplayBase {
     this.group.updateMatrixWorld(true);
     return { pos: this.group.localToWorld(new THREE.Vector3(this.pinX[name], this.pinTop, this.pinZ)), dir: new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion())) };
   }
-  header(g, names, pinZ) {
+  /** a 4-pin header standing up at z = pinZ: black plastic strip with gold pins */
+  header(g, names, pinZ, y0 = 4.3) {
     const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
-    this.pinX = {}; this.pinZ = pinZ; this.pinTop = 12;
-    const strip = new THREE.Mesh(new RoundedBoxGeometry(4 * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, 4.3, pinZ); g.add(sub(strip, this.hw + ':header'));
-    names.forEach((n, i) => { const x = (i - 1.5) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, 8.5, pinZ); g.add(sub(p, this.hw + ':' + n)); });
+    this.pinX = {}; this.pinZ = pinZ; this.pinTop = y0 + 8.2;
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(4 * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0, pinZ); g.add(sub(strip, this.hw + ':header'));
+    names.forEach((n, i) => { const x = (i - 1.5) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, y0 + 4.2, pinZ); g.add(sub(p, this.hw + ':' + n)); });
   }
 }
 export class LCD1602Module extends I2CDisplayBase {
@@ -349,24 +450,62 @@ export class LCD1602Module extends I2CDisplayBase {
     super();
     const g = this.group = new THREE.Group(); this.hw = 'lcd';
     const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
-    const pcb = new THREE.Mesh(new THREE.BoxGeometry(80, 1.6, 36), new THREE.MeshStandardMaterial({ color: 0x0f5d3a, roughness: 0.6 })); pcb.position.set(0, 2.6, 0); g.add(sub(pcb, 'lcd:pcb'));
-    const bezel = new THREE.Mesh(new RoundedBoxGeometry(71.2, 7, 24.2, 1, 0.5), new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.5 })); bezel.position.set(0, 7, -2); g.add(sub(bezel, 'lcd:glass'));
-    const tex = this.makeCanvas(512, 128);
-    this.screen = new THREE.Mesh(new THREE.PlaneGeometry(64.5, 14.5), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })); this.screen.rotation.x = -Math.PI / 2; this.screen.position.set(0, 10.55, -2); g.add(sub(this.screen, 'lcd:glass'));
-    const back = new THREE.Mesh(new THREE.BoxGeometry(34, 4, 9), new THREE.MeshStandardMaterial({ color: 0x14306e, roughness: 0.6 })); back.position.set(-14, 0.5, 13); g.add(sub(back, 'lcd:backpack'));
-    this.header(g, ['GND', 'VCC', 'SDA', 'SCL'], 16);
+    const edge = new THREE.MeshStandardMaterial({ color: 0x6b5a2e, roughness: 0.8 }), mask = new THREE.MeshStandardMaterial({ color: 0x0b5a38, roughness: 0.45, metalness: 0.05 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(80, 1.6, 36), [edge, edge, mask, mask, edge, edge]); pcb.position.set(0, 2.6, 0); g.add(sub(pcb, 'lcd:pcb'));
+    // silkscreen on the green PCB: mounting hole pads, the 16-pad row along the back edge, name
+    const PXp = 14, pcw = 80 * PXp, pch = 36 * PXp;
+    const ptex = canvasTex(pcw, pch, (c) => {
+      c.clearRect(0, 0, pcw, pch); c.strokeStyle = 'rgba(245,245,240,0.8)'; c.lineWidth = 3; c.strokeRect(8, 8, pcw - 16, pch - 16);
+      for (const [mx, my] of [[2.5, 2.5], [77.5, 2.5], [2.5, 33.5], [77.5, 33.5]]) { c.fillStyle = '#c9a44c'; c.beginPath(); c.arc(mx * PXp, my * PXp, 1.6 * PXp, 0, Math.PI * 2); c.fill(); c.fillStyle = '#05140c'; c.beginPath(); c.arc(mx * PXp, my * PXp, 1.0 * PXp, 0, Math.PI * 2); c.fill(); }
+      for (let i = 0; i < 16; i++) { const x = (14 + i * 2.54) * PXp; c.fillStyle = '#c9a44c'; c.beginPath(); c.arc(x, 3.2 * PXp, 0.9 * PXp, 0, Math.PI * 2); c.fill(); c.fillStyle = '#05140c'; c.beginPath(); c.arc(x, 3.2 * PXp, 0.5 * PXp, 0, Math.PI * 2); c.fill(); }
+      silk(c, '1', 14 * PXp, 6.2 * PXp, 17, '#f3f3ee'); silk(c, '16', (14 + 15 * 2.54) * PXp, 6.2 * PXp, 17, '#f3f3ee'); silk(c, 'LCD1602', 8 * PXp, 31 * PXp, 26, 'rgba(243,243,238,0.8)', 'left', 600);
+    });
+    const plabel = new THREE.Mesh(new THREE.PlaneGeometry(80, 36), new THREE.MeshStandardMaterial({ map: ptex, transparent: true, roughness: 0.5 })); plabel.rotation.x = -Math.PI / 2; plabel.position.set(0, 3.42, 0); g.add(sub(plabel, 'lcd:pcb'));
+    // metal bezel with the LCD glass: drawn in one texture (silver frame, dark border, backlit glass with a dot-matrix grid)
+    const frame = new THREE.Mesh(new RoundedBoxGeometry(71.2, 6.4, 25.2, 1, 0.5), new THREE.MeshStandardMaterial({ color: 0xaeb2b6, roughness: 0.38, metalness: 0.95 })); frame.position.set(0, 6.6, -2); g.add(sub(frame, 'lcd:glass'));
+    const tex = this.makeCanvas(1000, 354); this.PXb = 1000 / 71.2;
+    this.screen = new THREE.Mesh(new THREE.PlaneGeometry(71.2, 25.2), new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.32, metalness: 0.15 })); this.screen.rotation.x = -Math.PI / 2; this.screen.position.set(0, 9.82, -2); g.add(sub(this.screen, 'lcd:glass'));
+    const gloss = new THREE.Mesh(new THREE.PlaneGeometry(65, 17.5), new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.06, roughness: 0.04, metalness: 0, clearcoat: 1 })); gloss.rotation.x = -Math.PI / 2; gloss.position.set(0, 9.9, -2); g.add(gloss);
+    // the I2C backpack (PCF8574) sticking out in front, below the LCD: blue board, SOIC chip, blue contrast trimmer, solder-jumper pads, 4-pin header
+    const bb = new THREE.Mesh(new THREE.BoxGeometry(42, 1.4, 11), [edge, edge, new THREE.MeshStandardMaterial({ color: 0x103f8f, roughness: 0.45 }), mask, edge, edge]); bb.position.set(-12, 0.9, 18.5); g.add(sub(bb, 'lcd:backpack'));
+    const btex = canvasTex(840, 220, (c) => {
+      c.clearRect(0, 0, 840, 220); c.strokeStyle = 'rgba(245,245,240,0.8)'; c.lineWidth = 3; c.strokeRect(8, 8, 824, 204);
+      silk(c, 'PCF8574', 150, 66, 24, 'rgba(243,243,238,0.9)'); silk(c, 'A0 A1 A2', 360, 40, 18, 'rgba(243,243,238,0.85)');
+      for (let i = 0; i < 3; i++) { c.fillStyle = '#c9a44c'; c.fillRect(335 + i * 28, 70, 16, 24); c.fillRect(335 + i * 28, 104, 16, 24); }
+      silk(c, 'GND VCC SDA SCL', 700, 184, 20, 'rgba(243,243,238,0.9)');
+    });
+    const blabel = new THREE.Mesh(new THREE.PlaneGeometry(42, 11), new THREE.MeshStandardMaterial({ map: btex, transparent: true, roughness: 0.5 })); blabel.rotation.x = -Math.PI / 2; blabel.position.set(-12, 1.62, 18.5); g.add(sub(blabel, 'lcd:backpack'));
+    const chip = new THREE.Mesh(new RoundedBoxGeometry(9.6, 1.5, 4.2, 1, 0.2), new THREE.MeshStandardMaterial({ color: 0x17181a, roughness: 0.5 })); chip.position.set(-20, 2.35, 17.5); g.add(sub(chip, 'lcd:backpack'));
+    for (let i = 0; i < 8; i++) for (const sz of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 0.9), M.tin); l.position.set(-23.6 + i * 1.27, 1.72, 17.5 + sz * 2.4); g.add(l); }
+    const trim = new THREE.Mesh(new RoundedBoxGeometry(5.2, 3.8, 5.2, 1, 0.3), new THREE.MeshStandardMaterial({ color: 0x1a56b8, roughness: 0.4 })); trim.position.set(-3, 3.2, 17.5); g.add(sub(trim, 'lcd:backpack'));
+    const slot = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.3, 20), new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.4, metalness: 0.5 })); slot.position.set(-3, 5.2, 17.5); g.add(sub(slot, 'lcd:backpack'));
+    for (const [rx, rz] of [[-28, 20.6], [-26, 20.6], [-24, 20.6]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 1.0), new THREE.MeshStandardMaterial({ color: 0x151517, roughness: 0.6 })); r.position.set(rx, 1.9, rz); g.add(sub(r, 'lcd:backpack')); }
+    this.header(g, ['GND', 'VCC', 'SDA', 'SCL'], 21.5, 2.9);
     tagHW(g, 'lcd'); for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
     this.setContent({ powered: false });
   }
   /** state = { powered, backlight, lines: [l1, l2] | null } */
   setContent(st) {
-    const c = this.ctx, w = 512, h = 128;
-    c.fillStyle = st.powered && st.backlight ? '#6fa83a' : '#2b3a24'; c.fillRect(0, 0, w, h);
-    c.fillStyle = st.powered && st.backlight ? '#5a9230' : '#26331f';
-    for (let r = 0; r < 2; r++) for (let i = 0; i < 16; i++) c.fillRect(8 + i * 31.5, 14 + r * 58, 28, 46);   // character cells
-    if (st.powered && st.backlight && st.lines) {
-      c.fillStyle = '#10200a'; c.font = '700 44px "Courier New", monospace'; c.textBaseline = 'middle';
-      st.lines.slice(0, 2).forEach((l, r) => { for (let i = 0; i < Math.min(16, l.length); i++) c.fillText(l[i], 8 + i * 31.5 + 4, 14 + r * 58 + 24); });
+    const c = this.ctx, k = this.PXb, lit = st.powered && st.backlight, W = 1000, H = 354;
+    // silver bezel with a brushed gradient
+    const grad = c.createLinearGradient(0, 0, W, H); grad.addColorStop(0, '#c9cdd1'); grad.addColorStop(0.5, '#aeb2b6'); grad.addColorStop(1, '#bfc3c7'); c.fillStyle = grad; c.fillRect(0, 0, W, H);
+    for (const [mx, my] of [[1.8, 1.8], [69.4, 1.8], [1.8, 23.4], [69.4, 23.4]]) { c.fillStyle = '#4d5054'; c.beginPath(); c.arc(mx * k, my * k, 1.0 * k, 0, Math.PI * 2); c.fill(); c.fillStyle = '#2a2c2e'; c.beginPath(); c.arc(mx * k, my * k, 0.55 * k, 0, Math.PI * 2); c.fill(); }
+    // window: black border, then the glass
+    const wx = 3.0 * k, wy = 3.3 * k, ww = 65.2 * k, wh = 18.6 * k;
+    c.fillStyle = '#0c0d0c'; c.fillRect(wx, wy, ww, wh);
+    const gx = wx + 0.9 * k, gy = wy + 0.9 * k, gw = ww - 1.8 * k, gh = wh - 1.8 * k;
+    c.fillStyle = lit ? '#9bd13f' : st.powered ? '#5d6c3c' : '#4b5a33'; c.fillRect(gx, gy, gw, gh);
+    if (lit) { const gl = c.createRadialGradient(gx + gw / 2, gy + gh / 2, 0, gx + gw / 2, gy + gh / 2, gw * 0.6); gl.addColorStop(0, 'rgba(255,255,170,0.25)'); gl.addColorStop(1, 'rgba(255,255,170,0)'); c.fillStyle = gl; c.fillRect(gx, gy, gw, gh); }
+    // 16 x 2 characters of 5 x 8 dots (dot pitch 0.6 mm): faint dots everywhere, dark dots where the text is
+    const dp = 0.6 * k, ds = 0.52 * k, pitchX = gw / 16, rowY = [gy + 1.5 * k, gy + 1.5 * k + 7.2 * k];
+    const lines = st.lines || [];
+    for (let r = 0; r < 2; r++) for (let i = 0; i < 16; i++) {
+      const ch = (lines[r] || '')[i], gl = ch && ch !== ' ' ? glyph5x8(ch) : null, x0 = gx + i * pitchX + (pitchX - 5 * dp) / 2;
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 5; x++) {
+        const on = gl && gl[y][x];
+        c.fillStyle = on ? (lit ? '#16270a' : '#34402a') : lit ? 'rgba(60,100,20,0.16)' : 'rgba(40,50,30,0.14)';
+        c.fillRect(x0 + x * dp, rowY[r] + y * dp, ds, ds);
+      }
     }
     this.tex.needsUpdate = true;
   }
@@ -376,21 +515,40 @@ export class OLED128x64Module extends I2CDisplayBase {
     super();
     const g = this.group = new THREE.Group(); this.hw = 'oled';
     const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
-    const pcb = new THREE.Mesh(new THREE.BoxGeometry(27, 1.6, 27), new THREE.MeshStandardMaterial({ color: 0x1a3d8a, roughness: 0.5 })); pcb.position.set(0, 2.6, 0); g.add(sub(pcb, 'oled:pcb'));
-    const glass = new THREE.Mesh(new RoundedBoxGeometry(25, 1.2, 15.5, 1, 0.3), new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.2, metalness: 0.4 })); glass.position.set(0, 4.0, -3.5); g.add(sub(glass, 'oled:glass'));
-    const tex = this.makeCanvas(256, 128);
-    this.screen = new THREE.Mesh(new THREE.PlaneGeometry(22, 11), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })); this.screen.rotation.x = -Math.PI / 2; this.screen.position.set(0, 4.65, -3.5); g.add(sub(this.screen, 'oled:glass'));
+    const edge = new THREE.MeshStandardMaterial({ color: 0x6b5a2e, roughness: 0.8 });
+    const pcbTop = new THREE.MeshStandardMaterial({ color: 0x0c3a8e, roughness: 0.45 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(27.3, 1.6, 27.8), [edge, edge, pcbTop, pcbTop, edge, edge]); pcb.position.set(0, 2.6, 0); g.add(sub(pcb, 'oled:pcb'));
+    const K = 36, silkTex = canvasTex(Math.round(27.3 * K), Math.round(27.8 * K), (c) => {
+      const W = 27.3 * K, H = 27.8 * K; c.clearRect(0, 0, W, H);
+      c.strokeStyle = 'rgba(245,245,240,0.85)'; c.lineWidth = 3; c.strokeRect(0.9 * K, 0.9 * K, W - 1.8 * K, H - 1.8 * K);
+      for (const [mx, my] of [[2.0, 2.0], [25.3, 2.0], [2.0, 25.8], [25.3, 25.8]]) { c.fillStyle = '#c9a44c'; c.beginPath(); c.arc(mx * K, my * K, 1.0 * K, 0, Math.PI * 2); c.fill(); c.fillStyle = '#05091a'; c.beginPath(); c.arc(mx * K, my * K, 0.55 * K, 0, Math.PI * 2); c.fill(); }
+      ['GND', 'VCC', 'SCL', 'SDA'].forEach((n, i) => silk(c, n, W / 2 + (i - 1.5) * 2.54 * K, H - 1.9 * K, 17));
+    });
+    const silkPlane = new THREE.Mesh(new THREE.PlaneGeometry(27.3, 27.8), new THREE.MeshStandardMaterial({ map: silkTex, transparent: true, roughness: 0.5 })); silkPlane.rotation.x = -Math.PI / 2; silkPlane.position.set(0, 3.43, 0); g.add(sub(silkPlane, 'oled:pcb'));
+    // the glass panel stands above the PCB; the flexible ribbon folds over its far edge
+    const glass = new THREE.Mesh(new RoundedBoxGeometry(25.6, 1.1, 17.6, 1, 0.25), new THREE.MeshStandardMaterial({ color: 0x08090b, roughness: 0.18, metalness: 0.5 })); glass.position.set(0, 3.9, -4.2); g.add(sub(glass, 'oled:glass'));
+    this.PXo = 36;
+    const tex = this.makeCanvas(Math.round(25.6 * this.PXo), Math.round(17.6 * this.PXo));
+    this.screen = new THREE.Mesh(new THREE.PlaneGeometry(25.6, 17.6), new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.75, roughness: 0.4, metalness: 0, envMapIntensity: 0.12 })); this.screen.rotation.x = -Math.PI / 2; this.screen.position.set(0, 4.47, -4.2); g.add(sub(this.screen, 'oled:glass'));
+    const gloss = new THREE.Mesh(new THREE.PlaneGeometry(25.4, 17.3), new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.03, roughness: 0.04, clearcoat: 1, envMapIntensity: 0.3 })); gloss.rotation.x = -Math.PI / 2; gloss.position.set(0, 4.5, -4.2); g.add(gloss);
+    const fpc = new THREE.Mesh(new THREE.BoxGeometry(18, 0.25, 3.2), new THREE.MeshStandardMaterial({ color: 0xb87a2c, roughness: 0.55 })); fpc.position.set(0, 3.3, -13.6); g.add(sub(fpc, 'oled:fpc'));
     this.header(g, ['GND', 'VCC', 'SCL', 'SDA'], 11.5);
     tagHW(g, 'oled'); for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
     this.setContent({ powered: false });
   }
   setContent(st) {
-    const c = this.ctx, w = 256, h = 128;
-    c.fillStyle = '#000'; c.fillRect(0, 0, w, h);
+    const c = this.ctx, k = this.PXo, W = 25.6 * k, H = 17.6 * k;
+    c.fillStyle = '#08090b'; c.fillRect(0, 0, W, H);
+    // active area: 128 x 64 pixels, 21.7 x 11 mm, centred
+    const ax = (25.6 - 21.74) / 2 * k, ay = (17.6 - 11.0) / 2 * k, aw = 21.74 * k, ah = 11.0 * k;
+    c.fillStyle = st.powered ? '#020509' : '#040506'; c.fillRect(ax, ay, aw, ah);
     if (st.powered && st.lines) {
-      c.fillStyle = '#9fe4ff'; c.font = '700 30px "Courier New", monospace'; c.textBaseline = 'middle';
-      st.lines.slice(0, 2).forEach((l, r) => c.fillText(l.slice(0, 16), 6, 34 + r * 52));
-    } else if (st.powered) { c.fillStyle = '#05090c'; c.fillRect(0, 0, w, h); }
+      const px = aw / 128, py = ah / 64;
+      st.lines.slice(0, 2).forEach((l, r) => {
+        const txt = l.slice(0, 16), sc = txt.length <= 10 ? 2 : 1, x0 = 3, y0 = 6 + r * 26;
+        for (let i = 0; i < txt.length; i++) { const gl = glyph5x8(txt[i]); for (let y = 0; y < 7; y++) for (let x = 0; x < 5; x++) if (gl[y][x]) { c.fillStyle = '#aee0ff'; c.fillRect(ax + (x0 + i * 6 * sc + x * sc) * px, ay + (y0 + y * sc) * py, px * sc * 0.88, py * sc * 0.88); } }
+      });
+    }
     this.tex.needsUpdate = true;
   }
 }
