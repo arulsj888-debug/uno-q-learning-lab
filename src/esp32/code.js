@@ -330,3 +330,58 @@ void loop() {
   Serial.print(t);
   Serial.println(" C");
 }`;
+
+// Lesson 16 — analog joystick on two ADC1 pins
+export const E32_JOY = `// Analog joystick: VRx on GPIO34, VRy on GPIO35, switch on GPIO17
+const int xPin = 34;
+const int yPin = 35;
+const int swPin = 17;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(swPin, INPUT_PULLUP);   // the switch connects to GND when the stick is pressed
+}
+
+void loop() {
+  int x = analogRead(xPin);       // 0 ... 4095, about 2048 at the centre
+  int y = analogRead(yPin);
+  bool pressed = (digitalRead(swPin) == LOW);
+  Serial.print("X: ");
+  Serial.print(x);
+  Serial.print("  Y: ");
+  Serial.print(y);
+  Serial.print("  Button: ");
+  Serial.println(pressed ? "pressed" : "released");
+  delay(200);
+}`;
+
+// Lesson 17 — rotary encoder (polling the two quadrature signals)
+export const E32_ENC = `// Rotary encoder (KY-040 style): CLK on GPIO16, DT on GPIO17, SW on GPIO18
+const int clkPin = 16;
+const int dtPin = 17;
+const int swPin = 18;
+int counter = 0;
+int lastClk;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(clkPin, INPUT_PULLUP);
+  pinMode(dtPin, INPUT_PULLUP);
+  pinMode(swPin, INPUT_PULLUP);
+  lastClk = digitalRead(clkPin);
+}
+
+void loop() {
+  int clk = digitalRead(clkPin);
+  if (clk != lastClk && clk == LOW) {   // CLK just fell: one step
+    if (digitalRead(dtPin) != clk) counter++;   // DT is still HIGH: one direction
+    else counter--;                             // DT is already LOW: the other
+    Serial.println(counter);
+  }
+  lastClk = clk;
+  if (digitalRead(swPin) == LOW) {       // knob pressed
+    Serial.println("Knob pressed");
+    delay(300);
+  }
+  delay(2);
+}`;

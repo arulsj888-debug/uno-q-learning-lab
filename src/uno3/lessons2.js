@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -879,5 +879,112 @@ export const U3_LESSONS_2 = [
       { q: 'Which pin of the 4-pin DHT is not used?', a: ['Pin 1', 'Pin 2', 'Pin 3', 'Pin 4'], c: 2, why: 'Pin 3 is not connected.' },
     ],
     sources: [SRC.dhtguide, SRC.dhtlib, SRC.ds],
+  },
+
+  // ================================================================== 19
+  {
+    id: 'u19', num: 19, module: 8, title: 'Analog joystick: two axes and a button', level: 'Beginner', time: '15 min',
+    goal: 'Read the two analog axes of a joystick module with analogRead() and its push switch with INPUT_PULLUP.',
+    hardware: ['Arduino UNO R3', 'Breadboard', 'Analog joystick module (KY-023 style)', '5 × jumper wires'],
+    code: U3_JOY, file: 'Joystick.ino', program: 'u3_joy', fast: true, widgets: ['joy'],
+    circuit: JOY_PARTS, io: { A0: { kind: 'joyax', ax: 'x', item: 'joy1', needs: JOY_IDS }, A1: { kind: 'joyax', ax: 'y', item: 'joy1', needs: JOY_IDS }, D2: { kind: 'joysw', item: 'joy1', needs: JOY_IDS } },
+    explain: {
+      2: '<b>VRx</b> (the left–right axis) goes to an <b>analog input</b>.',
+      3: '<b>VRy</b> (the up–down axis) goes to a second analog input.',
+      4: 'The push switch <b>SW</b>.',
+      6: '<b>setup()</b> runs once.',
+      7: 'Serial output on.',
+      8: 'The switch connects the pin to GND when the stick is pressed, so use <b>INPUT_PULLUP</b>: released = HIGH, pressed = LOW.',
+      11: '<b>loop()</b> repeats forever.',
+      12: '<b>analogRead</b> measures the voltage on VRx: 0 … 1023, about 512 at the centre.',
+      13: 'Same for VRy.',
+      14: 'Pressed = the pin reads LOW.',
+      15: 'Print the label…',
+      16: '…the X value…',
+      17: '…the label for Y…',
+      18: '…the Y value…',
+      19: '…the label for the button…',
+      20: '…and its state.',
+      21: 'Wait 200 ms: five readings per second.',
+    },
+    steps: [
+      { title: 'What is in a joystick module?', view: 'bench', have: [], power: false,
+        body: `<p>Moving the stick turns <b>two 10 kΩ potentiometers</b> at 90° to each other. Each one is a voltage divider: its output (<b>VRx</b> or <b>VRy</b>) is a voltage between 0 V and the supply, and about <b>half the supply</b> when the stick is centred. Pushing the stick straight down closes a switch (<b>SW</b>).</p>
+        <p>Pins on a common KY-023 module: <b>GND, +5V, VRx, VRy, SW</b>. The order differs on some clones: read the printing, and swap VRx and VRy in the code if the axes are reversed.</p>` },
+      { title: 'Power it from the analog reference voltage', view: 'bench', have: [],
+        body: `<p>Connect the module’s supply to <b>5 V: the UNO R3 works at 5 V and its ADC reference is 5 V</b>.</p>
+        <p class="tip">The wiper voltage can go up to the supply voltage, and the ADC can only measure up to its own reference.</p>` },
+      { title: 'Step 1 — put the module on the breadboard', view: 'breadboard', power: false, have: ['joy1'], holes: ['g10 · GND', 'g11 · VCC', 'g12 · VRx', 'g13 · VRy', 'g14 · SW'],
+        body: `<p>Push the five header pins into row <b>g</b>: <b>g10 – g14</b>. The board lies over the breadboard.</p>` },
+      { title: 'Step 2 — five wires', view: 'bench', have: JOY_IDS, pins: ['5V', 'A0', 'A1', 'D2', 'GND2'],
+        body: `<ul><li>Black: <b>GND → j10</b></li><li>Red: <b>5V → j11</b> (+5V)</li><li>Green: <b>A0 → j12</b> (VRx)</li><li>Blue: <b>A1 → j13</b> (VRy)</li><li>Yellow: <b>pin 2 → j14</b> (SW)</li></ul>` },
+      { title: 'The code', view: 'bench', have: JOY_IDS, showCode: true, power: true, body: `<p>Two <code>analogRead()</code> calls and one <code>digitalRead()</code>. Click lines 8, 12 and 14.</p>` },
+      { title: 'Run it and move the stick', view: 'bench', have: JOY_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Move the <b>X</b> and <b>Y sliders</b> (or hold the button) in the panel: the numbers in the Serial Monitor follow, and the 3D stick tilts.</p><p class="sim">Simulated: 0 … 1023, ideal ADC with a little noise.</p>` },
+      { title: 'Summary', view: 'bench', have: JOY_IDS, power: true,
+        body: `<ul><li>Two potentiometers: VRx and VRy = voltages between 0 V and the supply, about half at the centre.</li><li>Read them with <code>analogRead()</code> on ADC pins; read SW with <code>INPUT_PULLUP</code> (pressed = LOW).</li><li>Power the module so the outputs never exceed what the analog pins accept.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'The stick is centred. About what does analogRead() return?', a: ['0', 'About half of the maximum', 'The maximum', 'Random'], c: 1, why: 'Each axis is a voltage divider: half the supply at the centre.' },
+      { q: 'SW is pressed. What does digitalRead() return with INPUT_PULLUP?', a: ['HIGH', 'LOW', '2.5 V', 'Nothing'], c: 1, why: 'The switch connects the pin to GND.' },
+      { q: 'The up and down axes are reversed. What is the easiest fix?', a: ['Replace the board', 'Swap VRx and VRy in the code (or the wires)', 'Use a bigger resistor', 'Nothing can be done'], c: 1, why: 'Some modules label the axes differently.' },
+      { q: 'Why power the module from the right supply?', a: ['To make it brighter', 'The outputs can reach the supply voltage, which must not exceed what the analog pin accepts', 'It needs no power', 'For the switch only'], c: 1, why: 'The wiper voltage goes up to the supply.' },
+    ],
+    sources: [SRC.ky023, SRC.ar, SRC.pinmode],
+  },
+
+  // ================================================================== 20
+  {
+    id: 'u20', num: 20, module: 8, title: 'Rotary encoder: count the clicks', level: 'Intermediate', time: '20 min',
+    goal: 'Read the two quadrature signals of a rotary encoder and count steps up and down.',
+    hardware: ['Arduino UNO R3', 'Breadboard', 'Rotary encoder module (KY-040 style)', '5 × jumper wires'],
+    code: U3_ENC, file: 'Encoder.ino', program: 'u3_enc', fast: true, widgets: ['enc'],
+    circuit: ENC_PARTS, io: { D2: { kind: 'enc', role: 'clk', item: 'enc1', needs: ENC_IDS }, D3: { kind: 'enc', role: 'dt', item: 'enc1', needs: ENC_IDS }, D4: { kind: 'enc', role: 'sw', item: 'enc1', needs: ENC_IDS } },
+    explain: {
+      2: '<b>CLK</b> (channel A) of the encoder.',
+      3: '<b>DT</b> (channel B).',
+      4: '<b>SW</b>: the push switch under the knob.',
+      5: 'The number of steps counted: up for one direction, down for the other.',
+      6: 'The last CLK level we saw, to detect a change.',
+      8: '<b>setup()</b> runs once.',
+      9: 'Serial output on.',
+      10: 'The contacts only connect the pins to GND, so the pins need <b>INPUT_PULLUP</b>.',
+      13: 'Remember the starting level of CLK.',
+      16: '<b>loop()</b> repeats forever.',
+      17: 'Read CLK now.',
+      18: 'CLK changed and is now LOW: the knob just moved one step.',
+      19: 'The other signal DT tells the direction: DT still HIGH → one direction.',
+      20: 'DT already LOW → the other direction.',
+      21: 'Print the new count.',
+      23: 'Remember CLK for the next time.',
+      24: 'Is the knob pressed?',
+      25: 'Say so.',
+      26: 'Wait a moment so one press is not reported many times.',
+      28: 'A tiny pause: the sketch polls the pins many times per second.',
+    },
+    steps: [
+      { title: 'How an encoder works', view: 'bench', have: [], power: false,
+        body: `<p>A rotary encoder has two contacts, <b>CLK</b> and <b>DT</b>, that close to GND in a <b>shifted pattern</b> as you turn the knob. Counting the pattern <b>11 → 01 → 00 → 10 → 11</b> in one direction, or backwards in the other, tells you how far and which way it turned. A push switch <b>SW</b> is built in.</p>
+        <p class="tip">Which direction counts up depends on the module and on how you wired CLK and DT. If it is reversed, swap the two wires or the + and − in the code.</p>` },
+      { title: 'Why INPUT_PULLUP?', view: 'bench', have: [],
+        body: `<p>The contacts only connect the pins to GND; when open, the pins would float. <b>INPUT_PULLUP</b> holds them HIGH. Descriptions of the KY-040 module disagree about which pins have pull-up resistors on the board, so enable the internal pull-up on all three and your sketch works either way.</p>
+        <p class="warn">Connect + to <b>5V</b>.</p>` },
+      { title: 'Step 1 — put the module on the breadboard', view: 'breadboard', power: false, have: ['enc1'], holes: ['g10 · CLK', 'g11 · DT', 'g12 · SW', 'g13 · VCC', 'g14 · GND'],
+        body: `<p>Push the five header pins into row <b>g</b>: <b>g10 – g14</b>: CLK, DT, SW, +, GND.</p>` },
+      { title: 'Step 2 — five wires', view: 'bench', have: ENC_IDS, pins: ['D2', 'D3', 'D4', '5V', 'GND2'],
+        body: `<ul><li>Green: <b>pin 2 → j10</b> (CLK)</li><li>Blue: <b>pin 3 → j11</b> (DT)</li><li>Yellow: <b>pin 4 → j12</b> (SW)</li><li>Red: <b>5V → j13</b> (+)</li><li>Black: <b>GND → j14</b></li></ul>` },
+      { title: 'The code', view: 'bench', have: ENC_IDS, showCode: true, power: true, body: `<p>The sketch polls CLK. When CLK has just fallen, DT tells the direction. Click lines 18, 19 and 20.</p>` },
+      { title: 'Run it and turn the knob', view: 'bench', have: ENC_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ turn</b> and <b>◀ turn</b> in the panel: each press is one click of the knob. The counter in the Serial Monitor goes up or down, and the CLK and DT levels change one after the other. Hold the knob button to see “Knob pressed”.</p><p class="sim">Simulated contacts without bounce. A real encoder bounces: debounce it in software.</p>` },
+      { title: 'Summary', view: 'bench', have: ENC_IDS, power: true,
+        body: `<ul><li>CLK and DT close to GND in a shifted pattern; the order tells the direction.</li><li>Use <code>INPUT_PULLUP</code> on CLK, DT and SW.</li><li>On a CLK falling edge, read DT: HIGH = one direction, LOW = the other.</li><li>Real contacts bounce: debounce in software.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What tells you the direction of rotation?', a: ['The speed', 'Which of CLK and DT changes first', 'The SW pin', 'The supply voltage'], c: 1, why: 'The two signals are shifted: the one that changes first shows the direction.' },
+      { q: 'Why INPUT_PULLUP on CLK, DT and SW?', a: ['To save power', 'The contacts only connect to GND: the pins would float when open', 'To measure voltage', 'It is not needed'], c: 1, why: 'The pull-up holds the pin HIGH when the contact is open.' },
+      { q: 'The count goes down when you turn clockwise. What is an easy fix?', a: ['Replace the encoder', 'Swap CLK and DT (or the + and − in the code)', 'Change the resistor', 'Nothing'], c: 1, why: 'The direction convention depends on the wiring.' },
+      { q: 'A real encoder counts too many steps sometimes. Why?', a: ['It is broken', 'The contacts bounce', 'The ADC is slow', 'The knob is loose'], c: 1, why: 'Mechanical contacts bounce: debounce in software.' },
+    ],
+    sources: [SRC.ky040, SRC.pinmode, SRC.ds],
   },
 ];

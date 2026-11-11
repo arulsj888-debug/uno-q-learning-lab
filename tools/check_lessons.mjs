@@ -44,6 +44,8 @@ function legs(d) {
     case 'servo': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.SIG']: `${d.row}${d.col + 2}` };
     case 'l293d': { const o = {}; for (let i = 1; i <= 8; i++) { o[`${d.id}.p${i}`] = `f${d.col + i - 1}`; o[`${d.id}.p${17 - i}`] = `e${d.col + i - 1}`; } return o; }
     case 'sht31': return { [d.id + '.VIN']: `${d.row}${d.col}`, [d.id + '.GND']: `${d.row}${d.col + 1}`, [d.id + '.SCL']: `${d.row}${d.col + 2}`, [d.id + '.SDA']: `${d.row}${d.col + 3}`, [d.id + '.ADDR']: `${d.row}${d.col + 4}`, [d.id + '.RST']: `${d.row}${d.col + 5}`, [d.id + '.ALRT']: `${d.row}${d.col + 6}` };
+    case 'joystick': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.VRX']: `${d.row}${d.col + 2}`, [d.id + '.VRY']: `${d.row}${d.col + 3}`, [d.id + '.SW']: `${d.row}${d.col + 4}` };
+    case 'encoder': return { [d.id + '.CLK']: `${d.row}${d.col}`, [d.id + '.DT']: `${d.row}${d.col + 1}`, [d.id + '.SW']: `${d.row}${d.col + 2}`, [d.id + '.VCC']: `${d.row}${d.col + 3}`, [d.id + '.GND']: `${d.row}${d.col + 4}` };
     case 'rgbled': return { [d.id + '.R']: `${d.row}${d.col}`, [d.id + '.C']: `${d.row}${d.col + 1}`, [d.id + '.G']: `${d.row}${d.col + 2}`, [d.id + '.B']: `${d.row}${d.col + 3}` };
     case 'dht': return { [d.id + '.VCC']: `${d.row}${d.col}`, [d.id + '.DATA']: `${d.row}${d.col + 1}`, [d.id + '.NC']: `${d.row}${d.col + 2}`, [d.id + '.GND']: `${d.row}${d.col + 3}` };
     case 'tmp36': return { [d.id + '.VS']: `${d.row}${d.col}`, [d.id + '.VO']: `${d.row}${d.col + 1}`, [d.id + '.GND']: `${d.row}${d.col + 2}` };
@@ -112,6 +114,18 @@ for (const L of list) {
     if (io.kind === 'touch') {
       const w = byId[io.item];
       if (!w || w.type !== 'fwire' || w.from !== pin) bad(L, `${pin}: touch pad wire is not connected to the pin`);
+    }
+    if (io.kind === 'joyax') {
+      const id = io.item, leg = io.ax === 'x' ? 'VRX' : 'VRY';
+      if (!N.same(id + '.' + leg, P)) bad(L, `${pin}: joystick ${leg} not on ${pin}`);
+      if (!N.same(id + '.VCC', 'PIN:' + SUP)) bad(L, `${pin}: joystick VCC not on ${SUP}`);
+      if (!N.same(id + '.GND', G)) bad(L, `${pin}: joystick GND not on GND`);
+    }
+    if (io.kind === 'joysw') { if (!N.same(io.item + '.SW', P)) bad(L, `${pin}: joystick SW not on ${pin}`); }
+    if (io.kind === 'enc') {
+      const id = io.item, leg = { clk: 'CLK', dt: 'DT', sw: 'SW' }[io.role];
+      if (!N.same(id + '.' + leg, P)) bad(L, `${pin}: encoder ${leg} not on ${pin}`);
+      if (io.role === 'clk') { if (!N.same(id + '.VCC', 'PIN:' + SUP)) bad(L, `${pin}: encoder + not on ${SUP}`); if (!N.same(id + '.GND', G)) bad(L, `${pin}: encoder GND not on GND`); }
     }
     if (io.kind === 'rgb') {
       const leg = ['R', 'G', 'B'][io.ch], id = io.item;

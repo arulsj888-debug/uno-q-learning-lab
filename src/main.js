@@ -352,7 +352,7 @@ class App {
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
     if (this.acc && this.acc.monitor.group.visible) this.acc.monitor.draw({ ...this.pios, mode: this.board.powered ? this.pios.mode : 'off' });
-    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick(); this.wifiTick(); this.sleepTick(); this.bleTick();
+    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick(); this.wifiTick(); this.sleepTick(); this.bleTick(); this.ctlTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -829,8 +829,10 @@ class App {
     const io = $('#dock-io');
     $('#dock').classList.toggle('with-io', w.length > 0);
     $('#dock').classList.toggle('no-serial', L.id === 'l9');
-    let h = ''; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
+    let h = ''; this.joyPos = { x: 0.5, y: 0.5 }; this.joySw = false; this.encPh = 0; this.encSw = false; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
     if (w.includes('ble')) h += `<div class="io-block pirstat tight"><div><span>Phone app (client)</span><b id="bl-s1">—</b></div><div class="arrow">→</div><div><span>ESP32 (BLE server)</span><b id="bl-s2">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="bl-s3">—</b></div></div><div id="bl-note" class="io-note"></div>`;
+    if (w.includes('joy')) h += `<div class="io-block"><div class="io-title">Joystick <span class="io-note">(simulated)</span></div><div class="throw"><label>X (left → right)</label><input id="jx" type="range" min="0" max="100" value="50"><b id="jx-v"></b></div><div class="throw"><label>Y (up ↔ down)</label><input id="jy" type="range" min="0" max="100" value="50"><b id="jy-v"></b></div><button id="jsw" class="hold">Hold to press the stick</button><div class="io-note">The sliders move the stick; pressing closes the switch under it.</div></div>`;
+    if (w.includes('enc')) h += `<div class="io-block"><div class="io-title">Rotary encoder <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="enc-l" class="small">◀ turn</button><button id="enc-r" class="small">turn ▶</button><button id="enc-sw" class="hold small">Hold to press the knob</button></div><div id="enc-st" class="io-val"></div><div class="io-note">One press = one click of the knob (four steps of the CLK / DT pattern).</div></div>`;
     if (w.includes('sleep')) h += `<div class="io-block pirstat tight"><div><span>ESP32</span><b id="sl-st">—</b></div><div class="arrow">→</div><div><span>Wake-up in</span><b id="sl-t">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="sl-led">—</b></div></div><div class="io-note">In deep sleep only the RTC controller, RTC peripherals and RTC memory stay powered.</div>`;
     if (w.includes('touch')) h += `<div class="io-block"><div class="io-title">Touch pad: the wire on GPIO4 (T0)</div><button id="tch" class="hold">Touch the wire</button><div id="tch-state" class="io-val">Not touched</div><div class="io-note">touchRead() values are illustrative: your board and wire will give different numbers.</div></div>`;
     if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on ${IS_PI ? 'GPIO2 (pin 3)' : 'D4'}</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
@@ -887,6 +889,8 @@ class App {
     }
     if ($('#wf-rssi')) { const upd = () => { $('#wf-val').innerHTML = `<b>${this.wf.rssi} dBm</b>`; }; $('#wf-rssi').oninput = e => { this.wf.rssi = +e.target.value; upd(); }; upd(); }
     if ($('#wf-router')) { $('#wf-router').onclick = () => { if (!this.sim.running) this.wf.router = !this.wf.router; }; $('#wf-pass').onclick = () => { if (!this.sim.running) this.wf.passOk = !this.wf.passOk; }; }
+    if ($('#jx')) { const sl = (id, ax) => { $(id).oninput = e => { this.joyPos[ax] = +e.target.value / 100; this.joyShow(); }; }; sl('#jx', 'x'); sl('#jy', 'y'); const sw = $('#jsw'); const dn = e => { e.preventDefault(); this.joySw = true; this.joyShow(); }, up = () => { this.joySw = false; this.joyShow(); }; sw.addEventListener('pointerdown', dn); sw.addEventListener('pointerup', up); sw.addEventListener('pointerleave', up); this.joyShow(); }
+    if ($('#enc-l')) { $('#enc-l').onclick = () => this.encTurn(-1); $('#enc-r').onclick = () => this.encTurn(1); const sw = $('#enc-sw'); const dn = e => { e.preventDefault(); this.encSw = true; this.encShow(); }, up = () => { this.encSw = false; this.encShow(); }; sw.addEventListener('pointerdown', dn); sw.addEventListener('pointerup', up); sw.addEventListener('pointerleave', up); this.encShow(); }
     if ($('#knob')) { $('#knob').oninput = e => this.setKnob(+e.target.value / 1000); this.setKnob(this.knobValue()); }
     if ($('#lux')) { $('#lux').oninput = e => this.setLux(this.sliderToLux(+e.target.value)); document.querySelectorAll('[data-lux]').forEach(b => b.onclick = () => this.setLux(+b.dataset.lux)); this.setLux(this.lux); }
     if ($('#dist')) { $('#dist').oninput = e => this.setDist(+e.target.value); $('#dist').onchange = e => this.setDist(+e.target.value, true); document.querySelectorAll('[data-dist]').forEach(b => b.onclick = () => this.setDist(+b.dataset.dist, true)); this.setDist(this.distCm); }
@@ -1513,6 +1517,15 @@ class App {
     set('#bl-s3', run ? (lit ? 'ON' : 'OFF') : '—', lit ? 'on' : 'off');
     set('#bl-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !run ? 'The sketch is not running: the phone cannot find the ESP32. Press <b>▶ Run</b>.' : !B.adv ? 'Starting Bluetooth…' : !B.conn ? 'The ESP32 is advertising. Tap <b>Connect</b> on the phone.' : 'Tap <b>Write “1”</b> / <b>Write “0”</b> on the phone.', 'io-note');
   }
+  // ---- lessons 16 / 17 / 19 / 20: joystick and rotary encoder
+  joyShow() { const o = this.bench.get('joy1'); if (o && o.setStick) o.setStick(this.joyPos.x, this.joyPos.y, this.joySw); }
+  encShow() { const o = this.bench.get('enc1'); if (o && o.setPhase) o.setPhase(this.encPh, this.encSw); }
+  encTurn(dir) { let n = 4; const step = () => { this.encPh += dir; this.encShow(); if (--n > 0) setTimeout(step, 25); }; step(); }
+  ctlTick() {
+    const L = this.lesson; if (!L) return; const w = L.widgets || [];
+    if (w.includes('joy')) { const set = (id, t) => { const e = $(id); if (e && e.textContent !== t) e.textContent = t; }; set('#jx-v', Math.round(this.joyPos.x * 100) + ' %'); set('#jy-v', Math.round(this.joyPos.y * 100) + ' %'); }
+    if (w.includes('enc')) { const ph = this.encPh & 3, e = $('#enc-st'); const t = `CLK ${ph === 1 || ph === 2 ? 'LOW' : 'HIGH'} · DT ${ph === 2 || ph === 3 ? 'LOW' : 'HIGH'} · SW ${this.encSw ? 'pressed (LOW)' : 'released (HIGH)'}`; if (e && e.textContent !== t) e.textContent = t; }
+  }
   sleepTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('sleep')) return;
     const run = this.sim.running; if (!run) this.slp = false; const sl = run && this.slp, set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; if (cls !== undefined) e.className = cls; } };
@@ -1883,6 +1896,8 @@ class App {
       noTone: pin => this.onNoTone(pin),
       read: (pin, mode) => {
         const io = this.ioFor(pin);
+        if (io && io.kind === 'enc' && this.wired(io)) { const ph = (this.encPh || 0) & 3; return io.role === 'clk' ? (ph === 1 || ph === 2 ? 0 : 1) : io.role === 'dt' ? (ph === 2 || ph === 3 ? 0 : 1) : (this.encSw ? 0 : 1); }
+        if (io && io.kind === 'joysw' && this.wired(io)) return this.joySw ? 0 : 1;
         if (io && io.kind === 'pir' && this.wired(io)) return this.pir.out;
         if (io && io.kind === 'button' && this.wired(io) && this.buttonDown) return 0;
         if (mode === 'INPUT_PULLUP') return 1;
@@ -1890,6 +1905,7 @@ class App {
       },
       analog: pin => {
         const io = this.ioFor(pin);
+        if (io && io.kind === 'joyax' && this.wired(io)) return (this.joyPos ? this.joyPos[io.ax] : 0.5) * LOGIC_V;
         if (io && io.kind === 'pot' && this.wired(io)) return this.knobValue() * LOGIC_V;
         if (io && io.kind === 'ldr' && this.wired(io)) return this.ldrVolts();
         if (io && io.kind === 'tmp36' && this.wired(io)) return this.tmp36Volts();

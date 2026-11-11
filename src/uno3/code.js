@@ -383,3 +383,58 @@ void loop() {
   Serial.print(t);
   Serial.println(" C");
 }`;
+
+// Lesson 19 — analog joystick
+export const U3_JOY = `// Analog joystick: VRx on A0, VRy on A1, switch on pin 2
+const int xPin = A0;
+const int yPin = A1;
+const int swPin = 2;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(swPin, INPUT_PULLUP);   // the switch connects to GND when the stick is pressed
+}
+
+void loop() {
+  int x = analogRead(xPin);       // 0 ... 1023, about 512 at the centre
+  int y = analogRead(yPin);
+  bool pressed = (digitalRead(swPin) == LOW);
+  Serial.print("X: ");
+  Serial.print(x);
+  Serial.print("  Y: ");
+  Serial.print(y);
+  Serial.print("  Button: ");
+  Serial.println(pressed ? "pressed" : "released");
+  delay(200);
+}`;
+
+// Lesson 20 — rotary encoder (polling the two quadrature signals)
+export const U3_ENC = `// Rotary encoder (KY-040 style): CLK on pin 2, DT on pin 3, SW on pin 4
+const int clkPin = 2;
+const int dtPin = 3;
+const int swPin = 4;
+int counter = 0;
+int lastClk;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(clkPin, INPUT_PULLUP);
+  pinMode(dtPin, INPUT_PULLUP);
+  pinMode(swPin, INPUT_PULLUP);
+  lastClk = digitalRead(clkPin);
+}
+
+void loop() {
+  int clk = digitalRead(clkPin);
+  if (clk != lastClk && clk == LOW) {   // CLK just fell: one step
+    if (digitalRead(dtPin) != clk) counter++;   // DT is still HIGH: one direction
+    else counter--;                             // DT is already LOW: the other
+    Serial.println(counter);
+  }
+  lastClk = clk;
+  if (digitalRead(swPin) == LOW) {       // knob pressed
+    Serial.println("Knob pressed");
+    delay(300);
+  }
+  delay(2);
+}`;

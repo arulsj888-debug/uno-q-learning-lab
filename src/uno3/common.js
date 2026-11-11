@@ -24,6 +24,8 @@ export const SRC = {
   sht31lib: { t: 'Adafruit SHT31 Arduino library (header, source and example)', u: 'https://github.com/adafruit/Adafruit_SHT31' },
   dhtguide: { t: 'Adafruit: DHT11, DHT22 and AM2302 Sensors (specifications, wiring)', u: 'https://learn.adafruit.com/dht' },
   dhtlib: { t: 'Adafruit DHT sensor library (DHTtester example)', u: 'https://github.com/adafruit/DHT-sensor-library' },
+  ky023: { t: 'KY-023 dual-axis joystick module (espboards.dev)', u: 'https://www.espboards.dev/sensors/ky-023' },
+  ky040: { t: 'KY-040 rotary encoder (Joy-IT sensor kit)', u: 'https://sensorkit.joy-it.net/en/sensors/ky-040' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -156,3 +158,24 @@ export const DHT_PARTS = [
   { id: 'w63', type: 'wire', from: 'b11', to: 'b16', color: 'orange', lift: 12 },
 ];
 export const DHT_IDS = DHT_PARTS.map(d => d.id);
+
+// ---- Lesson 19: joystick module (X on A0, Y on A1, switch on pin 2), powered from 5 V
+export const JOY_PARTS = [
+  { id: 'joy1', type: 'joystick', row: 'g', col: 10 },
+  { id: 'w70', type: 'wire', from: 'GND2', to: 'j10', color: 'black', lift: 16 },
+  { id: 'w71', type: 'wire', from: '5V', to: 'j11', color: 'red', lift: 20 },
+  { id: 'w72', type: 'wire', from: 'A0', to: 'j12', color: 'green', lift: 24 },
+  { id: 'w73', type: 'wire', from: 'A1', to: 'j13', color: 'blue', lift: 28 },
+  { id: 'w74', type: 'wire', from: 'D2', to: 'j14', color: 'yellow', lift: 32 },
+];
+export const JOY_IDS = JOY_PARTS.map(d => d.id);
+// ---- Lesson 20: rotary encoder (CLK pin 2, DT pin 3, SW pin 4)
+export const ENC_PARTS = [
+  { id: 'enc1', type: 'encoder', row: 'g', col: 10 },
+  { id: 'w80', type: 'wire', from: 'D2', to: 'j10', color: 'green', lift: 16 },
+  { id: 'w81', type: 'wire', from: 'D3', to: 'j11', color: 'blue', lift: 20 },
+  { id: 'w82', type: 'wire', from: 'D4', to: 'j12', color: 'yellow', lift: 24 },
+  { id: 'w83', type: 'wire', from: '5V', to: 'j13', color: 'red', lift: 28 },
+  { id: 'w84', type: 'wire', from: 'GND2', to: 'j14', color: 'black', lift: 32 },
+];
+export const ENC_IDS = ENC_PARTS.map(d => d.id);

@@ -612,6 +612,94 @@ export const PROGRAMS = {
     }
   },
 
+  async u3_joy(rt) {
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.serialBegin(9600);
+    await rt.at(8); rt.pinMode('D2', 'INPUT_PULLUP');
+    for (;;) {
+      await rt.at(11);
+      await rt.at(12); const x = rt.analogRead('A0');
+      await rt.at(13); const y = rt.analogRead('A1');
+      await rt.at(14); const pressed = rt.digitalRead('D2') === 0;
+      await rt.at(15); rt.print('X: ');
+      await rt.at(16); rt.print(x);
+      await rt.at(17); rt.print('  Y: ');
+      await rt.at(18); rt.print(y);
+      await rt.at(19); rt.print('  Button: ');
+      await rt.at(20); rt.println(pressed ? 'pressed' : 'released');
+      await rt.at(21); await rt.delay(200);
+    }
+  },
+
+  async u3_enc(rt) {
+    let counter = 0, last = 1;
+    await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5); await rt.at(6);
+    await rt.at(8);
+    await rt.at(9); rt.serialBegin(9600);
+    await rt.at(10); rt.pinMode('D2', 'INPUT_PULLUP'); await rt.at(11); rt.pinMode('D3', 'INPUT_PULLUP'); await rt.at(12); rt.pinMode('D4', 'INPUT_PULLUP');
+    await rt.at(13); last = rt.digitalRead('D2');
+    for (;;) {
+      await rt.at(16);
+      await rt.at(17); const clk = rt.digitalRead('D2');
+      await rt.at(18);
+      if (clk !== last && clk === 0) {
+        await rt.at(19);
+        if (rt.digitalRead('D3') !== clk) counter++;
+        else { await rt.at(20); counter--; }
+        await rt.at(21); rt.println(counter);
+      }
+      await rt.at(23); last = clk;
+      await rt.at(24);
+      if (rt.digitalRead('D4') === 0) { await rt.at(25); rt.println('Knob pressed'); await rt.at(26); await rt.delay(300); }
+      await rt.at(28); await rt.delay(2);
+    }
+  },
+
+  async e_joy(rt) {
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.serialBegin(115200);
+    await rt.at(8); rt.pinMode('G17', 'INPUT_PULLUP');
+    for (;;) {
+      await rt.at(11);
+      await rt.at(12); const x = rt.analogRead('G34');
+      await rt.at(13); const y = rt.analogRead('G35');
+      await rt.at(14); const pressed = rt.digitalRead('G17') === 0;
+      await rt.at(15); rt.print('X: ');
+      await rt.at(16); rt.print(x);
+      await rt.at(17); rt.print('  Y: ');
+      await rt.at(18); rt.print(y);
+      await rt.at(19); rt.print('  Button: ');
+      await rt.at(20); rt.println(pressed ? 'pressed' : 'released');
+      await rt.at(21); await rt.delay(200);
+    }
+  },
+
+  async e_enc(rt) {
+    let counter = 0, last = 1;
+    await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5); await rt.at(6);
+    await rt.at(8);
+    await rt.at(9); rt.serialBegin(115200);
+    await rt.at(10); rt.pinMode('G16', 'INPUT_PULLUP'); await rt.at(11); rt.pinMode('G17', 'INPUT_PULLUP'); await rt.at(12); rt.pinMode('G18', 'INPUT_PULLUP');
+    await rt.at(13); last = rt.digitalRead('G16');
+    for (;;) {
+      await rt.at(16);
+      await rt.at(17); const clk = rt.digitalRead('G16');
+      await rt.at(18);
+      if (clk !== last && clk === 0) {
+        await rt.at(19);
+        if (rt.digitalRead('G17') !== clk) counter++;
+        else { await rt.at(20); counter--; }
+        await rt.at(21); rt.println(counter);
+      }
+      await rt.at(23); last = clk;
+      await rt.at(24);
+      if (rt.digitalRead('G18') === 0) { await rt.at(25); rt.println('Knob pressed'); await rt.at(26); await rt.delay(300); }
+      await rt.at(28); await rt.delay(2);
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);
