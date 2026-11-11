@@ -269,3 +269,64 @@ void setup() {
 void loop() {
   delay(2000);
 }`;
+
+// Lesson 14 — RGB LED (common cathode) with LEDC PWM (Arduino-ESP32 core 3.x: ledcAttach, ledcWrite)
+export const E32_RGB = `// RGB LED (common cathode): red on GPIO16, green on GPIO17, blue on GPIO18
+const int redPin = 16;
+const int greenPin = 17;
+const int bluePin = 18;
+
+void setColor(int r, int g, int b) {
+  ledcWrite(redPin, r);         // 0 ... 255 (8-bit)
+  ledcWrite(greenPin, g);
+  ledcWrite(bluePin, b);
+}
+
+void setup() {
+  ledcAttach(redPin, 5000, 8);      // pin, 5 kHz, 8-bit resolution
+  ledcAttach(greenPin, 5000, 8);
+  ledcAttach(bluePin, 5000, 8);
+}
+
+void loop() {
+  setColor(255, 0, 0);          // red
+  delay(1000);
+  setColor(0, 255, 0);          // green
+  delay(1000);
+  setColor(0, 0, 255);          // blue
+  delay(1000);
+  setColor(255, 255, 0);        // red + green = yellow
+  delay(1000);
+  setColor(255, 255, 255);      // all three = white
+  delay(1000);
+  setColor(0, 0, 0);            // off
+  delay(1000);
+}`;
+
+// Lesson 15 — DHT22 (shortened from the DHTtester example of the Adafruit DHT sensor library)
+export const E32_DHT = `#include "DHT.h"
+
+#define DHTPIN 4        // the GPIO the DATA wire is on
+#define DHTTYPE DHT22   // DHT 22 (AM2302)
+
+DHT dht(DHTPIN, DHTTYPE);
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+}
+
+void loop() {
+  delay(2000);                       // DHT22: at most one reading every 2 seconds
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();   // Celsius
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+  Serial.print("Humidity: ");
+  Serial.print(h);
+  Serial.print(" %  Temperature: ");
+  Serial.print(t);
+  Serial.println(" C");
+}`;

@@ -577,6 +577,41 @@ export const PROGRAMS = {
     }
   },
 
+  async e_rgb(rt) {
+    const setColor = async (r, g, b) => { await rt.at(6); await rt.at(7); rt.ledcWrite('G16', r); await rt.at(8); rt.ledcWrite('G17', g); await rt.at(9); rt.ledcWrite('G18', b); await rt.at(10); };
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(12);
+    await rt.at(13); rt.ledcAttach('G16', 5000, 8); await rt.at(14); rt.ledcAttach('G17', 5000, 8); await rt.at(15); rt.ledcAttach('G18', 5000, 8);
+    for (;;) {
+      await rt.at(18);
+      await rt.at(19); await setColor(255, 0, 0); await rt.at(20); await rt.delay(1000);
+      await rt.at(21); await setColor(0, 255, 0); await rt.at(22); await rt.delay(1000);
+      await rt.at(23); await setColor(0, 0, 255); await rt.at(24); await rt.delay(1000);
+      await rt.at(25); await setColor(255, 255, 0); await rt.at(26); await rt.delay(1000);
+      await rt.at(27); await setColor(255, 255, 255); await rt.at(28); await rt.delay(1000);
+      await rt.at(29); await setColor(0, 0, 0); await rt.at(30); await rt.delay(1000);
+    }
+  },
+
+  async e_dht(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4); await rt.at(6);
+    await rt.at(8); await rt.at(9); rt.serialBegin(115200);
+    await rt.at(10);
+    for (;;) {
+      await rt.at(13);
+      await rt.at(14); await rt.delay(2000);
+      await rt.at(15); const r = rt.dhtRead();
+      await rt.at(16);
+      await rt.at(17);
+      if (!r.ok) { await rt.at(18); rt.println('Failed to read from DHT sensor!'); await rt.at(19); continue; }
+      await rt.at(21); rt.print('Humidity: ');
+      await rt.at(22); rt.print(r.h, 2);
+      await rt.at(23); rt.print(' %  Temperature: ');
+      await rt.at(24); rt.print(r.t, 2);
+      await rt.at(25); rt.println(' C');
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -18,6 +18,8 @@ const SRC = {
   rntsleep: { t: 'Random Nerd Tutorials: ESP32 Deep Sleep and wake-up sources', u: 'https://randomnerdtutorials.com/esp32-deep-sleep-arduino-ide-wake-up-sources/' },
   sleepex: { t: 'Arduino-ESP32 library: DeepSleep TimerWakeUp example', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/ESP32/examples/DeepSleep/TimerWakeUp/TimerWakeUp.ino' },
   blewrite: { t: 'Arduino-ESP32 BLE library: Write example (BLEDevice, BLEServer, characteristic callbacks)', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/BLE/examples/Write/Write.ino' },
+  dhtguide: { t: 'Adafruit: DHT11, DHT22 and AM2302 Sensors (specifications, wiring)', u: 'https://learn.adafruit.com/dht' },
+  dhtlib: { t: 'Adafruit DHT sensor library (DHTtester example)', u: 'https://github.com/adafruit/DHT-sensor-library' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -42,10 +44,31 @@ const POT_PARTS = [
   { id: 'w7', type: 'fwire', from: 'GND2', to: 'a28', color: 'black', lift: 22 },
 ];
 const POT_IDS = POT_PARTS.map(d => d.id);
+// RGB LED (common cathode) on GPIO16 / 17 / 18 and DHT22 on GPIO4 with a 10 kOhm pull-up (female-male wires from the board pins)
+const RGB_PARTS = [
+  { id: 'rgb1', type: 'rgbled', row: 'e', col: 10 },
+  { id: 'r1', type: 'resistor', a: 'a10', b: 'a16' },
+  { id: 'r2', type: 'resistor', a: 'a12', b: 'a17' },
+  { id: 'r3', type: 'resistor', a: 'a13', b: 'a18' },
+  { id: 'w50', type: 'fwire', from: 'G16', to: 'b16', color: 'red', lift: 22 },
+  { id: 'w51', type: 'fwire', from: 'G17', to: 'b17', color: 'green', lift: 26 },
+  { id: 'w52', type: 'fwire', from: 'G18', to: 'b18', color: 'blue', lift: 30 },
+  { id: 'w53', type: 'fwire', from: 'GND2', to: 'a11', color: 'black', lift: 18 },
+];
+const RGB_IDS = RGB_PARTS.map(d => d.id);
+const DHT_PARTS = [
+  { id: 'dht1', type: 'dht', model: 'dht22', row: 'e', col: 10 },
+  { id: 'w60', type: 'fwire', from: '3V3', to: 'a10', color: 'red', lift: 16 },
+  { id: 'w61', type: 'fwire', from: 'G4', to: 'a11', color: 'yellow', lift: 24 },
+  { id: 'w62', type: 'fwire', from: 'GND2', to: 'a13', color: 'black', lift: 20 },
+  { id: 'r60', type: 'resistor', a: 'c10', b: 'c16' },
+  { id: 'w63', type: 'wire', from: 'b11', to: 'b16', color: 'orange', lift: 12 },
+];
+const DHT_IDS = DHT_PARTS.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
-export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth' };
+export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth', 7: 'Module 7 — Light and climate' };
 export const E32_COMING = [];
 
 export const E32_LESSONS = [
@@ -693,5 +716,114 @@ export const E32_LESSONS = [
       { q: 'Why is this sketch not safe for a door lock?', a: ['BLE is too slow', 'Anyone nearby can connect and write: there is no protection', 'The LED is too weak', 'It uses GPIO16'], c: 1, why: 'The characteristic has no pairing or encryption.' },
     ],
     sources: [SRC.blewrite, SRC.mod, SRC.rnt],
+  },
+
+  // ================================================================== 14
+  {
+    id: 'e14', num: 14, module: 7, title: 'RGB LED: mix any colour with LEDC PWM', level: 'Beginner', time: '20 min',
+    goal: 'Drive the three dice of an RGB LED with three LEDC PWM pins and see why green and blue are dim on 3.3 V.',
+    hardware: ['ESP32 DevKit V1', 'Breadboard', 'RGB LED (common cathode, 4 legs)', '3 × 220 Ω resistors', '4 × female–male jumper wires'],
+    code: E32_RGB, file: 'RGB_LED.ino', program: 'e_rgb', widgets: [],
+    circuit: RGB_PARTS, io: { G16: { kind: 'rgb', ch: 0, item: 'rgb1', needs: RGB_IDS }, G17: { kind: 'rgb', ch: 1, item: 'rgb1', needs: RGB_IDS }, G18: { kind: 'rgb', ch: 2, item: 'rgb1', needs: RGB_IDS } },
+    explain: {
+      2: 'GPIO16 drives the <b>red</b> die.',
+      3: 'GPIO17 drives the <b>green</b> die.',
+      4: 'GPIO18 drives the <b>blue</b> die.',
+      6: 'Our own function: three brightness values set the colour.',
+      7: '<b>ledcWrite(pin, 0 … 255)</b>: the PWM duty cycle with 8-bit resolution (Arduino-ESP32 core 3.x).',
+      8: 'Green…',
+      9: '…and blue.',
+      12: '<b>setup()</b> runs once.',
+      13: '<b>ledcAttach(pin, 5000, 8)</b>: PWM at 5 kHz with 8-bit resolution on this pin. The ESP32 can use almost any output pin for PWM.',
+      14: 'Green pin.',
+      15: 'Blue pin.',
+      18: '<b>loop()</b> repeats forever.',
+      19: 'Red only.',
+      21: 'Green only.',
+      23: 'Blue only.',
+      25: 'Red + green = <b>yellow</b>.',
+      27: 'All three = <b>white</b>.',
+      29: 'All off.',
+    },
+    steps: [
+      { title: 'One LED, three colours', view: 'bench', have: [], power: false,
+        body: `<p>An <b>RGB LED</b> has a red, a green and a blue LED in one housing, with <b>four legs</b>: red, the <b>common</b> leg (the longest), green, blue. In a <b>common-cathode</b> LED the common leg goes to <b>GND</b>. Your eye mixes the light: red + green = yellow, green + blue = cyan, red + blue = magenta, all three = white.</p>` },
+      { title: 'Each colour needs a resistor — and 3.3 V is little', view: 'breadboard', have: ['rgb1'], power: false, holes: ['e10 · red', 'e11 · common', 'e12 · green', 'e13 · blue'],
+        body: `<p>Push the LED into <b>e10 – e13</b>. Every colour needs its own series resistor (220 Ω here).</p>
+        <p class="warn">The ESP32 pin gives <b>3.3 V</b>. Red needs about 2.0 V, but green and blue need about <b>3.0 V</b> or more (typical values: check your datasheet). With 220 Ω the green and blue dice get only about 1 mA or less, so they look <b>much dimmer</b> than red. For a bright mix use smaller resistors for green and blue, or power the LED from a supply with a transistor.</p>` },
+      { title: 'Step 1 — three resistors', view: 'breadboard', have: ['rgb1', 'r1', 'r2', 'r3'], power: false, holes: ['a10 → a16', 'a12 → a17', 'a13 → a18'],
+        body: `<p>Resistors from each colour leg to a free column: <b>a10 → a16</b> (red), <b>a12 → a17</b> (green), <b>a13 → a18</b> (blue).</p>` },
+      { title: 'Step 2 — wires to GPIO16, 17, 18 and GND', view: 'bench', have: RGB_IDS, pins: ['G16', 'G17', 'G18', 'GND2'],
+        body: `<ul><li>Red: <b>RX2</b> (GPIO16) → <b>b16</b></li><li>Green: <b>TX2</b> (GPIO17) → <b>b17</b></li><li>Blue: <b>D18</b> (GPIO18) → <b>b18</b></li><li>Black: <b>GND</b> (right row) → <b>a11</b> (the common leg)</li></ul>` },
+      { title: 'The code', view: 'bench', have: RGB_IDS, showCode: true, power: true,
+        body: `<p><code>ledcAttach(pin, frequency, resolution)</code> sets up PWM; <code>ledcWrite(pin, duty)</code> sets the brightness (core 3.x). Click lines 7, 13 and 25.</p>` },
+      { title: 'Run it', view: 'bench', have: RGB_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The LED shows red, green, blue, yellow, white and off, one second each. Notice how dim the blue and the green are next to the red.</p>
+        <p class="sim">Simulated brightness from the duty cycle and the typical forward voltages above (red 2.0 V, green 3.0 V, blue 3.1 V).</p>` },
+      { title: 'Summary', view: 'bench', have: RGB_IDS, power: true,
+        body: `<ul><li>RGB LED = three LEDs with one common leg (cathode to GND).</li><li>One resistor per colour; <code>ledcAttach</code> + <code>ledcWrite</code> on any output pin.</li><li>On 3.3 V the green and blue dice get far less current than red: choose the resistors accordingly.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Which function sets the brightness of a pin in Arduino-ESP32 core 3.x?', a: ['analogWrite only', 'ledcWrite(pin, duty)', 'digitalWrite(pin, 128)', 'pinMode(pin, PWM)'], c: 1, why: 'ledcAttach() sets up the pin, ledcWrite() sets the duty.' },
+      { q: 'Why are green and blue dim on 3.3 V with 220 Ω?', a: ['They are broken', 'Their forward voltage (about 3 V) is close to 3.3 V, so little current flows', 'The ESP32 has no PWM', 'The resistor is too small'], c: 1, why: 'I = (3.3 − Vf) ÷ R is only about 1 mA or less for the green and blue dice.' },
+      { q: 'You set red = 255, green = 0, blue = 255. The colour is…', a: ['Cyan', 'Yellow', 'Magenta', 'White'], c: 2, why: 'Red + blue = magenta.' },
+      { q: 'How many resistors?', a: ['One', 'Two', 'Three, one per colour', 'None'], c: 2, why: 'Each colour is a separate LED.' },
+    ],
+    sources: [SRC.ledc, SRC.ds],
+  },
+  // ================================================================== 15
+  {
+    id: 'e15', num: 15, module: 7, title: 'DHT22: temperature and humidity on one wire', level: 'Intermediate', time: '20 min',
+    goal: 'Wire a DHT22 from 3.3 V with its pull-up resistor and read temperature and humidity with the Adafruit DHT library.',
+    hardware: ['ESP32 DevKit V1', 'Breadboard', 'DHT22 sensor (4 pins)', '10 kΩ resistor', '3 × female–male jumper wires', '1 × jumper wire'],
+    code: E32_DHT, file: 'DHT_read.ino', program: 'e_dht', fast: true, widgets: ['pisens'], sdaWire: 'w61', dht: true,
+    circuit: DHT_PARTS, io: { G4: { kind: 'dht', item: 'dht1', needs: DHT_IDS } },
+    explain: {
+      1: 'The library by Adafruit: install <b>“DHT sensor library”</b> (and <b>Adafruit Unified Sensor</b>) from the Library Manager.',
+      3: 'The DATA wire is on <b>GPIO4</b>.',
+      4: 'The sensor type: DHT22 (white).',
+      6: 'Create the sensor object.',
+      8: '<b>setup()</b> runs once.',
+      9: 'Serial output on (115200).',
+      10: 'Start the sensor library.',
+      13: '<b>loop()</b> repeats forever.',
+      14: 'The DHT22 is slow: at most one reading every 2 seconds.',
+      15: 'Relative humidity in %.',
+      16: 'Temperature in °C.',
+      17: 'A failed read gives <b>NaN</b>.',
+      18: 'Tell the user.',
+      19: 'Try again later.',
+      21: 'Print the label…',
+      22: '…the humidity…',
+      24: '…the temperature…',
+      25: '…and the unit.',
+    },
+    steps: [
+      { title: 'The DHT22', view: 'breadboard', have: ['dht1'], power: false, holes: ['e10 · VCC', 'e11 · DATA', 'e12 · not connected', 'e13 · GND'],
+        body: `<p>The <b>DHT22</b> (also called AM2302) sends temperature and humidity on <b>one data wire</b>. Four pins (grille facing you, from the left): <b>1 VCC, 2 DATA, 3 not connected, 4 GND</b>.</p>
+        <ul><li>Power: <b>3 V to 5 V</b>.</li><li>Humidity <b>0 – 100 %</b> (2 – 5 % accuracy), temperature <b>−40 – 80 °C</b> (±0.5 °C), at most <b>one reading every 2 seconds</b> (Adafruit).</li></ul>
+        <p class="tip">A 3-pin <b>module</b> has the pull-up resistor on its board, but its pin order differs between makers: read the printing.</p>` },
+      { title: 'The pull-up resistor and the 3.3 V rule', view: 'bench', have: [],
+        body: `<p>The sensor can pull DATA low but not high: a <b>pull-up resistor</b> (10 kΩ in the Adafruit example) joins DATA and VCC.</p>
+        <p class="warn">The pull-up goes to the <b>same supply as VCC</b>. Power the sensor from <b>3V3</b>, never from VIN: from 5 V the DATA line is pulled up to <b>5 V</b>, and an ESP32 pin is <b>3.3 V only</b>.</p>` },
+      { title: 'Step 1 — the sensor and the resistor', view: 'breadboard', have: ['dht1', 'r60', 'w63'], power: false, holes: ['c10 · resistor', 'c16 · resistor'],
+        body: `<p>Sensor in <b>e10 – e13</b>. The <b>10 kΩ resistor</b> goes from <b>c10</b> (VCC column) to <b>c16</b>; a jumper from <b>b11</b> (DATA column) to <b>b16</b> completes the pull-up.</p>` },
+      { title: 'Step 2 — power, data and ground', view: 'bench', have: DHT_IDS, pins: ['3V3', 'G4', 'GND2'],
+        body: `<ul><li>Red: <b>3V3</b> → <b>a10</b> (VCC)</li><li>Yellow: <b>D4</b> (GPIO4) → <b>a11</b> (DATA)</li><li>Black: <b>GND</b> → <b>a13</b></li></ul>` },
+      { title: 'The code', view: 'bench', have: DHT_IDS, showCode: true, power: true, body: `<p>Shortened from Adafruit’s <b>DHTtester</b> example. Click lines 14, 17 and 22.</p>` },
+      { title: 'Run it', view: 'bench', have: DHT_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Every 2 seconds the Serial Monitor prints humidity and temperature. <b>Move the sliders</b> and watch the numbers follow.</p><p class="sim">Simulated values within the DHT22 specification (−40 – 80 °C, 0 – 100 %RH).</p>` },
+      { title: 'What if the data wire is loose?', view: 'bench', have: DHT_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Stop, press <b>“Unplug the DATA wire”</b> and run again: no reading arrives, the library returns NaN and the Serial Monitor shows:</p><pre class="tree">Failed to read from DHT sensor!</pre><p>Check the three wires and the <b>pull-up resistor</b>.</p>` },
+      { title: 'Summary', view: 'bench', have: DHT_IDS, power: true,
+        body: `<ul><li>VCC, DATA, (NC), GND; DATA needs a pull-up to VCC; power from 3V3 on the ESP32.</li><li><code>DHT dht(pin, DHT22)</code>, <code>dht.begin()</code>, <code>readHumidity()</code>, <code>readTemperature()</code>; <code>isnan()</code> = failed read.</li><li>DHT22: one reading per 2 seconds.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Why power the DHT from 3V3 on an ESP32?', a: ['It is brighter', 'With 5 V the pulled-up DATA line reaches 5 V, too high for an ESP32 pin', 'The DHT needs 3.3 V exactly', 'VIN has no ground'], c: 1, why: 'The pull-up goes to VCC, and ESP32 pins are 3.3 V only.' },
+      { q: 'How often may you read a DHT22?', a: ['1000 times per second', 'At most once every 2 seconds', 'Only at start-up', 'Once a day'], c: 1, why: 'Adafruit: no more than 0.5 Hz for the DHT22.' },
+      { q: 'readTemperature() returns NaN. Meaning?', a: ['0 °C', 'The read failed', 'It is hot', 'The pin is an output'], c: 1, why: 'NaN = not a number: no valid reading.' },
+      { q: 'What does the pull-up resistor do?', a: ['Cools the sensor', 'Holds DATA high when nobody pulls it low', 'Measures humidity', 'Limits LED current'], c: 1, why: 'The sensor can only pull the line low.' },
+    ],
+    sources: [SRC.dhtguide, SRC.dhtlib, SRC.ds],
   },
 ];
