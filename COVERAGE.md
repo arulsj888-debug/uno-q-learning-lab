@@ -35,7 +35,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | HC-SR04 ultrasonic, PIR HC-SR501 | DONE | DONE | DONE | build only (HC-SR04) | |
 | SHT31 (I2C) | DONE | DONE | DONE | build only | |
 | Modulino Thermo / Pixels (Qwiic) | DONE | n/a | n/a | n/a | UNO Q only |
-| DHT11 / DHT22 | TODO | TODO | TODO | TODO | single-wire protocol, needs library check per board |
+| DHT11 / DHT22 | Build DONE (library reported to return NaN on the UNO Q: lesson TODO, check first) | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | 4-pin sensor with external pull-up; specs from the Adafruit guide; Pi uses adafruit-circuitpython-dht |
 | DS18B20 (1-Wire) | TODO | TODO | TODO | TODO | Pi has 1-Wire in the kernel |
 | BMP280 / BME280 pressure (I2C/SPI) | TODO | TODO | TODO | TODO | |
 | Soil moisture (analog), rain, water level | TODO | n/a (no ADC) | TODO | TODO | |

@@ -133,6 +133,15 @@ r = rgbOK('esp32', findPinE32, '✔ RGB LED'); ok(r.parts.rgb1.levels[0] > r.par
 r = rgbOK('uno3', u3, '✖ Common-anode'); ok(r.parts.rgb1.status === 'off', 'UNO R3: common-anode LED wired like a common-cathode one stays dark');
 r = evaluate({ boardKind: 'uno3', pinInfo: u3, parts: [{ id: 'rgb1', type: 'rgbled', row: 'e', col: 10, ca: true }, ...[['a10', 'a16'], ['a12', 'a17'], ['a13', 'a18']].map(([a, b], i) => res('r' + i, a, b, 220)), W('w1', 'D5', 'b16'), W('w2', 'D6', 'b17'), W('w3', 'D9', 'b18'), W('w4', '5V', 'a11')], pinCfg: { D5: { mode: 'out0' }, D6: { mode: 'out0' }, D9: { mode: 'out1' } }, powered: true, env, t: 0 });
 ok(r.parts.rgb1.status === 'ok' && r.parts.rgb1.levels[0] > 0.05 && r.parts.rgb1.levels[2] < 0.01, 'UNO R3: common-anode LED on 5 V lights when the pin is LOW (and not when HIGH)');
+// ---- DHT11 / DHT22: 4 pins, needs a pull-up between DATA and VCC, reading from the room
+for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3']]) {
+  r = rgbOK(kind, info, '✔ DHT11'); ok(r.parts.dht1.status === 'ok' && /25\.0/.test(r.parts.dht1.msg), name + ': DHT11 with its pull-up resistor reads the room temperature');
+  r = rgbOK(kind, info, '✖ DHT without'); ok(r.parts.dht1.status === 'warn', name + ': DHT without the pull-up resistor is flagged');
+}
+r = rgbOK('esp32', findPinE32, '✔ DHT22'); ok(r.parts.dht1.status === 'ok' && !r.newDamage.size, 'ESP32: DHT22 on 3V3 works and nothing is damaged');
+r = rgbOK('esp32', findPinE32, '✖ DHT22 powered from VIN'); ok(r.newDamage.has('G4'), 'ESP32: DHT22 pulled up to 5 V (VIN) damages the GPIO pin');
+r = evaluate({ boardKind: 'unoq', pinInfo: uno, parts: [{ id: 'dht1', type: 'dht', model: 'dht11', row: 'e', col: 10 }, W('w1', '3V3', 'a10'), W('w2', 'D5', 'a11'), res('r1', 'c10', 'c16', 10000), W('w3', 'b11', 'b16'), W('w4', 'GND2', 'a13')], pinCfg: { D5: { mode: 'dht' } }, powered: true, env: { ...env, tempC: 70 }, t: 0 });
+ok(r.parts.dht1.status === 'warn', 'DHT11 at 70 degrees C is outside its 0 - 50 degrees C range');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

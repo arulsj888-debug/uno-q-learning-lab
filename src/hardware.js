@@ -212,6 +212,35 @@ export class RGBLED5mm extends LED5mm {
   }
 }
 
+// ---------------------------------------------------------------- DHT11 / DHT22 (AM2302) temperature + humidity sensor, 4 pins, 2.54 mm pitch
+// Pin order (Adafruit DHT guide, DHT11/DHT22 data sheets): 1 VCC, 2 DATA, 3 not connected, 4 GND, counted from the left with the grille facing you.
+export class DHTSensor {
+  constructor(model = 'dht11') {
+    const g = this.group = new THREE.Group();
+    const is22 = model === 'dht22', w = is22 ? 15.1 : 12, h = is22 ? 25 : 15.5, t = is22 ? 7.7 : 5.5;      // body width x height x thickness (mm), approximate
+    const col = is22 ? 0xf0eee6 : 0x2f78c4;
+    const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.55 });
+    const body = new THREE.Mesh(new RoundedBoxGeometry(w, h, t, 2, 0.5), mat);
+    body.position.set(0, 3.0 + h / 2, 0); g.add(body);
+    // grille on the front face: rows of slits
+    const slit = new THREE.MeshStandardMaterial({ color: is22 ? 0x9a998f : 0x174c82, roughness: 0.8 });
+    const rows = is22 ? 9 : 6;
+    for (let i = 0; i < rows; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(w * 0.62, 0.45, 0.2), slit); s.position.set(0, 3.0 + h * 0.52 + (i - (rows - 1) / 2) * (is22 ? 1.9 : 1.5), t / 2 + 0.05); g.add(s); }
+    const mark = canvasTex(256, 128, (c, ww, hh) => {
+      c.clearRect(0, 0, ww, hh); c.fillStyle = is22 ? 'rgba(40,40,40,0.9)' : 'rgba(235,240,250,0.92)'; c.font = '700 64px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(is22 ? 'DHT22' : 'DHT11', ww / 2, hh / 2);
+    });
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.8, w * 0.4), new THREE.MeshBasicMaterial({ map: mark, transparent: true, depthWrite: false }));
+    label.position.set(0, 3.0 + h * 0.2, t / 2 + 0.08); g.add(label);
+    // four legs: VCC, DATA, NC, GND (left to right)
+    for (const x of [-3.81, -1.27, 1.27, 3.81]) {
+      const path = new THREE.CatmullRomCurve3([new THREE.Vector3(x, 3.2, 0), new THREE.Vector3(x, 0, 0), new THREE.Vector3(x, -3.0, 0)]);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(path, 16, 0.22, 6, false), M.tin));
+    }
+    tagHW(g, 'dht');
+  }
+}
+
 // ---------------------------------------------------------------- axial resistor
 const BAND = { black: 0x111111, brown: 0x6b3a1e, red: 0xc8231b, orange: 0xe26a12, yellow: 0xe8c618, green: 0x1f8a3a, blue: 0x1f55c4, violet: 0x7a3fb5, grey: 0x8a8a8a, white: 0xf0f0f0, gold: 0xc9a23f, silver: 0xc0c0c0 };
 export class Resistor {
@@ -1427,6 +1456,17 @@ export const HW_INFO = {
       'Never connect an LED to a pin without a series resistor.',
     ],
     src: 'General electronics practice',
+  },
+  dht: {
+    name: 'DHT11 / DHT22 sensor', tag: 'Temperature + humidity, one data wire',
+    summary: 'Measures temperature and relative humidity and sends both numbers to the board over a single data wire.',
+    points: [
+      'Four pins (grille facing you, from the left): 1 VCC, 2 DATA, 3 not connected, 4 GND.',
+      'Supply 3 V to 5 V. DHT11: 20 – 80 %RH (±5 %), 0 – 50 °C (±2 °C), at most 1 reading per second. DHT22 / AM2302: 0 – 100 %RH (2 – 5 %), −40 – 80 °C (±0.5 °C), at most 1 reading per 2 seconds (Adafruit).',
+      'The DATA line needs a pull-up resistor to VCC: 10 kΩ in the Adafruit Arduino example, 1 – 5 kΩ in the CircuitPython documentation. A 3-pin module already has this resistor on its board, and its pin order differs between makers: read the printing.',
+      'On a 3.3 V board (Raspberry Pi, ESP32, UNO Q) power the sensor from 3.3 V, so the pulled-up DATA line never exceeds the pin’s 3.3 V.',
+    ],
+    src: 'Adafruit “DHT11, DHT22 and AM2302 Sensors”; Adafruit DHT sensor library example',
   },
   rgbled: {
     name: '5 mm RGB LED', tag: 'Red + green + blue in one package',
