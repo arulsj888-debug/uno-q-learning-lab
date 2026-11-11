@@ -2,7 +2,7 @@
 import { evaluate, resistorBands } from '../src/freebuild/circuit.js';
 let fail = 0;
 const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
-const uno = id => ({ D6: { id: 'D6', pwm: true }, D4: { id: 'D4' }, A1: { id: 'A1' }, D7: { id: 'D7' }, D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const uno = id => ({ D20: { id: 'D20' }, D21: { id: 'D21' }, D6: { id: 'D6', pwm: true }, D4: { id: 'D4' }, A1: { id: 'A1' }, D7: { id: 'D7' }, D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
 const pi = id => ({ p11: { gpio: 17 }, p3: { gpio: 2 }, p6: { label: 'GND', gpio: null }, p9: { label: 'GND', gpio: null }, p1: { label: '3V3', gpio: null }, p2: { label: '5V', gpio: null }, p12: { gpio: 18 } }[id]);
 const env = { lux: 300, tempC: 25, pressed: {}, pot: {} };
 const base = o => ({ boardKind: 'unoq', pinInfo: uno, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
@@ -168,6 +168,13 @@ for (const [kind, info, name, expectWarn] of [['uno3', u3, 'UNO R3', false], ['u
   ok(expectWarn ? r.parts.neo1.status === 'warn' : r.parts.neo1.status === 'ok' && r.parts.neo1.colors.length === 8, name + (expectWarn ? ': 5 V strip with a 3.3 V data pin is flagged (data below 70 % of the supply)' : ': NeoPixel strip on 5 V with a 5 V data pin works'));
 }
 { const x = EXAMPLES('uno3').find(e => e.title.startsWith('✖ NeoPixels at full white')); r = evaluate({ boardKind: 'uno3', pinInfo: u3, parts: x.parts, pinCfg: x.pins, powered: true, env, t: 0 }); ok(r.notes.some(n => /about 4\d\d mA/.test(n.text)), 'UNO R3: 8 pixels at full white are reported at about 480 mA'); }
+// ---- I2C displays: 16x2 LCD (5 V) and SSD1306 OLED
+for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3'], ['esp32', findPinE32, 'ESP32']]) {
+  r = rgbOK(kind, info, '✔ LCD 16×2'); ok(r.parts.lcd1.status === 'ok' && r.parts.lcd1.show, name + ': LCD with I2C backpack on 5 V shows its text');
+  r = rgbOK(kind, info, '✔ OLED'); ok(r.parts.oled1.status === 'ok' && r.parts.oled1.show, name + ': OLED on 3.3 V shows its text');
+}
+r = rgbOK('uno3', u3, '✖ LCD powered from 3.3 V'); ok(r.parts.lcd1.status === 'warn' && !r.parts.lcd1.show, 'UNO R3: LCD on 3.3 V is flagged and shows no text');
+r = rgbOK('uno3', u3, '✖ OLED with SDA'); ok(r.parts.oled1.status === 'warn' && !r.parts.oled1.show, 'UNO R3: OLED with SDA and SCL swapped stays dark');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

@@ -23,8 +23,8 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | RGB LED (common cathode / anode) | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 17) | DONE (Build + lesson 14) | 3D part, 3 dice model (R 2.0 V, G 3.0 V, B 3.1 V typical), 3 examples per board, tests |
 | WS2812 / NeoPixel strip and ring | Build DONE (strip of 8; library not verified on UNO Q), lesson TODO | Build DONE (GPIO18 example, needs root), lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | 5 V data level vs 3.3 V pins (70 % rule), current 60 mA/pixel; ring TODO |
 | 7-segment display (+ 74HC595 shift register) | TODO | TODO | TODO | TODO | |
-| 16x2 character LCD (HD44780 + I2C backpack) | TODO | TODO | TODO | TODO | |
-| OLED SSD1306 128x64 (I2C) | TODO | TODO | TODO | TODO | |
+| 16x2 character LCD (HD44780 + I2C backpack) | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | needs 5 V; backpack pull-ups to 5 V on 3.3 V boards flagged as a check-your-module warning; address 0x27/0x3F |
+| OLED SSD1306 128x64 (I2C) | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | address 0x3C (0x3D on some); pin order varies by maker |
 | 8x8 LED matrix (MAX7219, SPI) | TODO | TODO | TODO | TODO | |
 | TFT / e-paper | TODO | TODO | TODO | TODO | low priority |
 

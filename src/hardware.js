@@ -329,6 +329,72 @@ export class NeoPixelStrip {
   }
 }
 
+// ---------------------------------------------------------------- I2C displays on the desk: 16x2 character LCD with a PCF8574 backpack, 0.96" 128x64 OLED (SSD1306)
+// Stylised sizes. Both lie flat on the desk; the 4-pin header stands up at the front edge (pins GND, VCC, SDA, SCL for the LCD; GND, VCC, SCL, SDA for the OLED).
+class I2CDisplayBase {
+  makeCanvas(w, h) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; this.cv = cv; this.ctx = cv.getContext('2d'); this.tex = new THREE.CanvasTexture(cv); this.tex.colorSpace = THREE.SRGBColorSpace; this.tex.anisotropy = 8; return this.tex; }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    return { pos: this.group.localToWorld(new THREE.Vector3(this.pinX[name], this.pinTop, this.pinZ)), dir: new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion())) };
+  }
+  header(g, names, pinZ) {
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    this.pinX = {}; this.pinZ = pinZ; this.pinTop = 12;
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(4 * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, 4.3, pinZ); g.add(sub(strip, this.hw + ':header'));
+    names.forEach((n, i) => { const x = (i - 1.5) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, 8.5, pinZ); g.add(sub(p, this.hw + ':' + n)); });
+  }
+}
+export class LCD1602Module extends I2CDisplayBase {
+  constructor() {
+    super();
+    const g = this.group = new THREE.Group(); this.hw = 'lcd';
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(80, 1.6, 36), new THREE.MeshStandardMaterial({ color: 0x0f5d3a, roughness: 0.6 })); pcb.position.set(0, 2.6, 0); g.add(sub(pcb, 'lcd:pcb'));
+    const bezel = new THREE.Mesh(new RoundedBoxGeometry(71.2, 7, 24.2, 1, 0.5), new THREE.MeshStandardMaterial({ color: 0x1a1b1d, roughness: 0.5 })); bezel.position.set(0, 7, -2); g.add(sub(bezel, 'lcd:glass'));
+    const tex = this.makeCanvas(512, 128);
+    this.screen = new THREE.Mesh(new THREE.PlaneGeometry(64.5, 14.5), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })); this.screen.rotation.x = -Math.PI / 2; this.screen.position.set(0, 10.55, -2); g.add(sub(this.screen, 'lcd:glass'));
+    const back = new THREE.Mesh(new THREE.BoxGeometry(34, 4, 9), new THREE.MeshStandardMaterial({ color: 0x14306e, roughness: 0.6 })); back.position.set(-14, 0.5, 13); g.add(sub(back, 'lcd:backpack'));
+    this.header(g, ['GND', 'VCC', 'SDA', 'SCL'], 16);
+    tagHW(g, 'lcd'); for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+    this.setContent({ powered: false });
+  }
+  /** state = { powered, backlight, lines: [l1, l2] | null } */
+  setContent(st) {
+    const c = this.ctx, w = 512, h = 128;
+    c.fillStyle = st.powered && st.backlight ? '#6fa83a' : '#2b3a24'; c.fillRect(0, 0, w, h);
+    c.fillStyle = st.powered && st.backlight ? '#5a9230' : '#26331f';
+    for (let r = 0; r < 2; r++) for (let i = 0; i < 16; i++) c.fillRect(8 + i * 31.5, 14 + r * 58, 28, 46);   // character cells
+    if (st.powered && st.backlight && st.lines) {
+      c.fillStyle = '#10200a'; c.font = '700 44px "Courier New", monospace'; c.textBaseline = 'middle';
+      st.lines.slice(0, 2).forEach((l, r) => { for (let i = 0; i < Math.min(16, l.length); i++) c.fillText(l[i], 8 + i * 31.5 + 4, 14 + r * 58 + 24); });
+    }
+    this.tex.needsUpdate = true;
+  }
+}
+export class OLED128x64Module extends I2CDisplayBase {
+  constructor() {
+    super();
+    const g = this.group = new THREE.Group(); this.hw = 'oled';
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(27, 1.6, 27), new THREE.MeshStandardMaterial({ color: 0x1a3d8a, roughness: 0.5 })); pcb.position.set(0, 2.6, 0); g.add(sub(pcb, 'oled:pcb'));
+    const glass = new THREE.Mesh(new RoundedBoxGeometry(25, 1.2, 15.5, 1, 0.3), new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.2, metalness: 0.4 })); glass.position.set(0, 4.0, -3.5); g.add(sub(glass, 'oled:glass'));
+    const tex = this.makeCanvas(256, 128);
+    this.screen = new THREE.Mesh(new THREE.PlaneGeometry(22, 11), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false })); this.screen.rotation.x = -Math.PI / 2; this.screen.position.set(0, 4.65, -3.5); g.add(sub(this.screen, 'oled:glass'));
+    this.header(g, ['GND', 'VCC', 'SCL', 'SDA'], 11.5);
+    tagHW(g, 'oled'); for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+    this.setContent({ powered: false });
+  }
+  setContent(st) {
+    const c = this.ctx, w = 256, h = 128;
+    c.fillStyle = '#000'; c.fillRect(0, 0, w, h);
+    if (st.powered && st.lines) {
+      c.fillStyle = '#9fe4ff'; c.font = '700 30px "Courier New", monospace'; c.textBaseline = 'middle';
+      st.lines.slice(0, 2).forEach((l, r) => c.fillText(l.slice(0, 16), 6, 34 + r * 52));
+    } else if (st.powered) { c.fillStyle = '#05090c'; c.fillRect(0, 0, w, h); }
+    this.tex.needsUpdate = true;
+  }
+}
+
 // ---------------------------------------------------------------- axial resistor
 const BAND = { black: 0x111111, brown: 0x6b3a1e, red: 0xc8231b, orange: 0xe26a12, yellow: 0xe8c618, green: 0x1f8a3a, blue: 0x1f55c4, violet: 0x7a3fb5, grey: 0x8a8a8a, white: 0xf0f0f0, gold: 0xc9a23f, silver: 0xc0c0c0 };
 export class Resistor {
@@ -1544,6 +1610,28 @@ export const HW_INFO = {
       'Never connect an LED to a pin without a series resistor.',
     ],
     src: 'General electronics practice',
+  },
+  lcd: {
+    name: '16×2 character LCD with I²C backpack', tag: 'HD44780 + PCF8574, 4 wires',
+    summary: 'A 2-line, 16-character LCD. The small board on its back (PCF8574) turns the many LCD pins into just two I²C wires, SDA and SCL.',
+    points: [
+      'Four pins (as on common modules): GND, VCC, SDA, SCL. The backpack is made for 5 V (working voltage 5 V).',
+      'I²C address: usually 0x27 (PCF8574 backpacks), 0x3F on some (PCF8574A). A sketch with the wrong address shows nothing: run an I²C scanner.',
+      'Blue trimmer on the backpack = contrast. A blank screen with the backlight on is often just the contrast set too low.',
+      'Many backpacks pull SDA and SCL up to VCC: on a 3.3 V board (Raspberry Pi, ESP32, UNO Q) that would put 5 V on the pins. Check your module, or use a level shifter.',
+      'Library: LiquidCrystal_I2C (Frank de Brabander) — lcd.init(); lcd.backlight(); lcd.print("...").',
+    ],
+    src: 'I²C LCD1602 documentation (SunFounder, PCF8574 backpack descriptions)',
+  },
+  oled: {
+    name: '0.96" 128×64 OLED (SSD1306, I²C)', tag: 'Pixels that make their own light',
+    summary: 'A small display with 128 × 64 pixels on two I²C wires. Each pixel is a tiny light-emitting diode, so there is no backlight.',
+    points: [
+      'Four pins: GND, VCC, SCL, SDA on many modules; the order differs between makers, so read the printing.',
+      'I²C address 0x3C on most modules (0x3D on some): display.begin(SSD1306_SWITCHCAPVCC, 0x3C) with the Adafruit_SSD1306 library, width 128 and height 64.',
+      'Check whether your module accepts 3.3 V, 5 V or both before choosing VCC.',
+    ],
+    src: 'Adafruit_SSD1306 examples; module descriptions',
   },
   neopixel: {
     name: 'NeoPixel (WS2812B) strip, 8 pixels', tag: 'Addressable RGB LEDs on one data wire',

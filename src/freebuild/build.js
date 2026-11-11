@@ -9,11 +9,11 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 const RAILS = ['top+', 'top-', 'bot-', 'bot+'];
 const OHMS = [10, 100, 220, 330, 470, 1000, 2200, 4700, 10000, 47000, 100000, 1000000];
-const PREFIX = { neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
+const PREFIX = { lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
 const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
-const TERMS = { neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
-const DESK_SLOT = { neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
+const TERMS = { lcd1602: ['GND', 'VCC', 'SDA', 'SCL'], oled: ['GND', 'VCC', 'SCL', 'SDA'], neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
+const DESK_SLOT = { lcd1602: [20, 70], oled: [125, 70], neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
 const MOVABLE = new Set(['resistor', 'led', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
 
@@ -22,7 +22,7 @@ export class FreeBuild {
     this.app = app; this.isPi = isPi; this.boardKind = boardKind || (isPi ? 'pi4' : 'unoq'); this.isU3 = this.boardKind === 'uno3'; this.isE32 = this.boardKind === 'esp32'; this.fw = !!isPi || this.isE32; this.pinInfo = pinInfo;
     this.active = false;
     this.parts = []; this.pinCfg = {}; this.burnt = new Set(); this.damaged = new Set(); this.burnWhy = {};
-    this.env = { joy: {}, enc: {}, lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: true, touched: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
+    this.env = { disp1: 'Hello, world!', disp2: 'Free build', joy: {}, enc: {}, lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: true, touched: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
     this.seq = {}; this.undoStack = []; this.tool = null; this.selected = null; this.probe = null; this.probeOn = false;
     this.opts = { dht: 'dht11', rgbCA: false, ohms: 220, color: 'red', wire: 'auto', flip: false };
     this.result = null; this.tripMsg = null; this.lastRun = 0; this.lastHtml = {}; this.soundHz = 0;
@@ -272,7 +272,7 @@ export class FreeBuild {
     this.modPts = [];
     for (const d of this.parts) if (TERMS[d.type]) {
       const it = this.app.bench.items[d.id]; if (!it) continue; it.group.updateMatrixWorld(true);
-      for (const name of TERMS[d.type]) { const q = { ref: `${d.id}.${name}`, pos: it.obj.pin(name).pos.clone(), kind: d.type === 'pir' ? 'modpin' : (d.type === 'thermo' || d.type === 'pixels') ? 'qwiic' : 'term', label: name }; this.modPts.push(q); this.byRef.set(q.ref, q); }
+      for (const name of TERMS[d.type]) { const q = { ref: `${d.id}.${name}`, pos: it.obj.pin(name).pos.clone(), kind: (d.type === 'pir' || d.type === 'lcd1602' || d.type === 'oled') ? 'modpin' : (d.type === 'thermo' || d.type === 'pixels') ? 'qwiic' : 'term', label: name }; this.modPts.push(q); this.byRef.set(q.ref, q); }
     }
   }
   cancel() { this.tool = null; this.cand && (this.cand.count = 0); this.hover && (this.hover.visible = false); this.setHint(); this.renderSide && this.renderSide(); }
@@ -479,6 +479,7 @@ export class FreeBuild {
       if (d.type === 'led') it.obj.set(!!R && R.level > 0.02 && !this.burnt.has(d.id), R ? Math.max(0.15, R.level) : 0);
       else if (d.type === 'rgbled') it.obj.setRGB(R && R.levels && !this.burnt.has(d.id) ? R.levels.map(x => (x > 0.02 ? Math.max(0.15, x) : 0)) : [0, 0, 0], this.burnt.has(d.id));
       else if (d.type === 'button') it.obj.setPressed(!!this.env.pressed[d.id]);
+      else if (d.type === 'lcd1602' || d.type === 'oled') it.obj.setContent({ powered: this.powered() && !!R && R.status !== 'off' && R.status !== 'bad', backlight: !!(R && R.backlight), lines: R && R.show ? [this.env.disp1 ?? 'Hello, world!', this.env.disp2 ?? 'Free build'] : null });
       else if (d.type === 'neopixel') { if (it.obj.setColors) it.obj.setColors(R && R.colors && this.powered() ? R.colors : null); }
       else if (d.type === 'joystick') { const J = this.env.joy[d.id] || { x: 0.5, y: 0.5 }; it.obj.setStick(J.x, J.y, !!this.env.pressed[d.id]); }
       else if (d.type === 'encoder') it.obj.setPhase(this.env.enc[d.id] ?? 0, !!this.env.pressed[d.id]);
@@ -594,6 +595,8 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('ldr')}" data-tool="ldr">Light sensor (LDR)</button></div>
       <div class="fb-row"><button class="fb-btn${on('tmp36')}" data-tool="tmp36">TMP36 temperature${this.isPi ? ' (no ADC on Pi)' : ''}</button><label class="fb-chk"><input type="checkbox" data-opt="flip"${this.opts.flip ? ' checked' : ''}> turn round</label></div>
       <h3>Modules</h3>
+      <div class="fb-row"><button class="fb-btn" data-tool="lcd1602">LCD 16×2 with I²C backpack</button></div>
+      <div class="fb-row"><button class="fb-btn" data-tool="oled">OLED 128×64 (SSD1306, I²C)</button></div>
       <div class="fb-row"><button class="fb-btn" data-tool="neopixel">NeoPixel strip, 8 pixels (WS2812B)</button></div>
       <div class="fb-row"><button class="fb-btn${on('joystick')}" data-tool="joystick">Joystick module${this.isPi ? ' (no ADC on Pi)' : ''}</button></div>
       <div class="fb-row"><button class="fb-btn${on('encoder')}" data-tool="encoder">Rotary encoder (KY-040)</button></div>
@@ -664,7 +667,7 @@ export class FreeBuild {
     this.select(null); this.tripMsg = null; this.exNote = ex.note; this.renderPanel();
     if (!this.powered()) this.app.plug(true).then(() => { this.dirty = true; this.renderSide(); });
     const wide = ex.parts.some(p => p.type === 'pir' || p.type === 'servo');
-    const far = ex.parts.some(p => ['relay', 'battery', 'lamp', 'motor', 'neopixel'].includes(p.type)), qw = ex.parts.some(p => p.type === 'thermo' || p.type === 'pixels');
+    const far = ex.parts.some(p => ['relay', 'battery', 'lamp', 'motor', 'neopixel', 'lcd1602', 'oled'].includes(p.type)), qw = ex.parts.some(p => p.type === 'thermo' || p.type === 'pixels');
     this.app.view(this.isPi ? (far ? 'farpi' : wide ? 'bigpi' : 'pibb') : (qw ? 'qwq' : far ? 'farq' : wide ? 'bigq' : 'breadboard'));
   }
 
@@ -696,11 +699,12 @@ export class FreeBuild {
     if (sel) h += this.selectedHtml(sel);
     const hasLdr = this.parts.some(p => p.type === 'ldr'), hasT = this.parts.some(p => p.type === 'tmp36');
     const hasSht = this.parts.some(p => p.type === 'sht31' || p.type === 'thermo' || p.type === 'dht'), hasUs = this.parts.some(p => p.type === 'hcsr04'), hasPir = this.parts.some(p => p.type === 'pir');
-    const hasJoy = this.parts.some(p => p.type === 'joystick' || p.type === 'encoder');
+    const hasJoy = this.parts.some(p => p.type === 'joystick' || p.type === 'encoder' || p.type === 'lcd1602' || p.type === 'oled');
     if (hasLdr || hasT || hasUs || hasPir || hasSht || hasJoy) {
       h += `<h3>The room (simulated)</h3>`;
       if (hasUs) h += `<div class="fb-env">Obstacle <input type="range" min="2" max="400" value="${this.env.dist}" data-env="dist"><b data-envv="dist"></b></div>`;
       if (hasPir) h += `<div class="fb-env"><span>Motion</span><button class="hold" data-motion>👋 Hold to wave a hand</button><span></span></div>`;
+      if (this.parts.some(p => p.type === 'lcd1602' || p.type === 'oled')) h += `<div class="fb-env">Line 1 <input type="text" maxlength="16" value="${esc(this.env.disp1)}" data-disp="disp1"></div><div class="fb-env">Line 2 <input type="text" maxlength="16" value="${esc(this.env.disp2)}" data-disp="disp2"></div>`;
       for (const jd of this.parts.filter(p => p.type === 'joystick')) { const J = this.env.joy[jd.id] || { x: 0.5, y: 0.5 }; h += `<div class="fb-env">Stick ${jd.id} X <input type="range" min="0" max="100" value="${Math.round(J.x * 100)}" data-joy="x:${jd.id}"><b data-joyv="x:${jd.id}"></b></div><div class="fb-env">Stick ${jd.id} Y <input type="range" min="0" max="100" value="${Math.round(J.y * 100)}" data-joy="y:${jd.id}"><b data-joyv="y:${jd.id}"></b></div><div class="fb-env"><span>Switch</span><button class="hold" data-hold="${jd.id}">Hold to press the stick</button><span></span></div>`; }
       for (const ed of this.parts.filter(p => p.type === 'encoder')) h += `<div class="fb-env"><span>Knob ${ed.id}</span><button class="fb-btn small" data-encstep="${ed.id}:-1">◀ step</button><button class="fb-btn small" data-encstep="${ed.id}:1">step ▶</button></div><div class="fb-env"><span>Switch</span><button class="hold" data-hold="${ed.id}">Hold to press the knob</button><span></span></div>`;
       if (hasLdr) h += `<div class="fb-env">Light <input type="range" min="0" max="1000" value="${Math.round(250 * Math.log10(Math.max(this.env.lux, 0.1) / 0.1))}" data-env="lux"><b data-envv="lux"></b><div class="fb-chips">${Object.entries(LUX).map(([k, v]) => `<button class="lvl" data-lux="${v}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>`;
@@ -747,6 +751,7 @@ export class FreeBuild {
     else if (t.dataset.pinbright) { (this.pinCfg[t.dataset.pinbright] ||= {}).bright = +t.value; t.nextElementSibling.textContent = t.value; this.dirty = true; }
     else if (t.dataset.pinangle) { (this.pinCfg[t.dataset.pinangle] ||= {}).angle = +t.value; t.nextElementSibling.textContent = t.value + '°'; this.dirty = true; this.save(); }
     else if (t.dataset.pinfreq) { (this.pinCfg[t.dataset.pinfreq] ||= {}).freq = +t.value; t.nextElementSibling.textContent = t.value + ' Hz'; this.dirty = true; this.save(); }
+    else if (t.dataset.disp) { this.env[t.dataset.disp] = t.value; this.dirty = true; }
     else if (t.dataset.joy) { const [ax, id] = t.dataset.joy.split(':'); const J = this.env.joy[id] || (this.env.joy[id] = { x: 0.5, y: 0.5 }); J[ax] = +t.value / 100; this.dirty = true; this.syncControls(); }
     else if (t.dataset.env === 'lux') { this.env.lux = 0.1 * Math.pow(10, +t.value / 250); this.dirty = true; this.syncControls(); }
     else if (t.dataset.env === 'hum') { this.env.hum = +t.value; this.dirty = true; this.syncControls(); }

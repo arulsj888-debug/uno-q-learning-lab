@@ -46,6 +46,8 @@ export function terminals(d) {
     case 'relay': return [['DCP', `${d.id}.DCP`], ['DCN', `${d.id}.DCN`], ['IN', `${d.id}.IN`], ['NO', `${d.id}.NO`], ['COM', `${d.id}.COM`], ['NC', `${d.id}.NC`]];
     case 'battery': return [['POS', `${d.id}.POS`], ['NEG', `${d.id}.NEG`]];
     case 'lamp': return [['L1', `${d.id}.L1`], ['L2', `${d.id}.L2`]];
+    case 'lcd1602': return [['GND', `${d.id}.GND`], ['VCC', `${d.id}.VCC`], ['SDA', `${d.id}.SDA`], ['SCL', `${d.id}.SCL`]];
+    case 'oled': return [['GND', `${d.id}.GND`], ['VCC', `${d.id}.VCC`], ['SCL', `${d.id}.SCL`], ['SDA', `${d.id}.SDA`]];
     case 'neopixel': return [['VCC', `${d.id}.VCC`], ['DIN', `${d.id}.DIN`], ['GND', `${d.id}.GND`]];
     case 'hcsr04': return [['VCC', `${row}${c}`], ['TRIG', `${row}${c + 1}`], ['ECHO', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'servo': return [['GND', `${row}${c}`], ['V', `${row}${c + 1}`], ['SIG', `${row}${c + 2}`]];
@@ -258,6 +260,7 @@ export function evaluate(model) {
       const dead = burnt.has(d.id);
       if (d.type === 'resistor') { const r = Math.max(0.01, d.ohms), a = nodeOf(d.a), b = nodeOf(d.b); if (!dead) elems.push({ t: 'R', a, b, g: 1 / r }); pe[d.id] = { a, b, r }; }
       else if (d.type === 'led') { const lt = LED_TYPES[d.color || 'red'], Is = 0.02 / Math.exp(lt.vf / NVT), e = { t: 'D', a: nodeOf(d.anode), b: nodeOf(d.cathode), Is }; if (!dead) elems.push(e); pe[d.id] = { a: e.a, b: e.b, Is }; }
+      else if (d.type === 'lcd1602' || d.type === 'oled') { const vn = nid(T(d, 'VCC')), gn = nid(T(d, 'GND')); if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 1000, load: true }); pe[d.id] = { vn, gn }; }
       else if (d.type === 'neopixel') {
         const vn = nid(T(d, 'VCC')), gn = nid(T(d, 'GND')), dinNode = find(T(d, 'DIN'));
         const dp = [...usedPins].find(([id, k]) => k.k === 'gpio' && find(nodeOfRef(id)) === dinNode && (pinCfg[id] || {}).mode === 'neopixel');
@@ -369,7 +372,7 @@ export function evaluate(model) {
       else if (d.type === 'buzzer') { const V = v[q.a] - v[q.b]; acc(d.id, 'Vmax', V, 'max'); acc(d.id, 'Vmin', V, 'min'); acc(d.id, 'V', V); }
       else if (d.type === 'pot') acc(d.id, 'Vw', v[q.W]);
       else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo' || d.type === 'sht31' || d.type === 'dht') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
-      else if (d.type === 'neopixel') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
+      else if (d.type === 'neopixel' || d.type === 'lcd1602' || d.type === 'oled') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'joystick') { acc(d.id, 'Vs', v[q.vn] - v[q.gn]); acc(d.id, 'Vx', v[q.jx] - v[q.gn]); acc(d.id, 'Vy', v[q.jy] - v[q.gn]); }
       else if (d.type === 'encoder') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'tmp36') { acc(d.id, 'Vs', v[q.vs] - v[q.g]); acc(d.id, 'Vout', v[q.out] - v[q.g]); }
@@ -427,6 +430,28 @@ export function evaluate(model) {
         else if (Math.abs(V) <= 0.3) why = 'there is no voltage across it: the circuit is not complete (check the wires and the power, and that the pin is set to Output HIGH)';
         else why = 'almost no current flows (is the resistor much too large?)';
         R.msg = 'Off: ' + why + '.'; note('bad', `${label} stays dark: ${why}.`, d.id);
+      }
+    } else if (d.type === 'lcd1602' || d.type === 'oled') {
+      const lcd = d.type === 'lcd1602', vs = s.Vs ?? 0, sda = gpioOn(d, 'SDA'), scl = gpioOn(d, 'SCL'), kind = id => usedPins.get(id) || {}, addr = lcd ? '0x27' : '0x3C';
+      const where = boardKind === 'pi4' ? 'SDA must go to GPIO2 (pin 3) and SCL to GPIO3 (pin 5)' : boardKind === 'uno3' ? 'SDA must go to A4 (or SDA) and SCL to A5 (or SCL)' : boardKind === 'esp32' ? 'SDA must go to GPIO21 and SCL to GPIO22 (the default I²C pins of the Arduino core)' : 'SDA must go to D20 (or A4) and SCL to D21 (or A5)';
+      let bad = null;
+      if (!powered) R.status = 'off';
+      else if (vs < -0.5) { R.status = 'bad'; R.msg = 'Connected backwards.'; note('bad', `${label} is connected backwards (VCC and GND swapped).`, d.id); }
+      else if (vs < 2.7) { R.status = 'off'; R.msg = `Only ${Math.max(0, vs).toFixed(1)} V`; note('bad', `${label} gets only ${Math.max(0, vs).toFixed(1)} V: connect VCC to ${lcd ? '5 V' : '3.3 V or 5 V'} and GND to GND.`, d.id); }
+      else if (lcd && vs < 4.5) { R.status = 'warn'; R.backlight = true; R.msg = 'Too little voltage'; note('warn', `${label} gets ${vs.toFixed(1)} V, but the backpack and the LCD are made for 5 V: the characters are not readable. Use 5 V.`, d.id); }
+      else if (!sda.length || !scl.length) bad = `${!sda.length ? 'SDA' : 'SCL'} is not connected to a board pin`;
+      else if (sda.some(id => kind(id).i2c === 'scl') && scl.some(id => kind(id).i2c === 'sda')) bad = 'SDA and SCL are swapped';
+      else if (!sda.some(id => kind(id).i2c === 'sda') || !scl.some(id => kind(id).i2c === 'scl')) bad = `the wires are not on I²C pins: ${where}`;
+      else if (![...sda, ...scl].every(id => modeOf(id) === 'i2c')) bad = 'the SDA/SCL pins are not set to the I²C bus function. Set both pins to “I²C bus”';
+      if (powered && vs >= 2.7 && !(lcd && vs < 4.5)) {
+        R.backlight = true;
+        if (bad) { R.status = 'warn'; R.msg = bad[0].toUpperCase() + bad.slice(1) + '.'; note('bad', `${label}: ${bad}. The ${lcd ? 'backlight is on but no text appears' : 'screen stays dark'}.`, d.id); }
+        else {
+          R.show = true; R.msg = `Answers at address ${addr}${lcd ? ' (0x3F on some backpacks)' : ' (0x3D on some modules)'}: the text is shown.`;
+          for (const id of [...sda, ...scl]) (result.pins[id] ||= { I: 0, Imax: 0, V: 0 }).i2c = `${lcd ? 'LCD backpack' : 'OLED'} answers at ${addr}`;
+          note('ok', `${label}: ${R.msg}`, d.id);
+          if (lcd && vs > 4 && boardKind !== 'uno3') note('warn', `${label} runs from ${vs.toFixed(1)} V. Many backpacks pull SDA and SCL up to VCC, which would put ${vs.toFixed(1)} V on the pins of this 3.3 V board. Check your module, or use a level shifter.`, d.id);
+        }
       }
     } else if (d.type === 'neopixel') {
       const vs = s.Vs ?? 0, din = gpioOn(d, 'DIN'), dp = din.find(id => modeOf(id) === 'neopixel'), cfg = dp ? pinCfg[dp] : null;
@@ -734,6 +759,8 @@ export function evaluate(model) {
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
       hcsr04: d => [item(d, 'VCC', ['5v'], name['5v'], 'The HC-SR04 is made for 5 V'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'TRIG', ['gpio'], sig), (pi || e32 ? echoDivider(d) : item(d, 'ECHO', ['gpio'], pi || e32 ? 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider' : u3 ? 'a digital pin (for example D8)' : 'D8 (a 5 V-tolerant pin)', pi || e32 ? 'Its 5 V echo would damage the pin directly' : u3 ? '' : 'Not D3 or A0–A5: they are 3.3 V only', (k, id) => !pi && !e32 ? !k.v3 : true))],
+      lcd1602: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VCC', ['5v'], name['5v'] + ' (the LCD is made for 5 V)'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : u3 ? 'A4 (or SDA), the I²C data' : e32 ? 'GPIO21, the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda'), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : u3 ? 'A5 (or SCL), the I²C clock' : e32 ? 'GPIO22, the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl')],
+      oled: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VCC', ['3v3', '5v'], name['3v3'] + ' (or 5 V: check your module)'), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : u3 ? 'A5 (or SCL), the I²C clock' : e32 ? 'GPIO22, the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : u3 ? 'A4 (or SDA), the I²C data' : e32 ? 'GPIO21, the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda')],
       neopixel: d => [item(d, 'VCC', ['5v', '3v3'], name['5v'] + ' (the pixels are made for about 5 V)', 'Connect GND first'), item(d, 'DIN', ['gpio'], sig + (pi ? ' (GPIO18 in the Adafruit example)' : '')), item(d, 'GND', ['gnd'], name.gnd)],
       joystick: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VCC', ['3v3', '5v'], pi ? name['3v3'] : u3 ? '5V (or 3.3V)' : name['3v3'] + ': the analog pins of this board are 3.3 V only', 'The wipers go up to this voltage'), item(d, 'VRX', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', k => pi || k.analog), item(d, 'VRY', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', k => pi || k.analog), item(d, 'SW', ['gpio'], sig + ' (set to input with pull-up)')],
       encoder: d => [item(d, 'CLK', ['gpio'], sig + ' (input with pull-up)'), item(d, 'DT', ['gpio'], sig + ' (input with pull-up)'), item(d, 'SW', ['gpio'], sig + ' (input with pull-up)'), item(d, 'VCC', ['3v3', '5v'], pi ? name['3v3'] : u3 ? '5V (or 3.3V)' : name['3v3'], 'On a 3.3 V board use 3.3 V'), item(d, 'GND', ['gnd'], name.gnd)],
@@ -753,7 +780,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }
