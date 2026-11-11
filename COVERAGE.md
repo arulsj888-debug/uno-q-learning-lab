@@ -20,7 +20,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Item | UQ | PI | R3 | E32 | Notes |
 |---|---|---|---|---|---|
 | LED matrix (on-board) | DONE | n/a | n/a | n/a | |
-| RGB LED (common cathode / anode) | TODO | TODO | TODO | TODO | |
+| RGB LED (common cathode / anode) | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | 3D part, 3 dice model (R 2.0 V, G 3.0 V, B 3.1 V typical), 3 examples per board, tests |
 | WS2812 / NeoPixel strip and ring | TODO | TODO | TODO | TODO | 5 V data level on 3.3 V boards |
 | 7-segment display (+ 74HC595 shift register) | TODO | TODO | TODO | TODO | |
 | 16x2 character LCD (HD44780 + I2C backpack) | TODO | TODO | TODO | TODO | |

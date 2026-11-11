@@ -123,6 +123,16 @@ r = evaluate(e32({ parts: [{ id: 'us1', type: 'hcsr04', row: 'j', col: 11 }, W('
 { const x = EXAMPLES('esp32').find(e => e.title.includes('SHT31') && e.title.startsWith('✔')); r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r.parts.sen1.status === 'ok', 'ESP32: SHT31 on GPIO21 (SDA) and GPIO22 (SCL) works'); }
 { const x = EXAMPLES('esp32').find(e => e.title.startsWith('✔ Servo')); r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r.parts.sv1.status === 'ok', 'ESP32: servo on VIN (5 V) with pulses works'); }
 { const x = EXAMPLES('esp32').find(e => e.title.startsWith('✖ Servo')); r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r.parts.sv1.status !== 'ok', 'ESP32: servo on 3.3 V does not work'); }
+// ---- RGB LED (all boards): three dice with one common leg
+const rgbOK = (kind, info, ex, label) => { const x = EXAMPLES(kind).find(e => e.title.startsWith(ex)); const r0 = evaluate({ boardKind: kind, pinInfo: info, parts: x.parts, pinCfg: x.pins, powered: true, env, t: 0 }); return r0; };
+for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3'], ['esp32', findPinE32, 'ESP32']]) {
+  r = rgbOK(kind, info, '✔ RGB LED'); ok(r.parts.rgb1.status === 'ok' && r.parts.rgb1.levels[0] > 0.05, name + ': RGB LED with three resistors lights');
+  r = rgbOK(kind, info, '✖ RGB LED without'); ok(kind === 'uno3' ? r.newBurn.has('rgb1') : r.parts.rgb1.status === 'warn', name + (kind === 'uno3' ? ': RGB LED without resistors burns out on 5 V pins' : ': RGB LED without resistors is flagged (red die above 20 mA)'));
+}
+r = rgbOK('esp32', findPinE32, '✔ RGB LED'); ok(r.parts.rgb1.levels[0] > r.parts.rgb1.levels[1] * 1.5 || r.parts.rgb1.levels[1] < 0.6, 'ESP32: green die gets much less than red at 3.3 V');
+r = rgbOK('uno3', u3, '✖ Common-anode'); ok(r.parts.rgb1.status === 'off', 'UNO R3: common-anode LED wired like a common-cathode one stays dark');
+r = evaluate({ boardKind: 'uno3', pinInfo: u3, parts: [{ id: 'rgb1', type: 'rgbled', row: 'e', col: 10, ca: true }, ...[['a10', 'a16'], ['a12', 'a17'], ['a13', 'a18']].map(([a, b], i) => res('r' + i, a, b, 220)), W('w1', 'D5', 'b16'), W('w2', 'D6', 'b17'), W('w3', 'D9', 'b18'), W('w4', '5V', 'a11')], pinCfg: { D5: { mode: 'out0' }, D6: { mode: 'out0' }, D9: { mode: 'out1' } }, powered: true, env, t: 0 });
+ok(r.parts.rgb1.status === 'ok' && r.parts.rgb1.levels[0] > 0.05 && r.parts.rgb1.levels[2] < 0.01, 'UNO R3: common-anode LED on 5 V lights when the pin is LOW (and not when HIGH)');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

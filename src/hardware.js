@@ -182,6 +182,36 @@ export class LED5mm {
   setBurnt(b) { this.burnt = b; if (b) { this.set(false); this.lensMat.color.set(0x2a2220); this.lensMat.attenuationColor.set(0x1a1412); } }
 }
 
+
+// ---------------------------------------------------------------- 5 mm RGB LED (4 legs: R, common, G, B; 2.54 mm apart)
+export class RGBLED5mm extends LED5mm {
+  constructor(commonAnode = false) {
+    super(0xffffff);
+    this.commonAnode = commonAnode;
+    // two extra legs: the base class already has the legs at +-1.27 mm (common and green); red and blue are one pitch further out
+    const mkLeg = x => { const path = new THREE.CatmullRomCurve3([new THREE.Vector3(x, 3.1, 0), new THREE.Vector3(x, 0, 0), new THREE.Vector3(x, -3.0, 0)]); return new THREE.Mesh(new THREE.TubeGeometry(path, 24, 0.24, 8, false), M.tin); };
+    this.group.add(mkLeg(-3.81), mkLeg(3.81));
+    this.lensMat.transmission = 0.55; this.lensMat.roughness = 0.22;      // lightly diffused lens
+    this.lensMat.color.set(0xeeeeee); this.lensMat.attenuationColor.set(0xffffff);
+    this.levels = [0, 0, 0]; tagHW(this.group, 'rgbled');
+  }
+  /** levels = brightness 0..1 of the red, green and blue dice */
+  setRGB(levels, burnt = false) {
+    const [r, g, b] = levels, m = Math.max(r, g, b);
+    if (burnt) { this.set(false); this.lensMat.color.set(0x2a2220); this.lensMat.emissiveIntensity = 0; return; }
+    const hue = m > 0.02 ? new THREE.Color(r / m, g / m, b / m) : new THREE.Color(0, 0, 0);     // colour of the mix at full strength
+    this.lensMat.color.copy(m > 0.02 ? hue.clone().lerp(new THREE.Color(1, 1, 1), 0.0) : new THREE.Color(0xdddddd));
+    this.lensMat.attenuationColor.copy(m > 0.02 ? hue : new THREE.Color(0xffffff));
+    this.lensMat.emissive.copy(hue);
+    this.lensMat.emissiveIntensity = m * 2.2;
+    this.die.material.color.setRGB(m ? 3 * r + 0.2 : 0.2, m ? 3 * g + 0.2 : 0.2, m ? 3 * b + 0.2 : 0.2);
+    this.light.color.copy(m > 0.02 ? hue : new THREE.Color(1, 1, 1));
+    this.light.intensity = m * 30;
+    this.halo.material.color.copy(hue).multiplyScalar(m);
+    this.levels = levels;
+  }
+}
+
 // ---------------------------------------------------------------- axial resistor
 const BAND = { black: 0x111111, brown: 0x6b3a1e, red: 0xc8231b, orange: 0xe26a12, yellow: 0xe8c618, green: 0x1f8a3a, blue: 0x1f55c4, violet: 0x7a3fb5, grey: 0x8a8a8a, white: 0xf0f0f0, gold: 0xc9a23f, silver: 0xc0c0c0 };
 export class Resistor {
@@ -1395,6 +1425,17 @@ export const HW_INFO = {
       'Anode (+) = longer leg. Cathode (−) = shorter leg, next to the flat edge of the rim.',
       'A red LED typically drops about 1.8–2.2 V when lit (check its datasheet).',
       'Never connect an LED to a pin without a series resistor.',
+    ],
+    src: 'General electronics practice',
+  },
+  rgbled: {
+    name: '5 mm RGB LED', tag: 'Red + green + blue in one package',
+    summary: 'Three LEDs (red, green, blue) in one housing that share one common leg. Mixing their brightness makes any colour.',
+    points: [
+      'Four legs: red, the common leg (the longest one), green, blue. Each colour needs its own resistor.',
+      'Common cathode: the common leg goes to GND and each colour pin is driven HIGH. Common anode: the common leg goes to the supply and a colour pin is driven LOW to light it.',
+      'Typical forward voltages: red about 2.0 V, green and blue about 3.0 V or more (check your datasheet). On a 3.3 V board the green and blue dice get very little current.',
+      'Pins used with PWM (analogWrite or ledcWrite) give a different brightness per colour, so the colours mix.',
     ],
     src: 'General electronics practice',
   },

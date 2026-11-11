@@ -12,6 +12,7 @@
 
 const HOLE_RE = /^([a-j])(\d{1,2})$/;
 const RAIL_RE = /^r:(top[+-]|bot[+-]):(\d+)$/;
+export const RGB_VF = { R: 2.0, G: 3.0, B: 3.1 };   // typical forward voltages of the three dice of a 5 mm RGB LED (green and blue are InGaN)
 export const LED_TYPES = {
   red: { vf: 2.0, hex: 0xff2a12, name: 'Red' }, yellow: { vf: 2.1, hex: 0xffc400, name: 'Yellow' },
   green: { vf: 2.2, hex: 0x1fd24a, name: 'Green' }, blue: { vf: 3.1, hex: 0x2a5bff, name: 'Blue' }, white: { vf: 3.1, hex: 0xf4f4ff, name: 'White' },
@@ -47,6 +48,7 @@ export function terminals(d) {
     case 'lamp': return [['L1', `${d.id}.L1`], ['L2', `${d.id}.L2`]];
     case 'hcsr04': return [['VCC', `${row}${c}`], ['TRIG', `${row}${c + 1}`], ['ECHO', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'servo': return [['GND', `${row}${c}`], ['V', `${row}${c + 1}`], ['SIG', `${row}${c + 2}`]];
+    case 'rgbled': return [['R', `${row}${c}`], ['C', `${row}${c + 1}`], ['G', `${row}${c + 2}`], ['B', `${row}${c + 3}`]];
     case 'pir': return [['VCC', `${d.id}.VCC`], ['OUT', `${d.id}.OUT`], ['GND', `${d.id}.GND`]];
     case 'wire': case 'fwire': case 'lead': case 'qwiic': return [['from', d.from], ['to', d.to]];
     default: return [];
@@ -242,6 +244,11 @@ export function evaluate(model) {
       const dead = burnt.has(d.id);
       if (d.type === 'resistor') { const r = Math.max(0.01, d.ohms), a = nodeOf(d.a), b = nodeOf(d.b); if (!dead) elems.push({ t: 'R', a, b, g: 1 / r }); pe[d.id] = { a, b, r }; }
       else if (d.type === 'led') { const lt = LED_TYPES[d.color || 'red'], Is = 0.02 / Math.exp(lt.vf / NVT), e = { t: 'D', a: nodeOf(d.anode), b: nodeOf(d.cathode), Is }; if (!dead) elems.push(e); pe[d.id] = { a: e.a, b: e.b, Is }; }
+      else if (d.type === 'rgbled') {
+        // three LED dice with one common leg: common cathode (d.ca falsy) = colour pins are the anodes, common anode = colour pins are the cathodes
+        const C = nid(T(d, 'C')), dice = ['R', 'G', 'B'].map(k => { const lt = RGB_VF[k], Is = 0.02 / Math.exp(lt / NVT), pin = nid(T(d, k)), e = d.ca ? { t: 'D', a: C, b: pin, Is } : { t: 'D', a: pin, b: C, Is }; if (!dead) elems.push(e); return { a: e.a, b: e.b, Is }; });
+        pe[d.id] = { dice };
+      }
       else if (d.type === 'ldr') { const r = LDR_OHMS(env.lux), a = nodeOf(d.a), b = nodeOf(d.b); elems.push({ t: 'R', a, b, g: 1 / r }); pe[d.id] = { a, b, r }; }
       else if (d.type === 'button') { const down = !!(env.pressed || {})[d.id]; if (down) elems.push({ t: 'R', a: nid(T(d, 'e1')), b: nid(T(d, 'f1')), g: 20 }); pe[d.id] = { down }; }
       else if (d.type === 'pot') { const f = (env.pot || {})[d.id] ?? 0.5, r1 = Math.max(1, f * 10000), r2 = Math.max(1, (1 - f) * 10000); const A = nid(T(d, 'A')), W = nid(T(d, 'W')), B = nid(T(d, 'B')); elems.push({ t: 'R', a: A, b: W, g: 1 / r1 }, { t: 'R', a: W, b: B, g: 1 / r2 }); pe[d.id] = { W }; }
@@ -319,6 +326,7 @@ export function evaluate(model) {
       const q = pe[d.id]; if (!q) continue;
       if (d.type === 'resistor' || d.type === 'ldr') { const V = v[q.a] - v[q.b], I = V / q.r; acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'P', V * I); acc(d.id, 'Pmax', V * I, 'max'); }
       else if (d.type === 'led') { const V = v[q.a] - v[q.b], I = burnt.has(d.id) ? 0 : q.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'Imax', I, 'max'); }
+      else if (d.type === 'rgbled') { q.dice.forEach((e, i) => { const V = v[e.a] - v[e.b], I = burnt.has(d.id) ? 0 : e.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V' + i, V); acc(d.id, 'I' + i, I); acc(d.id, 'Imax' + i, I, 'max'); }); }
       else if (d.type === 'buzzer') { const V = v[q.a] - v[q.b]; acc(d.id, 'Vmax', V, 'max'); acc(d.id, 'Vmin', V, 'min'); acc(d.id, 'V', V); }
       else if (d.type === 'pot') acc(d.id, 'Vw', v[q.W]);
       else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo' || d.type === 'sht31') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
@@ -376,6 +384,28 @@ export function evaluate(model) {
         else if (V > 0.3 && V < vf - 0.35) why = `only ${V.toFixed(2)} V reach it, and a ${d.color || 'red'} LED needs about ${vf.toFixed(1)} V`;
         else if (Math.abs(V) <= 0.3) why = 'there is no voltage across it: the circuit is not complete (check the wires and the power, and that the pin is set to Output HIGH)';
         else why = 'almost no current flows (is the resistor much too large?)';
+        R.msg = 'Off: ' + why + '.'; note('bad', `${label} stays dark: ${why}.`, d.id);
+      }
+    } else if (d.type === 'rgbled') {
+      const names = ['red', 'green', 'blue'], I = [0, 1, 2].map(i => s['I' + i] ?? 0), Ipk = [0, 1, 2].map(i => s['Imax' + i] ?? 0), V = [0, 1, 2].map(i => s['V' + i] ?? 0);
+      R.levels = I.map(x => Math.pow(Math.min(1, Math.max(0, x / 0.015)), 0.6));
+      const dn = ['R', 'G', 'B', 'C'].filter(t => dangling(d, t));
+      if (burnt.has(d.id)) { R.status = 'bad'; R.levels = [0, 0, 0]; R.msg = 'Burnt out.'; note('bad', burnWhy[d.id] || `${label} is burnt out (too much current earlier). Delete it and place a new one.`, d.id); }
+      else if (Ipk.some(x => x > 0.030)) { const k = Ipk.findIndex(x => x > 0.030); R.levels = [1, 1, 1]; R.status = 'bad'; R.msg = 'Burnt out'; burn(d.id, `${label} burns out! About ${(Ipk[k] * 1000).toFixed(0)} mA flowed through its ${names[k]} die (rated about 20 mA). Every colour needs its own series resistor.`); }
+      else if (I.some(x => x > 0.0008)) {
+        const lit = names.map((n, i) => (I[i] > 0.0008 ? `${n} ${(I[i] * 1000).toFixed(1)} mA` : null)).filter(Boolean);
+        R.msg = `Lit: ${lit.join(', ')}.`;
+        const r = R.levels[0], g = R.levels[1], b = R.levels[2];
+        const colour = Math.max(r, g, b) < 0.02 ? '' : (() => { const m = Math.max(r, g, b), n = [r, g, b].map(x => x / m); const on = n.map(x => x > 0.35); const nm = { '100': 'red', '010': 'green', '001': 'blue', '110': 'yellow', '011': 'cyan', '101': 'magenta', '111': 'white' }[on.map(x => (x ? 1 : 0)).join('')]; return nm ? ` The colours mix to ${nm}${on.filter(Boolean).length > 1 ? '' : ''}.` : ''; })();
+        if (Ipk.some(x => x > 0.021)) { R.status = 'warn'; note('warn', `${label}: ${(Math.max(...Ipk) * 1000).toFixed(0)} mA is above the usual 20 mA rating of one colour. Use a larger resistor.`, d.id); }
+        else note('ok', `${label} lights: ${lit.join(', ')}.${colour}`, d.id);
+      } else if (!powered) { R.status = 'off'; R.msg = 'Off: no power.'; }
+      else {
+        R.status = 'off'; let why;
+        if (dn.length) why = `${dn.map(t => (t === 'C' ? 'the common leg' : 'the ' + { R: 'red', G: 'green', B: 'blue' }[t] + ' leg')).join(' and ')} ${dn.length > 1 ? 'are' : 'is'} not connected to anything`;
+        else if (V.some(x => x < -0.5)) why = d.ca ? 'with a common-anode LED the common leg must go to the supply (3.3 V or 5 V) and a colour pin must be driven LOW; the voltage here is the wrong way round' : 'with a common-cathode LED the common leg must go to GND and a colour pin must be driven HIGH; the voltage here is the wrong way round. (Is it a common-anode LED? Choose “common anode” and place it again.)';
+        else if (V.every(x => Math.abs(x) <= 0.3)) why = 'there is no voltage across any colour: the circuit is not complete (check the common leg, the resistors and that a colour pin is set to Output HIGH, or LOW for a common anode)';
+        else why = 'almost no current flows. On a 3.3 V pin the green and blue dice (about 3 V) get hardly any: use a small resistor, or drive them from 5 V';
         R.msg = 'Off: ' + why + '.'; note('bad', `${label} stays dark: ${why}.`, d.id);
       }
     } else if (d.type === 'resistor') {
@@ -573,6 +603,7 @@ export function evaluate(model) {
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
       hcsr04: d => [item(d, 'VCC', ['5v'], name['5v'], 'The HC-SR04 is made for 5 V'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'TRIG', ['gpio'], sig), (pi || e32 ? echoDivider(d) : item(d, 'ECHO', ['gpio'], pi || e32 ? 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider' : u3 ? 'a digital pin (for example D8)' : 'D8 (a 5 V-tolerant pin)', pi || e32 ? 'Its 5 V echo would damage the pin directly' : u3 ? '' : 'Not D3 or A0–A5: they are 3.3 V only', (k, id) => !pi && !e32 ? !k.v3 : true))],
+      rgbled: d => [item(d, 'C', d.ca ? ['3v3', '5v'] : ['gnd'], d.ca ? 'the supply (common anode): 3.3 V or 5 V' : name.gnd + ' (common cathode)', d.ca ? 'This is a common-anode LED: the common leg goes to the supply' : 'The common leg is the longest one'), item(d, 'R', ['gpio'], sig + ' (through a resistor)'), item(d, 'G', ['gpio'], sig + ' (through a resistor)'), item(d, 'B', ['gpio'], sig + ' (through a resistor)')],
       pir: d => [item(d, 'VCC', ['5v'], name['5v']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], sig)],
       servo: d => [item(d, 'GND', ['gnd'], name.gnd + ' (brown wire, first pin)'), item(d, 'V', ['5v'], name['5v'] + ' (red wire, middle pin)'), item(d, 'SIG', ['gpio'], sig + ' (orange wire)')],
       sht31: d => [item(d, 'VIN', u3 ? ['3v3', '5v'] : ['3v3'], u3 ? '3.3V or 5V (the breakout accepts 2.5–5 V)' : name['3v3'], pi ? 'On a Raspberry Pi use 3.3 V, not 5 V' : ''), item(d, 'GND', ['gnd'], name.gnd), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : e32 ? 'GPIO22, the I²C clock' : u3 ? 'A5 (or SCL), the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : e32 ? 'GPIO21, the I²C data' : u3 ? 'A4 (or SDA), the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda')],
@@ -587,7 +618,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }
