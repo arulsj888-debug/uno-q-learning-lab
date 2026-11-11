@@ -23,7 +23,7 @@ let PINS = UQ_PINS, PI = false, U3 = false, E32 = false, SUP = '3V3';    // SUP 
 PINS.add('QWIIC');                                         // the UNO Q Qwiic connector (I2C4 / Wire1)
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
-const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2|QA|QB)$/;          // pin of an off-board module, e.g. pir1.OUT
+const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2|QA|QB|SDA|SCL|DIN)$/;          // pin of an off-board module, e.g. pir1.OUT
 const isMod = r => MOD.test(r);
 const isWire = d => d.type === 'wire' || d.type === 'fwire' || d.type === 'lead' || d.type === 'qwiic';
 const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
@@ -80,7 +80,7 @@ for (const L of list) {
     const ends = isWire(d) ? [d.from, d.to] : Object.values(legs(d));
     for (const e of ends) {
       if (isHole(e)) { const [, , c] = HOLE.exec(e); if (+c < 1 || +c > 30) bad(L, `${d.id}: hole ${e} out of range`); (used[e] ??= []).push(d.id); }
-      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo', 'pixels'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
+      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo', 'pixels', 'lcd1602', 'oled', 'neopixel'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
       else if (!PINS.has(e)) bad(L, `${d.id}: unknown header pin ${e}`);
     }
   }
@@ -114,6 +114,14 @@ for (const L of list) {
     if (io.kind === 'touch') {
       const w = byId[io.item];
       if (!w || w.type !== 'fwire' || w.from !== pin) bad(L, `${pin}: touch pad wire is not connected to the pin`);
+    }
+    if (io.kind === 'lcd' || io.kind === 'oled') {
+      const id = io.item, lcd = io.kind === 'lcd', sda = pin, scl = io.scl;
+      if (!N.same(id + '.SDA', 'PIN:' + sda)) bad(L, `${io.kind}: SDA not on ${sda}`);
+      if (!N.same(id + '.SCL', 'PIN:' + scl)) bad(L, `${io.kind}: SCL not on ${scl}`);
+      if (!N.same(id + '.GND', G)) bad(L, `${io.kind}: GND not on GND`);
+      const v = lcd ? (U3 ? 'PIN:5V' : 'PIN:VIN') : 'PIN:3V3';
+      if (!N.same(id + '.VCC', v)) bad(L, `${io.kind}: VCC not on ${v.slice(4)}${lcd ? ' (the LCD backpack is made for 5 V)' : ''}`);
     }
     if (io.kind === 'joyax') {
       const id = io.item, leg = io.ax === 'x' ? 'VRX' : 'VRY';

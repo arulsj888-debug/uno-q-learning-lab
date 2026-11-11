@@ -26,6 +26,8 @@ export const SRC = {
   dhtlib: { t: 'Adafruit DHT sensor library (DHTtester example)', u: 'https://github.com/adafruit/DHT-sensor-library' },
   ky023: { t: 'KY-023 dual-axis joystick module (espboards.dev)', u: 'https://www.espboards.dev/sensors/ky-023' },
   ky040: { t: 'KY-040 rotary encoder (Joy-IT sensor kit)', u: 'https://sensorkit.joy-it.net/en/sensors/ky-040' },
+  lcdi2c: { t: 'I²C LCD1602 documentation (SunFounder): PCF8574 backpack, address 0x27 / 0x3F, LiquidCrystal_I2C', u: 'https://docs.sunfounder.com/projects/sf-components/en/latest/component_i2c_lcd.html' },
+  ssd1306: { t: 'Adafruit SSD1306 library (examples: begin(SSD1306_SWITCHCAPVCC, 0x3C))', u: 'https://github.com/adafruit/Adafruit_SSD1306' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -179,3 +181,21 @@ export const ENC_PARTS = [
   { id: 'w84', type: 'wire', from: 'GND2', to: 'j14', color: 'black', lift: 32 },
 ];
 export const ENC_IDS = ENC_PARTS.map(d => d.id);
+
+// ---- Lessons 21 / 22: I2C displays standing on the desk (module pins straight to the UNO R3 sockets)
+export const LCD_PARTS = [
+  { id: 'lcd1', type: 'lcd1602', x: 20, z: 138 },
+  { id: 'w90', type: 'fwire', from: 'lcd1.GND', to: 'GND2', color: 'black', lift: 24 },
+  { id: 'w91', type: 'fwire', from: 'lcd1.VCC', to: '5V', color: 'red', lift: 30 },
+  { id: 'w92', type: 'fwire', from: 'lcd1.SDA', to: 'A4', color: 'blue', lift: 36 },
+  { id: 'w93', type: 'fwire', from: 'lcd1.SCL', to: 'A5', color: 'yellow', lift: 42 },
+];
+export const LCD_IDS = LCD_PARTS.map(d => d.id);
+export const OLED_PARTS = [
+  { id: 'oled1', type: 'oled', x: 20, z: 138 },
+  { id: 'w95', type: 'fwire', from: 'oled1.GND', to: 'GND2', color: 'black', lift: 24 },
+  { id: 'w96', type: 'fwire', from: 'oled1.VCC', to: '3V3', color: 'red', lift: 30 },
+  { id: 'w97', type: 'fwire', from: 'oled1.SCL', to: 'A5', color: 'yellow', lift: 36 },
+  { id: 'w98', type: 'fwire', from: 'oled1.SDA', to: 'A4', color: 'blue', lift: 42 },
+];
+export const OLED_IDS = OLED_PARTS.map(d => d.id);

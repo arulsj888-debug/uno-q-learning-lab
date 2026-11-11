@@ -66,6 +66,7 @@ const VIEWS = {
   thermo2: { t: new THREE.Vector3(95, 0, 6), d: new THREE.Vector3(-0.08, 0.92, 0.38), dist: 270 },
   pixclose: { t: new THREE.Vector3(170, -4, 6), d: new THREE.Vector3(-0.06, 0.93, 0.36), dist: 62 },
   smart: { t: new THREE.Vector3(95, 0, 8), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 430 },
+  dispq: { t: new THREE.Vector3(30, 0, 105), d: new THREE.Vector3(-0.1, 0.88, 0.45), dist: 300 },
   farq: { t: new THREE.Vector3(110, 0, 50), d: new THREE.Vector3(-0.15, 0.9, 0.45), dist: 540 },
   farpi: { t: new THREE.Vector3(100, 0, -30), d: new THREE.Vector3(-0.1, 0.92, 0.4), dist: 520 },
   qwq: { t: new THREE.Vector3(50, 0, 95), d: new THREE.Vector3(-0.1, 0.92, 0.38), dist: 420 },
@@ -829,8 +830,10 @@ class App {
     const io = $('#dock-io');
     $('#dock').classList.toggle('with-io', w.length > 0);
     $('#dock').classList.toggle('no-serial', L.id === 'l9');
-    let h = ''; this.joyPos = { x: 0.5, y: 0.5 }; this.joySw = false; this.encPh = 0; this.encSw = false; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
+    let h = ''; this.lcdSt = { rows: [' '.repeat(16), ' '.repeat(16)], c: 0, r: 0, bl: false, ready: false }; this.oledSt = { buf: ['', ''], cy: 0, shown: null }; this.lcdAddr = 0x27; this.oledAddr = 0x3C; this._lcdKey = null; this._oledKey = null; this.joyPos = { x: 0.5, y: 0.5 }; this.joySw = false; this.encPh = 0; this.encSw = false; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
     if (w.includes('ble')) h += `<div class="io-block pirstat tight"><div><span>Phone app (client)</span><b id="bl-s1">—</b></div><div class="arrow">→</div><div><span>ESP32 (BLE server)</span><b id="bl-s2">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="bl-s3">—</b></div></div><div id="bl-note" class="io-note"></div>`;
+    if (w.includes('lcdaddr')) h += `<div class="io-block"><div class="io-title">LCD backpack <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="lcd-addr" class="hold small">Module address: 0x27</button></div><div id="lcd-note" class="io-note"></div></div>`;
+    if (w.includes('oledaddr')) h += `<div class="io-block"><div class="io-title">OLED module <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="oled-addr" class="hold small">Module address: 0x3C</button></div><div id="oled-note" class="io-note"></div></div>`;
     if (w.includes('joy')) h += `<div class="io-block"><div class="io-title">Joystick <span class="io-note">(simulated)</span></div><div class="throw"><label>X (left → right)</label><input id="jx" type="range" min="0" max="100" value="50"><b id="jx-v"></b></div><div class="throw"><label>Y (up ↔ down)</label><input id="jy" type="range" min="0" max="100" value="50"><b id="jy-v"></b></div><button id="jsw" class="hold">Hold to press the stick</button><div class="io-note">The sliders move the stick; pressing closes the switch under it.</div></div>`;
     if (w.includes('enc')) h += `<div class="io-block"><div class="io-title">Rotary encoder <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="enc-l" class="small">◀ turn</button><button id="enc-r" class="small">turn ▶</button><button id="enc-sw" class="hold small">Hold to press the knob</button></div><div id="enc-st" class="io-val"></div><div class="io-note">One press = one click of the knob (four steps of the CLK / DT pattern).</div></div>`;
     if (w.includes('sleep')) h += `<div class="io-block pirstat tight"><div><span>ESP32</span><b id="sl-st">—</b></div><div class="arrow">→</div><div><span>Wake-up in</span><b id="sl-t">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="sl-led">—</b></div></div><div class="io-note">In deep sleep only the RTC controller, RTC peripherals and RTC memory stay powered.</div>`;
@@ -889,6 +892,8 @@ class App {
     }
     if ($('#wf-rssi')) { const upd = () => { $('#wf-val').innerHTML = `<b>${this.wf.rssi} dBm</b>`; }; $('#wf-rssi').oninput = e => { this.wf.rssi = +e.target.value; upd(); }; upd(); }
     if ($('#wf-router')) { $('#wf-router').onclick = () => { if (!this.sim.running) this.wf.router = !this.wf.router; }; $('#wf-pass').onclick = () => { if (!this.sim.running) this.wf.passOk = !this.wf.passOk; }; }
+    if ($('#lcd-addr')) $('#lcd-addr').onclick = () => { if (!this.sim.running) this.lcdAddr = this.lcdAddr === 0x27 ? 0x3F : 0x27; };
+    if ($('#oled-addr')) $('#oled-addr').onclick = () => { if (!this.sim.running) this.oledAddr = this.oledAddr === 0x3C ? 0x3D : 0x3C; };
     if ($('#jx')) { const sl = (id, ax) => { $(id).oninput = e => { this.joyPos[ax] = +e.target.value / 100; this.joyShow(); }; }; sl('#jx', 'x'); sl('#jy', 'y'); const sw = $('#jsw'); const dn = e => { e.preventDefault(); this.joySw = true; this.joyShow(); }, up = () => { this.joySw = false; this.joyShow(); }; sw.addEventListener('pointerdown', dn); sw.addEventListener('pointerup', up); sw.addEventListener('pointerleave', up); this.joyShow(); }
     if ($('#enc-l')) { $('#enc-l').onclick = () => this.encTurn(-1); $('#enc-r').onclick = () => this.encTurn(1); const sw = $('#enc-sw'); const dn = e => { e.preventDefault(); this.encSw = true; this.encShow(); }, up = () => { this.encSw = false; this.encShow(); }; sw.addEventListener('pointerdown', dn); sw.addEventListener('pointerup', up); sw.addEventListener('pointerleave', up); this.encShow(); }
     if ($('#knob')) { $('#knob').oninput = e => this.setKnob(+e.target.value / 1000); this.setKnob(this.knobValue()); }
@@ -1521,7 +1526,42 @@ class App {
   joyShow() { const o = this.bench.get('joy1'); if (o && o.setStick) o.setStick(this.joyPos.x, this.joyPos.y, this.joySw); }
   encShow() { const o = this.bench.get('enc1'); if (o && o.setPhase) o.setPhase(this.encPh, this.encSw); }
   encTurn(dir) { let n = 4; const step = () => { this.encPh += dir; this.encShow(); if (--n > 0) setTimeout(step, 25); }; step(); }
+  // ---- lessons 18 / 19 / 21 / 22: I2C displays driven by the simulated sketch
+  i2cDispOk(kind) { const io = Object.values((this.lesson && this.lesson.io) || {}).find(x => x.kind === kind); return !!(io && this.wired(io) && this.board.powered); }
+  lcdOp({ op, a, b }) {
+    const S = this.lcdSt; if (!(this.lcdAddr === 0x27 && this.i2cDispOk('lcd'))) return;
+    if (op === 'init') { S.ready = true; S.rows = [' '.repeat(16), ' '.repeat(16)]; S.c = 0; S.r = 0; }
+    else if (op === 'backlight') S.bl = true;
+    else if (op === 'cursor') { S.c = a; S.r = b; }
+    else if (op === 'print') for (const ch of String(a)) { if (S.c >= 0 && S.c < 16 && S.r >= 0 && S.r < 2) S.rows[S.r] = S.rows[S.r].slice(0, S.c) + ch + S.rows[S.r].slice(S.c + 1); S.c++; }
+  }
+  oledOp({ op, a, b }) {
+    const S = this.oledSt;
+    if (op === 'begin') return this.i2cDispOk('oled') && this.oledAddr === a;
+    if (op === 'clear') { S.buf = ['', '']; S.cy = 0; }
+    else if (op === 'cursor') S.cy = Math.max(0, Math.min(1, Math.floor((b || 0) / 8)));
+    else if (op === 'println' || op === 'print') { S.buf[S.cy] = String(a); if (op === 'println') S.cy = Math.min(1, S.cy + 1); }
+    else if (op === 'display') S.shown = S.buf.slice();
+  }
+  displayTick() {
+    const L = this.lesson; if (!L) return; const w = L.widgets || [], run = this.sim.running, pw = this.board.powered;
+    if (!run) { this.lcdSt.ready = false; this.lcdSt.bl = false; this.oledSt.shown = null; }
+    const set = (id, h) => { const e = $(id); if (e && e.innerHTML !== h) e.innerHTML = h; };
+    if (w.includes('lcdaddr')) {
+      const S = this.lcdSt, okAddr = this.lcdAddr === 0x27, o = this.bench.get('lcd1');
+      const b = $('#lcd-addr'); if (b) { b.disabled = run; b.textContent = `Module address: 0x${this.lcdAddr.toString(16).toUpperCase()}`; b.classList.toggle('on', !okAddr); }
+      if (o && o.setContent) { const key = JSON.stringify([pw, run, S.bl, S.ready, okAddr, S.rows]); if (key !== this._lcdKey) { this._lcdKey = key; o.setContent({ powered: pw, backlight: pw && (S.bl || !okAddr), lines: pw && S.ready && okAddr ? S.rows : null }); } }
+      set('#lcd-note', !pw ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>. You can change the module address first (stop the sketch to change it).' : !okAddr ? 'The sketch talks to address <b>0x27</b>, but this module answers at <b>0x3F</b>: nobody answers and the screen stays blank.' : 'The module answers at 0x27 and shows the text.');
+    }
+    if (w.includes('oledaddr')) {
+      const S = this.oledSt, okAddr = this.oledAddr === 0x3C, o = this.bench.get('oled1');
+      const b = $('#oled-addr'); if (b) { b.disabled = run; b.textContent = `Module address: 0x${this.oledAddr.toString(16).toUpperCase()}`; b.classList.toggle('on', !okAddr); }
+      if (o && o.setContent) { const key = JSON.stringify([pw, run, S.shown, okAddr]); if (key !== this._oledKey) { this._oledKey = key; o.setContent({ powered: pw && run && !!S.shown, lines: pw && S.shown ? S.shown : null }); } }
+      set('#oled-note', !pw ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>. You can change the module address first.' : !okAddr ? 'The sketch calls begin() with 0x3C, but this module answers at <b>0x3D</b>: begin() returns false.' : 'The display answers at 0x3C; the text appears after display().');
+    }
+  }
   ctlTick() {
+    this.displayTick();
     const L = this.lesson; if (!L) return; const w = L.widgets || [];
     if (w.includes('joy')) { const set = (id, t) => { const e = $(id); if (e && e.textContent !== t) e.textContent = t; }; set('#jx-v', Math.round(this.joyPos.x * 100) + ' %'); set('#jy-v', Math.round(this.joyPos.y * 100) + ' %'); }
     if (w.includes('enc')) { const ph = this.encPh & 3, e = $('#enc-st'); const t = `CLK ${ph === 1 || ph === 2 ? 'LOW' : 'HIGH'} · DT ${ph === 2 || ph === 3 ? 'LOW' : 'HIGH'} · SW ${this.encSw ? 'pressed (LOW)' : 'released (HIGH)'}`; if (e && e.textContent !== t) e.textContent = t; }
@@ -1929,6 +1969,8 @@ class App {
         return ok ? { found: true, c: this.th.t + (Math.random() - 0.5) * 0.1, rh: Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3)) } : { found: false };
       },
       ble: ev => { if (ev.stage === 'adv') this.bl.adv = !!ev.val; else if (ev.stage === 'val') this.bl.val = ev.val; this.bleRender(); },
+      lcd: ev => this.lcdOp(ev),
+      oled: ev => this.oledOp(ev),
       dht: () => {
         const L = this.lesson, pin = L && L.io ? Object.keys(L.io).find(p => L.io[p].kind === 'dht') : null, io = pin && this.ioFor(pin);
         if (!(io && this.wired(io) && this.board.powered && !this.th.unplug)) return { ok: false };

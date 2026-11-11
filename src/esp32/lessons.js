@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -23,6 +23,9 @@ const SRC = {
   ky023: { t: 'KY-023 dual-axis joystick module (espboards.dev)', u: 'https://www.espboards.dev/sensors/ky-023' },
   ky040: { t: 'KY-040 rotary encoder (Joy-IT sensor kit)', u: 'https://sensorkit.joy-it.net/en/sensors/ky-040' },
   ar: { t: 'Arduino-ESP32 documentation: ADC (analogRead)', u: 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/adc.html' },
+  lcdi2c: { t: 'I²C LCD1602 documentation (SunFounder): PCF8574 backpack, address 0x27 / 0x3F, LiquidCrystal_I2C', u: 'https://docs.sunfounder.com/projects/sf-components/en/latest/component_i2c_lcd.html' },
+  ssd1306: { t: 'Adafruit SSD1306 library (examples: begin(SSD1306_SWITCHCAPVCC, 0x3C))', u: 'https://github.com/adafruit/Adafruit_SSD1306' },
+  wire: { t: 'Arduino-ESP32 documentation: I²C (Wire)', u: 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/i2c.html' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -87,10 +90,18 @@ const ENC_PARTS_E = [
   { id: 'w84', type: 'fwire', from: 'GND2', to: 'j14', color: 'black', lift: 34 },
 ];
 const ENC_IDS_E = ENC_PARTS_E.map(d => d.id);
+// I2C displays on the desk: the module pins go to breadboard holes a10..a13 and the board pins to b10..b13 (male header pins on both sides)
+const dispE = (type, id, vcc, order, firstWire) => [{ id, type, x: 20, z: 138 },
+  ...order.map((n, i) => ({ id: 'm' + firstWire + i, type: 'fwire', from: id + '.' + n, to: 'a' + (10 + i), color: { GND: 'black', VCC: 'red', SDA: 'blue', SCL: 'yellow' }[n], lift: 16 + i * 2 })),
+  ...order.map((n, i) => ({ id: 'w' + firstWire + i, type: 'fwire', from: { GND: 'GND2', VCC: vcc, SDA: 'G21', SCL: 'G22' }[n], to: 'b' + (10 + i), color: { GND: 'black', VCC: 'red', SDA: 'blue', SCL: 'yellow' }[n], lift: 22 + i * 3 }))];
+const LCD_PARTS_E = dispE('lcd1602', 'lcd1', 'VIN', ['GND', 'VCC', 'SDA', 'SCL'], 9);
+const LCD_IDS_E = LCD_PARTS_E.map(d => d.id);
+const OLED_PARTS_E = dispE('oled', 'oled1', '3V3', ['GND', 'VCC', 'SCL', 'SDA'], 8);
+const OLED_IDS_E = OLED_PARTS_E.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
-export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls' };
+export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays' };
 export const E32_COMING = [];
 
 export const E32_LESSONS = [
@@ -954,5 +965,102 @@ export const E32_LESSONS = [
       { q: 'A real encoder counts too many steps sometimes. Why?', a: ['It is broken', 'The contacts bounce', 'The ADC is slow', 'The knob is loose'], c: 1, why: 'Mechanical contacts bounce: debounce in software.' },
     ],
     sources: [SRC.ky040, SRC.pinmode, SRC.ds],
+  },
+
+  // ================================================================== 18
+  {
+    id: 'e18', num: 18, module: 9, title: 'LCD 16×2: show text over I²C', level: 'Beginner', time: '20 min',
+    goal: 'Print text on a 16×2 character LCD with the LiquidCrystal_I2C library, and find out why a display can stay blank.',
+    hardware: ['ESP32 DevKit V1', 'LCD 16×2 with I²C backpack (PCF8574)', '4 × jumper wires (male–male for the board pins)'],
+    code: E32_LCD, file: 'LCD_I2C.ino', program: 'e_lcd', fast: true, widgets: ['lcdaddr'],
+    circuit: LCD_PARTS_E, io: { G21: { kind: 'lcd', scl: 'G22', item: 'lcd1', needs: LCD_IDS_E } },
+    explain: {
+      1: '<b>Wire.h</b> is the I²C library of the Arduino core.',
+      2: 'The LCD library: install <b>LiquidCrystal I2C</b> by Frank de Brabander from the Library Manager.',
+      4: 'Create the display object: I²C <b>address 0x27</b>, <b>16</b> columns, <b>2</b> rows. A wrong address shows nothing.',
+      6: '<b>setup()</b> runs once.',
+      7: '<b>init()</b> starts the LCD (some library versions call it begin()).',
+      8: 'Switch the <b>backlight</b> on.',
+      9: 'Put the cursor at column 0 of row 0 (the top line).',
+      10: 'Print the first line.',
+      13: '<b>loop()</b> repeats forever.',
+      14: 'Cursor to row 1 (the bottom line).',
+      15: 'Print the label…',
+      16: '…and the seconds since the start (<b>millis()</b> counts milliseconds).',
+      17: 'Wait one second.',
+    },
+    steps: [
+      { title: 'The LCD and its I²C backpack', view: 'dispq', have: ['lcd1'], power: false,
+        body: `<p>A 16×2 LCD has <b>16 columns and 2 rows</b> of characters, each drawn from a <b>5 × 8 dot matrix</b>. The small blue board on its back, a <b>PCF8574</b> backpack, turns its many pins into <b>two I²C wires</b>. <b>Click the parts</b> in the 3D view.</p>
+        <ul><li>Four pins: <b>GND, VCC, SDA, SCL</b>. The backpack is made for <b>5 V</b>.</li><li>I²C address: usually <b>0x27</b>, on some <b>0x3F</b>.</li><li>The blue trimmer sets the <b>contrast</b>.</li></ul>` },
+      { title: 'Wire the four pins', view: 'dispq', have: LCD_IDS_E, power: false, pins: ['GND2', 'VIN', 'G21', 'G22'],
+        body: `<ul><li>GND → <b>GND</b></li><li>VCC → <b>VIN</b> (the 5 V from USB)</li><li>SDA → <b>D21</b> (GPIO21), SCL → <b>D22</b> (GPIO22)</li></ul><p class="warn">The ESP32 pins are 3.3 V only. Many backpacks pull SDA and SCL up to VCC (5 V here): check your module or use a level shifter.</p>` },
+      { title: 'Install the library', view: 'dispq', have: LCD_IDS_E,
+        body: `<p>In the Arduino IDE: <b>Sketch → Include Library → Manage Libraries…</b>, search for <b>LiquidCrystal I2C</b> (Frank de Brabander) and install it.</p>` },
+      { title: 'The code', view: 'dispq', have: LCD_IDS_E, showCode: true, power: true, body: `<p>Click lines 4, 7, 9 and 14.</p>` },
+      { title: 'Run it', view: 'dispq', have: LCD_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>The top line shows <b>Hello</b>, and the bottom line counts the seconds. <b>Turn the contrast trimmer</b> in real life if you only see dark blocks.</p><p class="sim">Simulated display: it shows the text the sketch prints.</p>` },
+      { title: 'Blank screen? Check the address', view: 'dispq', have: LCD_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Module address”</b> to change it to <b>0x3F</b> and run again. The sketch still talks to 0x27, nobody answers, and the screen shows <b>no text</b>.</p><p>On a real board run an <b>I²C scanner</b> sketch to find the address, then use it in <code>LiquidCrystal_I2C lcd(address, 16, 2)</code>.</p>` },
+      { title: 'Summary', view: 'dispq', have: LCD_IDS_E, power: true,
+        body: `<ul><li>Backpack: GND, VCC (5 V), SDA, SCL; address 0x27 or 0x3F.</li><li><code>init()</code>, <code>backlight()</code>, <code>setCursor(col, row)</code>, <code>print()</code>.</li><li>Blank screen: wrong address, contrast, or loose wire.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does the PCF8574 backpack do?', a: ['Makes the LCD brighter', 'Turns the LCD pins into two I²C wires', 'Stores the text', 'Powers the Arduino'], c: 1, why: 'It is an I²C port expander.' },
+      { q: 'The sketch shows nothing on the LCD but the backlight is on. What do you check first?', a: ['The USB cable length', 'The I²C address (0x27 or 0x3F) and the contrast', 'The LED', 'The baud rate'], c: 1, why: 'A wrong address or low contrast is the usual cause.' },
+      { q: 'lcd.setCursor(0, 1) moves the cursor to…', a: ['The top line', 'Column 0 of the bottom line', 'Column 1 of the top line', 'The backlight'], c: 1, why: 'setCursor(column, row): row 1 is the second line.' },
+      { q: 'The supply of the LCD backpack is…', a: ['3.3 V only', '5 V', '12 V', 'Not needed'], c: 1, why: 'The module is made for 5 V.' },
+    ],
+    sources: [SRC.lcdi2c, SRC.wire, SRC.ds],
+  },
+
+  // ================================================================== 19
+  {
+    id: 'e19', num: 19, module: 9, title: 'OLED 128×64: draw text with the SSD1306', level: 'Beginner', time: '20 min',
+    goal: 'Show text on a small OLED with the Adafruit SSD1306 library, and handle a display that is not found.',
+    hardware: ['ESP32 DevKit V1', 'SSD1306 OLED 128×64 (I²C)', '4 × jumper wires (male–male for the board pins)'],
+    code: E32_OLED, file: 'OLED_SSD1306.ino', program: 'e_oled', fast: true, widgets: ['oledaddr'],
+    circuit: OLED_PARTS_E, io: { G21: { kind: 'oled', scl: 'G22', item: 'oled1', needs: OLED_IDS_E } },
+    explain: {
+      1: '<b>Wire.h</b>: the I²C library.',
+      2: '<b>Adafruit_GFX</b>: drawing functions (text, lines, shapes) shared by many displays.',
+      3: '<b>Adafruit_SSD1306</b>: the driver of the SSD1306 chip in the OLED.',
+      5: 'Create the display object: <b>128 × 64</b> pixels, the <b>Wire</b> bus, <b>−1</b> = no reset pin.',
+      7: '<b>setup()</b> runs once.',
+      8: 'Serial output on (for error messages).',
+      9: '<b>begin()</b> starts the display at I²C address <b>0x3C</b> and returns <b>false</b> if nobody answers. SWITCHCAPVCC makes the display voltage from the supply.',
+      10: 'No answer → tell the user.',
+      11: 'Stop here forever.',
+      13: 'Empty the screen buffer.',
+      14: 'Text size 1 (6 × 8 pixels per character).',
+      15: 'White text (on this display: the pixel colour).',
+      16: 'Cursor at the top left.',
+      17: 'Print a line…',
+      18: '…and a second line.',
+      19: '<b>display()</b> sends the buffer to the screen. Nothing appears before this call.',
+    },
+    steps: [
+      { title: 'The OLED', view: 'dispq', have: ['oled1'], power: false,
+        body: `<p>An <b>OLED</b> makes its own light: every one of its <b>128 × 64 pixels</b> is a tiny LED, so there is no backlight. The <b>SSD1306</b> chip drives it and talks I²C. <b>Click the parts</b> in the 3D view.</p>
+        <ul><li>Four pins: <b>GND, VCC, SCL, SDA</b> (the order differs between makers: read the printing).</li><li>Address <b>0x3C</b>, on some modules <b>0x3D</b>.</li><li>Check whether your module accepts 3.3 V, 5 V or both.</li></ul>` },
+      { title: 'Wire the four pins', view: 'dispq', have: OLED_IDS_E, power: false, pins: ['GND2', '3V3', 'G22', 'G21'],
+        body: `<ul><li>GND → <b>GND</b></li><li>VCC → <b>3V3</b></li><li>SCL → <b>D22</b> (GPIO22), SDA → <b>D21</b> (GPIO21)</li></ul>` },
+      { title: 'Install the libraries', view: 'dispq', have: OLED_IDS_E,
+        body: `<p>In the Library Manager install <b>Adafruit SSD1306</b> and <b>Adafruit GFX Library</b> (accept the other libraries it asks for).</p>` },
+      { title: 'The code', view: 'dispq', have: OLED_IDS_E, showCode: true, power: true, body: `<p>Click lines 5, 9, 17 and 19. Note that nothing is shown until <code>display()</code>.</p>` },
+      { title: 'Run it', view: 'dispq', have: OLED_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Two lines of text appear on the OLED, drawn from the dot font of the library.</p><p class="sim">Simulated display.</p>` },
+      { title: 'What if the display is not found?', view: 'dispq', have: OLED_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Module address”</b> to switch it to <b>0x3D</b> and run again. <code>begin(…, 0x3C)</code> returns false and the Serial Monitor shows:</p><pre class="tree">SSD1306 not found</pre><p>Run an I²C scanner, use the address it reports, and check the four wires.</p>` },
+      { title: 'Summary', view: 'dispq', have: OLED_IDS_E, power: true,
+        body: `<ul><li><code>Adafruit_SSD1306 display(128, 64, &amp;Wire, -1)</code>, <code>display.begin(SSD1306_SWITCHCAPVCC, 0x3C)</code>.</li><li>Draw into a buffer (<code>setCursor</code>, <code>println</code>), then <code>display.display()</code>.</li><li>“not found” = wrong address or wiring.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'When does the text appear on the OLED?', a: ['At println()', 'After display.display()', 'After begin()', 'Never'], c: 1, why: 'Drawing goes into a buffer; display() sends it to the screen.' },
+      { q: 'begin() returns false. What do you check?', a: ['The I²C address and the wires', 'The LED', 'The resistor colours', 'The baud rate only'], c: 0, why: 'Nobody answered at that address.' },
+      { q: 'How many pixels does this OLED have?', a: ['16 × 2', '128 × 64', '8 × 8', '320 × 240'], c: 1, why: '128 columns by 64 rows.' },
+      { q: 'Why has an OLED no backlight?', a: ['It is broken', 'Each pixel makes its own light', 'It uses sunlight', 'It is always off'], c: 1, why: 'OLED pixels are light-emitting.' },
+    ],
+    sources: [SRC.ssd1306, SRC.wire, SRC.ds],
   },
 ];

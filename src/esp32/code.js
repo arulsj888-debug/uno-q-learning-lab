@@ -385,3 +385,48 @@ void loop() {
   }
   delay(2);
 }`;
+
+// Lesson 18 — 16x2 LCD with I2C backpack
+export const E32_LCD = `#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);   // I2C address 0x27, 16 columns, 2 rows
+
+void setup() {
+  lcd.init();                // start the display
+  lcd.backlight();           // switch the backlight on
+  lcd.setCursor(0, 0);       // column 0, row 0 (the top line)
+  lcd.print("Hello, ESP32!");
+}
+
+void loop() {
+  lcd.setCursor(0, 1);       // column 0, row 1 (the bottom line)
+  lcd.print("Seconds: ");
+  lcd.print(millis() / 1000);
+  delay(1000);
+}`;
+
+// Lesson 19 — SSD1306 OLED
+export const E32_OLED = `#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+Adafruit_SSD1306 display(128, 64, &Wire, -1);   // 128 x 64 pixels, no reset pin
+
+void setup() {
+  Serial.begin(115200);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {   // I2C address 0x3C
+    Serial.println("SSD1306 not found");
+    for (;;);                                         // stop here
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("Hello, ESP32!");
+  display.println("OLED 128 x 64");
+  display.display();                                  // send the picture to the screen
+}
+
+void loop() {
+}`;
