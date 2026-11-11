@@ -48,6 +48,8 @@ export function terminals(d) {
     case 'lamp': return [['L1', `${d.id}.L1`], ['L2', `${d.id}.L2`]];
     case 'hcsr04': return [['VCC', `${row}${c}`], ['TRIG', `${row}${c + 1}`], ['ECHO', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'servo': return [['GND', `${row}${c}`], ['V', `${row}${c + 1}`], ['SIG', `${row}${c + 2}`]];
+    case 'joystick': return [['GND', `${row}${c}`], ['VCC', `${row}${c + 1}`], ['VRX', `${row}${c + 2}`], ['VRY', `${row}${c + 3}`], ['SW', `${row}${c + 4}`]];
+    case 'encoder': return [['CLK', `${row}${c}`], ['DT', `${row}${c + 1}`], ['SW', `${row}${c + 2}`], ['VCC', `${row}${c + 3}`], ['GND', `${row}${c + 4}`]];
     case 'dht': return [['VCC', `${row}${c}`], ['DATA', `${row}${c + 1}`], ['NC', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'rgbled': return [['R', `${row}${c}`], ['C', `${row}${c + 1}`], ['G', `${row}${c + 2}`], ['B', `${row}${c + 3}`]];
     case 'pir': return [['VCC', `${d.id}.VCC`], ['OUT', `${d.id}.OUT`], ['GND', `${d.id}.GND`]];
@@ -249,6 +251,23 @@ export function evaluate(model) {
       const dead = burnt.has(d.id);
       if (d.type === 'resistor') { const r = Math.max(0.01, d.ohms), a = nodeOf(d.a), b = nodeOf(d.b); if (!dead) elems.push({ t: 'R', a, b, g: 1 / r }); pe[d.id] = { a, b, r }; }
       else if (d.type === 'led') { const lt = LED_TYPES[d.color || 'red'], Is = 0.02 / Math.exp(lt.vf / NVT), e = { t: 'D', a: nodeOf(d.anode), b: nodeOf(d.cathode), Is }; if (!dead) elems.push(e); pe[d.id] = { a: e.a, b: e.b, Is }; }
+      else if (d.type === 'joystick') {
+        const gn = nid(T(d, 'GND')), vn = nid(T(d, 'VCC')), jx = nid(T(d, 'VRX')), jy = nid(T(d, 'VRY')), sw = nid(T(d, 'SW')), J = (env.joy || {})[d.id] || { x: 0.5, y: 0.5 };
+        if (!dead) {
+          for (const [w, f] of [[jx, J.x], [jy, J.y]]) elems.push({ t: 'R', a: vn, b: w, g: 1 / Math.max(1, (1 - f) * 10000) }, { t: 'R', a: w, b: gn, g: 1 / Math.max(1, f * 10000) });
+          if ((env.pressed || {})[d.id]) elems.push({ t: 'R', a: sw, b: gn, g: 20 });
+        }
+        pe[d.id] = { vn, gn, jx, jy, sw };
+      }
+      else if (d.type === 'encoder') {
+        const gn = nid(T(d, 'GND')), clk = nid(T(d, 'CLK')), dt = nid(T(d, 'DT')), sw = nid(T(d, 'SW')), vn = nid(T(d, 'VCC')), ph = ((env.enc || {})[d.id] ?? 0) & 3;
+        if (!dead) {
+          if (ph === 1 || ph === 2) elems.push({ t: 'R', a: clk, b: gn, g: 20 });
+          if (ph === 2 || ph === 3) elems.push({ t: 'R', a: dt, b: gn, g: 20 });
+          if ((env.pressed || {})[d.id]) elems.push({ t: 'R', a: sw, b: gn, g: 20 });
+        }
+        pe[d.id] = { vn, gn, ph };
+      }
       else if (d.type === 'dht') { const vn = nid(T(d, 'VCC')), gn = nid(T(d, 'GND')); if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 20000, load: true }); pe[d.id] = { vn, gn }; }
       else if (d.type === 'rgbled') {
         // three LED dice with one common leg: common cathode (d.ca falsy) = colour pins are the anodes, common anode = colour pins are the cathodes
@@ -336,6 +355,8 @@ export function evaluate(model) {
       else if (d.type === 'buzzer') { const V = v[q.a] - v[q.b]; acc(d.id, 'Vmax', V, 'max'); acc(d.id, 'Vmin', V, 'min'); acc(d.id, 'V', V); }
       else if (d.type === 'pot') acc(d.id, 'Vw', v[q.W]);
       else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo' || d.type === 'sht31' || d.type === 'dht') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
+      else if (d.type === 'joystick') { acc(d.id, 'Vs', v[q.vn] - v[q.gn]); acc(d.id, 'Vx', v[q.jx] - v[q.gn]); acc(d.id, 'Vy', v[q.jy] - v[q.gn]); }
+      else if (d.type === 'encoder') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'tmp36') { acc(d.id, 'Vs', v[q.vs] - v[q.g]); acc(d.id, 'Vout', v[q.out] - v[q.g]); }
     }
     if (step === N - 1) {   // floating nets: no conducting path to any source
@@ -392,6 +413,37 @@ export function evaluate(model) {
         else why = 'almost no current flows (is the resistor much too large?)';
         R.msg = 'Off: ' + why + '.'; note('bad', `${label} stays dark: ${why}.`, d.id);
       }
+    } else if (d.type === 'joystick') {
+      const vs = s.Vs ?? 0, J = (env.joy || {})[d.id] || { x: 0.5, y: 0.5 }, rx = gpioOn(d, 'VRX'), ry = gpioOn(d, 'VRY'), sw = gpioOn(d, 'SW'), pressed = !!(env.pressed || {})[d.id];
+      let bad = null;
+      if (!powered) R.status = 'off';
+      else if (vs < -0.5) { R.status = 'bad'; R.msg = 'Connected backwards.'; note('bad', `${label} is connected backwards (VCC and GND swapped).`, d.id); }
+      else if (vs < 1) { R.status = 'off'; R.msg = 'No supply'; note('bad', `${label} has no supply: connect VCC to ${boardKind === 'uno3' ? '5V (or 3.3V)' : '3V3'} and GND to GND.`, d.id); }
+      else if (!rx.length || !ry.length) bad = `${!rx.length ? 'VRx' : 'VRy'} is not connected to a board pin`;
+      else if (boardKind === 'pi4') bad = 'the Raspberry Pi has no analog inputs, so it cannot read VRx and VRy (it needs an extra ADC chip)';
+      else if ([...rx, ...ry].some(id => !usedPins.get(id).analog)) bad = 'VRx and VRy must go to analog (ADC) pins';
+      else if (![...rx, ...ry].every(id => modeOf(id) === 'analog')) bad = 'set the pins on VRx and VRy to “Analog input (ADC)”';
+      if (powered && vs >= 1) {
+        if (bad) { R.status = 'warn'; R.msg = bad[0].toUpperCase() + bad.slice(1) + '.'; note('bad', `${label}: ${bad}.`, d.id); }
+        else {
+          R.msg = `Stick at X ${Math.round(J.x * 100)} %, Y ${Math.round(J.y * 100)} %: VRx ${(s.Vx ?? 0).toFixed(2)} V, VRy ${(s.Vy ?? 0).toFixed(2)} V${pressed ? ', pressed' : ''}.`;
+          note('ok', `${label}: ${R.msg}`, d.id);
+          if (sw.length && !sw.some(id => modeOf(id) === 'up')) note('warn', `${label}: SW closes to GND when the stick is pressed, so its pin needs the internal pull-up (set it to “Input with pull-up”), otherwise it floats.`, d.id);
+        }
+      }
+    } else if (d.type === 'encoder') {
+      const vs = s.Vs ?? 0, ph = ((env.enc || {})[d.id] ?? 0) & 3, clk = gpioOn(d, 'CLK'), dtp = gpioOn(d, 'DT'), sw = gpioOn(d, 'SW'), pressed = !!(env.pressed || {})[d.id];
+      let bad = null;
+      if (!clk.length || !dtp.length) bad = `${!clk.length ? 'CLK' : 'DT'} is not connected to a board pin`;
+      else if (![...clk, ...dtp, ...sw].every(id => ['up', 'in', 'down'].includes(modeOf(id)))) bad = 'the CLK, DT and SW pins must be inputs';
+      else if (![...clk, ...dtp, ...sw].every(id => modeOf(id) === 'up')) bad = 'set CLK, DT and SW to “Input with pull-up” (the contacts only connect to GND; the module’s own pull-up resistors, if any, are not relied on)';
+      const clkLow = ph === 1 || ph === 2, dtLow = ph === 2 || ph === 3;
+      R.msg = `Pattern CLK ${clkLow ? 'LOW' : 'HIGH'}, DT ${dtLow ? 'LOW' : 'HIGH'}${pressed ? ', SW pressed' : ''}.`;
+      if (powered) {
+        if (bad) { R.status = 'warn'; R.msg = bad[0].toUpperCase() + bad.slice(1) + '.'; note('bad', `${label}: ${bad}.`, d.id); }
+        else note('ok', `${label}: ${R.msg} Turn the knob: the two signals change one after the other, and the order tells the direction.`, d.id);
+        if (vs > 3.6 && boardKind !== 'uno3') note('warn', `${label}: + is at ${vs.toFixed(1)} V. If your module has pull-up resistors to +, they pull CLK, DT and SW up to that voltage, too high for a 3.3 V pin. Use 3.3 V.`, d.id);
+      } else R.status = 'off';
     } else if (d.type === 'dht') {
       const vs = s.Vs ?? 0, data = gpioOn(d, 'DATA'), is11 = (d.model || 'dht11') === 'dht11', nm = is11 ? 'DHT11' : 'DHT22';
       const vcc = find(T(d, 'VCC')), dn = find(T(d, 'DATA'));
@@ -646,6 +698,8 @@ export function evaluate(model) {
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
       hcsr04: d => [item(d, 'VCC', ['5v'], name['5v'], 'The HC-SR04 is made for 5 V'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'TRIG', ['gpio'], sig), (pi || e32 ? echoDivider(d) : item(d, 'ECHO', ['gpio'], pi || e32 ? 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider' : u3 ? 'a digital pin (for example D8)' : 'D8 (a 5 V-tolerant pin)', pi || e32 ? 'Its 5 V echo would damage the pin directly' : u3 ? '' : 'Not D3 or A0–A5: they are 3.3 V only', (k, id) => !pi && !e32 ? !k.v3 : true))],
+      joystick: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VCC', ['3v3', '5v'], pi ? name['3v3'] : u3 ? '5V (or 3.3V)' : name['3v3'] + ': the analog pins of this board are 3.3 V only', 'The wipers go up to this voltage'), item(d, 'VRX', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', k => pi || k.analog), item(d, 'VRY', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', k => pi || k.analog), item(d, 'SW', ['gpio'], sig + ' (set to input with pull-up)')],
+      encoder: d => [item(d, 'CLK', ['gpio'], sig + ' (input with pull-up)'), item(d, 'DT', ['gpio'], sig + ' (input with pull-up)'), item(d, 'SW', ['gpio'], sig + ' (input with pull-up)'), item(d, 'VCC', ['3v3', '5v'], pi ? name['3v3'] : u3 ? '5V (or 3.3V)' : name['3v3'], 'On a 3.3 V board use 3.3 V'), item(d, 'GND', ['gnd'], name.gnd)],
       dht: d => [item(d, 'VCC', ['3v3', '5v'], pi ? name['3v3'] + ': on a 3.3 V board power the sensor from 3.3 V' : u3 ? '5V (or 3.3V)' : name['3v3'] + ': on a 3.3 V board power the sensor from 3.3 V', 'The DATA pull-up goes to the same supply, so the DATA level is that voltage'), dhtData(d), item(d, 'GND', ['gnd'], name.gnd)],
       rgbled: d => [item(d, 'C', d.ca ? ['3v3', '5v'] : ['gnd'], d.ca ? 'the supply (common anode): 3.3 V or 5 V' : name.gnd + ' (common cathode)', d.ca ? 'This is a common-anode LED: the common leg goes to the supply' : 'The common leg is the longest one'), item(d, 'R', ['gpio'], sig + ' (through a resistor)'), item(d, 'G', ['gpio'], sig + ' (through a resistor)'), item(d, 'B', ['gpio'], sig + ' (through a resistor)')],
       pir: d => [item(d, 'VCC', ['5v'], name['5v']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], sig)],
@@ -662,7 +716,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }

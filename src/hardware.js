@@ -241,6 +241,50 @@ export class DHTSensor {
   }
 }
 
+// ---------------------------------------------------------------- 2-axis analog joystick module (KY-023 style): GND, VCC, VRx, VRy, SW at 2.54 mm
+// Stylised size (the exact board differs between makers). Two 10 kOhm potentiometers at 90 degrees and a push switch under the stick.
+export class JoystickModule {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const y0 = 2.5, T = 1.6, depth = 34, zc = -(depth / 2 - 2.54);
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(5 * 2.54, y0, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0 / 2, 0); g.add(strip);
+    for (let i = 0; i < 5; i++) { const x = (i - 2) * 2.54; const leg = new THREE.Mesh(new THREE.BoxGeometry(0.64, y0 + 4.5, 0.64), M.tin); leg.position.set(x, (y0 + 4.5) / 2 - 3.0 + 0.0, 0); g.add(leg); }
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(26, T, depth), new THREE.MeshStandardMaterial({ color: 0x17426f, roughness: 0.6 })); pcb.position.set(0, y0 + T / 2, zc); g.add(pcb);
+    const base = new THREE.Mesh(new RoundedBoxGeometry(17, 5, 17, 2, 0.8), new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.55 })); base.position.set(0, y0 + T + 2.5, zc); g.add(base);
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.4, 0.6, 32), new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.7 })); ring.position.set(0, y0 + T + 5.2, zc); g.add(ring);
+    this.stick = new THREE.Group(); this.stick.position.set(0, y0 + T + 5.4, zc); g.add(this.stick);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.0, 9, 16), new THREE.MeshStandardMaterial({ color: 0x202124, roughness: 0.5 })); shaft.position.y = 4.5; this.stick.add(shaft);
+    this.cap = new THREE.Mesh(new THREE.SphereGeometry(6, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2a2b2f, roughness: 0.45 })); this.cap.position.y = 8.5; this.cap.scale.y = 0.75; this.stick.add(this.cap);
+    this.capY = this.cap.position.y;
+    tagHW(g, 'joystick');
+  }
+  /** x, y = 0..1 (0.5 = centre); pressed = the stick is pushed down (the switch under it closes) */
+  setStick(x, y, pressed = false) {
+    this.stick.rotation.z = -(x - 0.5) * 0.9; this.stick.rotation.x = (y - 0.5) * 0.9;
+    this.cap.position.y = this.capY - (pressed ? 0.9 : 0);
+  }
+}
+
+// ---------------------------------------------------------------- rotary encoder module (KY-040 style): CLK, DT, SW, +, GND at 2.54 mm
+export class EncoderModule {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const y0 = 2.5, T = 1.6, depth = 22, zc = -(depth / 2 - 2.54);
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(5 * 2.54, y0, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0 / 2, 0); g.add(strip);
+    for (let i = 0; i < 5; i++) { const x = (i - 2) * 2.54; const leg = new THREE.Mesh(new THREE.BoxGeometry(0.64, y0 + 4.5, 0.64), M.tin); leg.position.set(x, (y0 + 4.5) / 2 - 3.0, 0); g.add(leg); }
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(26, T, depth), new THREE.MeshStandardMaterial({ color: 0x173f6a, roughness: 0.6 })); pcb.position.set(0, y0 + T / 2, zc); g.add(pcb);
+    const body = new THREE.Mesh(new RoundedBoxGeometry(12, 6.5, 12, 1, 0.4), new THREE.MeshStandardMaterial({ color: 0xb9bcc0, roughness: 0.35, metalness: 0.8 })); body.position.set(0, y0 + T + 3.25, zc); g.add(body);
+    this.knob = new THREE.Group(); this.knob.position.set(0, y0 + T + 6.5, zc); g.add(this.knob);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.1, 7, 24), new THREE.MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.3, metalness: 0.9 })); shaft.position.y = 3.5; this.knob.add(shaft);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 11, 40), new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.5 })); cap.position.y = 12.5; this.knob.add(cap);
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 5), new THREE.MeshStandardMaterial({ color: 0xe8e8e8 })); mark.position.set(0, 18.1, -3); this.knob.add(mark);
+    this.capY = cap.position.y; this.cap = cap;
+    tagHW(g, 'encoder');
+  }
+  /** phase = quarter steps turned (any integer); pressed = the push switch is closed */
+  setPhase(phase, pressed = false) { this.knob.rotation.y = -phase * (Math.PI / 20); this.knob.position.y = (this.knob.userData.y0 ??= this.knob.position.y) - (pressed ? 0.8 : 0); }
+}
+
 // ---------------------------------------------------------------- axial resistor
 const BAND = { black: 0x111111, brown: 0x6b3a1e, red: 0xc8231b, orange: 0xe26a12, yellow: 0xe8c618, green: 0x1f8a3a, blue: 0x1f55c4, violet: 0x7a3fb5, grey: 0x8a8a8a, white: 0xf0f0f0, gold: 0xc9a23f, silver: 0xc0c0c0 };
 export class Resistor {
@@ -1456,6 +1500,28 @@ export const HW_INFO = {
       'Never connect an LED to a pin without a series resistor.',
     ],
     src: 'General electronics practice',
+  },
+  joystick: {
+    name: 'Analog joystick module', tag: 'Two potentiometers + a push switch',
+    summary: 'Moving the stick turns two 10 kΩ potentiometers at 90° to each other: VRx and VRy are voltages between 0 V and the supply, near half the supply at the centre. Pushing the stick down closes a switch (SW).',
+    points: [
+      'Five pins (as printed on a common KY-023 module): GND, +5V, VRx, VRy, SW. The order differs on some clones: read the printing, and swap VRx / VRy in the code if the axes are reversed.',
+      'VRx and VRy go to analog (ADC) inputs. A Raspberry Pi has no ADC, so it needs an extra converter chip.',
+      'Power it from the board’s analog reference voltage: 3.3 V on a 3.3 V board (UNO Q, ESP32). 5 V on the wiper would damage a 3.3 V analog pin.',
+      'SW connects to GND when pressed: use INPUT_PULLUP.',
+    ],
+    src: 'KY-023 / HW-504 module descriptions (Joy-IT, Components101, Hackster); general electronics practice',
+  },
+  encoder: {
+    name: 'Rotary encoder module (KY-040 style)', tag: 'Quadrature outputs CLK + DT, push switch SW',
+    summary: 'Turning the knob closes the CLK and DT contacts to GND in a repeating pattern. Which of the two changes first tells you the direction.',
+    points: [
+      'Five pins: CLK, DT, SW, + and GND. CLK and DT are two contacts (A and B) that close in a shifted pattern: 11 → 01 → 00 → 10 → 11 (one direction) or the reverse.',
+      'Pull-up resistors: descriptions of the module disagree about which pins have them on the board, so enable INPUT_PULLUP on CLK, DT and SW in the sketch.',
+      'The contacts bounce: debounce in software (or use interrupts carefully).',
+      'On a 3.3 V board connect + to 3.3 V: a module with pull-up resistors to + would otherwise pull the pins above 3.3 V.',
+    ],
+    src: 'KY-040 module descriptions (Joy-IT sensor kit, peppe8o, ShillehTek); general electronics practice',
   },
   dht: {
     name: 'DHT11 / DHT22 sensor', tag: 'Temperature + humidity, one data wire',

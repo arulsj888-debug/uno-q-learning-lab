@@ -41,8 +41,8 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Soil moisture (analog), rain, water level | TODO | n/a (no ADC) | TODO | TODO | |
 | Gas MQ-2 / MQ-135 (analog + digital) | TODO | n/a | TODO | TODO | heater needs 5 V |
 | Sound sensor (analog/digital) | TODO | TODO | TODO | TODO | |
-| Joystick (2 analog + button) | TODO | n/a | TODO | TODO | |
-| Rotary encoder KY-040 | TODO | TODO | TODO | TODO | |
+| Joystick (2 analog + button) | Build DONE, lesson TODO | n/a (no ADC) | Build DONE, lesson TODO | Build DONE, lesson TODO | KY-023 style; powered from 3.3 V on 3.3 V boards (UNO Q analog pins are 3.3 V only) |
+| Rotary encoder KY-040 | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | module pull-ups described inconsistently by sources: the model relies on INPUT_PULLUP |
 | IR receiver + remote (VS1838 / NEC) | TODO | TODO | TODO | TODO | |
 | Flame, tilt, vibration, hall, line-follow IR | TODO | TODO | TODO | TODO | |
 | MPU6050 accelerometer / gyro (I2C) | TODO | TODO | TODO | TODO | |

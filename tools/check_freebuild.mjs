@@ -2,7 +2,7 @@
 import { evaluate, resistorBands } from '../src/freebuild/circuit.js';
 let fail = 0;
 const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
-const uno = id => ({ D7: { id: 'D7' }, D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const uno = id => ({ D4: { id: 'D4' }, A1: { id: 'A1' }, D7: { id: 'D7' }, D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
 const pi = id => ({ p11: { gpio: 17 }, p3: { gpio: 2 }, p6: { label: 'GND', gpio: null }, p9: { label: 'GND', gpio: null }, p1: { label: '3V3', gpio: null }, p2: { label: '5V', gpio: null }, p12: { gpio: 18 } }[id]);
 const env = { lux: 300, tempC: 25, pressed: {}, pot: {} };
 const base = o => ({ boardKind: 'unoq', pinInfo: uno, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
@@ -97,7 +97,7 @@ r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: '
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: 'pixels' }, Q('c2', 'th1.QB', 'pix1.QA')] })); ok(r.parts.th1.status === 'off' && r.parts.pix1.status === 'off', 'modules without a cable to the board are off');
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'th2', type: 'thermo' }, Q('c1', 'QWIIC', 'th1.QA'), Q('c2', 'th1.QB', 'th2.QA')] })); ok(r.parts.th1.status === 'warn', 'two Thermos clash');
 // ---- Arduino UNO R3 (5 V logic)
-const u3 = id => ({ D5: { id: 'D5', pwm: true }, D13: { id: 'D13' }, D2: { id: 'D2' }, A0: { id: 'A0' }, A4: { id: 'A4' }, A5: { id: 'A5' }, SDA: { id: 'SDA' }, '5V': { id: '5V', kind: 'pwr' }, '3V3': { id: '3V3', kind: 'pwr' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const u3 = id => ({ D4: { id: 'D4' }, D6: { id: 'D6', pwm: true }, D7: { id: 'D7' }, D9: { id: 'D9', pwm: true }, A1: { id: 'A1' }, D5: { id: 'D5', pwm: true }, D13: { id: 'D13' }, D2: { id: 'D2' }, A0: { id: 'A0' }, A4: { id: 'A4' }, A5: { id: 'A5' }, SDA: { id: 'SDA' }, '5V': { id: '5V', kind: 'pwr' }, '3V3': { id: '3V3', kind: 'pwr' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
 const b3 = o => ({ boardKind: 'uno3', pinInfo: u3, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
 r = evaluate(b3({ parts: [W('w1', 'D5', 'a10'), res('r1', 'b10', 'b14', 220), led('l1', 'c14', 'c15'), W('w2', 'GND2', 'd15')], pinCfg: { D5: { mode: 'out1' } } }));
 ok(r.parts.l1.status === 'ok' && r.parts.l1.I > 0.010 && r.parts.l1.I < 0.016 && r.pins.D5.V > 4.3, 'UNO R3: 5 V pin + 220 ohm + LED gives about 12 mA');
@@ -145,6 +145,22 @@ ok(r.parts.dht1.status === 'warn', 'DHT11 at 70 degrees C is outside its 0 - 50 
 { const x = EXAMPLES('esp32').find(e => e.title.startsWith('✖ EN pin')); r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r.parts.l1 === undefined && r.parts.led1.status !== 'ok' && r.notes.some(n => /held in reset/.test(n.text)), 'ESP32: EN wired to GND holds the chip in reset (LED dark, note shown)'); }
 r = evaluate(e32({ parts: [W('w1', 'VIN', 'a10'), W('w2', 'EN', 'b10')] })); ok(r.newDamage.has('EN'), 'ESP32: 5 V on the EN pin damages it');
 r = evaluate(e32({ parts: [W('w1', 'EN', 'a10'), W('w2', 'G17', 'b10')], pinCfg: { G17: { mode: 'in' } } })); ok(r.pins.EN.msg === 'HIGH: chip running', 'ESP32: EN left alone is pulled HIGH');
+// ---- Joystick module and rotary encoder
+for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3'], ['esp32', findPinE32, 'ESP32']]) {
+  r = rgbOK(kind, info, '✔ Joystick'); ok(r.parts.joy1.status === 'ok' && !r.newDamage.size, name + ': joystick example works');
+  const jx = EXAMPLES(kind).find(e => e.title.startsWith('✔ Joystick'));
+  r = evaluate({ boardKind: kind, pinInfo: info, parts: jx.parts, pinCfg: jx.pins, powered: true, env: { ...env, joy: { joy1: { x: 1, y: 0 } } }, t: 0 });
+  const adcMax = kind === 'esp32' ? 4095 : kind === 'uno3' ? 1023 : 1023, ax = kind === 'esp32' ? 'G34' : 'A0', ay = kind === 'esp32' ? 'G35' : 'A1';
+  ok(r.pins[ax].adc > adcMax * 0.95 && r.pins[ay].adc < adcMax * 0.05, name + ': stick fully right and up reads about full scale on VRx and about 0 on VRy');
+  r = evaluate({ boardKind: kind, pinInfo: info, parts: jx.parts, pinCfg: jx.pins, powered: true, env: { ...env, pressed: { joy1: true } }, t: 0 });
+  ok(r.pins[kind === 'esp32' ? 'G17' : 'D2'].read === 0, name + ': pressing the stick pulls SW LOW');
+  const enc = EXAMPLES(kind).find(e => e.title.startsWith('✔ Rotary encoder')), pk = kind === 'esp32' ? ['G16', 'G17'] : ['D2', 'D4'];
+  const phases = [0, 1, 2, 3].map(ph => { const q = evaluate({ boardKind: kind, pinInfo: info, parts: enc.parts, pinCfg: enc.pins, powered: true, env: { ...env, enc: { enc1: ph } }, t: 0 }); return `${q.pins[pk[0]].read}${q.pins[pk[1]].read}`; });
+  ok(phases.join() === '11,01,00,10', name + ': encoder gives the quadrature pattern 11, 01, 00, 10 (got ' + phases.join() + ')');
+}
+{ const x = EXAMPLES('unoq').find(e => e.title.startsWith('✖ Joystick')); r = evaluate({ boardKind: 'unoq', pinInfo: uno, parts: x.parts, pinCfg: x.pins, powered: true, env: { ...env, joy: { joy1: { x: 1, y: 1 } } }, t: 0 }); } ok(r.newDamage.has('A0'), 'UNO Q: joystick on 5 V damages the 3.3 V analog pin');
+{ const x = EXAMPLES('esp32').find(e => e.title.startsWith('✖ Joystick')); r = evaluate({ boardKind: 'esp32', pinInfo: findPinE32, parts: x.parts, pinCfg: x.pins, powered: true, env: { ...env, joy: { joy1: { x: 1, y: 1 } } }, t: 0 }); } ok(r.newDamage.has('G34') || r.newDamage.has('G35'), 'ESP32: joystick on VIN (5 V) damages an ADC pin');
+r = rgbOK('uno3', u3, '✖ Rotary encoder'); ok(r.parts.enc1.status === 'warn', 'UNO R3: encoder pins without pull-up are flagged');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);
