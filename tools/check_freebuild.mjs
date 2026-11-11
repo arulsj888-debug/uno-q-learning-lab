@@ -2,7 +2,7 @@
 import { evaluate, resistorBands } from '../src/freebuild/circuit.js';
 let fail = 0;
 const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
-const uno = id => ({ D4: { id: 'D4' }, A1: { id: 'A1' }, D7: { id: 'D7' }, D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const uno = id => ({ D6: { id: 'D6', pwm: true }, D4: { id: 'D4' }, A1: { id: 'A1' }, D7: { id: 'D7' }, D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
 const pi = id => ({ p11: { gpio: 17 }, p3: { gpio: 2 }, p6: { label: 'GND', gpio: null }, p9: { label: 'GND', gpio: null }, p1: { label: '3V3', gpio: null }, p2: { label: '5V', gpio: null }, p12: { gpio: 18 } }[id]);
 const env = { lux: 300, tempC: 25, pressed: {}, pot: {} };
 const base = o => ({ boardKind: 'unoq', pinInfo: uno, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
@@ -161,6 +161,13 @@ for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3']
 { const x = EXAMPLES('unoq').find(e => e.title.startsWith('✖ Joystick')); r = evaluate({ boardKind: 'unoq', pinInfo: uno, parts: x.parts, pinCfg: x.pins, powered: true, env: { ...env, joy: { joy1: { x: 1, y: 1 } } }, t: 0 }); } ok(r.newDamage.has('A0'), 'UNO Q: joystick on 5 V damages the 3.3 V analog pin');
 { const x = EXAMPLES('esp32').find(e => e.title.startsWith('✖ Joystick')); r = evaluate({ boardKind: 'esp32', pinInfo: findPinE32, parts: x.parts, pinCfg: x.pins, powered: true, env: { ...env, joy: { joy1: { x: 1, y: 1 } } }, t: 0 }); } ok(r.newDamage.has('G34') || r.newDamage.has('G35'), 'ESP32: joystick on VIN (5 V) damages an ADC pin');
 r = rgbOK('uno3', u3, '✖ Rotary encoder'); ok(r.parts.enc1.status === 'warn', 'UNO R3: encoder pins without pull-up are flagged');
+// ---- NeoPixel strip (WS2812B)
+for (const [kind, info, name, expectWarn] of [['uno3', u3, 'UNO R3', false], ['unoq', uno, 'UNO Q', true], ['esp32', findPinE32, 'ESP32', true]]) {
+  const x = EXAMPLES(kind).find(e => e.title.startsWith('✔ NeoPixel'));
+  r = evaluate({ boardKind: kind, pinInfo: info, parts: x.parts, pinCfg: x.pins, powered: true, env, t: 0 });
+  ok(expectWarn ? r.parts.neo1.status === 'warn' : r.parts.neo1.status === 'ok' && r.parts.neo1.colors.length === 8, name + (expectWarn ? ': 5 V strip with a 3.3 V data pin is flagged (data below 70 % of the supply)' : ': NeoPixel strip on 5 V with a 5 V data pin works'));
+}
+{ const x = EXAMPLES('uno3').find(e => e.title.startsWith('✖ NeoPixels at full white')); r = evaluate({ boardKind: 'uno3', pinInfo: u3, parts: x.parts, pinCfg: x.pins, powered: true, env, t: 0 }); ok(r.notes.some(n => /about 4\d\d mA/.test(n.text)), 'UNO R3: 8 pixels at full white are reported at about 480 mA'); }
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

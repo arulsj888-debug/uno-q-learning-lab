@@ -285,6 +285,50 @@ export class EncoderModule {
   setPhase(phase, pressed = false) { this.knob.rotation.y = -phase * (Math.PI / 20); this.knob.position.y = (this.knob.userData.y0 ??= this.knob.position.y) - (pressed ? 0.8 : 0); }
 }
 
+// ---------------------------------------------------------------- NeoPixel (WS2812B) strip of 8 pixels with a 3-way screw terminal: VCC, DIN, GND
+// Stylised size: a strip of 8 pixels with a terminal block at the input end.
+export class NeoPixelStrip {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const sub = (o, id) => { (this._sub ??= []).push([o, id]); return o; };
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(84, 1.6, 12), new THREE.MeshStandardMaterial({ color: 0xe8e8e2, roughness: 0.5 })); pcb.position.set(14, 0.8, 0); g.add(sub(pcb, 'neo:strip'));
+    this.leds = [];
+    for (let i = 0; i < 8; i++) {
+      const x = 14 + (i - 3.5) * 10;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(5.4, 1.6, 5.4), new THREE.MeshStandardMaterial({ color: 0xf2f1ea, roughness: 0.4 })); body.position.set(x, 2.4, 0); g.add(sub(body, 'neo:pixel'));
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 0.5, 24), new THREE.MeshStandardMaterial({ color: 0x4a4636, roughness: 0.3, emissive: 0x000000 })); lens.position.set(x, 3.4, 0); g.add(sub(lens, 'neo:pixel'));
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: 0x000000, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); halo.scale.set(16, 16, 1); halo.position.set(x, 5, 0); halo.raycast = () => {}; g.add(halo);
+      this.leds.push({ lens, halo });
+    }
+    const blue = new THREE.MeshPhysicalMaterial({ color: 0x1f5fd0, roughness: 0.35, clearcoat: 0.5 });
+    this.pinPos = {};
+    for (const [n, z] of [['VCC', -4], ['DIN', 0], ['GND', 4]]) {
+      const t = new THREE.Mesh(new RoundedBoxGeometry(5.5, 6, 3.6, 1, 0.4), blue); t.position.set(-34, 4, z); g.add(sub(t, 'neo:term'));
+      const sc = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.6, 16), M.steelSatin); sc.position.set(-34, 7.2, z); g.add(sub(sc, 'neo:term'));
+      this.pinPos[n] = { p: new THREE.Vector3(-36.8, 4, z), d: new THREE.Vector3(-1, 0, 0) };
+    }
+    tagHW(g, 'neopixel');
+    for (const [o, id] of this._sub) o.traverse(x => { x.userData.hw = id; });
+    this.setColors(null);
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    const q = this.group.getWorldQuaternion(new THREE.Quaternion());
+    return { pos: this.group.localToWorld(this.pinPos[name].p.clone()), dir: this.pinPos[name].d.clone().applyQuaternion(q) };
+  }
+  /** colors = 8 x [r, g, b, brightness 0..1] or null (dark) */
+  setColors(colors) {
+    this.leds.forEach((l, i) => {
+      const c = colors && colors[i];
+      if (!c || c[3] <= 0 || (c[0] + c[1] + c[2]) === 0) { l.lens.material.color.set(0x4a4636); l.lens.material.emissive.set(0x000000); l.halo.material.color.set(0x000000); return; }
+      const k = 0.35 + 0.65 * c[3];
+      l.lens.material.color.setRGB(Math.min(1, 0.15 + c[0] / 255 * k), Math.min(1, 0.15 + c[1] / 255 * k), Math.min(1, 0.15 + c[2] / 255 * k));
+      l.lens.material.emissive.setRGB(c[0] / 255 * k * 0.8, c[1] / 255 * k * 0.8, c[2] / 255 * k * 0.8);
+      l.halo.material.color.setRGB(c[0] / 255 * k * 0.9, c[1] / 255 * k * 0.9, c[2] / 255 * k * 0.9);
+    });
+  }
+}
+
 // ---------------------------------------------------------------- axial resistor
 const BAND = { black: 0x111111, brown: 0x6b3a1e, red: 0xc8231b, orange: 0xe26a12, yellow: 0xe8c618, green: 0x1f8a3a, blue: 0x1f55c4, violet: 0x7a3fb5, grey: 0x8a8a8a, white: 0xf0f0f0, gold: 0xc9a23f, silver: 0xc0c0c0 };
 export class Resistor {
@@ -1500,6 +1544,17 @@ export const HW_INFO = {
       'Never connect an LED to a pin without a series resistor.',
     ],
     src: 'General electronics practice',
+  },
+  neopixel: {
+    name: 'NeoPixel (WS2812B) strip, 8 pixels', tag: 'Addressable RGB LEDs on one data wire',
+    summary: 'Each pixel has its own driver chip: the data line (DIN) carries one colour value for every pixel in turn, so one pin controls the whole strip.',
+    points: [
+      'Three connections: 5 V (VCC), data in (DIN), GND. Connect GND first; the pixels are made for about 5 V (Adafruit): lower voltages make them dimmer and then give wrong colours, much higher voltages destroy them.',
+      'Current: up to 60 mA per pixel at full white (all three colours at maximum), about 20 mA per pixel in typical use (Adafruit). 8 pixels at full white = up to 480 mA, more than a board should take from a USB port: lower the brightness.',
+      'Data level: the signal should be at least 70 % of the pixel supply voltage (Adafruit): a 3.3 V pin is not enough for a 5 V strip. Use a level shifter, or power the strip from a lower voltage. Datasheet revisions of the WS2812B differ here, so check yours.',
+      'Add a large capacitor (500 – 1000 µF, at least 6.3 V) across + and − of the strip.',
+    ],
+    src: 'Adafruit NeoPixel Überguide (Powering NeoPixels); WS2812B datasheets',
   },
   joystick: {
     name: 'Analog joystick module', tag: 'Two potentiometers + a push switch',

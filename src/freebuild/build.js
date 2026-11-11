@@ -9,11 +9,11 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 const RAILS = ['top+', 'top-', 'bot-', 'bot+'];
 const OHMS = [10, 100, 220, 330, 470, 1000, 2200, 4700, 10000, 47000, 100000, 1000000];
-const PREFIX = { joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
+const PREFIX = { neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
 const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
-const TERMS = { pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
-const DESK_SLOT = { relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
+const TERMS = { neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
+const DESK_SLOT = { neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
 const MOVABLE = new Set(['resistor', 'led', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
 
@@ -479,6 +479,7 @@ export class FreeBuild {
       if (d.type === 'led') it.obj.set(!!R && R.level > 0.02 && !this.burnt.has(d.id), R ? Math.max(0.15, R.level) : 0);
       else if (d.type === 'rgbled') it.obj.setRGB(R && R.levels && !this.burnt.has(d.id) ? R.levels.map(x => (x > 0.02 ? Math.max(0.15, x) : 0)) : [0, 0, 0], this.burnt.has(d.id));
       else if (d.type === 'button') it.obj.setPressed(!!this.env.pressed[d.id]);
+      else if (d.type === 'neopixel') { if (it.obj.setColors) it.obj.setColors(R && R.colors && this.powered() ? R.colors : null); }
       else if (d.type === 'joystick') { const J = this.env.joy[d.id] || { x: 0.5, y: 0.5 }; it.obj.setStick(J.x, J.y, !!this.env.pressed[d.id]); }
       else if (d.type === 'encoder') it.obj.setPhase(this.env.enc[d.id] ?? 0, !!this.env.pressed[d.id]);
       else if (d.type === 'pot') it.obj.set(this.env.pot[d.id] ?? 0.5);
@@ -519,6 +520,7 @@ export class FreeBuild {
         pwm: `from gpiozero import PWMLED\nled = PWMLED(${n})\nled.value = ${duty.toFixed(2)}   # 0 … 1`,
         servo: `from gpiozero import AngularServo\ns = AngularServo(${n}, min_angle=0, max_angle=180, min_pulse_width=0.000544, max_pulse_width=0.0024)\ns.angle = ${Math.round(c.angle ?? 90)}`,
         pulse: `# HC-SR04: GPIO Zero sends the trigger pulse and times the echo for you\nfrom gpiozero import DistanceSensor\nsensor = DistanceSensor(echo=<ECHO GPIO>, trigger=${n})\nprint(sensor.distance * 100, "cm")`,
+        neopixel: `# pip3 install adafruit-circuitpython-neopixel   (run with sudo)\nimport board, neopixel\npixels = neopixel.NeoPixel(board.D${n}, 8, brightness=${((c.bright ?? 50) / 255).toFixed(2)})   # the Adafruit example uses D18\npixels.fill((255, 0, 0))   # red\npixels.show()`,
         tone: `from gpiozero import TonalBuzzer\nb = TonalBuzzer(${n})\nb.play(${f})   # Hz`,
         dht: `# pip3 install adafruit-circuitpython-dht\nimport adafruit_dht, board\ndht = adafruit_dht.DHT22(board.D${n})   # or DHT11(...)\nprint(dht.temperature, dht.humidity)   # may raise RuntimeError: wait 2 s and retry`,
         i2c: `# I²C bus 1 (SDA = GPIO2, SCL = GPIO3): enable it in raspi-config first\nimport board, busio\ni2c = board.I2C()`,
@@ -533,6 +535,7 @@ export class FreeBuild {
         out1: `pinMode(${n}, OUTPUT);\ndigitalWrite(${n}, HIGH);`, out0: `pinMode(${n}, OUTPUT);\ndigitalWrite(${n}, LOW);`,
         blink: `pinMode(${n}, OUTPUT);\n// in loop():\ndigitalWrite(${n}, HIGH); delay(500);\ndigitalWrite(${n}, LOW);  delay(500);`,
         pwm: `// in setup() (Arduino-ESP32 core 3.x):\nledcAttach(${n}, 5000, 8);   // pin, 5 kHz, 8 bit\n// in loop():\nledcWrite(${n}, ${Math.round(duty * 255)});   // 0 … 255`,
+        neopixel: `#include <Adafruit_NeoPixel.h>\nAdafruit_NeoPixel strip(8, ${n}, NEO_GRB + NEO_KHZ800);   // 8 pixels\n// in setup(): strip.begin(); strip.setBrightness(${c.bright ?? 50});\nstrip.fill(strip.Color(255, 0, 0));   // red\nstrip.show();`,
         tone: `tone(${n}, ${f});   // Hz`,
         dht: `#include "DHT.h"   // Adafruit "DHT sensor library" (+ Adafruit Unified Sensor)\nDHT dht(${n}, DHT22);   // or DHT11\n// in setup(): dht.begin();\nfloat h = dht.readHumidity();\nfloat t = dht.readTemperature();   // isnan() means the read failed`,
         servo: `#include <ESP32Servo.h>   // install the ESP32Servo library\nServo s;\n// in setup():\ns.attach(${n});\ns.write(${Math.round(c.angle ?? 90)});   // degrees`,
@@ -549,6 +552,7 @@ export class FreeBuild {
       blink: `pinMode(${id}, OUTPUT);\n// in loop():\ndigitalWrite(${id}, HIGH); delay(500);\ndigitalWrite(${id}, LOW);  delay(500);`,
       servo: `#include <Servo.h>\nServo s;\n// in setup():\ns.attach(${id});\ns.write(${Math.round(c.angle ?? 90)});   // degrees`,
       pulse: `pinMode(${id}, OUTPUT);\ndigitalWrite(${id}, LOW);  delayMicroseconds(2);\ndigitalWrite(${id}, HIGH); delayMicroseconds(10);   // 10 µs trigger pulse\ndigitalWrite(${id}, LOW);`,
+      neopixel: `#include <Adafruit_NeoPixel.h>\nAdafruit_NeoPixel strip(8, ${id}, NEO_GRB + NEO_KHZ800);   // 8 pixels\n// in setup(): strip.begin(); strip.setBrightness(${c.bright ?? 50});\nstrip.fill(strip.Color(255, 0, 0));   // red\nstrip.show();${this.isU3 ? '' : '\n// Note: not verified on the UNO Q (the library bit-bangs the data signal under Zephyr)'}`,
       dht: `#include "DHT.h"   // Adafruit "DHT sensor library" (+ Adafruit Unified Sensor)\nDHT dht(${id}, DHT22);   // or DHT11\n// in setup(): dht.begin();\nfloat h = dht.readHumidity();\nfloat t = dht.readTemperature();   // isnan() means the read failed${this.isU3 ? '' : '\n// Note: forum users report NaN with this library on the UNO Q (Zephyr timing); use the Modulino Thermo or SHT31 there'}`,
       pwm: `pinMode(${id}, OUTPUT);\nanalogWrite(${id}, ${Math.round(duty * 255)});   // 0 … 255`, tone: `tone(${id}, ${f});   // Hz`,
       i2c: `#include <Wire.h>\n// in setup():\nWire.begin();   // ${this.isU3 ? 'I²C bus: SDA = A4, SCL = A5' : 'I²C bus (SDA D20 / SCL D21; A4 / A5 use Wire2)'}`,
@@ -557,8 +561,8 @@ export class FreeBuild {
     })[c.mode] || '';
   }
   modesFor(k) {
-    if (this.isE32) return k.inOnly ? ['in', ...(k.analog ? ['analog'] : [])] : ['out0', 'out1', 'blink', 'pwm', 'tone', 'servo', 'pulse', 'dht', 'in', 'up', 'down', ...(k.analog ? ['analog'] : []), ...(k.i2c ? ['i2c'] : [])];
-    const m = ['out0', 'out1', 'blink']; if (k.pwm) m.push('pwm'); m.push('tone', 'servo', 'pulse', 'dht', 'in', 'up'); if (this.isPi) m.push('down'); if (k.analog) m.push('analog'); if (k.i2c) m.push('i2c'); return m;
+    if (this.isE32) return k.inOnly ? ['in', ...(k.analog ? ['analog'] : [])] : ['out0', 'out1', 'blink', 'pwm', 'tone', 'servo', 'pulse', 'dht', 'neopixel', 'in', 'up', 'down', ...(k.analog ? ['analog'] : []), ...(k.i2c ? ['i2c'] : [])];
+    const m = ['out0', 'out1', 'blink']; if (k.pwm) m.push('pwm'); m.push('tone', 'servo', 'pulse', 'dht', 'neopixel', 'in', 'up'); if (this.isPi) m.push('down'); if (k.analog) m.push('analog'); if (k.i2c) m.push('i2c'); return m;
   }
   usedPins() {
     const seen = new Map();
@@ -590,6 +594,7 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('ldr')}" data-tool="ldr">Light sensor (LDR)</button></div>
       <div class="fb-row"><button class="fb-btn${on('tmp36')}" data-tool="tmp36">TMP36 temperature${this.isPi ? ' (no ADC on Pi)' : ''}</button><label class="fb-chk"><input type="checkbox" data-opt="flip"${this.opts.flip ? ' checked' : ''}> turn round</label></div>
       <h3>Modules</h3>
+      <div class="fb-row"><button class="fb-btn" data-tool="neopixel">NeoPixel strip, 8 pixels (WS2812B)</button></div>
       <div class="fb-row"><button class="fb-btn${on('joystick')}" data-tool="joystick">Joystick module${this.isPi ? ' (no ADC on Pi)' : ''}</button></div>
       <div class="fb-row"><button class="fb-btn${on('encoder')}" data-tool="encoder">Rotary encoder (KY-040)</button></div>
       <div class="fb-row"><button class="fb-btn${on('dht')}" data-tool="dht">DHT temperature + humidity</button><select data-opt="dht"><option value="dht11"${this.opts.dht === 'dht22' ? '' : ' selected'}>DHT11</option><option value="dht22"${this.opts.dht === 'dht22' ? ' selected' : ''}>DHT22</option></select></div>
@@ -659,7 +664,7 @@ export class FreeBuild {
     this.select(null); this.tripMsg = null; this.exNote = ex.note; this.renderPanel();
     if (!this.powered()) this.app.plug(true).then(() => { this.dirty = true; this.renderSide(); });
     const wide = ex.parts.some(p => p.type === 'pir' || p.type === 'servo');
-    const far = ex.parts.some(p => ['relay', 'battery', 'lamp', 'motor'].includes(p.type)), qw = ex.parts.some(p => p.type === 'thermo' || p.type === 'pixels');
+    const far = ex.parts.some(p => ['relay', 'battery', 'lamp', 'motor', 'neopixel'].includes(p.type)), qw = ex.parts.some(p => p.type === 'thermo' || p.type === 'pixels');
     this.app.view(this.isPi ? (far ? 'farpi' : wide ? 'bigpi' : 'pibb') : (qw ? 'qwq' : far ? 'farq' : wide ? 'bigq' : 'breadboard'));
   }
 
@@ -682,6 +687,7 @@ export class FreeBuild {
           if (mode === 'pwm') h += `<label class="fb-sl">Duty <input type="range" min="0" max="100" value="${Math.round((cfg.duty ?? 0.5) * 100)}" data-pinduty="${id}"><b>${Math.round((cfg.duty ?? 0.5) * 100)} %</b></label>`;
           if (mode === 'servo') h += `<label class="fb-sl">Angle <input type="range" min="0" max="180" value="${Math.round(cfg.angle ?? 90)}" data-pinangle="${id}"><b>${Math.round(cfg.angle ?? 90)}°</b></label>`;
           if (mode === 'tone') { const lo = this.isPi ? 220 : 100, hi = this.isPi ? 880 : 2000; h += `<label class="fb-sl">Frequency <input type="range" min="${lo}" max="${hi}" value="${Math.round(cfg.freq || 440)}" data-pinfreq="${id}"><b>${Math.round(cfg.freq || 440)} Hz</b></label>`; }
+          if (mode === 'neopixel') h += `<label class="fb-sl">Pattern <select data-pinpattern="${id}">${['rainbow', 'red', 'green', 'blue', 'white', 'off'].map(x => `<option value="${x}"${(cfg.pattern || 'rainbow') === x ? ' selected' : ''}>${x}</option>`).join('')}</select></label><label class="fb-sl">Brightness <input type="range" min="0" max="255" value="${cfg.bright ?? 50}" data-pinbright="${id}"><b>${cfg.bright ?? 50}</b></label>`;
           h += `<div class="fb-pr" data-pr="${id}"></div>${mode ? `<details><summary>Code for this pin</summary><pre>${esc(this.codeFor(id))}</pre></details>` : ''}</div>`;
         } else h += `<div class="fb-pin sup"><div class="fb-pinh"><b>${esc(k.name)}</b><small>${{ '5v': '5 V supply', '3v3': '3.3 V supply', gnd: 'ground (0 V)', en: 'reset input: LOW = chip held in reset', nc: 'not modelled' }[k.k]}</small><span class="fb-pv" data-pv="${id}"></span></div></div>`;
       }
@@ -731,12 +737,14 @@ export class FreeBuild {
   panelChange(e) {
     const t = e.target;
     if (t.dataset.pinmode) { const id = t.dataset.pinmode; this.mutate(() => { const c = this.pinCfg[id] = { ...(this.pinCfg[id] || {}), mode: t.value }; if (t.value === 'pwm' && c.duty === undefined) c.duty = 0.5; if (t.value === 'tone' && !c.freq) c.freq = 440; if (t.value === 'servo' && c.angle === undefined) c.angle = 90; }); }
+    else if (t.dataset.pinpattern) { (this.pinCfg[t.dataset.pinpattern] ||= {}).pattern = t.value; this.mutate(() => {}); }
     else if (t.dataset.selohms) { const d = this.parts.find(p => p.id === this.selected); this.mutate(() => { d.ohms = +t.value; this.burnt.delete(d.id); this.place3D(d); }); this.app.setOutline([this.app.bench.items[d.id].group]); }
     else if (t.dataset.selcolor) { const d = this.parts.find(p => p.id === this.selected); this.mutate(() => { d.color = t.value; d.hex = LED_TYPES[t.value].hex; this.place3D(d); }); this.app.setOutline([this.app.bench.items[d.id].group]); }
   }
   panelInput(e) {
     const t = e.target;
     if (t.dataset.pinduty) { (this.pinCfg[t.dataset.pinduty] ||= {}).duty = +t.value / 100; t.nextElementSibling.textContent = t.value + ' %'; this.dirty = true; this.save(); }
+    else if (t.dataset.pinbright) { (this.pinCfg[t.dataset.pinbright] ||= {}).bright = +t.value; t.nextElementSibling.textContent = t.value; this.dirty = true; }
     else if (t.dataset.pinangle) { (this.pinCfg[t.dataset.pinangle] ||= {}).angle = +t.value; t.nextElementSibling.textContent = t.value + '°'; this.dirty = true; this.save(); }
     else if (t.dataset.pinfreq) { (this.pinCfg[t.dataset.pinfreq] ||= {}).freq = +t.value; t.nextElementSibling.textContent = t.value + ' Hz'; this.dirty = true; this.save(); }
     else if (t.dataset.joy) { const [ax, id] = t.dataset.joy.split(':'); const J = this.env.joy[id] || (this.env.joy[id] = { x: 0.5, y: 0.5 }); J[ax] = +t.value / 100; this.dirty = true; this.syncControls(); }

@@ -9,7 +9,7 @@
 //   { id:'t1', type:'tmp36', row:'e', col:18 }        legs +VS e18, VOUT e19, GND e20 (flat face toward +z)
 //   { id:'w1', type:'wire', from:'D5', to:'a10', color:'yellow' }
 import * as THREE from 'three';
-import { Resistor, LED5mm, RGBLED5mm, DHTSensor, JoystickModule, EncoderModule, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
+import { Resistor, LED5mm, RGBLED5mm, DHTSensor, NeoPixelStrip, JoystickModule, EncoderModule, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
 
 import { resistorBands } from './freebuild/circuit.js';
 
@@ -96,6 +96,7 @@ export class Bench {
       case 'pixels': obj = new ModulinoPixels(); break;
       case 'qwiic': obj = new QwiicCable(this.point(d.from), this.termDir(d.from), this.point(d.to), this.termDir(d.to), { lift: d.lift ?? 5 }); break;
       case 'lamp': obj = new MiniLamp(); break;
+      case 'neopixel': obj = new NeoPixelStrip(); break;
       case 'servo': obj = new ServoMotor(new THREE.Vector3(d.bx, DESK_Y, d.bz).sub(this.bb.hole(d.row, d.col + 1))); break;
       case 'fwire': { const bp = this.board.pins[d.from]; const p = bp && bp.female ? { pos: bp.female.clone(), dir: new THREE.Vector3(0, 1, 0) } : (([pid, pn]) => this.items[pid].obj.pin(pn))(d.from.split('.')); obj = new FemaleJumper(p.pos, p.dir, this.point(d.to), d.color, { lift: d.lift ?? 30, id: 'jumper' }); break; }
       case 'led': obj = new LED5mm(d.hex ?? d.color); break;
@@ -129,7 +130,7 @@ export class Bench {
       case 'dht': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       case 'rgbled': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       case 'l293d': return { pos: this.bb.hole('e', d.col).lerp(this.bb.hole('f', d.col + 7), 0.5), rotY: 0 };
-      case 'battery': case 'motor': case 'relay': case 'lamp': case 'thermo': case 'pixels': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
+      case 'battery': case 'motor': case 'relay': case 'lamp': case 'neopixel': case 'thermo': case 'pixels': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
       case 'hcsr04': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       default: return null;
     }
