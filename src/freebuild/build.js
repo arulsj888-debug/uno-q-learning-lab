@@ -526,7 +526,7 @@ export class FreeBuild {
         blink: `pinMode(${n}, OUTPUT);\n// in loop():\ndigitalWrite(${n}, HIGH); delay(500);\ndigitalWrite(${n}, LOW);  delay(500);`,
         pwm: `// in setup() (Arduino-ESP32 core 3.x):\nledcAttach(${n}, 5000, 8);   // pin, 5 kHz, 8 bit\n// in loop():\nledcWrite(${n}, ${Math.round(duty * 255)});   // 0 … 255`,
         tone: `tone(${n}, ${f});   // Hz`,
-        servo: `#include <ESP32Servo.h>   // install "ESP32Servo" from the Library Manager\nServo s;\n// in setup():\ns.attach(${n});\ns.write(${Math.round(c.angle ?? 90)});   // degrees`,
+        servo: `#include <ESP32Servo.h>   // install the ESP32Servo library\nServo s;\n// in setup():\ns.attach(${n});\ns.write(${Math.round(c.angle ?? 90)});   // degrees`,
         pulse: `pinMode(${n}, OUTPUT);\ndigitalWrite(${n}, LOW);  delayMicroseconds(2);\ndigitalWrite(${n}, HIGH); delayMicroseconds(10);   // 10 µs trigger pulse\ndigitalWrite(${n}, LOW);`,
         i2c: `#include <Wire.h>\n// in setup():\nWire.begin();   // default I²C pins: SDA = GPIO21, SCL = GPIO22`,
         in: `pinMode(${n}, INPUT);\nint v = digitalRead(${n});`, up: `pinMode(${n}, INPUT_PULLUP);\nint v = digitalRead(${n});   // pressed = LOW`,

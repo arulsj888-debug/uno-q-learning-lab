@@ -6269,7 +6269,7 @@ digitalWrite(${r}, HIGH); delay(500);
 digitalWrite(${r}, LOW);  delay(500);`,pwm:`// in setup() (Arduino-ESP32 core 3.x):
 ledcAttach(${r}, 5000, 8);   // pin, 5 kHz, 8 bit
 // in loop():
-ledcWrite(${r}, ${Math.round(s*255)});   // 0 \u2026 255`,tone:`tone(${r}, ${n});   // Hz`,servo:`#include <ESP32Servo.h>   // install "ESP32Servo" from the Library Manager
+ledcWrite(${r}, ${Math.round(s*255)});   // 0 \u2026 255`,tone:`tone(${r}, ${n});   // Hz`,servo:`#include <ESP32Servo.h>   // install the ESP32Servo library
 Servo s;
 // in setup():
 s.attach(${r});
