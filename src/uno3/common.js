@@ -28,6 +28,8 @@ export const SRC = {
   ky040: { t: 'KY-040 rotary encoder (Joy-IT sensor kit)', u: 'https://sensorkit.joy-it.net/en/sensors/ky-040' },
   lcdi2c: { t: 'I²C LCD1602 documentation (SunFounder): PCF8574 backpack, address 0x27 / 0x3F, LiquidCrystal_I2C', u: 'https://docs.sunfounder.com/projects/sf-components/en/latest/component_i2c_lcd.html' },
   ssd1306: { t: 'Adafruit SSD1306 library (examples: begin(SSD1306_SWITCHCAPVCC, 0x3C))', u: 'https://github.com/adafruit/Adafruit_SSD1306' },
+  neouber: { t: 'Adafruit NeoPixel Überguide: Powering NeoPixels', u: 'https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels' },
+  neolib: { t: 'Adafruit_NeoPixel library (examples: strandtest)', u: 'https://github.com/adafruit/Adafruit_NeoPixel' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -199,3 +201,12 @@ export const OLED_PARTS = [
   { id: 'w98', type: 'fwire', from: 'oled1.SDA', to: 'A4', color: 'blue', lift: 42 },
 ];
 export const OLED_IDS = OLED_PARTS.map(d => d.id);
+
+// ---- Lesson 23: NeoPixel strip standing on the desk, three leads to the UNO R3 sockets (5 V, data on pin 6, GND)
+export const NEO_PARTS = [
+  { id: 'neo1', type: 'neopixel', x: 35, z: 140 },
+  { id: 'l60', type: 'lead', from: 'neo1.VCC', to: '5V', color: 'red', lift: 30 },
+  { id: 'l61', type: 'lead', from: 'neo1.DIN', to: 'D6', color: 'yellow', lift: 36 },
+  { id: 'l62', type: 'lead', from: 'neo1.GND', to: 'GND2', color: 'black', lift: 24 },
+];
+export const NEO_IDS = NEO_PARTS.map(d => d.id);

@@ -483,3 +483,26 @@ void setup() {
 
 void loop() {
 }`;
+
+// Lesson 23 — NeoPixel (WS2812B) strip with the Adafruit_NeoPixel library
+export const U3_NEO = `#include <Adafruit_NeoPixel.h>
+
+#define PIN 6          // the pin the DIN wire is on
+#define NUMPIXELS 8    // number of pixels on the strip
+
+Adafruit_NeoPixel strip(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+
+void setup() {
+  strip.begin();                 // start the strip
+  strip.setBrightness(40);       // 0 ... 255: keep it low to limit the current
+  strip.show();                  // all pixels off
+}
+
+void loop() {
+  for (int i = 0; i < NUMPIXELS; i++) {
+    strip.clear();                                   // all pixels off
+    strip.setPixelColor(i, strip.Color(255, 0, 0));  // pixel i red
+    strip.show();                                    // send the colours to the strip
+    delay(150);
+  }
+}`;

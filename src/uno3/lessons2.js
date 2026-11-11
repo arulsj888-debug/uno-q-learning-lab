@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1083,5 +1083,52 @@ export const U3_LESSONS_2 = [
       { q: 'Why has an OLED no backlight?', a: ['It is broken', 'Each pixel makes its own light', 'It uses sunlight', 'It is always off'], c: 1, why: 'OLED pixels are light-emitting.' },
     ],
     sources: [SRC.ssd1306, SRC.wire, SRC.ds],
+  },
+
+  // ================================================================== 23
+  {
+    id: 'u23', num: 23, module: 9, title: 'NeoPixel strip: one wire, eight colours', level: 'Intermediate', time: '25 min',
+    goal: 'Light an 8-pixel NeoPixel strip with the Adafruit_NeoPixel library, and learn the power and data-level rules.',
+    hardware: ['Arduino UNO R3', 'NeoPixel (WS2812B) strip, 8 pixels', '3 × jumper wires', 'Capacitor 500 – 1000 µF (recommended)'],
+    code: U3_NEO, file: 'NeoPixel.ino', program: 'u3_neo', fast: true, widgets: [], neoLow: false,
+    circuit: NEO_PARTS, io: { D6: { kind: 'neo', item: 'neo1', needs: NEO_IDS } },
+    explain: {
+      1: 'The library by Adafruit: install <b>Adafruit NeoPixel</b> from the Library Manager.',
+      3: 'The data pin (<b>DIN</b> of the strip).',
+      4: 'How many pixels the strip has.',
+      6: 'Create the strip object: pixel count, pin, <b>NEO_GRB</b> (the colour order of the WS2812B) and <b>NEO_KHZ800</b> (the 800 kHz data speed).',
+      8: '<b>setup()</b> runs once.',
+      9: 'Start the strip.',
+      10: '<b>setBrightness</b> scales every colour: 40 of 255 keeps the current low.',
+      11: '<b>show()</b> sends the colours to the pixels: nothing changes on the strip before show().',
+      14: '<b>loop()</b> repeats forever.',
+      15: 'Go through the pixels 0 … 7.',
+      16: 'Clear the colours in memory.',
+      17: 'Set pixel <b>i</b> to red: <b>Color(red, green, blue)</b>, each 0 … 255.',
+      18: 'Send everything to the strip.',
+      19: 'Wait 150 ms: the red dot moves on.',
+    },
+    steps: [
+      { title: 'An addressable LED strip', view: 'dispq', have: ['neo1'], power: false,
+        body: `<p>On a <b>NeoPixel</b> (WS2812B) strip every pixel has its own driver chip. The <b>data line</b> carries one colour value for each pixel in turn, so <b>one pin controls the whole strip</b>. <b>Click the parts</b> in the 3D view.</p>
+        <ul><li>Three connections: <b>5 V</b>, <b>DIN</b> (data in) and <b>GND</b>.</li><li>Up to <b>60 mA per pixel</b> at full white; about 20 mA per pixel in typical use (Adafruit).</li></ul>` },
+      { title: 'Power rules', view: 'dispq', have: ['neo1'],
+        body: `<ul><li>Eight pixels at full white can draw <b>480 mA</b>: more than a USB port should be asked for. Keep the <b>brightness low</b> (the sketch uses 40).</li><li>Connect <b>GND first</b> when powering from a bench supply, and add a <b>500 – 1000 µF capacitor</b> across + and − (Adafruit).</li><li>The pixels want about <b>5 V</b>: lower voltages dim them and then give wrong colours; much higher voltages destroy them.</li></ul>` },
+      { title: 'Wire the strip', view: 'dispq', have: NEO_IDS, power: false, pins: ['5V', 'D6', 'GND2'],
+        body: `<ul><li>Red lead: strip <b>VCC → 5V</b></li><li>Yellow lead: strip <b>DIN → pin 6</b></li><li>Black lead: strip <b>GND → GND</b></li></ul>` },
+      { title: 'Install the library', view: 'dispq', have: NEO_IDS,
+        body: `<p>Library Manager → <b>Adafruit NeoPixel</b> → Install.</p>` },
+      { title: 'The code', view: 'dispq', have: NEO_IDS, showCode: true, power: true, body: `<p>Click lines 6, 10, 17 and 18. Note that nothing happens on the strip until <code>show()</code>.</p>` },
+      { title: 'Run it', view: 'dispq', have: NEO_IDS, showCode: true, power: true, action: 'run', body: `<p>A <b>red dot</b> runs along the 8 pixels, 150 ms per step. The brightness is only 40 of 255.</p><p class="sim">Simulated strip: the colours follow the sketch.</p>` },
+      { title: 'Summary', view: 'dispq', have: NEO_IDS, power: true,
+        body: `<ul><li>5 V, DIN, GND; one data pin for all pixels.</li><li><code>Adafruit_NeoPixel strip(n, pin, NEO_GRB + NEO_KHZ800)</code>, <code>begin()</code>, <code>setPixelColor()</code>, <code>show()</code>.</li><li>Up to 60 mA per pixel: keep the brightness low.</li><li>Data signal at least 70 % of the strip voltage (Adafruit).</li></ul>` },
+    ],
+    quiz: [
+      { q: 'When do the pixels change after setPixelColor()?', a: ['At once', 'After strip.show()', 'After begin()', 'Never'], c: 1, why: 'The colours are kept in memory until show() sends them.' },
+      { q: 'How much current can one NeoPixel draw at full white?', a: ['About 1 mA', 'Up to 60 mA', 'About 1 A', 'Exactly 20 mA always'], c: 1, why: 'Adafruit: up to 60 mA with red, green and blue at maximum.' },
+      { q: 'The data signal of a 5 V strip should be at least…', a: ['1 V', '70 % of the strip voltage (3.5 V)', '5 V exactly', '12 V'], c: 1, why: 'Adafruit recommends at least 70 % of the pixel voltage.' },
+      { q: 'Why keep the brightness low?', a: ['To save the library', 'To limit the current drawn from the supply', 'The strip would melt at once', 'No reason'], c: 1, why: 'The pixels draw current in proportion to their colour and brightness.' },
+    ],
+    sources: [SRC.neouber, SRC.neolib, SRC.ds],
   },
 ];

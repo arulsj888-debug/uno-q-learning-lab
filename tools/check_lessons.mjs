@@ -115,6 +115,12 @@ for (const L of list) {
       const w = byId[io.item];
       if (!w || w.type !== 'fwire' || w.from !== pin) bad(L, `${pin}: touch pad wire is not connected to the pin`);
     }
+    if (io.kind === 'neo') {
+      const id = io.item, v = U3 ? 'PIN:5V' : 'PIN:VIN';
+      if (!N.same(id + '.DIN', P)) bad(L, `neopixel DIN not on ${pin}`);
+      if (!N.same(id + '.VCC', v)) bad(L, `neopixel VCC not on ${v.slice(4)}`);
+      if (!N.same(id + '.GND', G)) bad(L, `neopixel GND not on GND`);
+    }
     if (io.kind === 'lcd' || io.kind === 'oled') {
       const id = io.item, lcd = io.kind === 'lcd', sda = pin, scl = io.scl;
       if (!N.same(id + '.SDA', 'PIN:' + sda)) bad(L, `${io.kind}: SDA not on ${sda}`);

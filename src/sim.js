@@ -56,6 +56,7 @@ export class Sim {
       // deep sleep: the CPU and digital pins are powered off (outputs go low), then the timer wakes the chip and the program restarts
       deepSleep: async (ms) => { for (const k of Object.keys(pins)) if (pins[k] && pins[k].mode === 'OUTPUT') H.pin(k, 0); for (const k of Object.keys(pins)) delete pins[k]; if (H.sleep) H.sleep(true, ms); await rt.delay(ms); if (H.sleep) H.sleep(false, ms); },
       ble: (stage, val) => { if (H.ble) H.ble({ stage, val }); },
+      neo: (op, a, b, c, d) => (H.neo ? H.neo({ op, a, b, c, d }) : undefined),
       lcd: (op, a, b) => (H.lcd ? H.lcd({ op, a, b }) : undefined),
       oled: (op, a, b) => (H.oled ? H.oled({ op, a, b }) : false),
       dhtRead: () => (H.dht ? H.dht() : { ok: false }),
@@ -764,6 +765,42 @@ export const PROGRAMS = {
     await rt.at(18); rt.oled('println', 'OLED 128 x 64');
     await rt.at(19); rt.oled('display');
     for (;;) { await rt.at(22); await rt.at(23); await rt.delay(1000); }
+  },
+
+  async u3_neo(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4); await rt.at(6);
+    await rt.at(8);
+    await rt.at(9); rt.neo('begin');
+    await rt.at(10); rt.neo('brightness', 40);
+    await rt.at(11); rt.neo('show');
+    for (;;) {
+      await rt.at(14);
+      for (let i = 0; i < 8; i++) {
+        await rt.at(15);
+        await rt.at(16); rt.neo('clear');
+        await rt.at(17); rt.neo('set', i, 255, 0, 0);
+        await rt.at(18); rt.neo('show');
+        await rt.at(19); await rt.delay(150);
+      }
+    }
+  },
+
+  async e_neo(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4); await rt.at(6);
+    await rt.at(8);
+    await rt.at(9); rt.neo('begin');
+    await rt.at(10); rt.neo('brightness', 40);
+    await rt.at(11); rt.neo('show');
+    for (;;) {
+      await rt.at(14);
+      for (let i = 0; i < 8; i++) {
+        await rt.at(15);
+        await rt.at(16); rt.neo('clear');
+        await rt.at(17); rt.neo('set', i, 255, 0, 0);
+        await rt.at(18); rt.neo('show');
+        await rt.at(19); await rt.delay(150);
+      }
+    }
   },
 
   async thermo(rt) {

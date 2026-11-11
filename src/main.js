@@ -830,8 +830,9 @@ class App {
     const io = $('#dock-io');
     $('#dock').classList.toggle('with-io', w.length > 0);
     $('#dock').classList.toggle('no-serial', L.id === 'l9');
-    let h = ''; this.lcdSt = { rows: [' '.repeat(16), ' '.repeat(16)], c: 0, r: 0, bl: false, ready: false }; this.oledSt = { buf: ['', ''], cy: 0, shown: null }; this.lcdAddr = 0x27; this.oledAddr = 0x3C; this._lcdKey = null; this._oledKey = null; this.joyPos = { x: 0.5, y: 0.5 }; this.joySw = false; this.encPh = 0; this.encSw = false; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
+    let h = ''; this.lcdSt = { rows: [' '.repeat(16), ' '.repeat(16)], c: 0, r: 0, bl: false, ready: false }; this.oledSt = { buf: ['', ''], cy: 0, shown: null }; this.lcdAddr = 0x27; this.oledAddr = 0x3C; this.neoSt = { px: Array.from({ length: 8 }, () => [0, 0, 0]), br: 255, shown: null }; this.neoShift = false; this._neoKey = null; this._lcdKey = null; this._oledKey = null; this.joyPos = { x: 0.5, y: 0.5 }; this.joySw = false; this.encPh = 0; this.encSw = false; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
     if (w.includes('ble')) h += `<div class="io-block pirstat tight"><div><span>Phone app (client)</span><b id="bl-s1">—</b></div><div class="arrow">→</div><div><span>ESP32 (BLE server)</span><b id="bl-s2">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="bl-s3">—</b></div></div><div id="bl-note" class="io-note"></div>`;
+    if (w.includes('neolevel')) h += `<div class="io-block"><div class="io-title">Data line <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="neo-shift" class="hold small">Level shifter: absent</button></div><div id="neo-note" class="io-note"></div></div>`;
     if (w.includes('lcdaddr')) h += `<div class="io-block"><div class="io-title">LCD backpack <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="lcd-addr" class="hold small">Module address: 0x27</button></div><div id="lcd-note" class="io-note"></div></div>`;
     if (w.includes('oledaddr')) h += `<div class="io-block"><div class="io-title">OLED module <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="oled-addr" class="hold small">Module address: 0x3C</button></div><div id="oled-note" class="io-note"></div></div>`;
     if (w.includes('joy')) h += `<div class="io-block"><div class="io-title">Joystick <span class="io-note">(simulated)</span></div><div class="throw"><label>X (left → right)</label><input id="jx" type="range" min="0" max="100" value="50"><b id="jx-v"></b></div><div class="throw"><label>Y (up ↔ down)</label><input id="jy" type="range" min="0" max="100" value="50"><b id="jy-v"></b></div><button id="jsw" class="hold">Hold to press the stick</button><div class="io-note">The sliders move the stick; pressing closes the switch under it.</div></div>`;
@@ -892,6 +893,7 @@ class App {
     }
     if ($('#wf-rssi')) { const upd = () => { $('#wf-val').innerHTML = `<b>${this.wf.rssi} dBm</b>`; }; $('#wf-rssi').oninput = e => { this.wf.rssi = +e.target.value; upd(); }; upd(); }
     if ($('#wf-router')) { $('#wf-router').onclick = () => { if (!this.sim.running) this.wf.router = !this.wf.router; }; $('#wf-pass').onclick = () => { if (!this.sim.running) this.wf.passOk = !this.wf.passOk; }; }
+    if ($('#neo-shift')) $('#neo-shift').onclick = () => { if (!this.sim.running) this.neoShift = !this.neoShift; };
     if ($('#lcd-addr')) $('#lcd-addr').onclick = () => { if (!this.sim.running) this.lcdAddr = this.lcdAddr === 0x27 ? 0x3F : 0x27; };
     if ($('#oled-addr')) $('#oled-addr').onclick = () => { if (!this.sim.running) this.oledAddr = this.oledAddr === 0x3C ? 0x3D : 0x3C; };
     if ($('#jx')) { const sl = (id, ax) => { $(id).oninput = e => { this.joyPos[ax] = +e.target.value / 100; this.joyShow(); }; }; sl('#jx', 'x'); sl('#jy', 'y'); const sw = $('#jsw'); const dn = e => { e.preventDefault(); this.joySw = true; this.joyShow(); }, up = () => { this.joySw = false; this.joyShow(); }; sw.addEventListener('pointerdown', dn); sw.addEventListener('pointerup', up); sw.addEventListener('pointerleave', up); this.joyShow(); }
@@ -1543,8 +1545,19 @@ class App {
     else if (op === 'println' || op === 'print') { S.buf[S.cy] = String(a); if (op === 'println') S.cy = Math.min(1, S.cy + 1); }
     else if (op === 'display') S.shown = S.buf.slice();
   }
+  neoOp({ op, a, b, c, d }) {
+    const S = this.neoSt; if (!this.i2cDispOk('neo')) return;
+    if (op === 'brightness') S.br = a; else if (op === 'clear') S.px = Array.from({ length: 8 }, () => [0, 0, 0]); else if (op === 'set') { if (a >= 0 && a < 8) S.px[a] = [b, c, d]; } else if (op === 'show') S.shown = S.px.map(p => [p[0], p[1], p[2], S.br / 255]);
+  }
   displayTick() {
-    const L = this.lesson; if (!L) return; const w = L.widgets || [], run = this.sim.running, pw = this.board.powered;
+    const L = this.lesson; if (!L) return;
+    if (!this.sim.running && this.neoSt) this.neoSt.shown = null;
+    if (L.io && Object.values(L.io).some(x => x.kind === 'neo')) {
+      const o = this.bench.get('neo1'), S = this.neoSt, bad = !!L.neoLow && !this.neoShift, pw = this.board.powered, key = JSON.stringify([pw, S.shown, bad]);
+      if (o && o.setColors && key !== this._neoKey) { this._neoKey = key; o.setColors(pw && S.shown ? (bad ? S.shown.map((c, i) => (i % 2 ? [0, 0, 0, 0] : [255, 0, 0, 0.3])) : S.shown) : null); }
+      const b = $('#neo-shift'); if (b) { b.disabled = this.sim.running; b.textContent = `Level shifter: ${this.neoShift ? 'present' : 'absent'}`; b.classList.toggle('on', this.neoShift); }
+      const n = $('#neo-note'); if (n) { const h = !pw ? 'USB is not plugged in — the board has no power.' : !this.sim.running ? 'Press <b>▶ Run</b>. Stop the sketch to change the level shifter.' : bad ? 'The data signal is 3.3 V but the 5 V pixels need at least 3.5 V (70 %): they show wrong colours or flicker.' : 'The data signal reaches the pixels at the level they need.'; if (n.innerHTML !== h) n.innerHTML = h; }
+    } const w = L.widgets || [], run = this.sim.running, pw = this.board.powered;
     if (!run) { this.lcdSt.ready = false; this.lcdSt.bl = false; this.oledSt.shown = null; }
     const set = (id, h) => { const e = $(id); if (e && e.innerHTML !== h) e.innerHTML = h; };
     if (w.includes('lcdaddr')) {
@@ -1969,6 +1982,7 @@ class App {
         return ok ? { found: true, c: this.th.t + (Math.random() - 0.5) * 0.1, rh: Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3)) } : { found: false };
       },
       ble: ev => { if (ev.stage === 'adv') this.bl.adv = !!ev.val; else if (ev.stage === 'val') this.bl.val = ev.val; this.bleRender(); },
+      neo: ev => this.neoOp(ev),
       lcd: ev => this.lcdOp(ev),
       oled: ev => this.oledOp(ev),
       dht: () => {

@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -26,6 +26,8 @@ const SRC = {
   lcdi2c: { t: 'I²C LCD1602 documentation (SunFounder): PCF8574 backpack, address 0x27 / 0x3F, LiquidCrystal_I2C', u: 'https://docs.sunfounder.com/projects/sf-components/en/latest/component_i2c_lcd.html' },
   ssd1306: { t: 'Adafruit SSD1306 library (examples: begin(SSD1306_SWITCHCAPVCC, 0x3C))', u: 'https://github.com/adafruit/Adafruit_SSD1306' },
   wire: { t: 'Arduino-ESP32 documentation: I²C (Wire)', u: 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/i2c.html' },
+  neouber: { t: 'Adafruit NeoPixel Überguide: Powering NeoPixels', u: 'https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels' },
+  neolib: { t: 'Adafruit_NeoPixel library (examples: strandtest)', u: 'https://github.com/adafruit/Adafruit_NeoPixel' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -98,6 +100,17 @@ const LCD_PARTS_E = dispE('lcd1602', 'lcd1', 'VIN', ['GND', 'VCC', 'SDA', 'SCL']
 const LCD_IDS_E = LCD_PARTS_E.map(d => d.id);
 const OLED_PARTS_E = dispE('oled', 'oled1', '3V3', ['GND', 'VCC', 'SCL', 'SDA'], 8);
 const OLED_IDS_E = OLED_PARTS_E.map(d => d.id);
+// NeoPixel strip on the desk: leads to breadboard holes a10..a12, board pins (VIN, GPIO16, GND) to b10..b12
+const NEO_PARTS_E = [
+  { id: 'neo1', type: 'neopixel', x: 35, z: 140 },
+  { id: 'l60', type: 'lead', from: 'neo1.VCC', to: 'a10', color: 'red', lift: 20 },
+  { id: 'l61', type: 'lead', from: 'neo1.DIN', to: 'a11', color: 'yellow', lift: 24 },
+  { id: 'l62', type: 'lead', from: 'neo1.GND', to: 'a12', color: 'black', lift: 28 },
+  { id: 'w60', type: 'fwire', from: 'VIN', to: 'b10', color: 'red', lift: 22 },
+  { id: 'w61', type: 'fwire', from: 'G16', to: 'b11', color: 'yellow', lift: 26 },
+  { id: 'w62', type: 'fwire', from: 'GND2', to: 'b12', color: 'black', lift: 30 },
+];
+const NEO_IDS_E = NEO_PARTS_E.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
@@ -1062,5 +1075,55 @@ export const E32_LESSONS = [
       { q: 'Why has an OLED no backlight?', a: ['It is broken', 'Each pixel makes its own light', 'It uses sunlight', 'It is always off'], c: 1, why: 'OLED pixels are light-emitting.' },
     ],
     sources: [SRC.ssd1306, SRC.wire, SRC.ds],
+  },
+
+  // ================================================================== 20
+  {
+    id: 'e20', num: 20, module: 9, title: 'NeoPixel strip: one wire, eight colours', level: 'Intermediate', time: '25 min',
+    goal: 'Light an 8-pixel NeoPixel strip with the Adafruit_NeoPixel library, and learn the power and data-level rules.',
+    hardware: ['ESP32 DevKit V1', 'NeoPixel (WS2812B) strip, 8 pixels', '3 × jumper wires (male–male) and the strip leads', 'Capacitor 500 – 1000 µF (recommended)'],
+    code: E32_NEO, file: 'NeoPixel.ino', program: 'e_neo', fast: true, widgets: ['neolevel'], neoLow: true,
+    circuit: NEO_PARTS_E, io: { G16: { kind: 'neo', item: 'neo1', needs: NEO_IDS_E } },
+    explain: {
+      1: 'The library by Adafruit: install <b>Adafruit NeoPixel</b> from the Library Manager.',
+      3: 'The data pin (<b>DIN</b> of the strip).',
+      4: 'How many pixels the strip has.',
+      6: 'Create the strip object: pixel count, pin, <b>NEO_GRB</b> (the colour order of the WS2812B) and <b>NEO_KHZ800</b> (the 800 kHz data speed).',
+      8: '<b>setup()</b> runs once.',
+      9: 'Start the strip.',
+      10: '<b>setBrightness</b> scales every colour: 40 of 255 keeps the current low.',
+      11: '<b>show()</b> sends the colours to the pixels: nothing changes on the strip before show().',
+      14: '<b>loop()</b> repeats forever.',
+      15: 'Go through the pixels 0 … 7.',
+      16: 'Clear the colours in memory.',
+      17: 'Set pixel <b>i</b> to red: <b>Color(red, green, blue)</b>, each 0 … 255.',
+      18: 'Send everything to the strip.',
+      19: 'Wait 150 ms: the red dot moves on.',
+    },
+    steps: [
+      { title: 'An addressable LED strip', view: 'dispq', have: ['neo1'], power: false,
+        body: `<p>On a <b>NeoPixel</b> (WS2812B) strip every pixel has its own driver chip. The <b>data line</b> carries one colour value for each pixel in turn, so <b>one pin controls the whole strip</b>. <b>Click the parts</b> in the 3D view.</p>
+        <ul><li>Three connections: <b>5 V</b>, <b>DIN</b> (data in) and <b>GND</b>.</li><li>Up to <b>60 mA per pixel</b> at full white; about 20 mA per pixel in typical use (Adafruit).</li></ul>` },
+      { title: 'Power rules', view: 'dispq', have: ['neo1'],
+        body: `<ul><li>Eight pixels at full white can draw <b>480 mA</b>: more than a USB port should be asked for. Keep the <b>brightness low</b> (the sketch uses 40).</li><li>Connect <b>GND first</b> when powering from a bench supply, and add a <b>500 – 1000 µF capacitor</b> across + and − (Adafruit).</li><li>The pixels want about <b>5 V</b>: lower voltages dim them and then give wrong colours; much higher voltages destroy them.</li></ul>` },
+      { title: 'Wire the strip', view: 'dispq', have: NEO_IDS_E, power: false, pins: ['VIN', 'G16', 'GND2'],
+        body: `<ul><li>Strip VCC → <b>VIN</b> (the 5 V from USB) through the breadboard</li><li>Strip DIN → <b>D16</b> (GPIO16)</li><li>Strip GND → <b>GND</b></li></ul><p class="warn">The ESP32 pin is 3.3 V and the strip is 5 V: see the step about the data level.</p>` },
+      { title: 'Install the library', view: 'dispq', have: NEO_IDS_E,
+        body: `<p>Library Manager → <b>Adafruit NeoPixel</b> → Install.</p>` },
+      { title: 'The 3.3 V data problem', view: 'dispq', have: NEO_IDS_E, power: true,
+        body: `<p>The strip runs at <b>5 V</b> and wants its data signal to be at least <b>70 %</b> of that (<b>3.5 V</b>, Adafruit). An ESP32 pin gives only <b>3.3 V</b>: just below. The pixels may then flicker or show wrong colours. The fix is a <b>level shifter</b> between the pin and DIN, or a lower strip supply.</p>
+        <p>Use the button in the panel to put a level shifter in the data line, and compare.</p>` },
+      { title: 'The code', view: 'dispq', have: NEO_IDS_E, showCode: true, power: true, body: `<p>Click lines 6, 10, 17 and 18. Note that nothing happens on the strip until <code>show()</code>.</p>` },
+      { title: 'Run it', view: 'dispq', have: NEO_IDS_E, showCode: true, power: true, action: 'run', body: `<p>A red dot should run along the 8 pixels. Try the <b>level shifter</b> button in the panel (stop the sketch first): without it the strip shows a broken pattern, as it may on real hardware.</p><p class="sim">Simulated strip.</p>` },
+      { title: 'Summary', view: 'dispq', have: NEO_IDS_E, power: true,
+        body: `<ul><li>5 V, DIN, GND; one data pin for all pixels.</li><li><code>Adafruit_NeoPixel strip(n, pin, NEO_GRB + NEO_KHZ800)</code>, <code>begin()</code>, <code>setPixelColor()</code>, <code>show()</code>.</li><li>Up to 60 mA per pixel: keep the brightness low.</li><li>Data signal at least 70 % of the strip voltage (Adafruit).</li></ul>` },
+    ],
+    quiz: [
+      { q: 'When do the pixels change after setPixelColor()?', a: ['At once', 'After strip.show()', 'After begin()', 'Never'], c: 1, why: 'The colours are kept in memory until show() sends them.' },
+      { q: 'How much current can one NeoPixel draw at full white?', a: ['About 1 mA', 'Up to 60 mA', 'About 1 A', 'Exactly 20 mA always'], c: 1, why: 'Adafruit: up to 60 mA with red, green and blue at maximum.' },
+      { q: 'The data signal of a 5 V strip should be at least…', a: ['1 V', '70 % of the strip voltage (3.5 V)', '5 V exactly', '12 V'], c: 1, why: 'Adafruit recommends at least 70 % of the pixel voltage.' },
+      { q: 'Why keep the brightness low?', a: ['To save the library', 'To limit the current drawn from the supply', 'The strip would melt at once', 'No reason'], c: 1, why: 'The pixels draw current in proportion to their colour and brightness.' },
+    ],
+    sources: [SRC.neouber, SRC.neolib, SRC.ds],
   },
 ];
