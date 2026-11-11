@@ -61,7 +61,7 @@ export const findPinE32 = id => E32_PINS.find(p => p.id === id);
 /** Arduino-ESP32 core: a GPIO is addressed by its number, e.g. pinMode(2, OUTPUT) */
 export const gpioOf = id => { const p = findPinE32(id); return p && p.gpio !== undefined ? p.gpio : null; };
 
-const COMMON = 'All pins are 3.3 V only: never apply 5 V to a GPIO. HIGH is above 0.75 × 3.3 V = 2.5 V, LOW is below 0.25 × 3.3 V = 0.8 V (chip datasheet). A pin can source about 40 mA or sink about 28 mA at most; design for 10 mA or less per pin.';
+const COMMON = 'All pins are 3.3 V only: never apply 5 V to a GPIO. HIGH is above 0.75 × 3.3 V = 2.475 V, LOW is below 0.25 × 3.3 V = 0.825 V (chip datasheet). A pin can source about 40 mA or sink about 28 mA at most; design for 10 mA or less per pin.';
 export const E32_HEADERS = [
   { id: 'jleft', name: 'Left header (EN … VIN)', pins: E32_PINS.filter(p => p.header === 'L'), common: COMMON },
   { id: 'jright', name: 'Right header (D23 … 3V3)', pins: E32_PINS.filter(p => p.header === 'R'), common: COMMON },

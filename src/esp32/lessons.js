@@ -108,7 +108,7 @@ export const E32_LESSONS = [
       { title: 'Uploading: the BOOT button', view: 'home', power: true, focus: 'boot',
         body: `<p>When you press <b>Upload</b>, the IDE prints <b>“Connecting…”</b> with dots. If the upload does not start, <b>press and hold the BOOT button</b> for a couple of seconds while the dots appear (Random Nerd Tutorials). Many boards upload without it.</p>` },
       { title: 'Limits you must remember', view: 'home', power: true, focus: ['jleft', 'jright'],
-        body: `<ul><li>Every GPIO works at <b>3.3 V</b>. The chip reads a level above <b>2.5 V</b> (0.75 × 3.3 V) as HIGH and below <b>0.8 V</b> (0.25 × 3.3 V) as LOW (datasheet).</li>
+        body: `<ul><li>Every GPIO works at <b>3.3 V</b>. The chip reads a level above about <b>2.5 V</b> (0.75 × 3.3 V = 2.475 V) as HIGH and below about <b>0.8 V</b> (0.25 × 3.3 V = 0.825 V) as LOW (datasheet). In between, the reading is undefined.</li>
         <li><b>Never apply 5 V</b> to a GPIO. The VIN pin is the only 5 V pin.</li>
         <li>One pin can source about <b>40 mA</b> or sink about <b>28 mA</b> at most (datasheet, maximum drive strength). Stay far below that: <b>10 mA</b> or less is a good habit.</li>
         <li>The <b>3V3</b> pin is for small loads only.</li></ul>` },
