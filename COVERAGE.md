@@ -20,7 +20,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Item | UQ | PI | R3 | E32 | Notes |
 |---|---|---|---|---|---|
 | LED matrix (on-board) | DONE | n/a | n/a | n/a | |
-| RGB LED (common cathode / anode) | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 17) | DONE (Build + lesson 14) | 3D part, 3 dice model (R 2.0 V, G 3.0 V, B 3.1 V typical), 3 examples per board, tests |
+| RGB LED (common cathode / anode) | Build DONE, lesson TODO | DONE (Build + lesson 14) | DONE (Build + lesson 17) | DONE (Build + lesson 14) | 3D part, 3 dice model (R 2.0 V, G 3.0 V, B 3.1 V typical), 3 examples per board, tests |
 | WS2812 / NeoPixel strip and ring | Build DONE (strip of 8; library not verified on UNO Q), lesson TODO | Build DONE (GPIO18 example, needs root), lesson TODO | DONE (Build + lesson 23) | DONE (Build + lesson 20, with the 3.3 V data-level demo) | 5 V data level vs 3.3 V pins (70 % rule), current 60 mA/pixel; ring TODO |
 | 7-segment display (+ 74HC595 shift register) | TODO | TODO | TODO | TODO | |
 | 16x2 character LCD (HD44780 + I2C backpack) | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 21) | DONE (Build + lesson 18) | needs 5 V; backpack pull-ups to 5 V on 3.3 V boards flagged as a check-your-module warning; address 0x27/0x3F |
@@ -35,14 +35,14 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | HC-SR04 ultrasonic, PIR HC-SR501 | DONE | DONE | DONE | build only (HC-SR04) | |
 | SHT31 (I2C) | DONE | DONE | DONE | build only | |
 | Modulino Thermo / Pixels (Qwiic) | DONE | n/a | n/a | n/a | UNO Q only |
-| DHT11 / DHT22 | Build DONE (library reported to return NaN on the UNO Q: lesson TODO, check first) | Build DONE, lesson TODO | DONE (Build + lesson 18) | DONE (Build + lesson 15) | 4-pin sensor with external pull-up; specs from the Adafruit guide; Pi uses adafruit-circuitpython-dht |
+| DHT11 / DHT22 | Build DONE (library reported to return NaN on the UNO Q: lesson TODO, check first) | DONE (Build + lesson 15) | DONE (Build + lesson 18) | DONE (Build + lesson 15) | 4-pin sensor with external pull-up; specs from the Adafruit guide; Pi uses adafruit-circuitpython-dht |
 | DS18B20 (1-Wire) | TODO | TODO | TODO | TODO | Pi has 1-Wire in the kernel |
 | BMP280 / BME280 pressure (I2C/SPI) | TODO | TODO | TODO | TODO | |
 | Soil moisture (analog), rain, water level | TODO | n/a (no ADC) | TODO | TODO | |
 | Gas MQ-2 / MQ-135 (analog + digital) | TODO | n/a | TODO | TODO | heater needs 5 V |
 | Sound sensor (analog/digital) | TODO | TODO | TODO | TODO | |
 | Joystick (2 analog + button) | Build DONE, lesson TODO | n/a (no ADC) | DONE (Build + lesson 19) | DONE (Build + lesson 16) | KY-023 style; powered from 3.3 V on 3.3 V boards (UNO Q analog pins are 3.3 V only) |
-| Rotary encoder KY-040 | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 20) | DONE (Build + lesson 17) | module pull-ups described inconsistently by sources: the model relies on INPUT_PULLUP |
+| Rotary encoder KY-040 | Build DONE, lesson TODO | DONE (Build + lesson 16) | DONE (Build + lesson 20) | DONE (Build + lesson 17) | module pull-ups described inconsistently by sources: the model relies on INPUT_PULLUP |
 | IR receiver + remote (VS1838 / NEC) | TODO | TODO | TODO | TODO | |
 | Flame, tilt, vibration, hall, line-follow IR | TODO | TODO | TODO | TODO | |
 | MPU6050 accelerometer / gyro (I2C) | TODO | TODO | TODO | TODO | |

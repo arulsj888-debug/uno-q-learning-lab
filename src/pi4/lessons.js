@@ -10,6 +10,10 @@ export const SRC_PI = {
   power: { t: 'Raspberry Pi documentation — Power supply', u: 'https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#power-supply' },
   leds: { t: 'Raspberry Pi documentation — LED warning flash codes', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#led-warning-flash-codes' },
   bcm: { t: 'Raspberry Pi documentation — BCM2711', u: 'https://www.raspberrypi.com/documentation/computers/processors.html#bcm2711' },
+  rgbled: { t: 'GPIO Zero documentation: RGBLED', u: 'https://gpiozero.readthedocs.io/en/stable/api_output.html' },
+  gpiozeroin: { t: 'GPIO Zero documentation: input devices (Button, RotaryEncoder)', u: 'https://gpiozero.readthedocs.io/en/stable/api_input.html' },
+  dhtpy: { t: 'Adafruit CircuitPython DHT library documentation', u: 'https://docs.circuitpython.org/projects/dht/en/latest/' },
+  dhtguide: { t: 'Adafruit: DHT11, DHT22 and AM2302 Sensors (specifications, wiring)', u: 'https://learn.adafruit.com/dht' },
   cfg: { t: 'Raspberry Pi documentation — Configuration: enable or disable I2C', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#i2c' },
   remote: { t: 'Raspberry Pi documentation — Remote access (find your IP address, SSH)', u: 'https://www.raspberrypi.com/documentation/computers/remote-access.html' },
   kernel: { t: 'Raspberry Pi documentation — Linux kernel (check your kernel)', u: 'https://www.raspberrypi.com/documentation/computers/linux_kernel.html' },
@@ -242,7 +246,96 @@ export const TERM_CMDS = [
   { g: 'Python', cmd: 'python3', does: 'Starts Python 3, which comes pre-installed with Raspberry Pi OS.', src: 'Using Python' },
 ];
 
-export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project', 7: 'Module 7 — Extra: sound', 8: 'Module 8 — Camera' };
+export const PI_RGB = `from gpiozero import RGBLED
+from time import sleep
+
+led = RGBLED(red=18, green=12, blue=13)   # GPIO18, GPIO12, GPIO13 (pins 12, 32, 33)
+
+while True:
+    led.color = (1, 0, 0)    # red
+    sleep(1)
+    led.color = (0, 1, 0)    # green
+    sleep(1)
+    led.color = (0, 0, 1)    # blue
+    sleep(1)
+    led.color = (1, 1, 0)    # red + green = yellow
+    sleep(1)
+    led.color = (1, 1, 1)    # all three = white
+    sleep(1)
+    led.color = (0, 0, 0)    # off
+    sleep(1)`;
+
+export const PI_DHT = `import time
+import board
+import adafruit_dht
+
+dht = adafruit_dht.DHT22(board.D18)   # DATA wire on GPIO18 (pin 12)
+
+while True:
+    try:
+        temperature = dht.temperature     # degrees Celsius
+        humidity = dht.humidity           # percent
+        print(f"Temp: {temperature:.1f} C  Humidity: {humidity:.1f} %")
+    except RuntimeError as error:
+        print("Read failed:", error.args[0])   # this happens now and then: just try again
+    time.sleep(2)`;
+
+export const PI_ENC = `from gpiozero import Button
+from time import sleep
+
+clk = Button(17)   # CLK on GPIO17 (pin 11). Button uses the pull-up: pressed = LOW
+dt = Button(27)    # DT on GPIO27 (pin 13)
+sw = Button(22)    # SW on GPIO22 (pin 15)
+counter = 0
+last_clk = clk.is_pressed
+
+while True:
+    now = clk.is_pressed                    # True while CLK is LOW
+    if now and not last_clk:                # CLK just fell: one step
+        if not dt.is_pressed:               # DT is still HIGH: one direction
+            counter += 1
+        else:                               # DT is already LOW: the other direction
+            counter -= 1
+        print(counter)
+    last_clk = now
+    if sw.is_pressed:                       # knob pressed
+        print("Knob pressed")
+        sleep(0.3)
+    sleep(0.002)`;
+
+
+// ---- lessons 14-16: RGB LED on GPIO18/12/13 (3 x 220 ohm), DHT22 on GPIO18 with a 4.7 kOhm pull-up to 3V3, rotary encoder on GPIO17/27/22
+export const PI_RGB_PARTS = [
+  { id: 'rgb1', type: 'rgbled', row: 'e', col: 10 },
+  { id: 'r1', type: 'resistor', a: 'a10', b: 'a16' },
+  { id: 'r2', type: 'resistor', a: 'a12', b: 'a17' },
+  { id: 'r3', type: 'resistor', a: 'a13', b: 'a18' },
+  { id: 'w50', type: 'fwire', from: 'p12', to: 'b16', color: 'red', lift: 24 },
+  { id: 'w51', type: 'fwire', from: 'p32', to: 'b17', color: 'green', lift: 34 },
+  { id: 'w52', type: 'fwire', from: 'p33', to: 'b18', color: 'blue', lift: 44 },
+  { id: 'w53', type: 'fwire', from: 'p34', to: 'a11', color: 'black', lift: 30 },
+];
+const RGB_IDS = PI_RGB_PARTS.map(d => d.id);
+export const PI_DHT_PARTS = [
+  { id: 'dht1', type: 'dht', model: 'dht22', row: 'e', col: 10 },
+  { id: 'w60', type: 'fwire', from: 'p1', to: 'a10', color: 'red', lift: 24 },
+  { id: 'w61', type: 'fwire', from: 'p12', to: 'a11', color: 'yellow', lift: 34 },
+  { id: 'w62', type: 'fwire', from: 'p6', to: 'a13', color: 'black', lift: 44 },
+  { id: 'r60', type: 'resistor', a: 'c10', b: 'c16', ohms: 4700 },
+  { id: 'w63', type: 'wire', from: 'b11', to: 'b16', color: 'orange', lift: 12 },
+];
+const DHT_IDS = PI_DHT_PARTS.map(d => d.id);
+export const PI_ENC_PARTS = [
+  { id: 'enc1', type: 'encoder', row: 'g', col: 10 },
+  { id: 'w80', type: 'fwire', from: 'p11', to: 'j10', color: 'green', lift: 24 },
+  { id: 'w81', type: 'fwire', from: 'p13', to: 'j11', color: 'blue', lift: 34 },
+  { id: 'w82', type: 'fwire', from: 'p15', to: 'j12', color: 'yellow', lift: 44 },
+  { id: 'w83', type: 'fwire', from: 'p1', to: 'j13', color: 'red', lift: 54 },
+  { id: 'w84', type: 'fwire', from: 'p6', to: 'j14', color: 'black', lift: 64 },
+];
+const ENC_IDS = PI_ENC_PARTS.map(d => d.id);
+
+export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project', 7: 'Module 7 — Extra: sound', 8: 'Module 8 — Camera', 9: 'Module 9 — Light and climate', 10: 'Module 10 — Controls' };
 
 export const PI_LESSONS = [
   // ================================================================== P1
@@ -1100,6 +1193,157 @@ pause()</pre>
       { q: 'How much extra current does the camera add?', a: ['About 2 mA', 'About 200–250 mA', 'About 5 A', 'None'], c: 1, why: 'Raspberry Pi troubleshooting: about 200–250 mA.' },
     ],
     sources: [SRC_PI.camin, SRC_PI.cam3, SRC_PI.camsw, SRC_PI.camtr, SRC_PI.magpi45],
+  },
+
+  // ================================================================== P14
+  {
+    id: 'p14', num: 14, module: 9, title: 'RGB LED: mix any colour with GPIO Zero', level: 'Beginner', time: '20 min',
+    goal: 'Drive the three dice of an RGB LED with three PWM pins using the RGBLED class, and see why green and blue are dim on 3.3 V.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'Breadboard', 'RGB LED (common cathode, 4 legs)', '3 × 220 Ω resistors', '4 × female–male jumper wires'],
+    code: PI_RGB, file: 'rgb_led.py', program: 'pi_rgb', fast: true, widgets: [],
+    circuit: PI_RGB_PARTS, io: { p12: { kind: 'rgb', ch: 0, item: 'rgb1', needs: RGB_IDS }, p32: { kind: 'rgb', ch: 1, item: 'rgb1', needs: RGB_IDS }, p33: { kind: 'rgb', ch: 2, item: 'rgb1', needs: RGB_IDS } },
+    explain: {
+      1: '<b>RGBLED</b> is the GPIO Zero class for an LED with a red, a green and a blue die.',
+      2: '<code>sleep</code> pauses the program.',
+      4: 'Create the LED: <b>red</b> on GPIO18, <b>green</b> on GPIO12, <b>blue</b> on GPIO13. By default it uses <b>PWM</b> on each pin, so every colour can have any brightness. (<code>active_high=False</code> is for a common-anode LED.)',
+      6: 'Repeat forever.',
+      7: '<b>led.color</b> takes three numbers from 0 to 1: red, green, blue. (1, 0, 0) = red.',
+      8: 'Wait one second.',
+      9: 'Green only.',
+      11: 'Blue only.',
+      13: 'Red + green light = <b>yellow</b>.',
+      15: 'All three = <b>white</b>.',
+      17: 'All off.',
+    },
+    steps: [
+      { title: 'One LED, three colours', view: 'pibench', have: [], power: false,
+        body: `<p>An <b>RGB LED</b> has a red, a green and a blue LED in one housing, with <b>four legs</b>: red, the <b>common</b> leg (the longest), green, blue. In a <b>common-cathode</b> LED the common leg goes to <b>GND</b>. Red + green look yellow, green + blue look cyan, red + blue look magenta, all three look white.</p>` },
+      { title: 'Resistors, and why 3.3 V is little', view: 'pibb', have: ['rgb1'], power: false, holes: ['e10 · red', 'e11 · common', 'e12 · green', 'e13 · blue'],
+        body: `<p>Push the LED into <b>e10 – e13</b>. Every colour needs its own resistor (220 Ω here).</p>
+        <p class="warn">A GPIO pin gives <b>3.3 V</b>. Red needs about 2.0 V, but green and blue need about <b>3.0 V</b> or more (typical values: check your datasheet). So the green and blue dice get only about 1 mA or less and look <b>much dimmer</b> than red.</p>` },
+      { title: 'Step 1 — three resistors', view: 'pibb', have: ['rgb1', 'r1', 'r2', 'r3'], power: false, holes: ['a10 → a16', 'a12 → a17', 'a13 → a18'],
+        body: `<p>Resistors from each colour leg to a free column: <b>a10 → a16</b> (red), <b>a12 → a17</b> (green), <b>a13 → a18</b> (blue).</p>` },
+      { title: 'Step 2 — wires to the Raspberry Pi', view: 'pibench', have: RGB_IDS, pins: ['p12', 'p32', 'p33', 'p34'],
+        body: `<ul><li>Red: <b>pin 12 (GPIO18) → b16</b></li><li>Green: <b>pin 32 (GPIO12) → b17</b></li><li>Blue: <b>pin 33 (GPIO13) → b18</b></li><li>Black: <b>pin 34 (GND) → a11</b> (the common leg)</li></ul>` },
+      { title: 'The program', view: 'pibench', have: RGB_IDS, showCode: true, power: true, body: `<p>The <b>RGBLED</b> class does the PWM for you. Click lines 4, 7 and 13.</p>` },
+      { title: 'Run it', view: 'pibench', have: RGB_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The LED shows red, green, blue, yellow, white and off, one second each. Notice how dim the green and blue are next to the red.</p><p class="sim">Simulated brightness from the typical forward voltages (red 2.0 V, green 3.0 V, blue 3.1 V).</p>` },
+      { title: 'Summary', view: 'pibench', have: RGB_IDS, power: true,
+        body: `<ul><li><code>RGBLED(red=…, green=…, blue=…)</code> and <code>led.color = (r, g, b)</code> with values from 0 to 1.</li><li>One resistor per colour; the common leg to GND.</li><li>On 3.3 V the green and blue dice are much dimmer than red.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'led.color = (1, 1, 0) shows…', a: ['Cyan', 'Magenta', 'Yellow', 'White'], c: 2, why: 'Red and green light mix to yellow.' },
+      { q: 'Which values does led.color take?', a: ['0 … 255', '0 … 1', '0 … 100', '0 or 1 only'], c: 1, why: 'RGBLED uses 0 … 1 for each colour (with PWM).' },
+      { q: 'Why are green and blue dim on 3.3 V?', a: ['They are broken', 'Their forward voltage (about 3 V) is close to 3.3 V, so little current flows', 'The Pi has no PWM', 'The resistor is too small'], c: 1, why: 'I = (3.3 − Vf) ÷ R is only about 1 mA or less.' },
+      { q: 'How many resistors does the RGB LED need?', a: ['One', 'Two', 'Three, one per colour', 'None'], c: 2, why: 'Each colour is a separate LED.' },
+    ],
+    sources: [SRC_PI.rgbled, SRC_PI.gpio, SRC_PI.usegpio],
+  },
+  // ================================================================== P15
+  {
+    id: 'p15', num: 15, module: 9, title: 'DHT22: temperature and humidity on one wire', level: 'Intermediate', time: '25 min',
+    goal: 'Wire a DHT22 with its pull-up resistor from 3.3 V and read it with the Adafruit CircuitPython DHT library.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'Breadboard', 'DHT22 sensor (4 pins)', '4.7 kΩ resistor', '3 × female–male jumper wires', '1 × jumper wire'],
+    code: PI_DHT, file: 'dht22.py', program: 'pi_dht', fast: true, widgets: ['pisens'], sdaWire: 'w61', dht: true,
+    circuit: PI_DHT_PARTS, io: { p12: { kind: 'dht', item: 'dht1', needs: DHT_IDS } },
+    explain: {
+      1: 'The <b>time</b> library, for <code>sleep</code>.',
+      2: '<b>board</b> (from Adafruit Blinka) knows the Raspberry Pi’s pin names, such as <code>board.D18</code> = GPIO18.',
+      3: 'The driver for the DHT11 and DHT22.',
+      5: 'Create the sensor object: <b>DHT22</b> (use <code>DHT11</code> for the blue sensor) with the data pin <b>GPIO18</b> (pin 12), the pin of Adafruit’s example.',
+      7: 'Repeat forever.',
+      8: 'Reading the sensor can fail now and then, so we use <b>try / except</b>.',
+      9: '<b>dht.temperature</b>: the temperature in °C.',
+      10: '<b>dht.humidity</b>: the relative humidity in %.',
+      11: 'Print both with one decimal.',
+      12: 'The library raises a <b>RuntimeError</b> when a reading fails. The documentation says to catch it and retry.',
+      13: 'Print the reason and carry on.',
+      14: 'Wait at least 2 seconds before the next reading (Adafruit).',
+    },
+    steps: [
+      { title: 'The DHT22', view: 'pibb', have: ['dht1'], power: false, holes: ['e10 · VCC', 'e11 · DATA', 'e12 · not connected', 'e13 · GND'],
+        body: `<p>The <b>DHT22</b> (AM2302) sends temperature and humidity on <b>one data wire</b>. Four pins (grille facing you, from the left): <b>1 VCC, 2 DATA, 3 not connected, 4 GND</b>.</p>
+        <ul><li>Power: <b>3 V to 5 V</b>. Humidity 0 – 100 % (2 – 5 %), temperature −40 – 80 °C (±0.5 °C), at most one reading every 2 seconds (Adafruit).</li></ul>
+        <p class="tip">A 3-pin <b>module</b> has the pull-up on its board, but its pin order differs between makers: read the printing.</p>` },
+      { title: 'Pull-up resistor, and 3.3 V', view: 'pibench', have: [],
+        body: `<p>The sensor can pull DATA low but not high. A <b>pull-up resistor</b> between DATA and VCC does that. The CircuitPython documentation says <b>1 – 5 kΩ</b>; this lesson uses <b>4.7 kΩ</b>.</p>
+        <p class="warn">Power the sensor from <b>3V3 (pin 1)</b>. The pull-up goes to VCC, so from 5 V the DATA line would be pulled up to <b>5 V</b>, and a Raspberry Pi GPIO pin is <b>3.3 V only</b>.</p>` },
+      { title: 'Step 1 — the sensor and the resistor', view: 'pibb', have: ['dht1', 'r60', 'w63'], power: false, holes: ['c10 · resistor', 'c16 · resistor'],
+        body: `<p>Sensor in <b>e10 – e13</b>. The <b>4.7 kΩ resistor</b> goes from <b>c10</b> (VCC column) to <b>c16</b>; a jumper from <b>b11</b> (DATA column) to <b>b16</b> completes the pull-up.</p>` },
+      { title: 'Step 2 — power, data and ground', view: 'pibench', have: DHT_IDS, pins: ['p1', 'p12', 'p6'],
+        body: `<ul><li>Red: <b>pin 1 (3V3) → a10</b> (VCC)</li><li>Yellow: <b>pin 12 (GPIO18) → a11</b> (DATA)</li><li>Black: <b>pin 6 (GND) → a13</b></li></ul>` },
+      { title: 'Install the library', view: 'home', acc: [],
+        body: `<p>In the Terminal (inside a virtual environment, see Lesson 8):</p><pre class="tree">pip3 install adafruit-circuitpython-dht</pre>
+        <p>The library works with <b>Adafruit Blinka</b>. Follow the current instructions of the CircuitPython DHT documentation for your Raspberry Pi OS: it may also ask for extra system packages.</p>` },
+      { title: 'The program', view: 'pibench', have: DHT_IDS, showCode: true, power: true, body: `<p>Click lines 5, 8 and 12.</p>` },
+      { title: 'Run it', view: 'pibench', have: DHT_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Every 2 seconds the Shell prints the temperature and humidity. <b>Move the sliders</b> and watch the numbers follow.</p><p class="sim">Simulated values within the DHT22 specification.</p>` },
+      { title: 'What if the data wire is loose?', view: 'pibench', have: DHT_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Unplug the DATA wire”</b> and run it again. No reading arrives, the library raises a RuntimeError, the <code>except</code> branch prints “Read failed: …” and the loop goes on. (The exact message differs.)</p><p>Check the three wires and the <b>pull-up resistor</b>.</p>` },
+      { title: 'Summary', view: 'pibench', have: DHT_IDS, power: true,
+        body: `<ul><li>VCC (3V3), DATA with a 1 – 5 kΩ pull-up, GND.</li><li><code>adafruit_dht.DHT22(board.D18)</code>; <code>dht.temperature</code>, <code>dht.humidity</code>.</li><li>Catch <b>RuntimeError</b> and wait at least 2 seconds before retrying.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Why power the DHT from 3V3 on a Raspberry Pi?', a: ['It is brighter', 'With 5 V the pulled-up DATA line reaches 5 V, too high for a GPIO pin', 'The DHT needs exactly 3.3 V', 'The Pi has no 5 V pin'], c: 1, why: 'The pull-up goes to VCC, and the GPIO pins are 3.3 V only.' },
+      { q: 'A reading fails with a RuntimeError. What does the documentation say to do?', a: ['Stop the program', 'Catch it and retry after at least 2 seconds', 'Replace the Pi', 'Ignore the sensor'], c: 1, why: 'Wrap the reads in try/except and wait before retrying.' },
+      { q: 'Which pull-up range does the CircuitPython documentation give?', a: ['1 – 5 kΩ', '1 – 5 MΩ', '10 – 50 Ω', 'None is needed'], c: 0, why: 'The data wire needs a pull-up of 1 – 5 kΩ.' },
+      { q: 'How often may you read a DHT22?', a: ['1000 times per second', 'At most once every 2 seconds', 'Only once', 'Once a day'], c: 1, why: 'Adafruit: no more than 0.5 Hz.' },
+    ],
+    sources: [SRC_PI.dhtpy, SRC_PI.dhtguide, SRC_PI.gpio],
+  },
+  // ================================================================== P16
+  {
+    id: 'p16', num: 16, module: 10, title: 'Rotary encoder: count the clicks', level: 'Intermediate', time: '25 min',
+    goal: 'Read the two quadrature signals of a rotary encoder with GPIO Zero buttons and count steps up and down.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'Breadboard', 'Rotary encoder module (KY-040 style)', '5 × female–male jumper wires'],
+    code: PI_ENC, file: 'encoder.py', program: 'pi_enc', fast: true, widgets: ['enc'],
+    circuit: PI_ENC_PARTS, io: { p11: { kind: 'enc', role: 'clk', item: 'enc1', needs: ENC_IDS }, p13: { kind: 'enc', role: 'dt', item: 'enc1', needs: ENC_IDS }, p15: { kind: 'enc', role: 'sw', item: 'enc1', needs: ENC_IDS } },
+    explain: {
+      1: '<b>Button</b> reads a pin with the <b>internal pull-up</b>: not pressed = HIGH, pressed = LOW (<code>is_pressed</code> is True while the pin is LOW).',
+      2: '<code>sleep</code> pauses the program.',
+      4: '<b>CLK</b> of the encoder on GPIO17.',
+      5: '<b>DT</b> on GPIO27.',
+      6: 'The push switch <b>SW</b> on GPIO22.',
+      7: 'The number of steps counted.',
+      8: 'Remember whether CLK was LOW the last time.',
+      10: 'Repeat forever.',
+      11: 'Is CLK LOW now?',
+      12: 'CLK has just fallen: the knob moved one step.',
+      13: 'DT still HIGH: one direction.',
+      14: 'Count up.',
+      15: 'DT already LOW: the other direction.',
+      16: 'Count down.',
+      17: 'Print the new count.',
+      18: 'Remember CLK for the next time.',
+      19: 'Is the knob pressed?',
+      20: 'Say so.',
+      21: 'Wait a moment so one press is not reported many times.',
+      22: 'A tiny pause: the program polls the pins many times per second.',
+    },
+    steps: [
+      { title: 'How an encoder works', view: 'pibench', have: [], power: false,
+        body: `<p>A rotary encoder has two contacts, <b>CLK</b> and <b>DT</b>, that close to GND in a <b>shifted pattern</b> as you turn the knob: <b>11 → 01 → 00 → 10 → 11</b> in one direction, backwards in the other. The order tells the direction. A push switch <b>SW</b> is built in.</p>
+        <p class="tip">Which direction counts up depends on the module and the wiring: swap CLK and DT if it is reversed.</p>` },
+      { title: 'Pull-ups and 3.3 V', view: 'pibench', have: [],
+        body: `<p>The contacts only connect the pins to GND, so the pins need pull-ups. GPIO Zero’s <code>Button</code> turns on the Pi’s internal pull-up. Descriptions of the KY-040 module disagree about which pins have pull-up resistors on the board, so relying on the internal ones works either way.</p>
+        <p class="warn">Connect the module’s <b>+</b> to <b>3V3 (pin 1)</b>: a module with pull-ups to + would otherwise pull the pins above 3.3 V.</p>` },
+      { title: 'Step 1 — put the module on the breadboard', view: 'pibb', power: false, have: ['enc1'], holes: ['g10 · CLK', 'g11 · DT', 'g12 · SW', 'g13 · VCC', 'g14 · GND'],
+        body: `<p>Push the five header pins into row <b>g</b>: <b>g10 – g14</b>: CLK, DT, SW, +, GND.</p>` },
+      { title: 'Step 2 — five wires', view: 'pibench', have: ENC_IDS, pins: ['p11', 'p13', 'p15', 'p1', 'p6'],
+        body: `<ul><li>Green: <b>pin 11 (GPIO17) → j10</b> (CLK)</li><li>Blue: <b>pin 13 (GPIO27) → j11</b> (DT)</li><li>Yellow: <b>pin 15 (GPIO22) → j12</b> (SW)</li><li>Red: <b>pin 1 (3V3) → j13</b> (+)</li><li>Black: <b>pin 6 (GND) → j14</b></li></ul>` },
+      { title: 'The program', view: 'pibench', have: ENC_IDS, showCode: true, power: true, body: `<p>The program polls CLK. When CLK has just fallen, DT tells the direction. Click lines 12, 13 and 15.</p>` },
+      { title: 'Run it and turn the knob', view: 'pibench', have: ENC_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ turn</b> and <b>◀ turn</b> in the panel: each press is one click of the knob. The count in the Shell goes up or down. Hold the knob button to see “Knob pressed”.</p><p class="sim">Simulated contacts without bounce. A real encoder bounces: debounce it in software, or use GPIO Zero’s <code>RotaryEncoder</code> class.</p>` },
+      { title: 'Summary', view: 'pibench', have: ENC_IDS, power: true,
+        body: `<ul><li>CLK and DT close to GND in a shifted pattern: the order gives the direction.</li><li><code>Button(pin).is_pressed</code> is True while the pin is LOW (internal pull-up).</li><li>On a CLK falling edge read DT: HIGH = one direction, LOW = the other.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What tells you the direction of rotation?', a: ['The speed', 'Which of CLK and DT changes first', 'The SW pin', 'The supply voltage'], c: 1, why: 'The two signals are shifted: the one that changes first shows the direction.' },
+      { q: 'clk.is_pressed is True. What is the level on the pin?', a: ['HIGH', 'LOW', '5 V', 'Floating'], c: 1, why: 'Button uses a pull-up: pressed = LOW.' },
+      { q: 'Where do you connect the module’s + on a Raspberry Pi?', a: ['5V (pin 2)', '3V3 (pin 1)', 'GPIO17', 'It is not needed'], c: 1, why: 'The GPIO pins are 3.3 V only.' },
+      { q: 'A real encoder counts too many steps sometimes. Why?', a: ['It is broken', 'The contacts bounce', 'The Pi is slow', 'The knob is loose'], c: 1, why: 'Mechanical contacts bounce.' },
+    ],
+    sources: [SRC_PI.gpiozeroin, SRC_PI.gpio, SRC_PI.usegpio],
   },
 ];
 

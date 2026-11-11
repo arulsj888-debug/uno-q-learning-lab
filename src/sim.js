@@ -1085,6 +1085,57 @@ export const PROGRAMS = {
     }
   },
 
+  async pi_rgb(rt) {
+    rt.serialBegin(9600);
+    const set = (r, g, b) => { rt.pwmValue('p12', r); rt.pwmValue('p32', g); rt.pwmValue('p33', b); };
+    await rt.at(1); await rt.at(2);
+    await rt.at(4); set(0, 0, 0);
+    for (;;) {
+      await rt.at(6);
+      await rt.at(7); set(1, 0, 0); await rt.at(8); await rt.delay(1000);
+      await rt.at(9); set(0, 1, 0); await rt.at(10); await rt.delay(1000);
+      await rt.at(11); set(0, 0, 1); await rt.at(12); await rt.delay(1000);
+      await rt.at(13); set(1, 1, 0); await rt.at(14); await rt.delay(1000);
+      await rt.at(15); set(1, 1, 1); await rt.at(16); await rt.delay(1000);
+      await rt.at(17); set(0, 0, 0); await rt.at(18); await rt.delay(1000);
+    }
+  },
+  async pi_dht(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(3);
+    await rt.at(5);
+    for (;;) {
+      await rt.at(7);
+      await rt.at(8);
+      const r = rt.dhtRead();
+      if (!r.ok) { await rt.at(9); await rt.at(12); await rt.at(13); rt.println('Read failed: DHT sensor not found, check wiring'); }
+      else { await rt.at(9); await rt.at(10); await rt.at(11); rt.println(`Temp: ${r.t.toFixed(1)} C  Humidity: ${r.h.toFixed(1)} %`); }
+      await rt.at(14); await rt.delay(2000);
+    }
+  },
+  async pi_enc(rt) {
+    rt.serialBegin(9600);
+    let counter = 0, last;
+    await rt.at(1); await rt.at(2);
+    await rt.at(4); rt.pinMode('p11', 'INPUT_PULLUP'); await rt.at(5); rt.pinMode('p13', 'INPUT_PULLUP'); await rt.at(6); rt.pinMode('p15', 'INPUT_PULLUP');
+    await rt.at(7); await rt.at(8); last = rt.digitalRead('p11') === 0;
+    for (;;) {
+      await rt.at(10);
+      await rt.at(11); const now = rt.digitalRead('p11') === 0;
+      await rt.at(12);
+      if (now && !last) {
+        await rt.at(13);
+        if (rt.digitalRead('p13') !== 0) { await rt.at(14); counter++; }
+        else { await rt.at(15); await rt.at(16); counter--; }
+        await rt.at(17); rt.println(counter);
+      }
+      await rt.at(18); last = now;
+      await rt.at(19);
+      if (rt.digitalRead('p15') === 0) { await rt.at(20); rt.println('Knob pressed'); await rt.at(21); await rt.delay(300); }
+      await rt.at(22); await rt.delay(2);
+    }
+  },
+
   async tmp36(rt) {
     await rt.at(2);
     await rt.at(4);
