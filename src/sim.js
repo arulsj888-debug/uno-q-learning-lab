@@ -55,6 +55,7 @@ export class Sim {
       digitalRead: (pin) => H.read(pin, pins[pin] ? pins[pin].mode : 'INPUT'),
       // deep sleep: the CPU and digital pins are powered off (outputs go low), then the timer wakes the chip and the program restarts
       deepSleep: async (ms) => { for (const k of Object.keys(pins)) if (pins[k] && pins[k].mode === 'OUTPUT') H.pin(k, 0); for (const k of Object.keys(pins)) delete pins[k]; if (H.sleep) H.sleep(true, ms); await rt.delay(ms); if (H.sleep) H.sleep(false, ms); },
+      ble: (stage, val) => { if (H.ble) H.ble({ stage, val }); },
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
       analogReadResolution: (b) => { readBits = Math.min(31, Math.max(1, b)); },
       analogRead: (pin) => {
@@ -510,6 +511,33 @@ export const PROGRAMS = {
       await rt.at(16); await rt.delay(2000);
       await rt.at(17); await rt.at(18); rt.println('Going to sleep now');
       await rt.at(19); await rt.at(20); await rt.deepSleep(5000); woke = true;
+    }
+  },
+
+  async e_ble(rt) {
+    await rt.at(5); await rt.at(6); await rt.at(7);
+    await rt.at(22);
+    await rt.at(23); rt.serialBegin(115200);
+    await rt.at(24); rt.pinMode('G16', 'OUTPUT');
+    await rt.at(25); await rt.at(26); await rt.at(27); await rt.at(28); await rt.at(29);
+    await rt.at(30); rt.ble('val', '0');
+    await rt.at(31); await rt.at(32);
+    await rt.at(33); rt.ble('adv', true);
+    await rt.at(34); rt.println('Advertising as ESP32-LED');
+    for (;;) {
+      await rt.at(37); await rt.at(38);
+      for (let i = 0; i < 16; i++) {          // delay(2000); the BLE library calls onWrite by itself in the meantime
+        for (const evn of rt.uiEvents()) {
+          if (evn !== 'w1' && evn !== 'w0') continue;
+          const v = evn === 'w1' ? '1' : '0';
+          rt.println('[simulated] phone wrote "' + v + '"'); rt.ble('val', v);
+          await rt.at(10); await rt.at(11); await rt.at(12);
+          if (v === '1') { await rt.at(13); rt.digitalWrite('G16', 1); await rt.at(14); rt.println('LED on'); }
+          else { await rt.at(15); await rt.at(16); rt.digitalWrite('G16', 0); await rt.at(17); rt.println('LED off'); }
+          await rt.at(38);
+        }
+        await rt.delay(125);
+      }
     }
   },
 

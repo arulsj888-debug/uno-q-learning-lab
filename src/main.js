@@ -138,7 +138,7 @@ class App {
     this.lamp.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 70, 6)));
     this.lamp.target.position.copy(this.bb.hole('e', 22).add(new THREE.Vector3(1.27, 0, 0)));
     s.add(this.lamp, this.lamp.target);
-    this.lux = 300; this.tempC = 25; this.distCm = 40; this.th = { t: 22.5, h: 45, unplug: false, last: null }; this.uiq = []; this.wf = { rssi: -48, router: true, passOk: true, t0: 0 }; this.br = { stage: 'idle', arg: null, led: null }; this.uiq = [];
+    this.lux = 300; this.tempC = 25; this.distCm = 40; this.th = { t: 22.5, h: 45, unplug: false, last: null }; this.uiq = []; this.bl = { adv: false, conn: false, val: '0' }; this.wf = { rssi: -48, router: true, passOk: true, t0: 0 }; this.br = { stage: 'idle', arg: null, led: null }; this.uiq = [];
     // ---- Lesson 13 scene, all at true scale (1 unit = 1 mm) -------------------------------------------
     // obstacle: a corrugated cardboard box standing on the desk (flat, hard face — what the datasheet asks for)
     {
@@ -350,7 +350,7 @@ class App {
     this.motorTick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
     if (this.acc && this.acc.monitor.group.visible) this.acc.monitor.draw({ ...this.pios, mode: this.board.powered ? this.pios.mode : 'off' });
-    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick(); this.wifiTick(); this.sleepTick();
+    this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick(); this.wifiTick(); this.sleepTick(); this.bleTick();
     const below = this.viewer.camera.position.y < -1;
     const show = !!this.showLabels;
     for (const l of this.partLabels) l.visible = show && (l.userData.bottom === below);
@@ -828,6 +828,7 @@ class App {
     $('#dock').classList.toggle('with-io', w.length > 0);
     $('#dock').classList.toggle('no-serial', L.id === 'l9');
     let h = ''; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
+    if (w.includes('ble')) h += `<div class="io-block pirstat tight"><div><span>Phone app (client)</span><b id="bl-s1">—</b></div><div class="arrow">→</div><div><span>ESP32 (BLE server)</span><b id="bl-s2">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="bl-s3">—</b></div></div><div id="bl-note" class="io-note"></div>`;
     if (w.includes('sleep')) h += `<div class="io-block pirstat tight"><div><span>ESP32</span><b id="sl-st">—</b></div><div class="arrow">→</div><div><span>Wake-up in</span><b id="sl-t">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="sl-led">—</b></div></div><div class="io-note">In deep sleep only the RTC controller, RTC peripherals and RTC memory stay powered.</div>`;
     if (w.includes('touch')) h += `<div class="io-block"><div class="io-title">Touch pad: the wire on GPIO4 (T0)</div><button id="tch" class="hold">Touch the wire</button><div id="tch-state" class="io-val">Not touched</div><div class="io-note">touchRead() values are illustrative: your board and wire will give different numbers.</div></div>`;
     if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on ${IS_PI ? 'GPIO2 (pin 3)' : 'D4'}</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
@@ -894,8 +895,9 @@ class App {
     if ($('#rl-manual')) $('#rl-manual').onclick = () => { if (this.rly && !this.sim.running) this.rly.manual = !this.rly.manual; };
     if ($('#pir-wave')) { $('#pir-wave').onclick = () => this.pirWave(); $('#pir-still').onclick = () => this.pirHoldStill(); }
     this.showRoom(w.includes('pir') && !!this.pirSensor());
+    const bleOn = w.includes('ble') && L.steps.slice(0, this.stepIdx + 1).some(st => st.phone);
     const piwebOn = w.includes('piweb') && L.steps.slice(0, this.stepIdx + 1).some(st => st.phone);   // the phone appears at the step that starts the server
-    this.showPhone(w.includes('dash') || w.includes('home') || piwebOn, w.includes('piweb') ? 'piweb' : w.includes('home') ? 'home' : 'dash');
+    this.showPhone(w.includes('dash') || w.includes('home') || piwebOn || bleOn, w.includes('ble') ? 'ble' : w.includes('piweb') ? 'piweb' : w.includes('home') ? 'home' : 'dash');
     if ($('#tempc')) { $('#tempc').oninput = e => this.setTemp(+e.target.value); this.setTemp(this.tempC); }
     this.lamp.intensity = w.includes('light') ? this.lampIntensity() : 0;
     if ($('#pwm')) $('#pwm').oninput = e => this.applyManualPwm(+e.target.value);
@@ -1450,6 +1452,14 @@ class App {
       this.pwRender();
       return;
     }
+    if (kind === 'ble') {
+      p.classList.add('live');
+      p.innerHTML = `<div class="ph-cap">Your phone: BLE scanner app (simulated)</div><div class="ph-frame"><div class="ph-bar">BLE scanner</div><div class="ph-body" id="bl-body"></div></div>`;
+      $('#stage').appendChild(p);
+      this.bl = { adv: false, conn: false, val: '0' };
+      this.bleRender();
+      return;
+    }
     if (kind === 'home') {
       p.classList.add('live');
       p.innerHTML = `<div class="ph-cap">Your phone (tap the buttons)</div><div class="ph-frame"><div class="ph-bar">http://&lt;board-ip&gt;:7000</div><div class="ph-body"><div class="ph-title">Smart room</div><div class="ph-card"><span>Temperature</span><b id="ph-t">--</b></div><div class="ph-card"><span>Lamp</span><b id="ph-l">--</b></div><button class="ph-btn" id="ph-mode">Mode: --</button><button class="ph-btn" id="ph-lamp">Lamp: switch</button><div class="ph-st" id="ph-s">waiting for data…</div></div></div>`;
@@ -1475,6 +1485,31 @@ class App {
     const f = this.toneState && this.toneState.f;
     document.querySelectorAll('.pkey').forEach(b => b.classList.toggle('on', !!f && Math.abs(+b.dataset.hz - f) < 0.05));
     const n = $('#pk-note'); if (n) { const k = f && [...document.querySelectorAll('.pkey')].find(b => Math.abs(+b.dataset.hz - f) < 0.05); const h = !this.board.powered ? 'USB-C is not plugged in — the Raspberry Pi has no power.' : k ? `Playing <b>${k.dataset.n}</b> · ${(+k.dataset.hz).toFixed(1)} Hz` : 'Silent. Press <b>▶ Run</b> or click a key.'; if (n.innerHTML !== h) n.innerHTML = h; }
+  }
+  // ---- ESP32 lesson 13: a simulated BLE scanner app on the phone ----------------------------------------
+  bleRender() {
+    const b = $('#bl-body'); if (!b) return;
+    const B = this.bl;
+    if (!B.conn) {
+      b.innerHTML = `<div class="pw-t">Scanner</div>${B.adv ? `<div class="pw-r"><b>ESP32-LED</b></div><a class="pw-a" data-b="connect">Connect</a>` : `<div class="pw-err">No device named ESP32-LED<small>The ESP32 is not advertising. Is the sketch running?</small></div>`}`;
+    } else {
+      b.innerHTML = `<div class="pw-t">ESP32-LED · connected</div><div class="pw-r">Service <b>4fafc201-…</b></div><div class="pw-r">Characteristic <b>beb5483e-…</b><br>READ, WRITE</div><div class="pw-h">Value: <b class="${B.val === '1' ? 'on' : ''}">“${B.val}”</b></div><a class="pw-a" data-b="w1">Write “1”</a> <a class="pw-a" data-b="w0">Write “0”</a>`;
+    }
+    b.querySelectorAll('.pw-a').forEach(a => a.onclick = () => {
+      if (!this.sim.running || !this.bl.adv) return;
+      if (a.dataset.b === 'connect') { this.bl.conn = true; this.bleRender(); } else this.uiq.push(a.dataset.b);
+    });
+  }
+  bleTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('ble')) return;
+    const run = this.sim.running, B = this.bl;
+    if (!run && (B.adv || B.conn)) { B.adv = false; B.conn = false; B.val = '0'; this.bleRender(); }
+    const set = (id, h, cls) => { const e = $(id); if (e && e.innerHTML !== h) { e.innerHTML = h; if (cls !== undefined) e.className = cls; } };
+    const lit = run && B.val === '1';
+    set('#bl-s1', !run ? '—' : B.conn ? 'connected' : 'scanning', run && B.conn ? 'on' : 'off');
+    set('#bl-s2', !run ? '—' : B.conn ? 'connected' : B.adv ? 'advertising' : 'starting…', run && B.adv ? 'on' : 'off');
+    set('#bl-s3', run ? (lit ? 'ON' : 'OFF') : '—', lit ? 'on' : 'off');
+    set('#bl-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !run ? 'The sketch is not running: the phone cannot find the ESP32. Press <b>▶ Run</b>.' : !B.adv ? 'Starting Bluetooth…' : !B.conn ? 'The ESP32 is advertising. Tap <b>Connect</b> on the phone.' : 'Tap <b>Write “1”</b> / <b>Write “0”</b> on the phone.', 'io-note');
   }
   sleepTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('sleep')) return;
@@ -1875,6 +1910,7 @@ class App {
         const io = this.ioFor(IS_U3 ? 'A4' : 'p3'), ok = io && io.kind === 'i2c' && this.wired(io) && this.board.powered && !this.th.unplug;
         return ok ? { found: true, c: this.th.t + (Math.random() - 0.5) * 0.1, rh: Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3)) } : { found: false };
       },
+      ble: ev => { if (ev.stage === 'adv') this.bl.adv = !!ev.val; else if (ev.stage === 'val') this.bl.val = ev.val; this.bleRender(); },
       sleep: (on, ms) => { this.slp = on; if (on) this.slpEnd = performance.now() + ms; },
       wifiScan: () => {
         const W = this.wf, list = [{ ssid: 'CoffeeShop-Free', rssi: -67, open: true }, { ssid: 'Workshop', rssi: -78, open: false }, { ssid: 'Neighbour-2G', rssi: -84, open: false }];

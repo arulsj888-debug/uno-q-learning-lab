@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -17,6 +17,7 @@ const SRC = {
   rnttouch: { t: 'Random Nerd Tutorials: ESP32 Touch Pins (touchRead)', u: 'https://randomnerdtutorials.com/esp32-touch-pins-arduino-ide/' },
   rntsleep: { t: 'Random Nerd Tutorials: ESP32 Deep Sleep and wake-up sources', u: 'https://randomnerdtutorials.com/esp32-deep-sleep-arduino-ide-wake-up-sources/' },
   sleepex: { t: 'Arduino-ESP32 library: DeepSleep TimerWakeUp example', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/ESP32/examples/DeepSleep/TimerWakeUp/TimerWakeUp.ino' },
+  blewrite: { t: 'Arduino-ESP32 BLE library: Write example (BLEDevice, BLEServer, characteristic callbacks)', u: 'https://github.com/espressif/arduino-esp32/blob/master/libraries/BLE/examples/Write/Write.ino' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -44,8 +45,8 @@ const POT_IDS = POT_PARTS.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
-export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power' };
-export const E32_COMING = ['Bluetooth LE'];
+export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth' };
+export const E32_COMING = [];
 
 export const E32_LESSONS = [
   // ================================================================== 1
@@ -625,5 +626,72 @@ export const E32_LESSONS = [
       { q: 'Why does a whole DevKit board use more current than the chip’s datasheet value?', a: ['The chip lies', 'The board also has a USB chip, regulator and LED that stay powered', 'Wi-Fi is always on', 'The antenna'], c: 1, why: 'Only the chip is switched down; the other parts on the board are not.' },
     ],
     sources: [SRC.rntsleep, SRC.sleepex, SRC.ds],
+  },
+
+  // ================================================================== 13
+  {
+    id: 'e13', num: 13, module: 6, title: 'Bluetooth LE: switch the LED from a phone app', level: 'Intermediate', time: '25 min',
+    goal: 'Make the ESP32 a Bluetooth Low Energy server with one characteristic that a phone app writes to.',
+    hardware: ['Lesson 4 LED circuit (LED on GPIO16)', 'A phone with a BLE scanner app (simulated here)'],
+    code: E32_BLE, file: 'BLE_Write.ino', program: 'e_ble', widgets: ['ble'],
+    circuit: LED_CIRCUIT, io: { G16: IO_LED },
+    explain: {
+      1: 'The BLE library of the Arduino-ESP32 core.',
+      5: 'The <b>service UUID</b>: a long unique number that names our service. You can generate your own.',
+      6: 'The <b>characteristic UUID</b>: names the one value inside the service.',
+      7: 'The LED from Lesson 4 on GPIO16.',
+      9: 'A class with <b>callbacks</b>: functions the library calls when something happens to the characteristic.',
+      10: '<b>onWrite</b> runs every time the phone writes a new value.',
+      11: 'Read the value the phone wrote (text).',
+      12: 'Did the phone write the text “1”?',
+      13: 'Yes → LED on.',
+      14: 'Print it.',
+      15: 'Did it write “0”?',
+      16: 'Yes → LED off.',
+      17: 'Print it.',
+      22: '<b>setup()</b> runs once.',
+      23: 'Serial output on (115200).',
+      24: 'GPIO16 drives the LED.',
+      25: 'Start Bluetooth LE. <b>“ESP32-LED”</b> is the name phones will see.',
+      26: 'The ESP32 becomes a <b>server</b>: it offers data, the phone (the client) connects to it.',
+      27: 'Create our service.',
+      28: 'Create the characteristic inside the service. The phone may <b>read</b> and <b>write</b> it.',
+      29: 'Connect the onWrite callback to the characteristic.',
+      30: 'Start value “0”.',
+      31: 'Start the service.',
+      32: 'Get the advertising object.',
+      33: '<b>Start advertising</b>: the ESP32 now sends small radio packets that say “I am ESP32-LED”. Phones find it in a scan.',
+      34: 'Tell the user.',
+      37: '<b>loop()</b> has nothing to do: the library calls onWrite by itself.',
+      38: 'Just wait.',
+    },
+    steps: [
+      { title: 'What you need', view: 'bench', have: LED_IDS,
+        body: `<p>The LED circuit from Lesson 4, and a phone with a <b>BLE scanner app</b> (for example nRF Connect). In this lesson the phone app is <b>simulated</b>.</p>` },
+      { title: 'What is Bluetooth LE?', view: 'bench', focus: 'antenna',
+        body: `<p><b>Bluetooth Low Energy (BLE)</b> is made for sending small amounts of data with very little power. The ESP32 supports Bluetooth v4.2 with LE (module datasheet). It uses the same antenna and the same 2.4 GHz band as Wi-Fi.</p>
+        <table class="kv"><tr><th>Role</th><th>Who</th><th>Does what</th></tr><tr><td>Server</td><td>ESP32</td><td><b>advertises</b> its name and offers data</td></tr><tr><td>Client</td><td>Phone</td><td>scans, connects, reads and writes</td></tr></table>` },
+      { title: 'Services and characteristics', view: 'bench',
+        body: `<div class="ptree"><div class="pt-row"><span class="pt bus">Server: “ESP32-LED”</span></div><div class="pt-arrow">│</div><div class="pt-row"><span class="pt">Service (UUID 4fafc201-…)</span></div><div class="pt-arrow">│</div><div class="pt-row"><span class="pt">Characteristic (UUID beb5483e-…) = “0” or “1” · READ, WRITE</span></div></div>
+        <p>BLE data is organised like folders: a <b>service</b> groups <b>characteristics</b>, and a characteristic holds one <b>value</b>. Each has a <b>UUID</b>, a long unique number. The phone writes “1” or “0” into our characteristic.</p>` },
+      { title: 'The code', view: 'bench', showCode: true, have: LED_IDS,
+        body: `<p>Based on the <b>Write</b> example of the BLE library. Click lines 10, 25, 28 and 33.</p><p class="tip">A BLE sketch is large. If the upload says the sketch is too big, choose a partition scheme with more app space in the Tools menu.</p>` },
+      { title: 'Run it', view: 'bench', have: LED_IDS, showCode: true, power: true, action: 'run', phone: true,
+        body: `<p>Press <b>▶ Run</b>. When the Serial Monitor says “Advertising as ESP32-LED”, the phone app finds the board.</p>
+        <ol><li>Tap <b>Connect</b> on the phone.</li><li>Tap <b>Write “1”</b>: the LED turns on.</li><li>Tap <b>Write “0”</b>: the LED turns off.</li></ol>
+        <p class="sim">The phone app is simulated. In a real app, choose to write the value as <b>text</b> (UTF-8), not as a hex byte.</p>` },
+      { title: 'Good to know', view: 'bench', have: LED_IDS, power: true, phone: true,
+        body: `<ul><li>This characteristic has <b>no protection</b>: any phone nearby can connect and write to it. Fine for learning, not for a door lock.</li><li>BLE reaches some metres; walls and bodies reduce it.</li><li>Stop the sketch: the phone loses the connection.</li></ul>` },
+      { title: 'Summary', view: 'bench', have: LED_IDS, power: true, phone: true,
+        body: `<ul><li>ESP32 = BLE <b>server</b>; phone = <b>client</b>.</li><li>Server → service → characteristic → value; each named by a UUID.</li><li><code>onWrite</code> runs when the phone writes; advertising makes the board visible.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'In this lesson the ESP32 is the BLE…', a: ['client', 'server', 'router', 'scanner'], c: 1, why: 'It offers a service; the phone connects as the client.' },
+      { q: 'What makes the ESP32 show up in the phone’s scan?', a: ['Serial.begin', 'Advertising', 'The LED', 'Wi-Fi'], c: 1, why: 'pAdvertising->start() sends the packets phones look for.' },
+      { q: 'Where does the value “1” go when the phone writes it?', a: ['Into the service name', 'Into the characteristic', 'Into the UUID', 'Into loop()'], c: 1, why: 'A characteristic holds the value; onWrite reads it.' },
+      { q: 'Which function runs when the phone writes a value?', a: ['loop()', 'setup()', 'onWrite()', 'delay()'], c: 2, why: 'The library calls the onWrite callback.' },
+      { q: 'Why is this sketch not safe for a door lock?', a: ['BLE is too slow', 'Anyone nearby can connect and write: there is no protection', 'The LED is too weak', 'It uses GPIO16'], c: 1, why: 'The characteristic has no pairing or encryption.' },
+    ],
+    sources: [SRC.blewrite, SRC.mod, SRC.rnt],
   },
 ];

@@ -228,3 +228,44 @@ void setup() {
 
 void loop() {
 }`;
+
+// Lesson 13 — Bluetooth LE server with one writable characteristic (based on the Write example of the Arduino-ESP32 BLE library)
+export const E32_BLE = `#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+
+#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+const int ledPin = 16;
+
+class MyCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *pCharacteristic) {
+    String value = pCharacteristic->getValue();
+    if (value == "1") {
+      digitalWrite(ledPin, HIGH);
+      Serial.println("LED on");
+    } else if (value == "0") {
+      digitalWrite(ledPin, LOW);
+      Serial.println("LED off");
+    }
+  }
+};
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  BLEDevice::init("ESP32-LED");                      // the name phones see
+  BLEServer *pServer = BLEDevice::createServer();
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  BLECharacteristic *pCharacteristic = pService->createCharacteristic(CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  pCharacteristic->setCallbacks(new MyCallbacks());
+  pCharacteristic->setValue("0");
+  pService->start();
+  BLEAdvertising *pAdvertising = pServer->getAdvertising();
+  pAdvertising->start();                             // now phones can find the ESP32
+  Serial.println("Advertising as ESP32-LED");
+}
+
+void loop() {
+  delay(2000);
+}`;
