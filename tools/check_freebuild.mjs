@@ -118,6 +118,11 @@ r = evaluate(e32({ parts: [{ id: 'p1', type: 'pot', row: 'e', col: 10 }, W('w1',
 ok(Math.abs(r.pins.G34.adc - 2048) < 8, 'ESP32: pot in the middle reads about 2048 (12-bit)');
 r = evaluate(e32({ parts: [{ id: 'sw1', type: 'button', col: 10 }, W('w1', 'G17', 'a10'), W('w2', 'GND2', 'j12')], pinCfg: { G17: { mode: 'up' } } })); ok(r.pins.G17.read === 1, 'ESP32: pull-up input reads HIGH when released');
 for (const x of EXAMPLES('esp32')) { r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r && r.pins, 'ESP32 example evaluates: ' + x.title); }
+r = evaluate(e32({ parts: [{ id: 'us1', type: 'hcsr04', row: 'j', col: 11 }, W('w1', 'VIN', 'i11'), W('w2', 'G16', 'i12'), W('w3', 'G17', 'i13'), W('w4', 'GND2', 'i14')], pinCfg: { G16: { mode: 'pulse' }, G17: { mode: 'in' } } })); ok(r.newDamage.has('G17'), 'ESP32: HC-SR04 5 V echo straight into a GPIO damages it');
+{ const x = EXAMPLES('esp32').find(e => e.title.includes('voltage divider')); r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(!r.newDamage.size && r.parts.us1.status === 'ok', 'ESP32: HC-SR04 with the 1k + 2.2k divider is safe and works'); }
+{ const x = EXAMPLES('esp32').find(e => e.title.includes('SHT31') && e.title.startsWith('✔')); r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r.parts.sen1.status === 'ok', 'ESP32: SHT31 on GPIO21 (SDA) and GPIO22 (SCL) works'); }
+{ const x = EXAMPLES('esp32').find(e => e.title.startsWith('✔ Servo')); r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r.parts.sv1.status === 'ok', 'ESP32: servo on VIN (5 V) with pulses works'); }
+{ const x = EXAMPLES('esp32').find(e => e.title.startsWith('✖ Servo')); r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r.parts.sv1.status !== 'ok', 'ESP32: servo on 3.3 V does not work'); }
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

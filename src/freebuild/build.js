@@ -526,6 +526,9 @@ export class FreeBuild {
         blink: `pinMode(${n}, OUTPUT);\n// in loop():\ndigitalWrite(${n}, HIGH); delay(500);\ndigitalWrite(${n}, LOW);  delay(500);`,
         pwm: `// in setup() (Arduino-ESP32 core 3.x):\nledcAttach(${n}, 5000, 8);   // pin, 5 kHz, 8 bit\n// in loop():\nledcWrite(${n}, ${Math.round(duty * 255)});   // 0 … 255`,
         tone: `tone(${n}, ${f});   // Hz`,
+        servo: `#include <ESP32Servo.h>   // install "ESP32Servo" from the Library Manager\nServo s;\n// in setup():\ns.attach(${n});\ns.write(${Math.round(c.angle ?? 90)});   // degrees`,
+        pulse: `pinMode(${n}, OUTPUT);\ndigitalWrite(${n}, LOW);  delayMicroseconds(2);\ndigitalWrite(${n}, HIGH); delayMicroseconds(10);   // 10 µs trigger pulse\ndigitalWrite(${n}, LOW);`,
+        i2c: `#include <Wire.h>\n// in setup():\nWire.begin();   // default I²C pins: SDA = GPIO21, SCL = GPIO22`,
         in: `pinMode(${n}, INPUT);\nint v = digitalRead(${n});`, up: `pinMode(${n}, INPUT_PULLUP);\nint v = digitalRead(${n});   // pressed = LOW`,
         down: `pinMode(${n}, INPUT_PULLDOWN);\nint v = digitalRead(${n});`,
         analog: `int v = analogRead(${n});   // 0 … 4095 (12-bit default)`,
@@ -544,7 +547,7 @@ export class FreeBuild {
     })[c.mode] || '';
   }
   modesFor(k) {
-    if (this.isE32) return k.inOnly ? ['in', ...(k.analog ? ['analog'] : [])] : ['out0', 'out1', 'blink', 'pwm', 'tone', 'in', 'up', 'down', ...(k.analog ? ['analog'] : [])];
+    if (this.isE32) return k.inOnly ? ['in', ...(k.analog ? ['analog'] : [])] : ['out0', 'out1', 'blink', 'pwm', 'tone', 'servo', 'pulse', 'in', 'up', 'down', ...(k.analog ? ['analog'] : []), ...(k.i2c ? ['i2c'] : [])];
     const m = ['out0', 'out1', 'blink']; if (k.pwm) m.push('pwm'); m.push('tone', 'servo', 'pulse', 'in', 'up'); if (this.isPi) m.push('down'); if (k.analog) m.push('analog'); if (k.i2c) m.push('i2c'); return m;
   }
   usedPins() {
@@ -575,16 +578,16 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('buzzer')}" data-tool="buzzer">Passive buzzer</button></div>
       <div class="fb-row"><button class="fb-btn${on('ldr')}" data-tool="ldr">Light sensor (LDR)</button></div>
       <div class="fb-row"><button class="fb-btn${on('tmp36')}" data-tool="tmp36">TMP36 temperature${this.isPi ? ' (no ADC on Pi)' : ''}</button><label class="fb-chk"><input type="checkbox" data-opt="flip"${this.opts.flip ? ' checked' : ''}> turn round</label></div>
-      ${this.isE32 ? '' : `<h3>Modules</h3>
+      <h3>Modules</h3>
       <div class="fb-row"><button class="fb-btn${on('hcsr04')}" data-tool="hcsr04">HC-SR04 distance sensor</button></div>
-      <div class="fb-row"><button class="fb-btn" data-tool="pir">PIR motion sensor HC-SR501</button></div>
+      ${this.isE32 ? '' : `      <div class="fb-row"><button class="fb-btn" data-tool="pir">PIR motion sensor HC-SR501</button></div>`}
       <div class="fb-row"><button class="fb-btn${on('servo')}" data-tool="servo">Servo SG90</button></div>
-      <div class="fb-row"><button class="fb-btn" data-tool="relay">Relay module (5 V, low-level trigger)</button></div>
-      <div class="fb-row"><button class="fb-btn" data-tool="battery">Battery pack 4 × AA (≈ 6 V)</button></div>
-      <div class="fb-row"><button class="fb-btn" data-tool="lamp">Lamp 6 V</button></div>
-      <div class="fb-row"><button class="fb-btn${on('l293d')}" data-tool="l293d">L293D motor driver (chip)</button></div>
-      <div class="fb-row"><button class="fb-btn" data-tool="motor">DC motor 130 with propeller</button></div>
-      <div class="fb-row"><button class="fb-btn${on('sht31')}" data-tool="sht31">SHT31-D temperature + humidity (I²C)</button></div>`}
+      ${this.isE32 ? '' : `      <div class="fb-row"><button class="fb-btn" data-tool="relay">Relay module (5 V, low-level trigger)</button></div>`}
+      ${this.isE32 ? '' : `      <div class="fb-row"><button class="fb-btn" data-tool="battery">Battery pack 4 × AA (≈ 6 V)</button></div>`}
+      ${this.isE32 ? '' : `      <div class="fb-row"><button class="fb-btn" data-tool="lamp">Lamp 6 V</button></div>`}
+      ${this.isE32 ? '' : `      <div class="fb-row"><button class="fb-btn${on('l293d')}" data-tool="l293d">L293D motor driver (chip)</button></div>`}
+      ${this.isE32 ? '' : `      <div class="fb-row"><button class="fb-btn" data-tool="motor">DC motor 130 with propeller</button></div>`}
+      <div class="fb-row"><button class="fb-btn${on('sht31')}" data-tool="sht31">SHT31-D temperature + humidity (I²C)</button></div>
       ${this.isPi || this.isU3 || this.isE32 ? '' : `<div class="fb-row"><button class="fb-btn" data-tool="thermo">Modulino Thermo (Qwiic)</button></div><div class="fb-row"><button class="fb-btn" data-tool="pixels">Modulino Pixels (Qwiic)</button></div><div class="fb-row"><button class="fb-btn${on('qwiic')}" data-tool="qwiic">Qwiic cable</button></div>`}
       <h3>Wires</h3>
       <button class="fb-btn${on('wire')}" data-tool="wire">${wireName}</button>
