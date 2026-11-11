@@ -677,7 +677,7 @@ export class FreeBuild {
           if (mode === 'servo') h += `<label class="fb-sl">Angle <input type="range" min="0" max="180" value="${Math.round(cfg.angle ?? 90)}" data-pinangle="${id}"><b>${Math.round(cfg.angle ?? 90)}°</b></label>`;
           if (mode === 'tone') { const lo = this.isPi ? 220 : 100, hi = this.isPi ? 880 : 2000; h += `<label class="fb-sl">Frequency <input type="range" min="${lo}" max="${hi}" value="${Math.round(cfg.freq || 440)}" data-pinfreq="${id}"><b>${Math.round(cfg.freq || 440)} Hz</b></label>`; }
           h += `<div class="fb-pr" data-pr="${id}"></div>${mode ? `<details><summary>Code for this pin</summary><pre>${esc(this.codeFor(id))}</pre></details>` : ''}</div>`;
-        } else h += `<div class="fb-pin sup"><div class="fb-pinh"><b>${esc(k.name)}</b><small>${{ '5v': '5 V supply', '3v3': '3.3 V supply', gnd: 'ground (0 V)', nc: 'not modelled' }[k.k]}</small><span class="fb-pv" data-pv="${id}"></span></div></div>`;
+        } else h += `<div class="fb-pin sup"><div class="fb-pinh"><b>${esc(k.name)}</b><small>${{ '5v': '5 V supply', '3v3': '3.3 V supply', gnd: 'ground (0 V)', en: 'reset input: LOW = chip held in reset', nc: 'not modelled' }[k.k]}</small><span class="fb-pv" data-pv="${id}"></span></div></div>`;
       }
       h += `</div>`;
     }

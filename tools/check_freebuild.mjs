@@ -142,6 +142,9 @@ r = rgbOK('esp32', findPinE32, '✔ DHT22'); ok(r.parts.dht1.status === 'ok' && 
 r = rgbOK('esp32', findPinE32, '✖ DHT22 powered from VIN'); ok(r.newDamage.has('G4'), 'ESP32: DHT22 pulled up to 5 V (VIN) damages the GPIO pin');
 r = evaluate({ boardKind: 'unoq', pinInfo: uno, parts: [{ id: 'dht1', type: 'dht', model: 'dht11', row: 'e', col: 10 }, W('w1', '3V3', 'a10'), W('w2', 'D5', 'a11'), res('r1', 'c10', 'c16', 10000), W('w3', 'b11', 'b16'), W('w4', 'GND2', 'a13')], pinCfg: { D5: { mode: 'dht' } }, powered: true, env: { ...env, tempC: 70 }, t: 0 });
 ok(r.parts.dht1.status === 'warn', 'DHT11 at 70 degrees C is outside its 0 - 50 degrees C range');
+{ const x = EXAMPLES('esp32').find(e => e.title.startsWith('✖ EN pin')); r = evaluate(e32({ parts: x.parts, pinCfg: x.pins })); ok(r.parts.l1 === undefined && r.parts.led1.status !== 'ok' && r.notes.some(n => /held in reset/.test(n.text)), 'ESP32: EN wired to GND holds the chip in reset (LED dark, note shown)'); }
+r = evaluate(e32({ parts: [W('w1', 'VIN', 'a10'), W('w2', 'EN', 'b10')] })); ok(r.newDamage.has('EN'), 'ESP32: 5 V on the EN pin damages it');
+r = evaluate(e32({ parts: [W('w1', 'EN', 'a10'), W('w2', 'G17', 'b10')], pinCfg: { G17: { mode: 'in' } } })); ok(r.pins.EN.msg === 'HIGH: chip running', 'ESP32: EN left alone is pulled HIGH');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

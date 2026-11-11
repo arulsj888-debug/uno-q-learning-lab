@@ -129,6 +129,7 @@ export function pinKind(boardKind, id, info) {
   if (boardKind === 'esp32') {
     if (info.kind === 'gnd') return { k: 'gnd', name: 'GND' };
     if (id === 'VIN') return { k: '5v', name: 'VIN (5 V from USB)' };
+    if (id === 'EN') return { k: 'en', name: 'EN (reset)', vmax: 3.6 };   // chip-enable input: LOW holds the chip in reset (the EN button does this)
     if (id === '3V3') return { k: '3v3', name: '3V3' };
     if (info.gpio !== undefined && info.gpio !== null) {
       // ESP32 datasheet v5.3: VIH 0.75 VDD, VIL 0.25 VDD, internal pull resistors about 45 kOhm (none on GPIO34-39), IOH 40 mA / IOL 28 mA at the strongest drive setting, pins accept up to 3.6 V
@@ -223,15 +224,18 @@ export function evaluate(model) {
       }
     };
     const src = (node, V, r, extra = {}) => { const e = { t: 'S', a: node, b: 0, g: 1 / r, i: V / r }; elems.push(e); pinSrc.push({ e, V, ...extra }); };
+    // EN wired straight to a GND pin: the chip is held in reset, so no GPIO pin drives anything
+    const enLow = [...usedPins].some(([id, k]) => k.k === 'en' && [...usedPins].some(([id2, k2]) => k2.k === 'gnd' && find(nodeOfRef(id2)) === find(nodeOfRef(id))));
     if (powered) {
       for (const [id, k] of usedPins) {
         const node = nodeOf(id);
         if (k.k === '5v') src(node, 5, 0.2, { id, supply: true });
         else if (k.k === '3v3') src(node, 3.3, 0.3, { id, supply: true });
         else if (k.k === 'gnd') src(node, 0, 0.01, { id, supply: true });
+        else if (k.k === 'en') src(node, 3.3, 10000, { id, pull: true });   // EN is pulled up to 3.3 V on the board (the EN button pulls it to GND)
         else if (k.k === 'gpio') {
           const cfg = pinCfg[id] || { mode: 'in' };
-          if (!damaged.has(id)) {
+          if (!damaged.has(id) && !enLow) {
             if (OUTPUT_MODES.includes(cfg.mode)) { const lv = level(cfg); src(node, lv ? (k.vdd || 3.3) : 0, k.rout || 50, { id, gpioOut: true }); }
             else if (cfg.mode === 'up') src(node, k.vdd || 3.3, k.pull, { id, pull: true });
             else if (cfg.mode === 'down') src(node, 0, k.pull, { id, pull: true });
@@ -567,6 +571,15 @@ export function evaluate(model) {
   for (const [id, k] of usedPins) {
     const o = result.pins[id] || (result.pins[id] = { I: 0, Imax: 0, V: 0 }), cfg = pinCfg[id] || { mode: 'in' };
     if (k.k === 'nc') { note('warn', `${k.name}: this pin is not modelled in free-build (it is not a normal I/O or power pin).`, id); continue; }
+    if (k.k === 'en') {
+      if (!powered) continue;
+      const Ven = v[nodeOf(id)]; o.V = Ven;
+      if (damaged.has(id)) { o.status = 'bad'; o.msg = 'Damaged (simulation).'; note('bad', `${k.name} is damaged: it was driven beyond its limits. Press “Replace broken parts”.`, id); continue; }
+      if (Ven > 3.6) { newDamage.add(id); o.status = 'bad'; note('bad', `${k.name} sees ${Ven.toFixed(1)} V. The EN pin is a 3.3 V input: the board can be damaged. Never connect 5 V to it.`, id); }
+      else if (Ven < 0.8) { o.status = 'warn'; o.msg = 'LOW: chip held in reset'; note('warn', `${k.name} is LOW (${Ven.toFixed(2)} V): the ESP32 is held in reset, so your program does not run and no pin is driven. This is what happens while you hold the EN button. Release EN (let it float to 3.3 V) to start the program.`, id); }
+      else o.msg = 'HIGH: chip running';
+      continue;
+    }
     if (k.k !== 'gpio') { if (powered) o.V = v[nodeOf(id)]; continue; }
     const net = nodeOf(id), V = v[net];
     o.V = V; o.floating = powered && floating.has(net);

@@ -22,6 +22,8 @@ export const SRC = {
   relaymod: { t: 'Handsontec: 1-channel 5 V optical-isolated relay module (user guide)', u: 'https://handsontec.com/dataspecs/module/Relay%20Module/1Ch-relay%20Opto.pdf' },
   sht31: { t: 'Adafruit SHT31-D Temperature & Humidity Sensor Breakout (product page and guide)', u: 'https://learn.adafruit.com/adafruit-sht31-d-temperature-and-humidity-sensor-breakout' },
   sht31lib: { t: 'Adafruit SHT31 Arduino library (header, source and example)', u: 'https://github.com/adafruit/Adafruit_SHT31' },
+  dhtguide: { t: 'Adafruit: DHT11, DHT22 and AM2302 Sensors (specifications, wiring)', u: 'https://learn.adafruit.com/dht' },
+  dhtlib: { t: 'Adafruit DHT sensor library (DHTtester example)', u: 'https://github.com/adafruit/DHT-sensor-library' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -131,3 +133,26 @@ export const I2C_PARTS = [
   { id: 'w43', type: 'wire', from: 'A4', to: 'j13', color: 'blue', lift: 26 },
 ];
 export const I2C_IDS = I2C_PARTS.map(d => d.id);
+
+// ---- Lesson 17: RGB LED (common cathode) with three resistors on pins 9, 10, 11
+export const RGB_PARTS = [
+  { id: 'rgb1', type: 'rgbled', row: 'e', col: 10 },
+  { id: 'r1', type: 'resistor', a: 'a10', b: 'a16' },
+  { id: 'r2', type: 'resistor', a: 'a12', b: 'a17' },
+  { id: 'r3', type: 'resistor', a: 'a13', b: 'a18' },
+  { id: 'w50', type: 'wire', from: 'D9', to: 'b16', color: 'red', lift: 20 },
+  { id: 'w51', type: 'wire', from: 'D10', to: 'b17', color: 'green', lift: 24 },
+  { id: 'w52', type: 'wire', from: 'D11', to: 'b18', color: 'blue', lift: 28 },
+  { id: 'w53', type: 'wire', from: 'GND2', to: 'a11', color: 'black', lift: 16 },
+];
+export const RGB_IDS = RGB_PARTS.map(d => d.id);
+// ---- Lesson 18: DHT11 on pin 2 with a 10 kOhm pull-up between DATA and VCC
+export const DHT_PARTS = [
+  { id: 'dht1', type: 'dht', model: 'dht11', row: 'e', col: 10 },
+  { id: 'w60', type: 'wire', from: '5V', to: 'a10', color: 'red', lift: 14 },
+  { id: 'w61', type: 'wire', from: 'D2', to: 'a11', color: 'yellow', lift: 22 },
+  { id: 'w62', type: 'wire', from: 'GND3', to: 'a13', color: 'black', lift: 18 },
+  { id: 'r60', type: 'resistor', a: 'c10', b: 'c16' },
+  { id: 'w63', type: 'wire', from: 'b11', to: 'b16', color: 'orange', lift: 12 },
+];
+export const DHT_IDS = DHT_PARTS.map(d => d.id);

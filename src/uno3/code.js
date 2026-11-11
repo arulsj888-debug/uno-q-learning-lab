@@ -322,3 +322,64 @@ void loop() {
   Serial.println(" %");
   delay(2000);
 }`;
+
+// Lesson 17 — RGB LED (common cathode), analogWrite on three PWM pins
+export const U3_RGB = `// RGB LED (common cathode): red on pin 9, green on pin 10, blue on pin 11
+const int redPin = 9;
+const int greenPin = 10;
+const int bluePin = 11;
+
+void setColor(int r, int g, int b) {
+  analogWrite(redPin, r);       // 0 ... 255
+  analogWrite(greenPin, g);
+  analogWrite(bluePin, b);
+}
+
+void setup() {
+  pinMode(redPin, OUTPUT);
+  pinMode(greenPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+}
+
+void loop() {
+  setColor(255, 0, 0);          // red
+  delay(1000);
+  setColor(0, 255, 0);          // green
+  delay(1000);
+  setColor(0, 0, 255);          // blue
+  delay(1000);
+  setColor(255, 255, 0);        // red + green = yellow
+  delay(1000);
+  setColor(255, 255, 255);      // all three = white
+  delay(1000);
+  setColor(0, 0, 0);            // off
+  delay(1000);
+}`;
+
+// Lesson 18 — DHT11 (shortened from the DHTtester example of the Adafruit DHT sensor library)
+export const U3_DHT = `#include "DHT.h"
+
+#define DHTPIN 2        // the pin the DATA wire is on
+#define DHTTYPE DHT11   // DHT 11
+
+DHT dht(DHTPIN, DHTTYPE);
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+}
+
+void loop() {
+  delay(2000);                       // the sensor is slow: wait between readings
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();   // Celsius
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+  Serial.print("Humidity: ");
+  Serial.print(h);
+  Serial.print(" %  Temperature: ");
+  Serial.print(t);
+  Serial.println(" C");
+}`;

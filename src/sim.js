@@ -56,6 +56,7 @@ export class Sim {
       // deep sleep: the CPU and digital pins are powered off (outputs go low), then the timer wakes the chip and the program restarts
       deepSleep: async (ms) => { for (const k of Object.keys(pins)) if (pins[k] && pins[k].mode === 'OUTPUT') H.pin(k, 0); for (const k of Object.keys(pins)) delete pins[k]; if (H.sleep) H.sleep(true, ms); await rt.delay(ms); if (H.sleep) H.sleep(false, ms); },
       ble: (stage, val) => { if (H.ble) H.ble({ stage, val }); },
+      dhtRead: () => (H.dht ? H.dht() : { ok: false }),
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
       analogReadResolution: (b) => { readBits = Math.min(31, Math.max(1, b)); },
       analogRead: (pin) => {
@@ -538,6 +539,41 @@ export const PROGRAMS = {
         }
         await rt.delay(125);
       }
+    }
+  },
+
+  async u3_rgb(rt) {
+    const setColor = async (r, g, b) => { await rt.at(6); await rt.at(7); rt.analogWrite('D9', r); await rt.at(8); rt.analogWrite('D10', g); await rt.at(9); rt.analogWrite('D11', b); await rt.at(10); };
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(12);
+    await rt.at(13); rt.pinMode('D9', 'OUTPUT'); await rt.at(14); rt.pinMode('D10', 'OUTPUT'); await rt.at(15); rt.pinMode('D11', 'OUTPUT');
+    for (;;) {
+      await rt.at(18);
+      await rt.at(19); await setColor(255, 0, 0); await rt.at(20); await rt.delay(1000);
+      await rt.at(21); await setColor(0, 255, 0); await rt.at(22); await rt.delay(1000);
+      await rt.at(23); await setColor(0, 0, 255); await rt.at(24); await rt.delay(1000);
+      await rt.at(25); await setColor(255, 255, 0); await rt.at(26); await rt.delay(1000);
+      await rt.at(27); await setColor(255, 255, 255); await rt.at(28); await rt.delay(1000);
+      await rt.at(29); await setColor(0, 0, 0); await rt.at(30); await rt.delay(1000);
+    }
+  },
+
+  async u3_dht(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4); await rt.at(6);
+    await rt.at(8); await rt.at(9); rt.serialBegin(9600);
+    await rt.at(10);
+    for (;;) {
+      await rt.at(13);
+      await rt.at(14); await rt.delay(2000);
+      await rt.at(15); const r = rt.dhtRead();
+      await rt.at(16);
+      await rt.at(17);
+      if (!r.ok) { await rt.at(18); rt.println('Failed to read from DHT sensor!'); await rt.at(19); continue; }
+      await rt.at(21); rt.print('Humidity: ');
+      await rt.at(22); rt.print(r.h, 2);
+      await rt.at(23); rt.print(' %  Temperature: ');
+      await rt.at(24); rt.print(r.t, 2);
+      await rt.at(25); rt.println(' C');
     }
   },
 

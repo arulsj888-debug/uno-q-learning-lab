@@ -44,6 +44,8 @@ function legs(d) {
     case 'servo': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.SIG']: `${d.row}${d.col + 2}` };
     case 'l293d': { const o = {}; for (let i = 1; i <= 8; i++) { o[`${d.id}.p${i}`] = `f${d.col + i - 1}`; o[`${d.id}.p${17 - i}`] = `e${d.col + i - 1}`; } return o; }
     case 'sht31': return { [d.id + '.VIN']: `${d.row}${d.col}`, [d.id + '.GND']: `${d.row}${d.col + 1}`, [d.id + '.SCL']: `${d.row}${d.col + 2}`, [d.id + '.SDA']: `${d.row}${d.col + 3}`, [d.id + '.ADDR']: `${d.row}${d.col + 4}`, [d.id + '.RST']: `${d.row}${d.col + 5}`, [d.id + '.ALRT']: `${d.row}${d.col + 6}` };
+    case 'rgbled': return { [d.id + '.R']: `${d.row}${d.col}`, [d.id + '.C']: `${d.row}${d.col + 1}`, [d.id + '.G']: `${d.row}${d.col + 2}`, [d.id + '.B']: `${d.row}${d.col + 3}` };
+    case 'dht': return { [d.id + '.VCC']: `${d.row}${d.col}`, [d.id + '.DATA']: `${d.row}${d.col + 1}`, [d.id + '.NC']: `${d.row}${d.col + 2}`, [d.id + '.GND']: `${d.row}${d.col + 3}` };
     case 'tmp36': return { [d.id + '.VS']: `${d.row}${d.col}`, [d.id + '.VO']: `${d.row}${d.col + 1}`, [d.id + '.GND']: `${d.row}${d.col + 2}` };
     default: return {};
   }
@@ -110,6 +112,21 @@ for (const L of list) {
     if (io.kind === 'touch') {
       const w = byId[io.item];
       if (!w || w.type !== 'fwire' || w.from !== pin) bad(L, `${pin}: touch pad wire is not connected to the pin`);
+    }
+    if (io.kind === 'rgb') {
+      const leg = ['R', 'G', 'B'][io.ch], id = io.item;
+      const r = all.find(d => d.type === 'resistor' && ((N.same(d.id + '.1', P) && N.same(d.id + '.2', id + '.' + leg)) || (N.same(d.id + '.2', P) && N.same(d.id + '.1', id + '.' + leg))));
+      if (!r) bad(L, `${pin}: no resistor between the pin and the ${leg} leg of ${id}`);
+      if (!N.same(id + '.C', G)) bad(L, `${pin}: common leg of ${id} is not on GND (common cathode)`);
+      if (N.same(P, id + '.' + leg)) bad(L, `${pin}: the ${leg} leg is connected to the pin without a resistor`);
+    }
+    if (io.kind === 'dht') {
+      const id = io.item;
+      if (!N.same(id + '.VCC', 'PIN:' + SUP)) bad(L, `${pin}: DHT VCC not on ${SUP}`);
+      if (!N.same(id + '.GND', G)) bad(L, `${pin}: DHT GND not on GND`);
+      if (!N.same(id + '.DATA', P)) bad(L, `${pin}: DHT DATA not on ${pin}`);
+      const pull = all.find(d => d.type === 'resistor' && ((N.same(d.id + '.1', id + '.DATA') && N.same(d.id + '.2', id + '.VCC')) || (N.same(d.id + '.2', id + '.DATA') && N.same(d.id + '.1', id + '.VCC'))));
+      if (!pull) bad(L, `${pin}: no pull-up resistor between DHT DATA and VCC`);
     }
     if (io.kind === 'button') {
       if (N.same(P, G)) bad(L, `${pin}: pin is on GND even when the button is NOT pressed`);

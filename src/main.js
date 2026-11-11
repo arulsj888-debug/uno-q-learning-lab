@@ -22,6 +22,7 @@ import piThumb from '../assets/thumbs/pi.jpg';
 import { makeUsbCable, plugUsb, Breadboard, HW_INFO, DESK_Y, HandModel } from './hardware.js';
 import { Bench } from './bench.js';
 import { FreeBuild } from './freebuild/build.js';
+import { RGB_VF } from './freebuild/circuit.js';
 import { PARTS as UQ_PARTS, CATEGORIES as UQ_CATEGORIES, BOARD_FACTS as UQ_FACTS } from './data/parts.js';
 import { JDIGITAL, JANALOG, JSPI, JCTL, findPin as uqFindPin } from './data/pins.js';
 import { LESSONS as UQ_LESSONS, COMING_SOON as UQ_SOON, MODULES as UQ_MODULES } from './data/lessons.js';
@@ -276,6 +277,7 @@ class App {
     if (this.rly) { this.rly.mode = 'INPUT'; this.rly.level = null; }
     for (const it of Object.values(this.bench.items)) {
       if (it.def.type === 'led') it.obj.set(false);
+      else if (it.def.type === 'rgbled') { this.rgbLv = [0, 0, 0]; it.obj.setRGB([0, 0, 0]); }
       if (it.def.type === 'buzzer') it.obj.vibrate(false);
     }
     this.stopSound(); this.toneState = null;
@@ -1587,8 +1589,8 @@ class App {
   pisensTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('pisens')) return;
     const run = this.sim.running, w = this.bench.get(L.sdaWire || 'w4'); if (w) w.group.visible = !this.th.unplug;
-    const b = $('#th-plug'); if (b) { b.disabled = run; b.textContent = this.th.unplug ? '🔌 Plug the SDA wire back in' : '🔌 Unplug the SDA wire'; b.classList.toggle('on', this.th.unplug); }
-    const n = $('#ps-note'); if (n) { const h = !this.board.powered ? (IS_U3 ? 'USB is not plugged in — the board has no power.' : 'USB-C is not plugged in — the Raspberry Pi has no power.') : this.th.unplug ? 'The SDA wire is out: nobody answers at 0x44.' : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : (L.sdaWire && !IS_U3 ? 'The sensor answers at address 0x44; it is read each time the page is built (every 5 seconds).' : 'The sensor answers at address 0x44; the program reads it every 2 seconds.'); if (n.innerHTML !== h) n.innerHTML = h; }
+    const b = $('#th-plug'); if (b) { b.disabled = run; b.textContent = L.dht ? (this.th.unplug ? '🔌 Plug the DATA wire back in' : '🔌 Unplug the DATA wire') : this.th.unplug ? '🔌 Plug the SDA wire back in' : '🔌 Unplug the SDA wire'; b.classList.toggle('on', this.th.unplug); }
+    const n = $('#ps-note'); if (n) { const h = !this.board.powered ? (IS_U3 ? 'USB is not plugged in — the board has no power.' : 'USB-C is not plugged in — the Raspberry Pi has no power.') : this.th.unplug ? (L.dht ? 'The DATA wire is out: no reading arrives and the library returns NaN.' : 'The SDA wire is out: nobody answers at 0x44.') : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : (L.dht ? 'The sensor answers on its data wire; the program reads it every 2 seconds (the DHT11 gives whole numbers).' : L.sdaWire && !IS_U3 ? 'The sensor answers at address 0x44; it is read each time the page is built (every 5 seconds).' : 'The sensor answers at address 0x44; the program reads it every 2 seconds.'); if (n.innerHTML !== h) n.innerHTML = h; }
   }
   thermoTick() {
     const io = this.thermoIo(); if (!io) return;
@@ -1911,6 +1913,13 @@ class App {
         return ok ? { found: true, c: this.th.t + (Math.random() - 0.5) * 0.1, rh: Math.min(100, Math.max(0, this.th.h + (Math.random() - 0.5) * 0.3)) } : { found: false };
       },
       ble: ev => { if (ev.stage === 'adv') this.bl.adv = !!ev.val; else if (ev.stage === 'val') this.bl.val = ev.val; this.bleRender(); },
+      dht: () => {
+        const L = this.lesson, pin = L && L.io ? Object.keys(L.io).find(p => L.io[p].kind === 'dht') : null, io = pin && this.ioFor(pin);
+        if (!(io && this.wired(io) && this.board.powered && !this.th.unplug)) return { ok: false };
+        const part = (L.circuit || []).find(d => d.id === io.item), is11 = ((part && part.model) || 'dht11') === 'dht11';
+        const t = Math.min(is11 ? 50 : 80, Math.max(is11 ? 0 : -40, this.th.t)), h = Math.min(is11 ? 80 : 100, Math.max(is11 ? 20 : 0, this.th.h));
+        return { ok: true, t: is11 ? Math.round(t) : Math.round(t * 10) / 10, h: is11 ? Math.round(h) : Math.round(h * 10) / 10 };
+      },
       sleep: (on, ms) => { this.slp = on; if (on) this.slpEnd = performance.now() + ms; },
       wifiScan: () => {
         const W = this.wf, list = [{ ssid: 'CoffeeShop-Free', rssi: -67, open: true }, { ssid: 'Workshop', rssi: -78, open: false }, { ssid: 'Neighbour-2G', rssi: -84, open: false }];
@@ -1938,9 +1947,20 @@ class App {
     $('#stop').disabled = true;
   }
 
+  // RGB LED of a lesson: every die shows duty x its full brightness at the board's logic voltage with 220 ohm (typical forward voltages: red 2.0 V, green 3.0 V, blue 3.1 V)
+  rgbSet(io, v) {
+    const vf = [RGB_VF.R, RGB_VF.G, RGB_VF.B][io.ch], full = Math.pow(Math.min(1, Math.max(0, (LOGIC_V - vf) / 220 / 0.015)), 0.6);
+    this.rgbLv = this.rgbLv || [0, 0, 0]; this.rgbLv[io.ch] = v * full; this.rgbShow(io);
+  }
+  rgbShow(io) {
+    const o = this.bench.get(io.item); if (!o || !o.setRGB) return;
+    const on = this.board.powered && this.wired(io);
+    o.setRGB(on ? this.rgbLv.map(x => (x > 0.02 ? Math.max(0.12, x) : 0)) : [0, 0, 0]);
+  }
   ledFor(pin) { const io = this.ioFor(pin); return io && io.kind === 'led' ? { io, led: this.bench.get(io.item) } : null; }
 
   onDigital(pin, level) {
+    { const rg = this.ioFor(pin); if (rg && rg.kind === 'rgb') this.rgbSet(rg, level ? 1 : 0); }
     if (IS_E32 && pin === 'G2') { this.br.led = !!level; if (this.board.powered) this.board.setLed('blue', !!level); }   // the blue LED is on GPIO2 (active high)
     if (IS_U3 && pin === 'LED_BUILTIN') {        // the yellow L LED on pin 13 is active-high
       this.br.led = !!level;
@@ -1967,6 +1987,7 @@ class App {
   }
 
   onPwm(pin, duty, raw) {
+    { const rg = this.ioFor(pin); if (rg && rg.kind === 'rgb') this.rgbSet(rg, duty); }
     { const mio = this.motorIo(); if (mio && pin === mio.en && this.mot) this.mot.en = duty; }
     const L = this.ledFor(pin);
     const on = !!(L && L.led && this.board.powered && this.wired(L.io));

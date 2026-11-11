@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31 } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -763,5 +763,121 @@ export const U3_LESSONS_2 = [
       { q: 'The Serial Monitor says “Couldn’t find SHT31”. What do you check?', a: ['The monitor', 'The four wires and the address', 'The USB cable length', 'The LED'], c: 1, why: 'begin(0x44) returned false: nobody answered, usually a loose or swapped wire.' },
     ],
     sources: [SRC.sht31, SRC.sht31lib, SRC.wire, SRC.ds],
+  },
+
+  // ================================================================== 17
+  {
+    id: 'u17', num: 17, module: 7, title: 'RGB LED: mix any colour', level: 'Beginner', time: '20 min',
+    goal: 'Drive the three dice of an RGB LED with three PWM pins and mix red, green and blue into other colours.',
+    hardware: ['Arduino UNO R3', 'Breadboard', 'RGB LED (common cathode, 4 legs)', '3 × 220 Ω resistors', '4 × jumper wires'],
+    code: U3_RGB, file: 'RGB_LED.ino', program: 'u3_rgb', widgets: [],
+    circuit: RGB_PARTS, io: { D9: { kind: 'rgb', ch: 0, item: 'rgb1', needs: RGB_IDS }, D10: { kind: 'rgb', ch: 1, item: 'rgb1', needs: RGB_IDS }, D11: { kind: 'rgb', ch: 2, item: 'rgb1', needs: RGB_IDS } },
+    explain: {
+      2: 'Pin 9 drives the <b>red</b> die. All three pins must be PWM pins (marked ~ on the board).',
+      3: 'Pin 10 drives the <b>green</b> die.',
+      4: 'Pin 11 drives the <b>blue</b> die.',
+      6: 'Our own function: give it three brightness values and it sets the colour.',
+      7: '<b>analogWrite(pin, 0 … 255)</b>: PWM duty cycle. 255 = full brightness, 0 = off.',
+      8: 'Green…',
+      9: '…and blue.',
+      12: '<b>setup()</b> runs once.',
+      13: 'The three pins become outputs.',
+      14: 'Green pin.',
+      15: 'Blue pin.',
+      18: '<b>loop()</b> repeats forever.',
+      19: 'Red only.',
+      21: 'Green only.',
+      23: 'Blue only.',
+      25: 'Red + green light together look <b>yellow</b> (additive colour mixing).',
+      27: 'All three together look <b>white</b>.',
+      29: 'All off.',
+    },
+    steps: [
+      { title: 'One LED, three colours', view: 'bench', have: [], power: false,
+        body: `<p>An <b>RGB LED</b> has a <b>red</b>, a <b>green</b> and a <b>blue</b> LED in one housing. Your eye mixes their light: red + green looks <b>yellow</b>, green + blue looks <b>cyan</b>, red + blue looks <b>magenta</b>, all three look <b>white</b>.</p>
+        <p>It has <b>four legs</b>: red, the <b>common</b> leg (the longest one), green, blue. In a <b>common-cathode</b> LED the common leg goes to <b>GND</b>; in a <b>common-anode</b> LED it goes to the supply and a colour lights when its pin is <b>LOW</b>. This lesson uses common cathode.</p>` },
+      { title: 'Each colour needs its own resistor', view: 'breadboard', have: ['rgb1'], power: false, holes: ['e10 · red', 'e11 · common', 'e12 · green', 'e13 · blue'],
+        body: `<p>Push the LED into <b>e10 – e13</b>: red, common, green, blue. Every colour is a separate LED, so every colour needs a <b>series resistor</b> (about 220 Ω here).</p>
+        <p class="tip">The three dice need different voltages: red about <b>2.0 V</b>, green and blue about <b>3.0 V</b> or more (typical values, check your datasheet). With the same 220 Ω resistor, red gets more current and looks brighter than green and blue. Real projects use a smaller resistor for green and blue.</p>` },
+      { title: 'Step 1 — three resistors', view: 'breadboard', have: ['rgb1', 'r1', 'r2', 'r3'], power: false, holes: ['a10 → a16', 'a12 → a17', 'a13 → a18'],
+        body: `<p>Resistors from each colour leg to a free column: <b>a10 → a16</b> (red), <b>a12 → a17</b> (green), <b>a13 → a18</b> (blue).</p>` },
+      { title: 'Step 2 — wires to pins 9, 10, 11 and GND', view: 'bench', have: RGB_IDS, pins: ['D9', 'D10', 'D11', 'GND2'],
+        body: `<ul><li>Red: <b>pin 9 → b16</b></li><li>Green: <b>pin 10 → b17</b></li><li>Blue: <b>pin 11 → b18</b></li><li>Black: <b>GND → a11</b> (the common leg)</li></ul>
+        <p class="warn">If your LED is <b>common anode</b>, the common leg must go to <b>5V</b> instead and the colours work upside down (255 = off).</p>` },
+      { title: 'The code', view: 'bench', have: RGB_IDS, showCode: true, power: true,
+        body: `<p><code>analogWrite(pin, value)</code> sends PWM at the pin; the value 0 – 255 is the brightness. <code>setColor(r, g, b)</code> sets all three at once. Click any line.</p>` },
+      { title: 'Run it', view: 'bench', have: RGB_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The LED shows red, green, blue, yellow, white and off, one second each. Watch the serial line under the code: it shows the PWM value of the pin that changed.</p>
+        <p class="sim">Simulated brightness: it follows the duty cycle and the typical forward voltages above, so on 5 V the green and blue look a little dimmer than red.</p>` },
+      { title: 'Summary', view: 'bench', have: RGB_IDS, power: true,
+        body: `<ul><li>RGB LED = three LEDs, one common leg (cathode to GND, or anode to the supply).</li><li>One resistor per colour; three PWM pins; <code>analogWrite(pin, 0 … 255)</code>.</li><li>Colours add: R + G = yellow, G + B = cyan, R + B = magenta, R + G + B = white.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Which leg of a common-cathode RGB LED goes to GND?', a: ['Red', 'The common (longest) leg', 'Green', 'Blue'], c: 1, why: 'The common leg is the shared cathode.' },
+      { q: 'You set red = 255, green = 255, blue = 0. What colour do you see?', a: ['Cyan', 'Magenta', 'Yellow', 'White'], c: 2, why: 'Red and green light mix to yellow.' },
+      { q: 'How many resistors does the RGB LED need?', a: ['None', 'One for the common leg', 'One per colour (three)', 'Four'], c: 2, why: 'Each colour is a separate LED and needs its own series resistor.' },
+      { q: 'Why must the three colour pins be PWM pins?', a: ['To set different brightness values with analogWrite', 'Only to save power', 'They do not have to be', 'To read the LED'], c: 0, why: 'PWM changes the average current, which sets the brightness.' },
+    ],
+    sources: [SRC.aw, SRC.ds],
+  },
+  // ================================================================== 18
+  {
+    id: 'u18', num: 18, module: 7, title: 'DHT11: temperature and humidity on one wire', level: 'Intermediate', time: '20 min',
+    goal: 'Wire a DHT11 with its pull-up resistor and read temperature and humidity with the Adafruit DHT library.',
+    hardware: ['Arduino UNO R3', 'Breadboard', 'DHT11 sensor (4 pins)', '10 kΩ resistor', '4 × jumper wires'],
+    code: U3_DHT, file: 'DHT_read.ino', program: 'u3_dht', fast: true, widgets: ['pisens'], sdaWire: 'w61', dht: true,
+    circuit: DHT_PARTS, io: { D2: { kind: 'dht', item: 'dht1', needs: DHT_IDS } },
+    explain: {
+      1: 'The library by Adafruit. Install <b>“DHT sensor library”</b> from the Library Manager (it also needs <b>Adafruit Unified Sensor</b>).',
+      3: 'The DATA wire is on <b>pin 2</b>.',
+      4: 'Which sensor: DHT11 (blue) or DHT22 (white).',
+      6: 'Create the sensor object.',
+      8: '<b>setup()</b> runs once.',
+      9: 'Serial output on (9600).',
+      10: 'Start the sensor library.',
+      13: '<b>loop()</b> repeats forever.',
+      14: 'The DHT11 is slow: do not read it more than once per second (the DHT22 once per 2 seconds). We wait 2 seconds.',
+      15: '<b>readHumidity()</b> returns the relative humidity in %.',
+      16: '<b>readTemperature()</b> returns °C.',
+      17: 'If the read failed, the library returns <b>NaN</b> (not a number).',
+      18: 'Tell the user.',
+      19: 'Try again after the next delay.',
+      21: 'Print the label…',
+      22: '…the humidity…',
+      24: '…the temperature…',
+      25: '…and the unit.',
+    },
+    steps: [
+      { title: 'The DHT sensor', view: 'breadboard', have: ['dht1'], power: false, holes: ['e10 · VCC', 'e11 · DATA', 'e12 · not connected', 'e13 · GND'],
+        body: `<p>The <b>DHT11</b> measures temperature and humidity and sends both numbers on <b>one data wire</b>. Its four pins (grille facing you, from the left): <b>1 VCC, 2 DATA, 3 not connected, 4 GND</b>.</p>
+        <ul><li>Power: <b>3 V to 5 V</b>.</li><li>DHT11: humidity <b>20 – 80 %</b> (±5 %), temperature <b>0 – 50 °C</b> (±2 °C), at most <b>1 reading per second</b>.</li><li>DHT22: 0 – 100 %RH, −40 – 80 °C, ±0.5 °C, one reading every 2 s.</li></ul>
+        <p class="tip">A 3-pin <b>module</b> already has the pull-up resistor on its board, but its pin order differs between makers: read the printing on it. This lesson uses the bare 4-pin sensor.</p>` },
+      { title: 'The pull-up resistor', view: 'bench', have: [],
+        body: `<p>The sensor can pull the DATA line <b>low</b> but cannot pull it <b>high</b>. A <b>pull-up resistor</b> between DATA and VCC (10 kΩ in the Adafruit example) holds the line high when nobody pulls it down. Without it the board never receives a reading.</p>` },
+      { title: 'Step 1 — the sensor and the resistor', view: 'breadboard', have: ['dht1', 'r60', 'w63'], power: false, holes: ['c10 · resistor', 'c16 · resistor'],
+        body: `<p>Push the sensor into <b>e10 – e13</b>. The <b>10 kΩ resistor</b> goes from <b>c10</b> (VCC column) to <b>c16</b>; a jumper from <b>b11</b> (DATA column) to <b>b16</b> joins the other end to DATA. Together they are the pull-up between DATA and VCC.</p>` },
+      { title: 'Step 2 — power, data and ground', view: 'bench', have: DHT_IDS, pins: ['5V', 'D2', 'GND3'],
+        body: `<ul><li>Red: <b>5V → a10</b> (VCC)</li><li>Yellow: <b>pin 2 → a11</b> (DATA)</li><li>Black: <b>GND → a13</b></li></ul>
+        <p class="warn">On a 3.3 V board (ESP32, Raspberry Pi) you would power the sensor from <b>3.3 V</b> so that the pulled-up DATA line never exceeds the 3.3 V of the pin. The UNO R3 works at 5 V.</p>` },
+      { title: 'Install the library', view: 'bench', have: DHT_IDS,
+        body: `<p>In the Arduino IDE: <b>Sketch → Include Library → Manage Libraries…</b>, search for <b>DHT sensor library</b> (Adafruit) and install it with its dependency <b>Adafruit Unified Sensor</b>.</p>` },
+      { title: 'The code', view: 'bench', have: DHT_IDS, showCode: true, power: true, body: `<p>Shortened from Adafruit’s <b>DHTtester</b> example. Click lines 14, 17 and 22.</p>` },
+      { title: 'Run it', view: 'bench', have: DHT_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Every 2 seconds the Serial Monitor prints the humidity and temperature. <b>Move the sliders</b> and watch the numbers follow (the DHT11 gives whole numbers).</p>
+        <p class="sim">Simulated values, limited to what a DHT11 is specified for (0 – 50 °C, 20 – 80 %RH).</p>` },
+      { title: 'What if the data wire is loose?', view: 'bench', have: DHT_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Unplug the DATA wire”</b> and run it again. Nothing arrives, the library returns NaN, and the Serial Monitor shows:</p>
+        <pre class="tree">Failed to read from DHT sensor!</pre>
+        <p>This is the first message to look for when a DHT does not work: check the three wires and the <b>pull-up resistor</b>.</p>` },
+      { title: 'Summary', view: 'bench', have: DHT_IDS, power: true,
+        body: `<ul><li>DHT: VCC, DATA, (NC), GND; DATA needs a pull-up resistor to VCC.</li><li><code>DHT dht(pin, DHT11)</code>, <code>dht.begin()</code>, <code>readHumidity()</code>, <code>readTemperature()</code>; <code>isnan()</code> means the read failed.</li><li>Read the DHT11 at most once per second, the DHT22 once per 2 seconds.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does the pull-up resistor on the DATA line do?', a: ['It cools the sensor', 'It holds the line high when nobody pulls it low', 'It measures the humidity', 'It limits the LED current'], c: 1, why: 'The sensor can only pull the line low.' },
+      { q: 'readTemperature() returns NaN. What does it mean?', a: ['It is 0 °C', 'The read failed', 'The sensor is a DHT22', 'The temperature is very high'], c: 1, why: 'NaN means not a number: no valid reading arrived.' },
+      { q: 'How often may you read a DHT11?', a: ['1000 times per second', 'At most once per second', 'Only once', 'Once per hour'], c: 1, why: 'Adafruit: no more than 1 Hz for the DHT11 (0.5 Hz for the DHT22).' },
+      { q: 'Which pin of the 4-pin DHT is not used?', a: ['Pin 1', 'Pin 2', 'Pin 3', 'Pin 4'], c: 2, why: 'Pin 3 is not connected.' },
+    ],
+    sources: [SRC.dhtguide, SRC.dhtlib, SRC.ds],
   },
 ];
