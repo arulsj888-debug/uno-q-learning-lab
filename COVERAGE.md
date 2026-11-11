@@ -1,0 +1,95 @@
+# Coverage plan: hardware and connectivity
+
+Rule for every item: verify it from a primary source (datasheet / library docs) for EACH board, model it so the picture agrees with
+the data, add (1) a 3D part, (2) a Build-mode circuit model with a wiring checklist and mistakes, (3) a lesson with a simulated
+sketch, (4) tests. Status: DONE / TODO. "n/a" = does not make sense on that board (reason written).
+Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
+
+## A. Basic electronics
+| Item | UQ | PI | R3 | E32 | Notes |
+|---|---|---|---|---|---|
+| Resistor, LED, push button | DONE | DONE | DONE | DONE | |
+| Potentiometer, buzzer (passive) | DONE | DONE (pot n/a: no ADC) | DONE | DONE | |
+| Active buzzer | TODO | TODO | TODO | TODO | |
+| Capacitor (decoupling, RC), diode (flyback, 1N4148) | TODO | TODO | TODO | TODO | solver has diode element |
+| Transistor / MOSFET switch (2N2222, IRLZ44N) | TODO | TODO | TODO | TODO | drives motor / LED strip |
+| Slide switch, toggle, tilt switch, reed switch | TODO | TODO | TODO | TODO | |
+| Battery + breadboard power supply | partly (battery pack) | partly | partly | partly | |
+
+## B. Light and display
+| Item | UQ | PI | R3 | E32 | Notes |
+|---|---|---|---|---|---|
+| LED matrix (on-board) | DONE | n/a | n/a | n/a | |
+| RGB LED (common cathode / anode) | TODO | TODO | TODO | TODO | |
+| WS2812 / NeoPixel strip and ring | TODO | TODO | TODO | TODO | 5 V data level on 3.3 V boards |
+| 7-segment display (+ 74HC595 shift register) | TODO | TODO | TODO | TODO | |
+| 16x2 character LCD (HD44780 + I2C backpack) | TODO | TODO | TODO | TODO | |
+| OLED SSD1306 128x64 (I2C) | TODO | TODO | TODO | TODO | |
+| 8x8 LED matrix (MAX7219, SPI) | TODO | TODO | TODO | TODO | |
+| TFT / e-paper | TODO | TODO | TODO | TODO | low priority |
+
+## C. Sensors
+| Item | UQ | PI | R3 | E32 | Notes |
+|---|---|---|---|---|---|
+| LDR light, TMP36 | DONE | n/a (no ADC) | DONE | DONE (build) | |
+| HC-SR04 ultrasonic, PIR HC-SR501 | DONE | DONE | DONE | build only (HC-SR04) | |
+| SHT31 (I2C) | DONE | DONE | DONE | build only | |
+| Modulino Thermo / Pixels (Qwiic) | DONE | n/a | n/a | n/a | UNO Q only |
+| DHT11 / DHT22 | TODO | TODO | TODO | TODO | single-wire protocol, needs library check per board |
+| DS18B20 (1-Wire) | TODO | TODO | TODO | TODO | Pi has 1-Wire in the kernel |
+| BMP280 / BME280 pressure (I2C/SPI) | TODO | TODO | TODO | TODO | |
+| Soil moisture (analog), rain, water level | TODO | n/a (no ADC) | TODO | TODO | |
+| Gas MQ-2 / MQ-135 (analog + digital) | TODO | n/a | TODO | TODO | heater needs 5 V |
+| Sound sensor (analog/digital) | TODO | TODO | TODO | TODO | |
+| Joystick (2 analog + button) | TODO | n/a | TODO | TODO | |
+| Rotary encoder KY-040 | TODO | TODO | TODO | TODO | |
+| IR receiver + remote (VS1838 / NEC) | TODO | TODO | TODO | TODO | |
+| Flame, tilt, vibration, hall, line-follow IR | TODO | TODO | TODO | TODO | |
+| MPU6050 accelerometer / gyro (I2C) | TODO | TODO | TODO | TODO | |
+| Keypad 4x4 (matrix scan) | TODO | TODO | TODO | TODO | |
+| RFID RC522 (SPI) | TODO | TODO | TODO | TODO | 3.3 V part |
+| GPS (UART, NEO-6M) | TODO | TODO | TODO | TODO | |
+| DS3231 real-time clock (I2C) | TODO | TODO | TODO | TODO | |
+| Camera (Pi Camera DONE; ESP32-CAM TODO) | n/a | DONE | n/a | TODO | |
+| Touch (capacitive) | n/a | n/a | n/a | DONE (lesson) | on-chip |
+
+## D. Actuators
+| Item | UQ | PI | R3 | E32 | Notes |
+|---|---|---|---|---|---|
+| Servo SG90 | DONE | TODO | DONE | build only | |
+| DC motor + L293D, relay | DONE | build only | DONE | n/a (5 V handling TODO) | |
+| Stepper 28BYJ-48 + ULN2003 | TODO | TODO | TODO | TODO | |
+| Stepper A4988 / DRV8825 driver | TODO | TODO | TODO | TODO | |
+| Solenoid / pump / fan with MOSFET | TODO | TODO | TODO | TODO | |
+| SD card (SPI) | TODO | n/a | TODO | TODO | |
+
+## E. Connectivity and protocols
+| Item | UQ | PI | R3 | E32 | Notes |
+|---|---|---|---|---|---|
+| USB serial / Serial Monitor | DONE | DONE (terminal) | DONE | DONE | |
+| I2C (one device) | DONE | DONE | DONE | build only | |
+| I2C scanner, two devices on one bus | TODO | TODO | TODO | TODO | |
+| SPI (concept + one device) | TODO | TODO | TODO | TODO | |
+| UART between two boards | TODO | TODO | TODO | TODO | 3.3 V / 5 V level shifting |
+| Wi-Fi scan / connect / web server | partly (dashboard) | DONE (web) | n/a | DONE | |
+| HTTP client (fetch a web API, weather) | TODO | TODO | n/a | TODO | |
+| MQTT publish / subscribe + dashboard | TODO | TODO | n/a | TODO | biggest IoT gap |
+| NTP time, OTA update | n/a | n/a | n/a | TODO | |
+| Bluetooth LE | n/a (not verified) | TODO | n/a | DONE | |
+| Bluetooth classic (HC-05 on R3/UQ, built in E32) | TODO | n/a | TODO | TODO | |
+| ESP-NOW (board to board, no router) | n/a | n/a | n/a | TODO | |
+| LoRa (SX1276), nRF24L01, Zigbee | TODO | TODO | TODO | TODO | external modules, SPI |
+| Ethernet | n/a (not verified) | built in | n/a (shield) | n/a | |
+| Interrupts, timers, millis() without delay, EEPROM / preferences | TODO | TODO | TODO | TODO | core programming lessons |
+
+## F. Projects (after the parts exist)
+Weather station (DHT + OLED + MQTT), security alarm (PIR + buzzer + keypad), plant watering (soil + relay/pump), smart door
+(RFID + servo), robot car (2 motors + HC-SR04), home automation over Wi-Fi/MQTT, data logger (RTC + SD).
+
+## Order of work
+1. Basic electronics gaps (A) and RGB LED, DHT11, joystick, rotary encoder: quick wins, little new protocol.
+2. Displays: I2C LCD, OLED, 7-segment, NeoPixel.
+3. Protocols: SPI, UART, I2C scanner, interrupts / millis / EEPROM.
+4. IoT: HTTP client, MQTT, ESP-NOW, NTP.
+5. Remaining sensors and actuators (stepper, IR, MPU6050, RFID, GPS, RTC, SD, LoRa).
+6. Projects.
