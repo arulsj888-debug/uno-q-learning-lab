@@ -197,29 +197,46 @@ export class LED5mm {
 
 
 // ---------------------------------------------------------------- 5 mm RGB LED (4 legs: R, common, G, B; 2.54 mm apart)
-export class RGBLED5mm extends LED5mm {
+export class RGBLED5mm {
   constructor(commonAnode = false) {
-    super(0xffffff);
+    const g = this.group = new THREE.Group();
     this.commonAnode = commonAnode;
-    // two extra legs: the base class already has the legs at +-1.27 mm (common and green); red and blue are one pitch further out
-    const mkLeg = x => { const path = new THREE.CatmullRomCurve3([new THREE.Vector3(x, 3.1, 0), new THREE.Vector3(x, 0, 0), new THREE.Vector3(x, -3.0, 0)]); return new THREE.Mesh(new THREE.TubeGeometry(path, 24, 0.24, 8, false), M.tin); };
-    this.group.add(mkLeg(-3.81), mkLeg(3.81));
-    this.lensMat.transmission = 0.55; this.lensMat.roughness = 0.22;      // lightly diffused lens
-    this.lensMat.color.set(0xeeeeee); this.lensMat.attenuationColor.set(0xffffff);
-    this.levels = [0, 0, 0]; tagHW(this.group, 'rgbled');
+    // clear, slightly milky epoxy lens: flange, cylinder, dome (the same 5 mm shape as a single LED), with a flat on the rim next to the common leg
+    this.lensMat = new THREE.MeshPhysicalMaterial({ color: 0xf4f1e8, roughness: 0.16, metalness: 0, transmission: 0.62, thickness: 4.0, ior: 1.52, attenuationColor: new THREE.Color(0xffffff), attenuationDistance: 6.0, emissive: new THREE.Color(0x000000), emissiveIntensity: 0, clearcoat: 1, clearcoatRoughness: 0.05 });
+    const pts = [new THREE.Vector2(0, 0), new THREE.Vector2(2.9, 0), new THREE.Vector2(2.9, 1.0), new THREE.Vector2(2.5, 1.05), new THREE.Vector2(2.5, 6.0)];
+    for (let i = 1; i <= 16; i++) { const a2 = i / 16 * Math.PI / 2; pts.push(new THREE.Vector2(2.5 * Math.cos(a2), 6.0 + 2.6 * Math.sin(a2))); }
+    const lens = new THREE.Mesh(new THREE.LatheGeometry(pts, 48), this.lensMat); lens.position.y = 3.0; g.add(lens);
+    const flat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.0, 3.6), new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0 })); flat.position.set(-2.75, 3.5, 0); g.add(flat);
+    // inside the lens: the lead frame. The common leg carries a reflector cup with three tiny dice (red, green, blue); gold bond wires go to the three other leads
+    const frame = new THREE.MeshStandardMaterial({ color: 0xc4c7cc, metalness: 1, roughness: 0.28 }), gold = new THREE.MeshStandardMaterial({ color: 0xe0b45a, metalness: 1, roughness: 0.25 });
+    const post = (x, h) => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.55, h, 0.5), frame); m.position.set(x, 3.0 + h / 2, 0); g.add(m); return m; };
+    post(-1.9, 3.4); post(1.0, 3.4); post(1.9, 3.4);
+    const anvil = new THREE.Mesh(new THREE.BoxGeometry(1.7, 3.6, 0.5), frame); anvil.position.set(-0.45, 4.8, 0); g.add(anvil);
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.0, 0.7, 20, 1, true), frame); cup.position.set(-0.45, 6.95, 0); g.add(cup);
+    this.dieMats = [0xff3318, 0x2bd75a, 0x3a64ff].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.3, emissive: new THREE.Color(0x000000), emissiveIntensity: 0 }));
+    this.dieMats.forEach((m, i) => { const d = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.18, 0.32), m); d.position.set(-0.45 + (i - 1) * 0.5, 6.74, 0); g.add(d); });
+    const wire = (x0, x1, i) => { const p = new THREE.CatmullRomCurve3([new THREE.Vector3(x0, 6.85, 0), new THREE.Vector3((x0 + x1) / 2, 7.5, 0.12 * (i - 1)), new THREE.Vector3(x1, 6.4, 0)]); g.add(new THREE.Mesh(new THREE.TubeGeometry(p, 14, 0.04, 5, false), gold)); };
+    wire(-0.95, -1.9, 0); wire(-0.45, 1.0, 1); wire(0.05, 1.9, 2);
+    // four legs 2.54 mm apart: red, common (the longest), green, blue; each with the small kink under the flange
+    const leg = (x0, x, bottom) => {   // from the lead frame inside the lens (x0) the leg splays out under the flange to the 2.54 mm grid (x)
+      const path = new THREE.CatmullRomCurve3([new THREE.Vector3(x0, 3.1, 0), new THREE.Vector3(x0, 2.3, 0), new THREE.Vector3((x0 + x) / 2, 1.5, 0), new THREE.Vector3(x, 0.8, 0), new THREE.Vector3(x, bottom, 0)]);
+      return new THREE.Mesh(new THREE.TubeGeometry(path, 24, 0.24, 8, false), M.tin);
+    };
+    g.add(leg(-1.9, -3.81, -3.0), leg(-0.45, -1.27, -5.6), leg(1.0, 1.27, -3.0), leg(1.9, 3.81, -3.0));
+    this.light = new THREE.PointLight(0xffffff, 0, 60, 2); this.light.position.set(0, 9, 0); g.add(this.light);
+    this.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: 0x000000, toneMapped: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); this.halo.scale.set(18, 18, 1); this.halo.position.set(0, 8.2, 0); this.halo.renderOrder = 6; this.halo.raycast = () => {}; g.add(this.halo);
+    this.levels = [0, 0, 0]; tagHW(g, 'rgbled');
   }
   /** levels = brightness 0..1 of the red, green and blue dice */
   setRGB(levels, burnt = false) {
     const [r, g, b] = levels, m = Math.max(r, g, b);
-    if (burnt) { this.set(false); this.lensMat.color.set(0x2a2220); this.lensMat.emissiveIntensity = 0; return; }
-    const hue = m > 0.02 ? new THREE.Color(r / m, g / m, b / m) : new THREE.Color(0, 0, 0);     // colour of the mix at full strength
-    this.lensMat.color.copy(m > 0.02 ? hue.clone().lerp(new THREE.Color(1, 1, 1), 0.0) : new THREE.Color(0xdddddd));
+    if (burnt) { this.dieMats.forEach(d => { d.emissive.set(0x000000); d.emissiveIntensity = 0; d.color.set(0x2a2220); }); this.lensMat.emissiveIntensity = 0; this.lensMat.color.set(0x2a2220); this.halo.material.color.set(0x000000); this.light.intensity = 0; return; }
+    this.dieMats.forEach((d, i) => { d.emissive.set([0xff3318, 0x2bd75a, 0x3a64ff][i]); d.emissiveIntensity = levels[i] * 3.2; });
+    const hue = m > 0.02 ? new THREE.Color(r / m, g / m, b / m) : new THREE.Color(0, 0, 0);
+    this.lensMat.color.copy(m > 0.02 ? hue.clone().lerp(new THREE.Color(0xf4f1e8), 0.45) : new THREE.Color(0xf4f1e8));
     this.lensMat.attenuationColor.copy(m > 0.02 ? hue : new THREE.Color(0xffffff));
-    this.lensMat.emissive.copy(hue);
-    this.lensMat.emissiveIntensity = m * 2.2;
-    this.die.material.color.setRGB(m ? 3 * r + 0.2 : 0.2, m ? 3 * g + 0.2 : 0.2, m ? 3 * b + 0.2 : 0.2);
-    this.light.color.copy(m > 0.02 ? hue : new THREE.Color(1, 1, 1));
-    this.light.intensity = m * 30;
+    this.lensMat.emissive.copy(hue); this.lensMat.emissiveIntensity = m * 1.4;
+    this.light.color.copy(m > 0.02 ? hue : new THREE.Color(1, 1, 1)); this.light.intensity = m * 30;
     this.halo.material.color.copy(hue).multiplyScalar(m);
     this.levels = levels;
   }
