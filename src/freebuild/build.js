@@ -9,13 +9,13 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 const RAILS = ['top+', 'top-', 'bot-', 'bot+'];
 const OHMS = [10, 100, 220, 330, 470, 1000, 2200, 4700, 10000, 47000, 100000, 1000000];
-const PREFIX = { sevenseg: 'seg', reed: 'reed', tilt: 'tilt', slidesw: 'ssw', cap: 'cap', diode: 'd', npn: 'q', mosfet: 'fet', lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
+const PREFIX = { ds18b20: 'ds', sevenseg: 'seg', reed: 'reed', tilt: 'tilt', slidesw: 'ssw', cap: 'cap', diode: 'd', npn: 'q', mosfet: 'fet', lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
 const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
 const TERMS = { sevenseg: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP', 'COM'], lcd1602: ['GND', 'VCC', 'SDA', 'SCL'], oled: ['GND', 'VCC', 'SCL', 'SDA'], neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
 const DESK_SLOT_PI = { sevenseg: [100, 45], lcd1602: [125, 17], oled: [125, 17], neopixel: [110, 42] };
 const DESK_SLOT = { sevenseg: [72, 8], lcd1602: [20, 70], oled: [125, 70], neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
-const MOVABLE = new Set(['resistor', 'led', 'cap', 'reed', 'tilt', 'slidesw', 'diode', 'npn', 'mosfet', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
+const MOVABLE = new Set(['resistor', 'led', 'cap', 'ds18b20', 'reed', 'tilt', 'slidesw', 'diode', 'npn', 'mosfet', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
 
 export class FreeBuild {
@@ -297,6 +297,7 @@ export class FreeBuild {
     if (type === 'rgbled') { if (col > 27) return null; return { def: { type, row, col, ca: this.opts.rgbCA }, refs: [at(row, col), at(row, col + 1), at(row, col + 2), at(row, col + 3)] }; }
     if (type === 'servo') { if (col > 28) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     if (type === 'mosfet') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
+    if (type === 'ds18b20') { if (col > 28) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     if (type === 'slidesw') { if (col > 28) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     if (type === 'npn') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     if (type === 'tmp36') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
@@ -349,7 +350,7 @@ export class FreeBuild {
   }
   click(ref) {
     const T = this.tool; if (!T) return; this.occ = this.occupied();
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw'].includes(T.type)) {
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw', 'ds18b20'].includes(T.type)) {
       const fp = this.footprint(T.type, ref);
       if (!fp) return this.toast('That part does not fit there (it needs more holes to the right).');
       if (fp.refs.some(r => !this.free(r))) return this.toast('One of the holes is already used.');
@@ -433,13 +434,13 @@ export class FreeBuild {
   }
   hoverOk(ref) {
     const T = this.tool; this.occ = this.occupied();
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw'].includes(T.type)) { const fp = this.footprint(T.type, ref); return !!fp && fp.refs.every(r => this.free(r)); }
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw', 'ds18b20'].includes(T.type)) { const fp = this.footprint(T.type, ref); return !!fp && fp.refs.every(r => this.free(r)); }
     if (T.step === 0) return this.firstOk(T.type, ref) && this.second(T.type, ref).length > 0;
     return this.second(T.type, T.first).includes(ref);
   }
   previewFoot(ref) {
     const T = this.tool; if (!T) return;
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw'].includes(T.type)) { const fp = ref && this.footprint(T.type, ref); this.occ = this.occupied(); if (fp) this.setMarks(fp.refs.filter(r => this.free(r)), fp.refs.filter(r => !this.free(r))); else this.cand.count = 0; }
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw', 'ds18b20'].includes(T.type)) { const fp = ref && this.footprint(T.type, ref); this.occ = this.occupied(); if (fp) this.setMarks(fp.refs.filter(r => this.free(r)), fp.refs.filter(r => !this.free(r))); else this.cand.count = 0; }
   }
   pointName(q) {
     if (q.kind === 'hole') return `Hole ${q.ref} (column ${q.col}, row ${q.row})`;
@@ -523,7 +524,7 @@ export class FreeBuild {
     const T = this.tool, h = $('#fb-hint'); let t;
     if (!T) t = this.probeOn ? 'Voltmeter: click any hole or board pin to measure the voltage there.' : 'Drag a part from the left onto the breadboard (or click it, then click holes). Drag from a board pin to a hole to make a wire. Drag a placed part to move it. Hold a push button to press it; drag a knob to turn it.';
     else if (T.type === 'wire') t = T.step ? 'Click the other end of the wire (green = free).' : 'Click where the wire starts: a board pin, a breadboard hole or a power rail.';
-    else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw'].includes(T.type)) t = { slidesw: 'Click a hole for the first leg (A): the three legs go in columns n, n+1, n+2 of one row: A, COM (middle), B. Click the switch in the 3D view to slide it.', mosfet: 'Click a hole for the GATE leg: the three legs go in columns n, n+1, n+2 of one row: gate, drain, source (front with the text toward you, metal tab at the back). Tick “turn round” to swap gate and source.', npn: 'Click a hole for the EMITTER leg: the three legs go in columns n, n+1, n+2 of one row: emitter, base, collector (flat side toward you). Tick “turn round” to swap emitter and collector.', joystick: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: GND, VCC, VRx, VRy, SW. The module lies over the breadboard towards you.', encoder: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: CLK, DT, SW, +, GND.', dht: 'Click a hole for the VCC pin: the 4 pins go in columns n … n+3 of one row: VCC, DATA, (not connected), GND. The grille faces you. DATA needs a pull-up resistor to VCC.', rgbled: 'Click the hole for the red leg: the 4 legs go in columns n … n+3 of one row: red, common (the longest leg), green, blue. Each colour needs its own resistor.', l293d: 'Click a hole: the 16-pin chip straddles the middle gap over 8 columns (n … n+7). Pin 1 is at the left of the row nearest you (row f); the notch marks the pin-1 end.', sht31: 'Click a hole in row f to j for the VIN pin: the breakout has 7 pins in columns n … n+6: VIN, GND, SCL, SDA, ADDR, RST, ALRT. The board lies over the middle of the breadboard.', hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
+    else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw', 'ds18b20'].includes(T.type)) t = { ds18b20: 'Click a hole for the GND leg: the three legs go in columns n, n+1, n+2 of one row: GND, DQ, VDD (flat face with the text toward you).', slidesw: 'Click a hole for the first leg (A): the three legs go in columns n, n+1, n+2 of one row: A, COM (middle), B. Click the switch in the 3D view to slide it.', mosfet: 'Click a hole for the GATE leg: the three legs go in columns n, n+1, n+2 of one row: gate, drain, source (front with the text toward you, metal tab at the back). Tick “turn round” to swap gate and source.', npn: 'Click a hole for the EMITTER leg: the three legs go in columns n, n+1, n+2 of one row: emitter, base, collector (flat side toward you). Tick “turn round” to swap emitter and collector.', joystick: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: GND, VCC, VRx, VRy, SW. The module lies over the breadboard towards you.', encoder: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: CLK, DT, SW, +, GND.', dht: 'Click a hole for the VCC pin: the 4 pins go in columns n … n+3 of one row: VCC, DATA, (not connected), GND. The grille faces you. DATA needs a pull-up resistor to VCC.', rgbled: 'Click the hole for the red leg: the 4 legs go in columns n … n+3 of one row: red, common (the longest leg), green, blue. Each colour needs its own resistor.', l293d: 'Click a hole: the 16-pin chip straddles the middle gap over 8 columns (n … n+7). Pin 1 is at the left of the row nearest you (row f); the notch marks the pin-1 end.', sht31: 'Click a hole in row f to j for the VIN pin: the breakout has 7 pins in columns n … n+6: VIN, GND, SCL, SDA, ADDR, RST, ALRT. The board lies over the middle of the breadboard.', hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
     else if (T.type === 'qwiic') t = T.step ? 'Click the other Qwiic socket (green).' : 'Click a Qwiic socket: the one on the board (left edge) or one of a module. The cable fits only one way.';
     else t = T.step ? { reed: 'Click the hole for the other end of the glass capsule (4 to 6 holes away in the same row).', tilt: 'Click the neighbouring hole for the second leg.', cap: 'Click the neighbouring hole for the SHORT leg (−, next to the stripe). The first hole is the long leg (+).', diode: 'Click the hole for the CATHODE (the end with the silver band). The first hole is the anode.', led: 'Click the neighbouring hole for the SHORT leg (cathode, −). The first hole is the long leg (anode, +).', buzzer: 'Click the hole 3 columns away for the − leg. The first hole is +.', resistor: 'Click the hole for the other leg (a resistor has no polarity).', ldr: 'Click the neighbouring hole for the other leg.' }[T.type] : { reed: 'Click a hole for one end of the reed switch (no polarity).', tilt: 'Click a hole for the first leg of the tilt switch (no polarity).', cap: 'Click the hole for the LONG leg (+). The leg next to the stripe on the can (−) goes to the lower voltage.', diode: 'Click the hole for the ANODE (the end without the band).', led: 'Click the hole for the LONG leg (anode, +).', buzzer: 'Click the hole for the + leg.', resistor: 'Click the hole for one leg.', ldr: 'Click the hole for one leg.' }[T.type];
     if (h) h.textContent = t;
@@ -543,6 +544,7 @@ export class FreeBuild {
         neopixel: `# pip3 install adafruit-circuitpython-neopixel   (run with sudo)\nimport board, neopixel\npixels = neopixel.NeoPixel(board.D${n}, 8, brightness=${((c.bright ?? 50) / 255).toFixed(2)})   # the Adafruit example uses D18\npixels.fill((255, 0, 0))   # red\npixels.show()`,
         tone: `from gpiozero import TonalBuzzer\nb = TonalBuzzer(${n})\nb.play(${f})   # Hz`,
         dht: `# pip3 install adafruit-circuitpython-dht\nimport adafruit_dht, board\ndht = adafruit_dht.DHT22(board.D${n})   # or DHT11(...)\nprint(dht.temperature, dht.humidity)   # may raise RuntimeError: wait 2 s and retry`,
+        onewire: `# 1-Wire must be enabled in raspi-config; the default 1-Wire pin is GPIO4 (physical pin 7)\n# pip3 install w1thermsensor\nfrom w1thermsensor import W1ThermSensor\nsensor = W1ThermSensor()\nprint(sensor.get_temperature())`,
         i2c: `# I²C bus 1 (SDA = GPIO2, SCL = GPIO3): enable it in raspi-config first\nimport board, busio\ni2c = board.I2C()`,
         in: `from gpiozero import DigitalInputDevice\npin = DigitalInputDevice(${n}, pull_up=None, active_state=True)\nprint(pin.value)`,
         up: `from gpiozero import Button\nbutton = Button(${n})   # internal pull-up\nprint(button.is_pressed)`,
@@ -558,6 +560,7 @@ export class FreeBuild {
         neopixel: `#include <Adafruit_NeoPixel.h>\nAdafruit_NeoPixel strip(8, ${n}, NEO_GRB + NEO_KHZ800);   // 8 pixels\n// in setup(): strip.begin(); strip.setBrightness(${c.bright ?? 50});\nstrip.fill(strip.Color(255, 0, 0));   // red\nstrip.show();`,
         tone: `tone(${n}, ${f});   // Hz`,
         dht: `#include "DHT.h"   // Adafruit "DHT sensor library" (+ Adafruit Unified Sensor)\nDHT dht(${n}, DHT22);   // or DHT11\n// in setup(): dht.begin();\nfloat h = dht.readHumidity();\nfloat t = dht.readTemperature();   // isnan() means the read failed`,
+        onewire: `#include <OneWire.h>\n#include <DallasTemperature.h>\nOneWire oneWire(${n});\nDallasTemperature sensors(&oneWire);\n// in setup(): sensors.begin();\nsensors.requestTemperatures();\nfloat t = sensors.getTempCByIndex(0);`,
         servo: `#include <ESP32Servo.h>   // install the ESP32Servo library\nServo s;\n// in setup():\ns.attach(${n});\ns.write(${Math.round(c.angle ?? 90)});   // degrees`,
         pulse: `pinMode(${n}, OUTPUT);\ndigitalWrite(${n}, LOW);  delayMicroseconds(2);\ndigitalWrite(${n}, HIGH); delayMicroseconds(10);   // 10 µs trigger pulse\ndigitalWrite(${n}, LOW);`,
         i2c: `#include <Wire.h>\n// in setup():\nWire.begin();   // default I²C pins: SDA = GPIO21, SCL = GPIO22`,
@@ -574,6 +577,7 @@ export class FreeBuild {
       pulse: `pinMode(${id}, OUTPUT);\ndigitalWrite(${id}, LOW);  delayMicroseconds(2);\ndigitalWrite(${id}, HIGH); delayMicroseconds(10);   // 10 µs trigger pulse\ndigitalWrite(${id}, LOW);`,
       neopixel: `#include <Adafruit_NeoPixel.h>\nAdafruit_NeoPixel strip(8, ${id}, NEO_GRB + NEO_KHZ800);   // 8 pixels\n// in setup(): strip.begin(); strip.setBrightness(${c.bright ?? 50});\nstrip.fill(strip.Color(255, 0, 0));   // red\nstrip.show();${this.isU3 ? '' : '\n// Note: not verified on the UNO Q (the library bit-bangs the data signal under Zephyr)'}`,
       dht: `#include "DHT.h"   // Adafruit "DHT sensor library" (+ Adafruit Unified Sensor)\nDHT dht(${id}, DHT22);   // or DHT11\n// in setup(): dht.begin();\nfloat h = dht.readHumidity();\nfloat t = dht.readTemperature();   // isnan() means the read failed${this.isU3 ? '' : '\n// Note: forum users report NaN with this library on the UNO Q (Zephyr timing); use the Modulino Thermo or SHT31 there'}`,
+      onewire: `#include <OneWire.h>\n#include <DallasTemperature.h>\nOneWire oneWire(${id});\nDallasTemperature sensors(&oneWire);\n// in setup(): sensors.begin();\nsensors.requestTemperatures();\nfloat t = sensors.getTempCByIndex(0);`,
       pwm: `pinMode(${id}, OUTPUT);\nanalogWrite(${id}, ${Math.round(duty * 255)});   // 0 … 255`, tone: `tone(${id}, ${f});   // Hz`,
       i2c: `#include <Wire.h>\n// in setup():\nWire.begin();   // ${this.isU3 ? 'I²C bus: SDA = A4, SCL = A5' : 'I²C bus (SDA D20 / SCL D21; A4 / A5 use Wire2)'}`,
       in: `pinMode(${id}, INPUT);\nint v = digitalRead(${id});`, up: `pinMode(${id}, INPUT_PULLUP);\nint v = digitalRead(${id});   // pressed = LOW`,
@@ -581,8 +585,8 @@ export class FreeBuild {
     })[c.mode] || '';
   }
   modesFor(k) {
-    if (this.isE32) return k.inOnly ? ['in', ...(k.analog ? ['analog'] : [])] : ['out0', 'out1', 'blink', 'pwm', 'tone', 'servo', 'pulse', 'dht', 'neopixel', 'in', 'up', 'down', ...(k.analog ? ['analog'] : []), ...(k.i2c ? ['i2c'] : [])];
-    const m = ['out0', 'out1', 'blink']; if (k.pwm) m.push('pwm'); m.push('tone', 'servo', 'pulse', 'dht', 'neopixel', 'in', 'up'); if (this.isPi) m.push('down'); if (k.analog) m.push('analog'); if (k.i2c) m.push('i2c'); return m;
+    if (this.isE32) return k.inOnly ? ['in', ...(k.analog ? ['analog'] : [])] : ['out0', 'out1', 'blink', 'pwm', 'tone', 'servo', 'pulse', 'dht', 'onewire', 'neopixel', 'in', 'up', 'down', ...(k.analog ? ['analog'] : []), ...(k.i2c ? ['i2c'] : [])];
+    const m = ['out0', 'out1', 'blink']; if (k.pwm) m.push('pwm'); m.push('tone', 'servo', 'pulse', 'dht', 'onewire', 'neopixel', 'in', 'up'); if (this.isPi) m.push('down'); if (k.analog) m.push('analog'); if (k.i2c) m.push('i2c'); return m;
   }
   usedPins() {
     const seen = new Map();
@@ -627,6 +631,7 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn" data-tool="neopixel">NeoPixel strip, 8 pixels (WS2812B)</button></div>
       <div class="fb-row"><button class="fb-btn${on('joystick')}" data-tool="joystick">Joystick module${this.isPi ? ' (no ADC on Pi)' : ''}</button></div>
       <div class="fb-row"><button class="fb-btn${on('encoder')}" data-tool="encoder">Rotary encoder (KY-040)</button></div>
+      <div class="fb-row"><button class="fb-btn${on('ds18b20')}" data-tool="ds18b20">DS18B20 temperature (1-Wire)</button></div>
       <div class="fb-row"><button class="fb-btn${on('dht')}" data-tool="dht">DHT temperature + humidity</button><select data-opt="dht"><option value="dht11"${this.opts.dht === 'dht22' ? '' : ' selected'}>DHT11</option><option value="dht22"${this.opts.dht === 'dht22' ? ' selected' : ''}>DHT22</option></select></div>
       <div class="fb-row"><button class="fb-btn${on('hcsr04')}" data-tool="hcsr04">HC-SR04 distance sensor</button></div>
       ${this.isE32 ? '' : `      <div class="fb-row"><button class="fb-btn" data-tool="pir">PIR motion sensor HC-SR501</button></div>`}
@@ -725,7 +730,7 @@ export class FreeBuild {
     }
     if (sel) h += this.selectedHtml(sel);
     const hasLdr = this.parts.some(p => p.type === 'ldr'), hasT = this.parts.some(p => p.type === 'tmp36');
-    const hasSht = this.parts.some(p => p.type === 'sht31' || p.type === 'thermo' || p.type === 'dht'), hasUs = this.parts.some(p => p.type === 'hcsr04'), hasPir = this.parts.some(p => p.type === 'pir');
+    const hasSht = this.parts.some(p => p.type === 'sht31' || p.type === 'thermo' || p.type === 'dht' || p.type === 'ds18b20'), hasUs = this.parts.some(p => p.type === 'hcsr04'), hasPir = this.parts.some(p => p.type === 'pir');
     const hasJoy = this.parts.some(p => p.type === 'joystick' || p.type === 'encoder' || p.type === 'lcd1602' || p.type === 'oled');
     if (hasLdr || hasT || hasUs || hasPir || hasSht || hasJoy) {
       h += `<h3>The room (simulated)</h3>`;

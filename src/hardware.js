@@ -592,7 +592,7 @@ export class Diode1N4007 {
 
 // ---------------------------------------------------------------- PN2222A NPN transistor in a TO-92 case: flat face toward you, pins 1 2 3 = emitter, base, collector (left to right)
 export class TransistorPN2222A {
-  constructor() {
+  constructor(name = 'PN2222A', pinsText = 'E  B  C', tag = 'npn') {
     const g = this.group = new THREE.Group();
     const r = 2.4, flat = 1.0, a = Math.asin(flat / r), fx = r * Math.cos(a);
     const sh = new THREE.Shape();
@@ -600,14 +600,14 @@ export class TransistorPN2222A {
     const geo = new THREE.ExtrudeGeometry(sh, { depth: 4.7, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 2, curveSegments: 32 });
     geo.rotateX(Math.PI / 2); geo.translate(0, 4.7, 0);
     const body = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x1b1b1d, roughness: 0.55 })); body.position.y = 3.2; g.add(body);
-    const mark = canvasTex(256, 256, (c, w, h) => { c.clearRect(0, 0, w, h); c.fillStyle = 'rgba(214,216,218,0.9)'; c.font = '700 46px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('PN2222A', w / 2, h * 0.38); c.font = '600 30px Arial, Helvetica, sans-serif'; c.fillText('E  B  C', w / 2, h * 0.66); });
+    const mark = canvasTex(256, 256, (c, w, h) => { c.clearRect(0, 0, w, h); c.fillStyle = 'rgba(214,216,218,0.9)'; c.font = '700 46px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(name, w / 2, h * 0.38); c.font = '600 30px Arial, Helvetica, sans-serif'; c.fillText(pinsText, w / 2, h * 0.66); });
     const label = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 4.0), new THREE.MeshBasicMaterial({ map: mark, transparent: true, depthWrite: false })); label.position.set(0, 3.2 + 2.35, flat + 0.12); g.add(label);
     for (const [i, x] of [[0, -2.54], [1, 0], [2, 2.54]]) {
       const bx = (i - 1) * 1.27;
       const path = new THREE.CatmullRomCurve3([new THREE.Vector3(bx, 3.3, 0), new THREE.Vector3(bx, 2.2, 0), new THREE.Vector3(x, 0.9, 0), new THREE.Vector3(x, -3.0, 0)]);
       g.add(new THREE.Mesh(new THREE.TubeGeometry(path, 16, 0.22, 6, false), M.tin));
     }
-    tagHW(g, 'npn');
+    tagHW(g, tag);
   }
 }
 
@@ -2044,6 +2044,17 @@ export const HW_INFO = {
       'Uses: smoothing a supply, filtering noise, timing with a resistor.',
     ],
     src: 'General electronics practice (standard capacitor formulas); sizes and ratings in the app are typical values',
+  },
+  ds18b20: {
+    name: 'DS18B20 digital temperature sensor (TO-92)', tag: 'A temperature sensor on a 1-Wire bus',
+    summary: 'A digital thermometer: it sends the temperature as a number over a single data wire (the 1-Wire bus), so no analog-to-digital converter is needed. Many sensors can share the same wire, each with its own 64-bit serial code.',
+    points: [
+      'Datasheet (Maxim/Dallas): flat face with the text toward you, legs down: 1 GND, 2 DQ (data), 3 VDD. Supply 3.0 V to 5.5 V.',
+      'Measures −55 °C to +125 °C, accurate to ±0.5 °C from −10 °C to +85 °C. Resolution 9 to 12 bits (12-bit = 0.0625 °C steps); a 12-bit conversion takes up to 750 ms.',
+      'DQ is an open-drain line: it needs a pull-up resistor to VDD (the datasheet says about 5 kΩ; 4.7 kΩ is the usual value).',
+      'The sensor can also take its power from the data line (“parasite power”, VDD to GND); this app models the normal three-wire connection.',
+    ],
+    src: 'DS18B20 datasheet (Dallas Semiconductor / Maxim)',
   },
   mosfet: {
     name: 'IRLZ44N logic-level N-channel MOSFET (TO-220)', tag: 'An electronic switch driven by voltage, not current',

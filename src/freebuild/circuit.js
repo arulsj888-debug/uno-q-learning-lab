@@ -56,6 +56,7 @@ export function terminals(d) {
     case 'dht': return [['VCC', `${row}${c}`], ['DATA', `${row}${c + 1}`], ['NC', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'diode': return [['A', d.a], ['K', d.k]];
     case 'cap': return [['plus', d.a], ['minus', d.k]];
+    case 'ds18b20': return [['GND', `${row}${c}`], ['DQ', `${row}${c + 1}`], ['VDD', `${row}${c + 2}`]];
     case 'reed': case 'tilt': return [['a', d.a], ['b', d.k]];
     case 'sevenseg': return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'].concat(['COM']).map(n => [n, `${d.id}.${n}`]);
     case 'slidesw': return [['A', `${row}${c}`], ['COM', `${row}${c + 1}`], ['B', `${row}${c + 2}`]];
@@ -189,7 +190,7 @@ export function pinKind(boardKind, id, info) {
 export const PIN_MODES = {
   out0: 'Output LOW', out1: 'Output HIGH', blink: 'Blink (1 Hz)', pwm: 'PWM (duty cycle)', tone: 'Tone (frequency)',
   i2c: 'I²C bus (SDA / SCL)', servo: 'Servo angle (50 Hz pulses)', pulse: 'Trigger pulses (HC-SR04)',
-  dht: 'Single-wire data (DHT11 / DHT22)', neopixel: 'Pixel data (WS2812 / NeoPixel)', in: 'Input (no pull resistor)', up: 'Input with pull-up', down: 'Input with pull-down', analog: 'Analog input (ADC)',
+  dht: 'Single-wire data (DHT11 / DHT22)', onewire: '1-Wire data (DS18B20)', neopixel: 'Pixel data (WS2812 / NeoPixel)', in: 'Input (no pull resistor)', up: 'Input with pull-up', down: 'Input with pull-down', analog: 'Analog input (ADC)',
 };
 const OUTPUT_MODES = ['out0', 'out1', 'blink', 'pwm', 'tone', 'servo', 'pulse', 'neopixel'];
 /** the 8 pixel colours [r, g, b, brightness] of a NeoPixel strip for a pin setting */
@@ -306,6 +307,7 @@ export function evaluate(model) {
         }
         pe[d.id] = { vn, gn, ph };
       }
+      else if (d.type === 'ds18b20') { const vn = nid(T(d, 'VDD')), gn = nid(T(d, 'GND')); if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 100000, load: true }); pe[d.id] = { vn, gn }; }
       else if (d.type === 'dht') { const vn = nid(T(d, 'VCC')), gn = nid(T(d, 'GND')); if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 20000, load: true }); pe[d.id] = { vn, gn }; }
       else if (d.type === 'diode') { const Is = 0.02 / Math.exp(0.85 / NVT), e = { t: 'D', a: nid(T(d, 'A')), b: nid(T(d, 'K')), Is }; if (!dead) elems.push(e); pe[d.id] = { a: e.a, b: e.b, Is }; }   // 1.1 V at 1 A
       else if (d.type === 'npn') {
@@ -413,7 +415,7 @@ export function evaluate(model) {
       else if (d.type === 'rgbled') { q.dice.forEach((e, i) => { const V = v[e.a] - v[e.b], I = burnt.has(d.id) ? 0 : e.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V' + i, V); acc(d.id, 'I' + i, I); acc(d.id, 'Imax' + i, I, 'max'); }); }
       else if (d.type === 'buzzer') { const V = v[q.a] - v[q.b]; acc(d.id, 'Vmax', V, 'max'); acc(d.id, 'Vmin', V, 'min'); acc(d.id, 'V', V); }
       else if (d.type === 'pot') acc(d.id, 'Vw', v[q.W]);
-      else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo' || d.type === 'sht31' || d.type === 'dht') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
+      else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo' || d.type === 'sht31' || d.type === 'dht' || d.type === 'ds18b20') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'neopixel' || d.type === 'lcd1602' || d.type === 'oled') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'diode') { const V = v[q.a] - v[q.b], I = burnt.has(d.id) ? 0 : q.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'Imax', I, 'max'); }
       else if (d.type === 'npn') { acc(d.id, 'Vbe', v[q.b] - v[q.e]); acc(d.id, 'Vce', v[q.c] - v[q.e]); acc(d.id, 'Ic', q.q.ic); acc(d.id, 'Ib', q.q.ib); acc(d.id, 'Icmax', q.q.ic, 'max'); }
@@ -659,6 +661,28 @@ export function evaluate(model) {
           for (const id of data) (result.pins[id] ||= { I: 0, Imax: 0, V: 0 }).dht = `${nm}: ${t.toFixed(1)} °C, ${h.toFixed(0)} %RH`;
           if (t < lim.t0 || t > lim.t1 || h < lim.h0 || h > lim.h1) { R.status = 'warn'; note('warn', `${label}: ${t.toFixed(1)} °C / ${h.toFixed(0)} %RH is outside what the ${nm} is specified for (${lim.t0} – ${lim.t1} °C, ${lim.h0} – ${lim.h1} %RH): the reading is not reliable.`, d.id); }
           else note('ok', `${label} reads ${t.toFixed(1)} °C and ${h.toFixed(0)} %RH (at most one reading every ${is11 ? '1 s' : '2 s'}).`, d.id);
+        }
+      }
+    } else if (d.type === 'ds18b20') {
+      const vs = s.Vs ?? 0, dq = gpioOn(d, 'DQ'), vdd = find(T(d, 'VDD')), dn = find(T(d, 'DQ'));
+      const pull = parts.find(p => p.type === 'resistor' && !burnt.has(p.id) && ((find(T(p, 'a')) === dn && find(T(p, 'b')) === vdd) || (find(T(p, 'b')) === dn && find(T(p, 'a')) === vdd)));
+      let bad = null;
+      if (!powered) R.status = 'off';
+      else if (vs < -0.5) { R.status = 'bad'; R.msg = 'Connected backwards.'; note('bad', `${label} is connected backwards (VDD and GND swapped). With the flat face toward you, the legs are GND, DQ, VDD from left to right. A real sensor can be destroyed this way.`, d.id); }
+      else if (vs < 3.0) { R.status = 'off'; R.msg = `Only ${Math.max(0, vs).toFixed(1)} V`; note('bad', `${label} gets only ${Math.max(0, vs).toFixed(1)} V, but the DS18B20 needs 3.0 V to 5.5 V (datasheet): connect VDD to the 3.3 V (or 5 V) pin and GND to GND.`, d.id); }
+      else if (vs > 5.5) { R.status = 'bad'; note('bad', `${label} gets ${vs.toFixed(1)} V, above the 5.5 V supply limit of the DS18B20.`, d.id); }
+      else if (!dq.length) bad = 'DQ is not connected to a board pin';
+      else if (!pull) bad = 'there is no pull-up resistor between DQ and VDD (the datasheet asks for about 5 kΩ, 4.7 kΩ is the usual value): the 1-Wire line is open-drain and cannot go high without it';
+      else if (pull.ohms < 1000 || pull.ohms > 22000) bad = `the pull-up resistor is ${fmtOhms(pull.ohms)}: use about 4.7 kΩ between DQ and VDD`;
+      else if (!dq.some(id => modeOf(id) === 'onewire')) bad = 'the pin on DQ is not set to “1-Wire data (DS18B20)”';
+      if (powered && vs >= 3.0 && vs <= 5.5) {
+        if (bad) { R.status = 'warn'; R.msg = bad[0].toUpperCase() + bad.slice(1) + '.'; note('bad', `${label}: ${bad}.`, d.id); }
+        else {
+          const t = Math.round((env.tempC ?? 25) / 0.0625) * 0.0625;   // 12-bit resolution: steps of 0.0625 degC
+          R.msg = `Reads ${t.toFixed(2)} °C.`;
+          for (const id of dq) (result.pins[id] ||= { I: 0, Imax: 0, V: 0 }).dht = `DS18B20: ${t.toFixed(2)} °C`;
+          if (t < -55 || t > 125) { R.status = 'warn'; note('warn', `${label}: ${t.toFixed(1)} °C is outside the −55 to +125 °C range of the DS18B20.`, d.id); }
+          else note('ok', `${label} reads ${t.toFixed(2)} °C (12-bit resolution, 0.0625 °C steps; accurate to ±0.5 °C from −10 to +85 °C; a conversion takes up to 750 ms).`, d.id);
         }
       }
     } else if (d.type === 'rgbled') {
@@ -909,6 +933,7 @@ export function evaluate(model) {
     const SPEC = {
       led: d => [item(d, 'anode', ['gpio', '3v3', '5v'], pi ? 'a GPIO pin (through a resistor)' : 'a pin (through a resistor)'), item(d, 'cathode', ['gnd'], name.gnd)],
       sevenseg: d => ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'].slice(0, 7).map(n => item(d, n, ['gpio'], sig + ' (through about 220 Ω)', n === 'A' ? 'Every segment needs its own resistor' : '')).concat([item(d, 'COM', ['gnd'], name.gnd + ' (common cathode: COM goes to GND)')]),
+      ds18b20: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VDD', ['3v3', '5v'], name['3v3'] + ' (3.0 V to 5.5 V)'), ((ids, gp) => (gp.length && ids.every(id => ['gpio', '3v3', '5v'].includes(usedPins.get(id).k)) ? { ok: true, text: 'DQ: ' + sig + ' (plus a 4.7 kΩ pull-up resistor to VDD)' } : { ok: false, text: (ids.length ? 'DQ is on ' + ids.map(id => usedPins.get(id).name).join(', ') + ', but it should go to ' : 'DQ is not connected to a board pin yet. It should go to ') + sig + ' (plus a 4.7 kΩ pull-up resistor to VDD).' }))(reachPins(d, 'DQ'), reachPins(d, 'DQ').filter(id => usedPins.get(id).k === 'gpio'))],
       buzzer: d => d.active ? [item(d, 'plus', ['gpio', '3v3', '5v'], sig + ' (or a supply pin)', 'The + leg is marked on the buzzer'), item(d, 'minus', ['gnd'], name.gnd)] : [item(d, 'plus', ['gpio'], sig), item(d, 'minus', ['gnd'], name.gnd)],
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
@@ -936,7 +961,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', cap: 'Capacitor', sevenseg: '7-segment display', reed: 'Reed switch', tilt: 'Tilt switch', slidesw: 'Slide switch', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', ds18b20: 'DS18B20 sensor', cap: 'Capacitor', sevenseg: '7-segment display', reed: 'Reed switch', tilt: 'Tilt switch', slidesw: 'Slide switch', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }

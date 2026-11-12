@@ -97,7 +97,7 @@ r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: '
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: 'pixels' }, Q('c2', 'th1.QB', 'pix1.QA')] })); ok(r.parts.th1.status === 'off' && r.parts.pix1.status === 'off', 'modules without a cable to the board are off');
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'th2', type: 'thermo' }, Q('c1', 'QWIIC', 'th1.QA'), Q('c2', 'th1.QB', 'th2.QA')] })); ok(r.parts.th1.status === 'warn', 'two Thermos clash');
 // ---- Arduino UNO R3 (5 V logic)
-const u3 = id => ({ D3: { id: 'D3' }, D8: { id: 'D8' }, D4: { id: 'D4' }, D6: { id: 'D6', pwm: true }, D7: { id: 'D7' }, D9: { id: 'D9', pwm: true }, A1: { id: 'A1' }, D5: { id: 'D5', pwm: true }, D13: { id: 'D13' }, D2: { id: 'D2' }, A0: { id: 'A0' }, A4: { id: 'A4' }, A5: { id: 'A5' }, SDA: { id: 'SDA' }, '5V': { id: '5V', kind: 'pwr' }, '3V3': { id: '3V3', kind: 'pwr' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const u3 = id => ({ D2: { id: 'D2' }, D3: { id: 'D3' }, D8: { id: 'D8' }, D4: { id: 'D4' }, D6: { id: 'D6', pwm: true }, D7: { id: 'D7' }, D9: { id: 'D9', pwm: true }, A1: { id: 'A1' }, D5: { id: 'D5', pwm: true }, D13: { id: 'D13' }, D2: { id: 'D2' }, A0: { id: 'A0' }, A4: { id: 'A4' }, A5: { id: 'A5' }, SDA: { id: 'SDA' }, '5V': { id: '5V', kind: 'pwr' }, '3V3': { id: '3V3', kind: 'pwr' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
 const b3 = o => ({ boardKind: 'uno3', pinInfo: u3, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
 r = evaluate(b3({ parts: [W('w1', 'D5', 'a10'), res('r1', 'b10', 'b14', 220), led('l1', 'c14', 'c15'), W('w2', 'GND2', 'd15')], pinCfg: { D5: { mode: 'out1' } } }));
 ok(r.parts.l1.status === 'ok' && r.parts.l1.I > 0.010 && r.parts.l1.I < 0.016 && r.pins.D5.V > 4.3, 'UNO R3: 5 V pin + 220 ohm + LED gives about 12 mA');
@@ -248,6 +248,12 @@ for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3']
   ok([0, 2, 3, 5, 6].every(i => L[i] > 0.3) && [1, 4, 7].every(i => L[i] < 0.05) && /digit 5/.test(r.parts.seg1.msg), name + ': the display shows a 5 (segments A, C, D, F, G lit; ' + r.parts.seg1.msg + ')');
   r = rgbOK(kind, info, '✖ 7-segment display without resistors'); ok(r.parts.seg1.status !== 'ok' || r.newDamage.size > 0 || r.newBurn.size > 0, name + ': no resistors overloads the segments or the pins');
   r = rgbOK(kind, info, '✖ 7-segment display with COM'); ok(r.parts.seg1.levels.every(x => x < 0.03) && r.parts.seg1.status === 'off', name + ': COM not connected keeps the display dark');
+}
+// ---- DS18B20 (1-Wire temperature sensor)
+for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3'], ['esp32', findPinE32, 'ESP32']]) {
+  r = rgbOK(kind, info, '✔ DS18B20'); ok(r.parts.ds1.status === 'ok' && /Reads 25\.00/.test(r.parts.ds1.msg), name + ': DS18B20 with a pull-up reads the temperature (' + r.parts.ds1.msg + ')');
+  r = rgbOK(kind, info, '✖ DS18B20 without'); ok(r.parts.ds1.status === 'warn' && /pull-up/.test(r.parts.ds1.msg), name + ': DS18B20 without the pull-up is flagged');
+  r = rgbOK(kind, info, '✖ DS18B20 pin'); ok(r.parts.ds1.status === 'warn' && /1-Wire/.test(r.parts.ds1.msg), name + ': DS18B20 on a pin not set to 1-Wire is flagged');
 }
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
