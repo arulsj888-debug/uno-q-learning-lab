@@ -9,13 +9,13 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 const RAILS = ['top+', 'top-', 'bot-', 'bot+'];
 const OHMS = [10, 100, 220, 330, 470, 1000, 2200, 4700, 10000, 47000, 100000, 1000000];
-const PREFIX = { diode: 'd', npn: 'q', mosfet: 'fet', lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
+const PREFIX = { cap: 'cap', diode: 'd', npn: 'q', mosfet: 'fet', lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
 const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
 const TERMS = { lcd1602: ['GND', 'VCC', 'SDA', 'SCL'], oled: ['GND', 'VCC', 'SCL', 'SDA'], neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
 const DESK_SLOT_PI = { lcd1602: [125, 17], oled: [125, 17], neopixel: [110, 42] };
 const DESK_SLOT = { lcd1602: [20, 70], oled: [125, 70], neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
-const MOVABLE = new Set(['resistor', 'led', 'diode', 'npn', 'mosfet', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
+const MOVABLE = new Set(['resistor', 'led', 'cap', 'diode', 'npn', 'mosfet', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
 
 export class FreeBuild {
@@ -25,7 +25,8 @@ export class FreeBuild {
     this.parts = []; this.pinCfg = {}; this.burnt = new Set(); this.damaged = new Set(); this.burnWhy = {};
     this.env = { disp1: 'Hello, world!', disp2: 'Free build', joy: {}, enc: {}, lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: true, touched: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
     this.seq = {}; this.undoStack = []; this.tool = null; this.selected = null; this.probe = null; this.probeOn = false;
-    this.opts = { bzActive: false, dht: 'dht11', rgbCA: false, ohms: 220, color: 'red', wire: 'auto', flip: false };
+    this.capV = {}; this.lastCapT = 0;
+    this.opts = { uf: 100, bzActive: false, dht: 'dht11', rgbCA: false, ohms: 220, color: 'red', wire: 'auto', flip: false };
     this.result = null; this.tripMsg = null; this.lastRun = 0; this.lastHtml = {}; this.soundHz = 0;
     this.key = 'fb:' + this.boardKind;
     this.t0 = performance.now();
@@ -233,7 +234,7 @@ export class FreeBuild {
       if (fp) { if (fp.refs.every(r => this.free(r))) { def = { ...fp.def }; if (type === 'tmp36' && old) def.flip = old.flip; } }
       else if (this.firstOk(type, ref)) {
         const cands = this.second(type, ref), p = this.byRef.get(ref);
-        const pref = { diode: [4, -4, 5, -5, 3, -3], resistor: [4, -4, 5, -5, 3, -3], led: [1, -1], ldr: [1, -1], buzzer: [3, -3] }[type] || [];
+        const pref = { diode: [4, -4, 5, -5, 3, -3], resistor: [4, -4, 5, -5, 3, -3], led: [1, -1], ldr: [1, -1], cap: [1, -1], buzzer: [3, -3] }[type] || [];
         let b = null; for (const dc of pref) { const r = p.row + (p.col + dc); if (cands.includes(r)) { b = r; break; } }
         if (!b && (type === 'resistor' || type === 'diode') && cands.length) b = cands[0];
         if (b) {
@@ -241,6 +242,7 @@ export class FreeBuild {
           else if (type === 'led') { const c = old ? old.color : this.opts.color; def = { type, anode: ref, cathode: b, color: c, hex: LED_TYPES[c].hex }; }
           else if (type === 'diode') def = { type, a: ref, k: b };
           else if (type === 'ldr') def = { type, a: ref, b };
+          else if (type === 'cap') def = { type, a: ref, k: b, uf: old ? old.uf : this.opts.uf };
           else if (type === 'buzzer') def = { type, plus: ref, minus: b, ...(((old && old.active) || (!old && this.opts.bzActive)) ? { active: true } : {}) };
         }
       }
@@ -308,7 +310,7 @@ export class FreeBuild {
       if (p.kind !== 'hole') continue;
       const dx = Math.abs(p.pos.x - f.pos.x), dz = Math.abs(p.pos.z - f.pos.z), dist = Math.hypot(dx, dz);
       if (type === 'resistor' || type === 'diode') { if (dist >= 7.4 && dist <= 26) out.push(p.ref); }
-      else if (type === 'led' || type === 'ldr') { if (p.row === f.row && Math.abs(p.col - f.col) === 1) out.push(p.ref); }
+      else if (type === 'led' || type === 'ldr' || type === 'cap') { if (p.row === f.row && Math.abs(p.col - f.col) === 1) out.push(p.ref); }
       else if (type === 'buzzer') { if (p.row === f.row && Math.abs(p.col - f.col) === 3) out.push(p.ref); }
     }
     return out;
@@ -361,6 +363,7 @@ export class FreeBuild {
     else if (T.type === 'led') def = { type: 'led', anode: a, cathode: ref, color: this.opts.color, hex: LED_TYPES[this.opts.color].hex };
     else if (T.type === 'diode') def = { type: 'diode', a, k: ref };
     else if (T.type === 'ldr') def = { type: 'ldr', a, b: ref };
+    else if (T.type === 'cap') def = { type: 'cap', a, k: ref, uf: this.opts.uf };
     else if (T.type === 'buzzer') def = { type: 'buzzer', plus: a, minus: ref, ...(this.opts.bzActive ? { active: true } : {}) };
     else if (T.type === 'wire') def = this.wireDef(a, ref);
     else if (T.type === 'qwiic') def = { type: 'qwiic', from: a, to: ref, lift: 4 };
@@ -459,15 +462,17 @@ export class FreeBuild {
 
   // ------------------------------------------------------------------ simulation loop
   powered() { return this.app.usbPlugged; }
+  capDt(now) { const d = Math.min(0.5, Math.max(0.02, (now - (this.lastCapT || now)) / 1000)); this.lastCapT = now; return d; }
   tick(dt = 0.016) {
     if (!this.active) return;
     const now = performance.now();
-    const animated = this.parts.some(p => p.type === 'relay' || p.type === 'motor') || Object.values(this.pinCfg).some(c => ['blink', 'pwm', 'tone', 'servo', 'pulse'].includes(c.mode)) || this.parts.some(p => p.type === 'servo');
+    const animated = this.parts.some(p => p.type === 'relay' || p.type === 'motor' || p.type === 'cap') || Object.values(this.pinCfg).some(c => ['blink', 'pwm', 'tone', 'servo', 'pulse'].includes(c.mode)) || this.parts.some(p => p.type === 'servo');
     for (const d of this.parts) if (d.type === 'motor') { const it = this.app.bench.items[d.id]; if (it) { const t = this.powered() ? (this.motorTarget[d.id] || 0) : 0; it.obj.speed += (t - it.obj.speed) * Math.min(1, dt / 0.3); if (Math.abs(it.obj.speed) < 0.003 && !t) it.obj.speed = 0; it.obj.spin(dt); } }
     for (const d of this.parts) if (d.type === 'relay') { const it = this.app.bench.items[d.id]; if (it) { const on = !!this.relayOn[d.id] && this.powered(); if (it.obj.update(dt, on, this.powered())) this.app.playClick(on); } }
     if (!this.dirty && now - this.lastRun < (animated ? 90 : 400)) return;
     this.lastRun = now; this.dirty = false;
-    let res = evaluate({ boardKind: this.boardKind, pinInfo: this.pinInfo, parts: this.parts, pinCfg: this.pinCfg, powered: this.powered(), burnt: this.burnt, damaged: this.damaged, burnWhy: this.burnWhy, env: this.env, t: (now - this.t0) / 1000 });
+    let res = evaluate({ boardKind: this.boardKind, pinInfo: this.pinInfo, parts: this.parts, pinCfg: this.pinCfg, powered: this.powered(), burnt: this.burnt, damaged: this.damaged, burnWhy: this.burnWhy, env: this.env, t: (now - this.t0) / 1000, dt: this.capDt(now), capV: this.capV });
+    for (const d of this.parts) if (d.type === 'cap') this.capV[d.id] = (res.capV || {})[d.id] ?? 0;
     if (res.tripped) { this.tripMsg = res.notes[0].text; this.app.plug(false); res = evaluate({ boardKind: this.boardKind, pinInfo: this.pinInfo, parts: this.parts, pinCfg: this.pinCfg, powered: false, burnt: this.burnt, damaged: this.damaged, burnWhy: this.burnWhy, env: this.env, t: 0 }); this.renderSide(); this.renderPanel(); }
     if (res.newBurn.size || res.newDamage.size) {
       this.pre = this.snap(); for (const id of res.newBurn) { this.burnt.add(id); const n = res.notes.find(x => x.id === id && x.lvl === 'bad'); if (n) this.burnWhy[id] = n.text; } for (const id of res.newDamage) this.damaged.add(id);
@@ -511,7 +516,7 @@ export class FreeBuild {
     else if (T.type === 'wire') t = T.step ? 'Click the other end of the wire (green = free).' : 'Click where the wire starts: a board pin, a breadboard hole or a power rail.';
     else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet'].includes(T.type)) t = { mosfet: 'Click a hole for the GATE leg: the three legs go in columns n, n+1, n+2 of one row: gate, drain, source (front with the text toward you, metal tab at the back). Tick “turn round” to swap gate and source.', npn: 'Click a hole for the EMITTER leg: the three legs go in columns n, n+1, n+2 of one row: emitter, base, collector (flat side toward you). Tick “turn round” to swap emitter and collector.', joystick: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: GND, VCC, VRx, VRy, SW. The module lies over the breadboard towards you.', encoder: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: CLK, DT, SW, +, GND.', dht: 'Click a hole for the VCC pin: the 4 pins go in columns n … n+3 of one row: VCC, DATA, (not connected), GND. The grille faces you. DATA needs a pull-up resistor to VCC.', rgbled: 'Click the hole for the red leg: the 4 legs go in columns n … n+3 of one row: red, common (the longest leg), green, blue. Each colour needs its own resistor.', l293d: 'Click a hole: the 16-pin chip straddles the middle gap over 8 columns (n … n+7). Pin 1 is at the left of the row nearest you (row f); the notch marks the pin-1 end.', sht31: 'Click a hole in row f to j for the VIN pin: the breakout has 7 pins in columns n … n+6: VIN, GND, SCL, SDA, ADDR, RST, ALRT. The board lies over the middle of the breadboard.', hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
     else if (T.type === 'qwiic') t = T.step ? 'Click the other Qwiic socket (green).' : 'Click a Qwiic socket: the one on the board (left edge) or one of a module. The cable fits only one way.';
-    else t = T.step ? { diode: 'Click the hole for the CATHODE (the end with the silver band). The first hole is the anode.', led: 'Click the neighbouring hole for the SHORT leg (cathode, −). The first hole is the long leg (anode, +).', buzzer: 'Click the hole 3 columns away for the − leg. The first hole is +.', resistor: 'Click the hole for the other leg (a resistor has no polarity).', ldr: 'Click the neighbouring hole for the other leg.' }[T.type] : { diode: 'Click the hole for the ANODE (the end without the band).', led: 'Click the hole for the LONG leg (anode, +).', buzzer: 'Click the hole for the + leg.', resistor: 'Click the hole for one leg.', ldr: 'Click the hole for one leg.' }[T.type];
+    else t = T.step ? { cap: 'Click the neighbouring hole for the SHORT leg (−, next to the stripe). The first hole is the long leg (+).', diode: 'Click the hole for the CATHODE (the end with the silver band). The first hole is the anode.', led: 'Click the neighbouring hole for the SHORT leg (cathode, −). The first hole is the long leg (anode, +).', buzzer: 'Click the hole 3 columns away for the − leg. The first hole is +.', resistor: 'Click the hole for the other leg (a resistor has no polarity).', ldr: 'Click the neighbouring hole for the other leg.' }[T.type] : { cap: 'Click the hole for the LONG leg (+). The leg next to the stripe on the can (−) goes to the lower voltage.', diode: 'Click the hole for the ANODE (the end without the band).', led: 'Click the hole for the LONG leg (anode, +).', buzzer: 'Click the hole for the + leg.', resistor: 'Click the hole for one leg.', ldr: 'Click the hole for one leg.' }[T.type];
     if (h) h.textContent = t;
     if (this.active) $('#legend').textContent = t;
   }
@@ -597,6 +602,7 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('button')}" data-tool="button">Push button</button></div>
       <div class="fb-row"><button class="fb-btn${on('pot')}" data-tool="pot">Potentiometer 10 kΩ${this.isPi ? ' (no ADC on Pi)' : ''}</button></div>
       <div class="fb-row"><button class="fb-btn${on('buzzer')}" data-tool="buzzer">Buzzer</button><select data-opt="bzActive"><option value="0"${this.opts.bzActive ? '' : ' selected'}>passive</option><option value="1"${this.opts.bzActive ? ' selected' : ''}>active</option></select></div>
+      <div class="fb-row"><button class="fb-btn${on('cap')}" data-tool="cap">Capacitor</button><select data-opt="uf"><option value="10"${this.opts.uf === 10 ? ' selected' : ''}>10 µF</option><option value="100"${this.opts.uf === 100 ? ' selected' : ''}>100 µF</option><option value="470"${this.opts.uf === 470 ? ' selected' : ''}>470 µF</option></select></div>
       <div class="fb-row"><button class="fb-btn${on('diode')}" data-tool="diode">Diode 1N4007</button></div>
       <div class="fb-row"><button class="fb-btn${on('npn')}" data-tool="npn">Transistor NPN (PN2222A)</button></div>
       <div class="fb-row"><button class="fb-btn${on('mosfet')}" data-tool="mosfet">MOSFET N-channel (IRLZ44N)</button></div>
@@ -667,11 +673,11 @@ export class FreeBuild {
     if (t.dataset.picam !== undefined) { this.piToggle('cam', t.value); return; }
     if (t.dataset.piflip !== undefined) { this.piToggle('flip', t.checked); return; }
     const o = t.dataset.opt; if (!o) return;
-    this.opts[o] = o === 'ohms' ? +t.value : o === 'flip' ? t.checked : o === 'rgbCA' || o === 'bzActive' ? t.value === '1' : t.value;
+    this.opts[o] = o === 'ohms' || o === 'uf' ? +t.value : o === 'flip' ? t.checked : o === 'rgbCA' || o === 'bzActive' ? t.value === '1' : t.value;
   }
   loadExample(i) {
     const ex = EXAMPLES(this.boardKind)[i]; this.cancel();
-    this.mutate(() => { this.parts = ex.parts.map(p => ({ ...p, ...(p.type === 'led' ? { hex: LED_TYPES[p.color || 'red'].hex } : {}) })); this.pinCfg = JSON.parse(JSON.stringify(ex.pins || {})); this.burnt.clear(); this.damaged.clear(); this.burnWhy = {}; this.env.pot = {}; this.env.joy = {}; this.env.enc = {}; this.seq = {}; for (const p of this.parts) { const m = /^([a-z]+)(\d+)$/.exec(p.id); if (m) this.seq[m[1]] = Math.max(this.seq[m[1]] || 0, +m[2]); } this.rebuild3D(); });
+    this.mutate(() => { this.parts = ex.parts.map(p => ({ ...p, ...(p.type === 'led' ? { hex: LED_TYPES[p.color || 'red'].hex } : {}) })); this.pinCfg = JSON.parse(JSON.stringify(ex.pins || {})); this.capV = { ...(ex.caps || {}) }; this.burnt.clear(); this.damaged.clear(); this.burnWhy = {}; this.env.pot = {}; this.env.joy = {}; this.env.enc = {}; this.seq = {}; for (const p of this.parts) { const m = /^([a-z]+)(\d+)$/.exec(p.id); if (m) this.seq[m[1]] = Math.max(this.seq[m[1]] || 0, +m[2]); } this.rebuild3D(); });
     this.select(null); this.tripMsg = null; this.exNote = ex.note; this.renderPanel();
     if (!this.powered()) this.app.plug(true).then(() => { this.dirty = true; this.renderSide(); });
     const wide = ex.parts.some(p => p.type === 'pir' || p.type === 'servo');

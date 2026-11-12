@@ -55,6 +55,7 @@ export function terminals(d) {
     case 'encoder': return [['CLK', `${row}${c}`], ['DT', `${row}${c + 1}`], ['SW', `${row}${c + 2}`], ['VCC', `${row}${c + 3}`], ['GND', `${row}${c + 4}`]];
     case 'dht': return [['VCC', `${row}${c}`], ['DATA', `${row}${c + 1}`], ['NC', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'diode': return [['A', d.a], ['K', d.k]];
+    case 'cap': return [['plus', d.a], ['minus', d.k]];
     case 'npn': return d.flip ? [['E', `${row}${c + 2}`], ['B', `${row}${c + 1}`], ['C', `${row}${c}`]] : [['E', `${row}${c}`], ['B', `${row}${c + 1}`], ['C', `${row}${c + 2}`]];
     case 'mosfet': return d.flip ? [['S', `${row}${c + 2}`], ['D', `${row}${c + 1}`], ['G', `${row}${c}`]] : [['G', `${row}${c}`], ['D', `${row}${c + 1}`], ['S', `${row}${c + 2}`]];
     case 'rgbled': return [['R', `${row}${c}`], ['C', `${row}${c + 1}`], ['G', `${row}${c + 2}`], ['B', `${row}${c + 3}`]];
@@ -113,6 +114,8 @@ export function solveDC(n, elems, temp = 25) {
         const rds = vgs >= 10 ? 0.022 : vgs >= 5 ? 0.025 - (vgs - 5) * 0.003 / 5 : 0.035 - (Math.max(vgs, 4) - 4) * 0.010;
         const ramp = Math.min(1, Math.max(0, (vgs - 1.5) / 2.5)), g = ramp > 0 ? ramp / rds : 1e-9;
         e.vgs = vgs; e.id = vds > 0 ? g * vds : 0; G(e.d, e.s, vds > 0 ? g + 1e-9 : 1e-9);
+      } else if (e.t === 'C') {   // capacitor, backward Euler: a conductance C/dt in parallel with a current source C/dt x the voltage it held at the last step
+        const g = e.c / e.dt; G(e.a, e.b, g); I(e.a, g * e.v0); I(e.b, -g * e.v0);
       } else if (e.t === 'D') {
         const old = dv.has(e) ? dv.get(e) : 0, ex = Math.exp(Math.min(old, 6) / NVT);
         const gd = e.Is / NVT * ex + 1e-12, id = e.Is * (ex - 1), ieq = id - gd * old;
@@ -199,6 +202,7 @@ export function neoColors(cfg) {
  */
 export function evaluate(model) {
   const { boardKind, pinInfo, parts, pinCfg = {}, powered, env, t = 0 } = model;
+  const dt = model.dt || 0, capV = model.capV || {};
   const burnt = model.burnt || new Set(), damaged = model.damaged || new Set(), burnWhy = model.burnWhy || {};
   const notes = [], newBurn = new Set(), newDamage = new Set();
   const note = (lvl, text, id) => notes.push({ lvl, text, id });
@@ -311,6 +315,7 @@ export function evaluate(model) {
         if (!dead) { elems.push(body, f); }
         pe[d.id] = { g: Gn, d: Dn, s: Sn, f, body };
       }
+      else if (d.type === 'cap') { const a = nid(T(d, 'plus')), b = nid(T(d, 'minus')); if (!dead && dt > 0) elems.push({ t: 'C', a, b, c: (d.uf || 100) * 1e-6, dt, v0: capV[d.id] ?? 0 }); pe[d.id] = { a, b }; }
       else if (d.type === 'rgbled') {
         // three LED dice with one common leg: common cathode (d.ca falsy) = colour pins are the anodes, common anode = colour pins are the cathodes
         const C = nid(T(d, 'C')), dice = ['R', 'G', 'B'].map(k => { const lt = RGB_VF[k], Is = 0.02 / Math.exp(lt / NVT), pin = nid(T(d, k)), e = d.ca ? { t: 'D', a: C, b: pin, Is } : { t: 'D', a: pin, b: C, Is }; if (!dead) elems.push(e); return { a: e.a, b: e.b, Is }; });
@@ -370,6 +375,8 @@ export function evaluate(model) {
     }
     if (flipped) ({ v } = solveDC(n, elems, env.tempC ?? 25));
     lastV = v;
+    // an empty capacitor is a short circuit for an instant: solve once with the capacitors as stiff voltage sources to find the peak (inrush) current the pins must deliver
+    const vIn = elems.some(e => e.t === 'C') ? solveDC(n, elems.map(e => (e.t === 'C' ? { ...e, dt: 1e-6 } : e)), env.tempC ?? 25).v : null;
     for (const d of parts) { const q = pe[d.id]; if (!q) continue;
       if (d.type === 'relay') { acc(d.id, 'on', q.on ? 1 : 0); acc(d.id, 'sup', q.sup); acc(d.id, 'dv', q.dv); }
       else if (d.type === 'lamp') { const V = v[q.a] - v[q.b]; acc(d.id, 'V', V); acc(d.id, 'Vmax', V, 'max'); }
@@ -386,7 +393,7 @@ export function evaluate(model) {
       if (!p.id) continue;
       const cur = p.e.i - p.e.g * v[p.e.a];
       const o = result.pins[p.id] || (result.pins[p.id] = { I: 0, Imax: 0, V: 0 });
-      if (p.gpioOut) { o.Imax = Math.max(o.Imax, Math.abs(cur)); o.I += cur / N; }
+      if (p.gpioOut) { o.Imax = Math.max(o.Imax, Math.abs(cur), vIn ? Math.abs(p.e.i - p.e.g * vIn[p.e.a]) : 0); o.I += cur / N; }
       if (p.supply) srcMax = Math.max(srcMax, Math.abs(cur));
     }
     for (const d of parts) {
@@ -400,6 +407,7 @@ export function evaluate(model) {
       else if (d.type === 'neopixel' || d.type === 'lcd1602' || d.type === 'oled') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'diode') { const V = v[q.a] - v[q.b], I = burnt.has(d.id) ? 0 : q.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'Imax', I, 'max'); }
       else if (d.type === 'npn') { acc(d.id, 'Vbe', v[q.b] - v[q.e]); acc(d.id, 'Vce', v[q.c] - v[q.e]); acc(d.id, 'Ic', q.q.ic); acc(d.id, 'Ib', q.q.ib); acc(d.id, 'Icmax', q.q.ic, 'max'); }
+      else if (d.type === 'cap') { const V = v[q.a] - v[q.b]; acc(d.id, 'V', V); acc(d.id, 'Vmax', V, 'max'); acc(d.id, 'Vmin', V, 'min'); }
       else if (d.type === 'mosfet') { acc(d.id, 'Vgs', v[q.g] - v[q.s]); acc(d.id, 'Vgsmax', v[q.g] - v[q.s], 'max'); acc(d.id, 'Vgsmin', v[q.g] - v[q.s], 'min'); acc(d.id, 'Vds', v[q.d] - v[q.s]); acc(d.id, 'Id', q.f.id); acc(d.id, 'Idmax', q.f.id, 'max'); }
       else if (d.type === 'joystick') { acc(d.id, 'Vs', v[q.vn] - v[q.gn]); acc(d.id, 'Vx', v[q.jx] - v[q.gn]); acc(d.id, 'Vy', v[q.jy] - v[q.gn]); }
       else if (d.type === 'encoder') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
@@ -512,6 +520,18 @@ export function evaluate(model) {
           const prot = parts.some(p => p.type === 'diode' && !burnt.has(p.id) && find(T(p, 'A')) === cn && find(T(p, 'K')) === other);
           if (!prot) note('warn', `${label} switches an inductive load (${nameOf(l)}) without a flyback diode. The voltage spike when the current stops can destroy the MOSFET. Put a diode across the load: cathode (band) to the supply side, anode to the MOSFET side.`, d.id);
         }
+      }
+    } else if (d.type === 'cap') {
+      const V = s.V ?? 0, uf = d.uf || 100, prev = (model.capV || {})[d.id] ?? 0, dn = dangling(d, 'plus') ? '+' : dangling(d, 'minus') ? '−' : null;
+      (result.capV || (result.capV = {}))[d.id] = burnt.has(d.id) ? 0 : V;
+      if (burnt.has(d.id)) { R.status = 'bad'; R.msg = 'Burnt out.'; note('bad', burnWhy[d.id] || `${label} is burnt out. Delete it and place a new one.`, d.id); }
+      else if ((s.Vmin ?? 0) < -1.0) burn(d.id, `${label} burns out: the voltage across it is ${(-(s.Vmin ?? 0)).toFixed(1)} V the wrong way round. An electrolytic capacitor is polarised: the leg next to the stripe (−) goes to the lower voltage. In real life it can vent or burst.`);
+      else if ((s.Vmax ?? 0) > 16) burn(d.id, `${label} burns out: ${(s.Vmax ?? 0).toFixed(1)} V is above its voltage rating (a typical small electrolytic is rated 16 V: read the can of your part).`);
+      else if (dn) { R.status = 'warn'; R.msg = `Leg ${dn} is not connected.`; note('warn', `${label}: its ${dn} leg is not connected to anything, so it stores nothing.`, d.id); }
+      else {
+        const dv = V - prev; R.V = V;
+        R.msg = !powered && V < 0.05 ? 'Empty (0 V).' : dv > 0.004 ? `Charging: ${V.toFixed(2)} V.` : dv < -0.004 ? `Discharging: ${V.toFixed(2)} V.` : `Holding ${V.toFixed(2)} V.`;
+        note('info', `${label} (${uf} µF): ${R.msg} A capacitor charges through a resistor with a time constant τ = R × C (about 63 % charged after one τ, almost full after 5 τ).`, d.id);
       }
     } else if (d.type === 'lcd1602' || d.type === 'oled') {
       const lcd = d.type === 'lcd1602', vs = s.Vs ?? 0, sda = gpioOn(d, 'SDA'), scl = gpioOn(d, 'SCL'), kind = id => usedPins.get(id) || {}, addr = lcd ? '0x27' : '0x3C';
@@ -883,7 +903,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', cap: 'Capacitor', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }

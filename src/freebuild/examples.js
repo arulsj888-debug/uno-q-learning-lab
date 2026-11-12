@@ -49,6 +49,14 @@ export function EXAMPLES(boardKind) {
       ldf('ld1', 'bat1.POS', load + '.' + t1, 'red'), ldf('ld2', load + '.' + t2, dc, 'orange'), ldf('ld3', 'bat1.NEG', sc, 'black'),
       ...(o.diode ? [{ id: 'd1', type: 'diode', a: 'a11', k: 'a16' }, ldf('ld4', 'mot1.M1', 'a16', 'red')] : [])];
   };
+  // RC circuit: pin (through R) charges a capacitor to GND; an LED with 1 k from the capacitor node shows the voltage
+  const rcParts = (pin, gnd, o = {}) => [
+    w('w1', pin, 'a10', 'yellow'),
+    ...(o.noR ? [{ id: 'w5', type: 'wire', from: 'b10', to: 'b14', color: 'orange', lift: 12 }] : [res('r1', 'c10', 'c14', 1000)]),
+    { id: 'cap1', type: 'cap', a: o.rev ? 'd15' : 'd14', k: o.rev ? 'd14' : 'd15', uf: 470 },
+    w('w2', gnd, 'a15', 'black'),
+    res('r2', 'b14', 'b17', 1000), led('led1', 'c17', 'c18'),
+    { id: 'w3', type: 'wire', from: 'b15', to: 'b18', color: 'black', lift: 12 }];
   const motorParts = ground => [{ id: 'u1', type: 'l293d', col: 12 }, { id: 'bat1', type: 'battery' }, { id: 'mot1', type: 'motor' },
     w('w1', '5V', 'a12', 'red'), w('w3', 'D5', 'j12', 'orange'), w('w4', 'D7', 'j13', 'yellow'), w('w5', 'D8', 'j18', 'blue'),
     ...(ground ? [w('w6', 'GND3', 'a15', 'black')] : []), ld('ld7', 'bat1.POS', 'j19', 'red'), ld('ld8', 'bat1.NEG', 'j16', 'black'), ld('ld9', 'mot1.M1', 'j14', 'white'), ld('ld10', 'mot1.M2', 'j17', 'green')];
@@ -119,6 +127,10 @@ export function EXAMPLES(boardKind) {
     { title: '✖ MOSFET motor without a flyback diode', parts: mosParts(P.sig, P.gnd, ld, { motor: true }), pins: { [P.sig]: { mode: 'out1' } }, note: 'When the motor is switched off, its coil keeps pushing current and makes a voltage spike far above the supply. Without a diode across the motor, the spike can destroy the MOSFET.' },
     { title: '✖ MOSFET gate not connected', parts: mosParts(P.sig, P.gnd, ld, { nogate: true }), pins: {}, note: 'The gate is left floating. A MOSFET gate holds charge and can switch the load on or off by itself, even from a hand nearby. Always drive the gate from a pin and add a resistor from gate to GND.' },
     { title: '✖ MOSFET drain and source swapped', parts: mosParts(P.sig, P.gnd, ld, { swap: true }), pins: { [P.sig]: { mode: 'out1' } }, note: 'The load is on the source leg and GND on the drain leg. The built-in body diode (source to drain) now conducts, so the lamp is on whatever the gate does and cannot be switched off. The TO-220 pins are gate, drain, source from left to right (text toward you).' },
+    { title: '✔ Capacitor charges slowly: the LED fades in', parts: rcParts(P.sig, P.gnd), pins: { [P.sig]: { mode: 'out1' } }, note: 'The pin charges a 470 µF capacitor through 1 kΩ: τ = R × C = 0.47 s, so the voltage across the capacitor (and the LED brightness) rises gradually. After about 5 τ it is full.' },
+    { title: '✔ Capacitor keeps the LED glowing after the pin goes LOW', parts: rcParts(P.sig, P.gnd), caps: { cap1: 3.4 }, pins: { [P.sig]: { mode: 'out0' } }, note: 'The capacitor starts charged (3.4 V). With the pin LOW it discharges through the LED branch and through the 1 kΩ resistor to the pin, so the LED fades out over a fraction of a second instead of switching off at once.' },
+    { title: '✖ Capacitor connected backwards', parts: rcParts(P.sig, P.gnd, { rev: true }), pins: { [P.sig]: { mode: 'out1' } }, note: 'The + leg is toward GND and the stripe (−) toward the resistor. An electrolytic capacitor is polarised: with voltage the wrong way round it fails (in real life it can vent or burst).' },
+    { title: '✖ Capacitor straight from a pin (no resistor)', parts: rcParts(P.sig, P.gnd, { noR: true }), pins: { [P.sig]: { mode: 'out1' } }, note: 'An empty capacitor acts like a short circuit for a moment: with nothing to limit the inrush current, the pin has to deliver far more than it can and is damaged. Always charge through a resistor.' },
     { title: '✖ Short circuit', parts: [w('w1', P.v5, 'r:top+:3', 'red'), w('w2', P.gnd, 'r:top+:4', 'black')], pins: {}, note: 'The 5 V pin and a GND pin are joined by the same power rail. Nothing limits the current, so the power would be cut (here the cable pops out).' },
   ];
   return list;
@@ -152,6 +164,14 @@ function EXAMPLES_E32() {
       ldf('ld1', 'bat1.POS', load + '.' + t1, 'red'), ldf('ld2', load + '.' + t2, dc, 'orange'), ldf('ld3', 'bat1.NEG', sc, 'black'),
       ...(o.diode ? [{ id: 'd1', type: 'diode', a: 'a11', k: 'a16' }, ldf('ld4', 'mot1.M1', 'a16', 'red')] : [])];
   };
+  // RC circuit: pin (through R) charges a capacitor to GND; an LED with 1 k from the capacitor node shows the voltage
+  const rcParts = (pin, gnd, o = {}) => [
+    w('w1', pin, 'a10', 'yellow'),
+    ...(o.noR ? [{ id: 'w5', type: 'wire', from: 'b10', to: 'b14', color: 'orange', lift: 12 }] : [res('r1', 'c10', 'c14', 1000)]),
+    { id: 'cap1', type: 'cap', a: o.rev ? 'd15' : 'd14', k: o.rev ? 'd14' : 'd15', uf: 470 },
+    w('w2', gnd, 'a15', 'black'),
+    res('r2', 'b14', 'b17', 1000), led('led1', 'c17', 'c18'),
+    { id: 'w3', type: 'wire', from: 'b15', to: 'b18', color: 'black', lift: 12 }];
   const neoE32 = (vcc, din, gnd) => [{ id: 'neo1', type: 'neopixel' }, ldE('ld1', 'neo1.VCC', 'a10', 'red'), ldE('ld2', 'neo1.DIN', 'a11', 'yellow'), ldE('ld3', 'neo1.GND', 'a12', 'black'), w('w1', vcc, 'b10', 'red'), w('w2', din, 'b11', 'yellow'), w('w3', gnd, 'b12', 'black')];
   return [
     { title: '✔ LED with a resistor (works)', parts: ledCircuit(false), pins: { G16: { mode: 'out1' } }, note: 'GPIO16 is set to <b>Output HIGH</b> (3.3 V), the 220 Ω resistor limits the current to about 5 mA, and the LED’s long leg (+) faces the pin. Try changing the pin to <b>Input</b>, or the resistor to 100 kΩ.' },
@@ -186,6 +206,10 @@ function EXAMPLES_E32() {
     { title: '✖ MOSFET motor without a flyback diode', parts: mosParts('G16', 'GND2', ldE, { motor: true }), pins: { G16: { mode: 'out1' } }, note: 'When the motor is switched off, its coil keeps pushing current and makes a voltage spike far above the supply. Without a diode across the motor, the spike can destroy the MOSFET.' },
     { title: '✖ MOSFET gate not connected', parts: mosParts('G16', 'GND2', ldE, { nogate: true }), pins: {}, note: 'The gate is left floating. A MOSFET gate holds charge and can switch the load on or off by itself. Always drive the gate from a pin and add a resistor from gate to GND.' },
     { title: '✖ MOSFET drain and source swapped', parts: mosParts('G16', 'GND2', ldE, { swap: true }), pins: { G16: { mode: 'out1' } }, note: 'The load is on the source leg and GND on the drain leg. The built-in body diode now conducts, so the lamp is on whatever the gate does. The TO-220 pins are gate, drain, source from left to right (text toward you).' },
+    { title: '✔ Capacitor charges slowly: the LED fades in', parts: rcParts('G16', 'GND2'), pins: { G16: { mode: 'out1' } }, note: 'The pin charges a 470 µF capacitor through 1 kΩ: τ = R × C = 0.47 s, so the voltage across the capacitor (and the LED brightness) rises gradually. After about 5 τ it is full.' },
+    { title: '✔ Capacitor keeps the LED glowing after the pin goes LOW', parts: rcParts('G16', 'GND2'), caps: { cap1: 3.4 }, pins: { G16: { mode: 'out0' } }, note: 'The capacitor starts charged (3.4 V). With the pin LOW it discharges through the LED branch and through the 1 kΩ resistor to the pin, so the LED fades out over a fraction of a second instead of switching off at once.' },
+    { title: '✖ Capacitor connected backwards', parts: rcParts('G16', 'GND2', { rev: true }), pins: { G16: { mode: 'out1' } }, note: 'The + leg is toward GND and the stripe (−) toward the resistor. An electrolytic capacitor is polarised: with voltage the wrong way round it fails (in real life it can vent or burst).' },
+    { title: '✖ Capacitor straight from a pin (no resistor)', parts: rcParts('G16', 'GND2', { noR: true }), pins: { G16: { mode: 'out1' } }, note: 'An empty capacitor acts like a short circuit for a moment: with nothing to limit the inrush current, the pin has to deliver far more than it can and is damaged. Always charge through a resistor.' },
     { title: '✖ EN pin wired to GND (chip held in reset)', parts: [...ledCircuit(false), w('w3', 'EN', 'a20', 'yellow'), w('w4', 'GND1', 'b20', 'black')], pins: { G16: { mode: 'out1' } }, note: 'GPIO16 is set to Output HIGH and the LED circuit is correct, but the EN pin is joined to GND. EN is the chip-enable (reset) input: while it is LOW the ESP32 does not run, so no pin is driven and the LED stays dark. This is what the EN button does while you hold it. Delete the EN wire and the LED lights.' },
     { title: '✖ 5 V on a 3.3 V pin', parts: [w('w1', 'VIN', 'a10', 'red'), w('w2', 'G17', 'b10', 'yellow')], pins: { G17: { mode: 'in' } }, note: 'VIN carries the 5 V from USB. ESP32 pins are 3.3 V only (3.6 V at most), so 5 V on a GPIO pin can damage the chip. Press “Replace broken parts”.' },
     { title: '✖ LED without a resistor', parts: [w('w1', 'VIN', 'a10', 'red'), led('led1', 'c10', 'c11'), w('w2', 'GND2', 'd11', 'black')], pins: {}, note: 'The LED is connected straight to the 5 V pin with no resistor. Nothing limits the current, so it burns out in a moment. Press “Replace broken parts”, then put a resistor in the path.' },

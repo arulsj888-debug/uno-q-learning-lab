@@ -611,6 +611,35 @@ export class TransistorPN2222A {
   }
 }
 
+// ---------------------------------------------------------------- radial aluminium electrolytic capacitor
+// Typical sizes only (maker series differ): 10 uF 5 x 11 mm, 100 uF 6.3 x 11 mm, 470 uF 8 x 12 mm; the long leg is +, the stripe marks the - side.
+export class ElectrolyticCap {
+  constructor(uf = 100) {
+    const g = this.group = new THREE.Group();
+    const dia = uf >= 470 ? 8 : uf >= 100 ? 6.3 : 5, hgt = uf >= 470 ? 12 : 11, r = dia / 2;
+    const side = canvasTex(1024, 256, (c, w, h) => {
+      c.fillStyle = '#14233f'; c.fillRect(0, 0, w, h); noise(c, w, h, 5);
+      c.fillStyle = '#b9bcc2'; c.fillRect(w * 0.75 - w * 0.09, 0, w * 0.18, h);   // stripe on the - side
+      c.fillStyle = '#14233f'; c.font = '700 64px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      for (let i = 0; i < 4; i++) c.fillText('−', w * 0.75, h * (0.14 + i * 0.24));
+      c.fillStyle = '#e6e8ec'; c.font = '700 60px Arial, Helvetica, sans-serif'; c.fillText(uf + ' µF', w * 0.515, h * 0.34); c.fillText('16 V', w * 0.515, h * 0.68);
+    });
+    side.wrapS = THREE.RepeatWrapping; side.offset.x = 0.5;   // put the label in front and the stripe on the - side
+    const mat = new THREE.MeshPhysicalMaterial({ map: side, roughness: 0.4, clearcoat: 0.3 });
+    const top = canvasTex(256, 256, (c, w, h) => {
+      c.fillStyle = '#c9ccd2'; c.fillRect(0, 0, w, h); noise(c, w, h, 8);
+      c.strokeStyle = '#8d9096'; c.lineWidth = 6; c.beginPath(); c.arc(w / 2, h / 2, w * 0.38, 0, Math.PI * 2); c.stroke();
+      c.lineWidth = 5; c.beginPath(); c.moveTo(w * 0.28, h * 0.28); c.lineTo(w * 0.72, h * 0.72); c.moveTo(w * 0.72, h * 0.28); c.lineTo(w * 0.28, h * 0.72); c.stroke();   // pressure vent
+    });
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(r, r, hgt, 40), [mat, new THREE.MeshStandardMaterial({ map: top, metalness: 0.6, roughness: 0.4 }), new THREE.MeshStandardMaterial({ color: 0x15151a, roughness: 0.8 })]);
+    can.rotation.y = Math.PI; can.position.y = 0.6 + hgt / 2; g.add(can);
+    for (const [x, len] of [[1.27, 4.0], [-1.27, 2.6]]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, len + 0.8, 8), M.tin); leg.position.set(x, 0.8 - (len + 0.8) / 2, 0); g.add(leg);
+    }
+    tagHW(g, 'cap');
+  }
+}
+
 // ---------------------------------------------------------------- IRLZ44N logic-level MOSFET (TO-220)
 export class MOSFETIRLZ44N {
   constructor() {
@@ -1879,6 +1908,17 @@ export const HW_INFO = {
       'Flyback diode: connect it across the coil in the reverse direction, cathode to the supply side, anode to the switched side.',
     ],
     src: '1N4007 datasheets (Vishay, onsemi); general electronics practice',
+  },
+  cap: {
+    name: 'Electrolytic capacitor', tag: 'Stores charge: smoothing and timing',
+    summary: 'A capacitor stores electric charge (Q = C × V). Through a resistor it charges and discharges gradually, with a time constant τ = R × C: after one τ it has reached about 63 % of the final voltage.',
+    points: [
+      'It is polarised: the leg next to the stripe (−) goes to the lower voltage. The long leg is +. Connected backwards, it can fail (in real life it may vent or burst).',
+      'Never exceed the voltage printed on the can (the app assumes a typical 16 V part: read your own).',
+      'Straight from a pin to GND with no resistor, an empty capacitor takes a large inrush current that can damage the pin.',
+      'Uses: smoothing a supply, filtering noise, timing with a resistor.',
+    ],
+    src: 'General electronics practice (standard capacitor formulas); sizes and ratings in the app are typical values',
   },
   mosfet: {
     name: 'IRLZ44N logic-level N-channel MOSFET (TO-220)', tag: 'An electronic switch driven by voltage, not current',

@@ -212,6 +212,26 @@ for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3']
   if (kind !== 'esp32') { r = rgbOK(kind, info, '✖ Buzzer that stays silent'); ok(r.parts.bz1.loud === 0, name + ': (control) passive buzzer on a steady HIGH stays silent'); }
 }
 r = rgbOK('uno3', u3, '✔ Active buzzer'); ok(r.notes.some(n => /20 mA per pin/.test(n.text)), 'UNO R3: active buzzer draw above 20 mA per pin is mentioned');
+// ---- capacitor (time-dependent: backward Euler, state carried between evaluations)
+{
+  const run = (kind, info, title, steps, dtS = 0.1) => {
+    const x = EXAMPLES(kind).find(e => e.title.startsWith(title)); let capV = { ...(x.caps || {}) }, res, hist = [], burnt = new Set();
+    for (let i = 0; i < steps; i++) { res = evaluate({ boardKind: kind, pinInfo: info, parts: x.parts, pinCfg: x.pins, powered: true, env, t: i * dtS, dt: dtS, capV, burnt }); capV = { ...res.capV }; hist.push(capV.cap1 ?? 0); for (const id of res.newBurn) burnt.add(id); }
+    return { res, hist, burnt };
+  };
+  for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3'], ['esp32', findPinE32, 'ESP32']]) {
+    let { hist, res: rr } = run(kind, info, '✔ Capacitor charges', 40); ok(rr.newDamage.size === 0 && rr.newBurn.size === 0, name + ': charging through 1 kΩ harms nothing');
+    ok(hist.every((v, i) => i === 0 || v >= hist[i - 1] - 1e-6) && hist[39] > 2.0 && hist[4] < hist[39] * 0.9, name + ': capacitor charges gradually and monotonically (' + hist[4].toFixed(2) + ' V after 0.5 s, ' + hist[39].toFixed(2) + ' V after 4 s)');
+    ({ hist } = run(kind, info, '✔ Capacitor keeps', 40));
+    ok(hist.every((v, i) => i === 0 || v <= hist[i - 1] + 1e-6) && hist[39] < hist[0] * 0.5 && hist[0] > 1.0, name + ': capacitor discharges gradually through the LED branch (' + hist[0].toFixed(2) + ' V to ' + hist[39].toFixed(2) + ' V)');
+    let q = run(kind, info, '✖ Capacitor connected backwards', 30);
+    ok(q.burnt.has('cap1'), name + ': capacitor connected backwards burns out');
+    q = run(kind, info, '✖ Capacitor straight', 1);
+    ok(q.res.newDamage.size > 0, name + ': capacitor straight from a pin damages the pin');
+  }
+  const q = run('uno3', u3, '✔ Capacitor charges', 40);
+  ok(q.res.parts.led1.level > 0.2, 'UNO R3: LED glows once the capacitor is charged');
+}
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);
