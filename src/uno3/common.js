@@ -30,6 +30,7 @@ export const SRC = {
   ssd1306: { t: 'Adafruit SSD1306 library (examples: begin(SSD1306_SWITCHCAPVCC, 0x3C))', u: 'https://github.com/adafruit/Adafruit_SSD1306' },
   neouber: { t: 'Adafruit NeoPixel Überguide: Powering NeoPixels', u: 'https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels' },
   neolib: { t: 'Adafruit_NeoPixel library (examples: strandtest)', u: 'https://github.com/adafruit/Adafruit_NeoPixel' },
+  pn2222: { t: 'onsemi PN2222 / PN2222A datasheet (TO-92: emitter, base, collector; 600 mA; VCE(sat) 0.3 V at 150 mA / 15 mA)', u: 'https://www.onsemi.com/pdf/datasheet/pn2222-d.pdf' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -210,3 +211,17 @@ export const NEO_PARTS = [
   { id: 'l62', type: 'lead', from: 'neo1.GND', to: 'GND2', color: 'black', lift: 24 },
 ];
 export const NEO_IDS = NEO_PARTS.map(d => d.id);
+
+// ---- Lesson 24: PN2222A low-side switch for a 6 V lamp (base resistor from pin 5, battery pack and lamp on the desk)
+export const Q_PARTS = [
+  { id: 'q1', type: 'npn', row: 'e', col: 10 },
+  { id: 'r1', type: 'resistor', a: 'a11', b: 'a15', ohms: 1000 },
+  { id: 'w100', type: 'wire', from: 'D5', to: 'b15', color: 'yellow', lift: 24 },
+  { id: 'w101', type: 'wire', from: 'GND2', to: 'b10', color: 'black', lift: 18 },
+  { id: 'bat1', type: 'battery', x: 125, z: 12 },
+  { id: 'lamp1', type: 'lamp', x: 165, z: -26 },
+  { id: 'l100', type: 'lead', from: 'bat1.POS', to: 'lamp1.L1', color: 'red', lift: 14 },
+  { id: 'l101', type: 'lead', from: 'lamp1.L2', to: 'c12', color: 'orange', lift: 18 },
+  { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c10', color: 'black', lift: 20 },
+];
+export const Q_IDS = Q_PARTS.map(d => d.id);

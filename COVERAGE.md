@@ -13,7 +13,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Active buzzer | TODO | TODO | TODO | TODO | |
 | Diode 1N4007 (forward / blocking, flyback) | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | 1.1 V at 1 A model; 1 A limit |
 | Capacitor (decoupling, RC charging) | TODO | TODO | TODO | TODO | needs a time-dependent solver |
-| NPN transistor PN2222A low-side switch (TO-92 E B C) | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | base resistor, saturation, pin order, flyback-diode warning; max 600 mA |
+| NPN transistor PN2222A low-side switch (TO-92 E B C) | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 24) | DONE (Build + lesson 21) | base resistor, saturation, pin order, flyback-diode warning; max 600 mA |
 | MOSFET switch (IRLZ44N) | TODO | TODO | TODO | TODO | logic-level MOSFET for LED strips / motors |
 | Slide switch, toggle, tilt switch, reed switch | TODO | TODO | TODO | TODO | |
 | Battery + breadboard power supply | partly (battery pack) | partly | partly | partly | |

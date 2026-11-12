@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -28,6 +28,7 @@ const SRC = {
   wire: { t: 'Arduino-ESP32 documentation: I²C (Wire)', u: 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/i2c.html' },
   neouber: { t: 'Adafruit NeoPixel Überguide: Powering NeoPixels', u: 'https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels' },
   neolib: { t: 'Adafruit_NeoPixel library (examples: strandtest)', u: 'https://github.com/adafruit/Adafruit_NeoPixel' },
+  pn2222: { t: 'onsemi PN2222 / PN2222A datasheet (TO-92: emitter, base, collector; 600 mA; VCE(sat) 0.3 V at 150 mA / 15 mA)', u: 'https://www.onsemi.com/pdf/datasheet/pn2222-d.pdf' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -111,10 +112,23 @@ const NEO_PARTS_E = [
   { id: 'w62', type: 'fwire', from: 'GND2', to: 'b12', color: 'black', lift: 30 },
 ];
 const NEO_IDS_E = NEO_PARTS_E.map(d => d.id);
+// PN2222A low-side switch for a 6 V lamp: 470 ohm base resistor from GPIO16, battery pack and lamp on the desk
+const Q_PARTS_E = [
+  { id: 'q1', type: 'npn', row: 'e', col: 10 },
+  { id: 'r1', type: 'resistor', a: 'a11', b: 'a15', ohms: 470 },
+  { id: 'w100', type: 'fwire', from: 'G16', to: 'b15', color: 'yellow', lift: 24 },
+  { id: 'w101', type: 'fwire', from: 'GND2', to: 'b10', color: 'black', lift: 18 },
+  { id: 'bat1', type: 'battery', x: 125, z: 12 },
+  { id: 'lamp1', type: 'lamp', x: 165, z: -26 },
+  { id: 'l100', type: 'lead', from: 'bat1.POS', to: 'lamp1.L1', color: 'red', lift: 14 },
+  { id: 'l101', type: 'lead', from: 'lamp1.L2', to: 'c12', color: 'orange', lift: 18 },
+  { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c10', color: 'black', lift: 20 },
+];
+const Q_IDS_E = Q_PARTS_E.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
-export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays' };
+export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays', 10: 'Module 10 — Switching loads' };
 export const E32_COMING = [];
 
 export const E32_LESSONS = [
@@ -1125,5 +1139,51 @@ export const E32_LESSONS = [
       { q: 'Why keep the brightness low?', a: ['To save the library', 'To limit the current drawn from the supply', 'The strip would melt at once', 'No reason'], c: 1, why: 'The pixels draw current in proportion to their colour and brightness.' },
     ],
     sources: [SRC.neouber, SRC.neolib, SRC.ds],
+  },
+
+  // ================================================================== 21
+  {
+    id: 'e21', num: 21, module: 10, title: 'A transistor switches a lamp', level: 'Intermediate', time: '25 min',
+    goal: 'Let a small pin current switch a much bigger load with an NPN transistor, and choose the base resistor.',
+    hardware: ['ESP32 DevKit V1', 'PN2222A NPN transistor (TO-92)', 'Resistor (470 Ω)', 'Battery holder 4 × AA (about 6 V) and a 6 V lamp', 'Breadboard and jumper wires'],
+    code: E32_QSW, file: 'TransistorSwitch.ino', program: 'e_qsw', fast: true, widgets: ['qbase'], qdefault: 470,
+    circuit: Q_PARTS_E, io: { G16: { kind: 'npn', item: 'q1', lamp: 'lamp1', needs: Q_IDS_E } },
+    explain: {
+      2: 'The pin is wired to the <b>base resistor</b>, which leads to the transistor’s <b>base</b>. The lamp is <b>not</b> connected to the pin.',
+      4: '<b>setup()</b> runs once.',
+      5: 'The pin is an output.',
+      8: '<b>loop()</b> repeats forever.',
+      9: 'HIGH: a small current flows through the base resistor into the base. The transistor then lets a much larger current flow from the collector to the emitter: <b>the lamp lights</b>.',
+      10: 'Wait one second.',
+      11: 'LOW: no base current, the transistor blocks, the lamp is off.',
+      12: 'Wait one second.',
+    },
+    steps: [
+      { title: 'Why a transistor?', view: 'farq', have: [], power: false,
+        body: `<p>A 6 V lamp needs about <b>300 mA</b>. An ESP32 pin gives up to 40 mA source / 28 mA sink at the strongest drive setting (datasheet). So a pin <b>cannot</b> drive the lamp directly. A <b>transistor</b> is a small electronic switch: a <b>small current into its base</b> lets a <b>big current flow</b> from the collector to the emitter.</p>
+        <p class="warn">Never connect a lamp, motor or relay coil straight to a pin.</p>` },
+      { title: 'The PN2222A', view: 'bigq', have: ['q1'], power: false, holes: ['e10 · emitter', 'e11 · base', 'e12 · collector'],
+        body: `<p>The <b>PN2222A</b> in a TO-92 case. With the <b>flat side facing you</b>, the pins from the left are <b>1 emitter, 2 base, 3 collector</b>. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Continuous collector current <b>600 mA</b> (onsemi datasheet).</li><li>Saturation voltage <b>0.3 V</b> at 150 mA collector current with 15 mA of base current.</li></ul>
+        <p class="warn">Other versions (for example the P2N2222A) have the pins in another order: <b>collector, base, emitter</b>. Always check the datasheet of your part.</p>` },
+      { title: 'The base resistor', view: 'bigq', have: ['q1', 'r1'], power: false, holes: ['a11 → a15'],
+        body: `<p>The base-emitter junction is a diode: without a resistor the pin would push far too much current into it. The resistor sets the <b>base current</b>: I = (V<sub>pin</sub> − 0.7 V) ÷ R.</p>
+        <p>For a hard switch the datasheet’s saturation figure uses a base current of <b>one tenth</b> of the collector current. For 300 mA that would be 30 mA, more than a pin should give, so this lesson uses a smaller base current: the lamp still lights, and the transistor drops a little more than 0.3 V.</p>` },
+      { title: 'Wire it', view: 'farq', have: Q_IDS_E, power: false, pins: ['G16', 'GND2'],
+        body: `<ul><li>Yellow: <b>RX2 (GPIO16) → b15</b> (to the base resistor)</li><li>Black: <b>GND → b10</b> (the emitter column)</li></ul>
+        <p>The lamp circuit is separate: battery + → lamp → <b>collector</b> (column 12); battery − → the <b>emitter column</b> (column 10), which is also connected to the board’s GND. All the grounds must be joined.</p>` },
+      { title: 'The code', view: 'farq', have: Q_IDS_E, showCode: true, power: true, body: `<p>Just a blink: the pin drives the base. Click lines 9 and 11.</p>` },
+      { title: 'Run it and change the base resistor', view: 'farq', have: Q_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>The lamp blinks. In the panel choose another <b>base resistor</b> and watch the numbers: with a small resistor the transistor is <b>saturated</b> (fully on); with <b>100 kΩ</b> only a trickle flows into the base and the lamp gets little or no current.</p><p class="sim">Simplified model: collector current = about 100 × base current, up to what the lamp draws.</p>` },
+      { title: 'Summary', view: 'farq', have: Q_IDS_E, power: true,
+        body: `<ul><li>A pin drives the <b>base</b> through a resistor; the load goes between the supply and the <b>collector</b>; the <b>emitter</b> goes to GND (low-side switch).</li><li>All grounds joined.</li><li>PN2222A: E, B, C with the flat side toward you; 600 mA continuous.</li><li>Inductive loads (motors, relays) need a flyback diode.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Why not connect the lamp directly to the pin?', a: ['The lamp is too bright', 'The lamp needs far more current than a pin can give', 'Pins are always LOW', 'Lamps need AC'], c: 1, why: 'A pin supplies only a few tens of mA at most.' },
+      { q: 'Which leg of the PN2222A (flat side toward you) is the base?', a: ['The left one', 'The middle one', 'The right one', 'None'], c: 1, why: 'Emitter, base, collector from the left.' },
+      { q: 'What does the base resistor do?', a: ['Dims the lamp directly', 'Limits the current into the base', 'Cools the transistor', 'Nothing'], c: 1, why: 'The base-emitter junction is a diode: it needs current limiting.' },
+      { q: 'The base resistor is 100 kΩ. What happens?', a: ['The lamp is brighter', 'Too little base current: the lamp stays dark or dim', 'The pin burns', 'Nothing changes'], c: 1, why: 'Collector current is only about 100 times the small base current.' },
+    ],
+    sources: [SRC.pn2222, SRC.ds, SRC.pinmode],
   },
 ];

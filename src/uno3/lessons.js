@@ -5,7 +5,7 @@ import { U3_BLINK, U3_EXT_LED, U3_BUTTON, U3_POT, U3_FADE, U3_BUZZER } from './c
 import { U3_LESSONS_2 } from './lessons2.js';
 import { SRC, LED_CIRCUIT, LED_IDS, IO_LED, BUTTON_PARTS, BUTTON_IDS, POT_PARTS, POT_IDS, BUZZER_PARTS, BUZZER_IDS } from './common.js';
 
-export const U3_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion and power', 6: 'Module 6 — Digital sensors (I²C)', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays' };
+export const U3_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion and power', 6: 'Module 6 — Digital sensors (I²C)', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays', 10: 'Module 10 — Switching loads' };
 export const U3_COMING = [];
 
 const U3_BASE = [

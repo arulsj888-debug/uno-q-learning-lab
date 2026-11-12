@@ -46,6 +46,7 @@ function legs(d) {
     case 'sht31': return { [d.id + '.VIN']: `${d.row}${d.col}`, [d.id + '.GND']: `${d.row}${d.col + 1}`, [d.id + '.SCL']: `${d.row}${d.col + 2}`, [d.id + '.SDA']: `${d.row}${d.col + 3}`, [d.id + '.ADDR']: `${d.row}${d.col + 4}`, [d.id + '.RST']: `${d.row}${d.col + 5}`, [d.id + '.ALRT']: `${d.row}${d.col + 6}` };
     case 'joystick': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.VRX']: `${d.row}${d.col + 2}`, [d.id + '.VRY']: `${d.row}${d.col + 3}`, [d.id + '.SW']: `${d.row}${d.col + 4}` };
     case 'encoder': return { [d.id + '.CLK']: `${d.row}${d.col}`, [d.id + '.DT']: `${d.row}${d.col + 1}`, [d.id + '.SW']: `${d.row}${d.col + 2}`, [d.id + '.VCC']: `${d.row}${d.col + 3}`, [d.id + '.GND']: `${d.row}${d.col + 4}` };
+    case 'npn': return { [d.id + '.E']: `${d.row}${d.col}`, [d.id + '.B']: `${d.row}${d.col + 1}`, [d.id + '.C']: `${d.row}${d.col + 2}` };
     case 'rgbled': return { [d.id + '.R']: `${d.row}${d.col}`, [d.id + '.C']: `${d.row}${d.col + 1}`, [d.id + '.G']: `${d.row}${d.col + 2}`, [d.id + '.B']: `${d.row}${d.col + 3}` };
     case 'dht': return { [d.id + '.VCC']: `${d.row}${d.col}`, [d.id + '.DATA']: `${d.row}${d.col + 1}`, [d.id + '.NC']: `${d.row}${d.col + 2}`, [d.id + '.GND']: `${d.row}${d.col + 3}` };
     case 'tmp36': return { [d.id + '.VS']: `${d.row}${d.col}`, [d.id + '.VO']: `${d.row}${d.col + 1}`, [d.id + '.GND']: `${d.row}${d.col + 2}` };
@@ -114,6 +115,15 @@ for (const L of list) {
     if (io.kind === 'touch') {
       const w = byId[io.item];
       if (!w || w.type !== 'fwire' || w.from !== pin) bad(L, `${pin}: touch pad wire is not connected to the pin`);
+    }
+    if (io.kind === 'npn') {
+      const id = io.item, r = all.find(d => d.type === 'resistor' && ((N.same(d.id + '.1', P) && N.same(d.id + '.2', id + '.B')) || (N.same(d.id + '.2', P) && N.same(d.id + '.1', id + '.B'))));
+      if (!r) bad(L, `${pin}: no base resistor between the pin and the base of ${id}`);
+      if (N.same(P, id + '.B')) bad(L, `${pin}: the pin is wired straight to the base`);
+      if (!N.same(id + '.E', G)) bad(L, `${id}: emitter not on GND`);
+      if (!N.same(id + '.C', io.lamp + '.L2')) bad(L, `${id}: collector not on the lamp (L2)`);
+      if (!N.same(io.lamp + '.L1', 'bat1.POS')) bad(L, `lamp L1 not on the battery +`);
+      if (!N.same('bat1.NEG', G)) bad(L, `battery − not on GND (no common ground)`);
     }
     if (io.kind === 'neo') {
       const id = io.item, v = (U3 || PI) ? 'PIN:5V' : 'PIN:VIN';

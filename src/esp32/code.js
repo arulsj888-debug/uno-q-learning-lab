@@ -453,3 +453,18 @@ void loop() {
     delay(150);
   }
 }`;
+
+// Lesson 21 — NPN transistor (PN2222A) switching a 6 V lamp
+export const E32_QSW = `// A transistor switches a 6 V lamp: the pin drives the base through a resistor
+const int basePin = 16;
+
+void setup() {
+  pinMode(basePin, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(basePin, HIGH);   // base current flows: the lamp lights
+  delay(1000);
+  digitalWrite(basePin, LOW);    // no base current: the lamp is off
+  delay(1000);
+}`;

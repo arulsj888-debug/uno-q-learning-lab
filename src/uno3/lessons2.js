@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1130,5 +1130,51 @@ export const U3_LESSONS_2 = [
       { q: 'Why keep the brightness low?', a: ['To save the library', 'To limit the current drawn from the supply', 'The strip would melt at once', 'No reason'], c: 1, why: 'The pixels draw current in proportion to their colour and brightness.' },
     ],
     sources: [SRC.neouber, SRC.neolib, SRC.ds],
+  },
+
+  // ================================================================== 24
+  {
+    id: 'u24', num: 24, module: 10, title: 'A transistor switches a lamp', level: 'Intermediate', time: '25 min',
+    goal: 'Let a small pin current switch a much bigger load with an NPN transistor, and choose the base resistor.',
+    hardware: ['Arduino UNO R3', 'PN2222A NPN transistor (TO-92)', 'Resistor (1 kΩ)', 'Battery holder 4 × AA (about 6 V) and a 6 V lamp', 'Breadboard and jumper wires'],
+    code: U3_QSW, file: 'TransistorSwitch.ino', program: 'u3_qsw', fast: true, widgets: ['qbase'], qdefault: 1000,
+    circuit: Q_PARTS, io: { D5: { kind: 'npn', item: 'q1', lamp: 'lamp1', needs: Q_IDS } },
+    explain: {
+      2: 'The pin is wired to the <b>base resistor</b>, which leads to the transistor’s <b>base</b>. The lamp is <b>not</b> connected to the pin.',
+      4: '<b>setup()</b> runs once.',
+      5: 'The pin is an output.',
+      8: '<b>loop()</b> repeats forever.',
+      9: 'HIGH: a small current flows through the base resistor into the base. The transistor then lets a much larger current flow from the collector to the emitter: <b>the lamp lights</b>.',
+      10: 'Wait one second.',
+      11: 'LOW: no base current, the transistor blocks, the lamp is off.',
+      12: 'Wait one second.',
+    },
+    steps: [
+      { title: 'Why a transistor?', view: 'farq', have: [], power: false,
+        body: `<p>A 6 V lamp needs about <b>300 mA</b>. The ATmega328P datasheet allows 40 mA absolute maximum per pin (20 mA recommended). So a pin <b>cannot</b> drive the lamp directly. A <b>transistor</b> is a small electronic switch: a <b>small current into its base</b> lets a <b>big current flow</b> from the collector to the emitter.</p>
+        <p class="warn">Never connect a lamp, motor or relay coil straight to a pin.</p>` },
+      { title: 'The PN2222A', view: 'bigq', have: ['q1'], power: false, holes: ['e10 · emitter', 'e11 · base', 'e12 · collector'],
+        body: `<p>The <b>PN2222A</b> in a TO-92 case. With the <b>flat side facing you</b>, the pins from the left are <b>1 emitter, 2 base, 3 collector</b>. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Continuous collector current <b>600 mA</b> (onsemi datasheet).</li><li>Saturation voltage <b>0.3 V</b> at 150 mA collector current with 15 mA of base current.</li></ul>
+        <p class="warn">Other versions (for example the P2N2222A) have the pins in another order: <b>collector, base, emitter</b>. Always check the datasheet of your part.</p>` },
+      { title: 'The base resistor', view: 'bigq', have: ['q1', 'r1'], power: false, holes: ['a11 → a15'],
+        body: `<p>The base-emitter junction is a diode: without a resistor the pin would push far too much current into it. The resistor sets the <b>base current</b>: I = (V<sub>pin</sub> − 0.7 V) ÷ R.</p>
+        <p>For a hard switch the datasheet’s saturation figure uses a base current of <b>one tenth</b> of the collector current. For 300 mA that would be 30 mA, more than a pin should give, so this lesson uses a smaller base current: the lamp still lights, and the transistor drops a little more than 0.3 V.</p>` },
+      { title: 'Wire it', view: 'farq', have: Q_IDS, power: false, pins: ['D5', 'GND2'],
+        body: `<ul><li>Yellow: <b>pin 5 → b15</b> (to the base resistor)</li><li>Black: <b>GND → b10</b> (the emitter column)</li></ul>
+        <p>The lamp circuit is separate: battery + → lamp → <b>collector</b> (column 12); battery − → the <b>emitter column</b> (column 10), which is also connected to the board’s GND. All the grounds must be joined.</p>` },
+      { title: 'The code', view: 'farq', have: Q_IDS, showCode: true, power: true, body: `<p>Just a blink: the pin drives the base. Click lines 9 and 11.</p>` },
+      { title: 'Run it and change the base resistor', view: 'farq', have: Q_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The lamp blinks. In the panel choose another <b>base resistor</b> and watch the numbers: with a small resistor the transistor is <b>saturated</b> (fully on); with <b>100 kΩ</b> only a trickle flows into the base and the lamp gets little or no current.</p><p class="sim">Simplified model: collector current = about 100 × base current, up to what the lamp draws.</p>` },
+      { title: 'Summary', view: 'farq', have: Q_IDS, power: true,
+        body: `<ul><li>A pin drives the <b>base</b> through a resistor; the load goes between the supply and the <b>collector</b>; the <b>emitter</b> goes to GND (low-side switch).</li><li>All grounds joined.</li><li>PN2222A: E, B, C with the flat side toward you; 600 mA continuous.</li><li>Inductive loads (motors, relays) need a flyback diode.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Why not connect the lamp directly to the pin?', a: ['The lamp is too bright', 'The lamp needs far more current than a pin can give', 'Pins are always LOW', 'Lamps need AC'], c: 1, why: 'A pin supplies only a few tens of mA at most.' },
+      { q: 'Which leg of the PN2222A (flat side toward you) is the base?', a: ['The left one', 'The middle one', 'The right one', 'None'], c: 1, why: 'Emitter, base, collector from the left.' },
+      { q: 'What does the base resistor do?', a: ['Dims the lamp directly', 'Limits the current into the base', 'Cools the transistor', 'Nothing'], c: 1, why: 'The base-emitter junction is a diode: it needs current limiting.' },
+      { q: 'The base resistor is 100 kΩ. What happens?', a: ['The lamp is brighter', 'Too little base current: the lamp stays dark or dim', 'The pin burns', 'Nothing changes'], c: 1, why: 'Collector current is only about 100 times the small base current.' },
+    ],
+    sources: [SRC.pn2222, SRC.ds, SRC.pinmode],
   },
 ];

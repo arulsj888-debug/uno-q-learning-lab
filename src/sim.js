@@ -803,6 +803,30 @@ export const PROGRAMS = {
     }
   },
 
+  async u3_qsw(rt) {
+    await rt.at(2); await rt.at(4);
+    await rt.at(5); rt.pinMode('D5', 'OUTPUT');
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); rt.digitalWrite('D5', 1);
+      await rt.at(10); await rt.delay(1000);
+      await rt.at(11); rt.digitalWrite('D5', 0);
+      await rt.at(12); await rt.delay(1000);
+    }
+  },
+
+  async e_qsw(rt) {
+    await rt.at(2); await rt.at(4);
+    await rt.at(5); rt.pinMode('G16', 'OUTPUT');
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); rt.digitalWrite('G16', 1);
+      await rt.at(10); await rt.delay(1000);
+      await rt.at(11); rt.digitalWrite('G16', 0);
+      await rt.at(12); await rt.delay(1000);
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);
