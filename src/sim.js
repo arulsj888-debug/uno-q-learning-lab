@@ -64,6 +64,8 @@ export class Sim {
       mqttSubscribe: (topic) => { if (H.mqtt) H.mqtt({ op: 'subscribe', topic }); },
       mqttPublish: (topic, payload) => { if (H.mqtt) H.mqtt({ op: 'publish', topic, payload }); },
       mqttPoll: () => (H.mqtt ? H.mqtt({ op: 'poll' }) : null),
+      configTime: (gmt) => { if (H.configTime) H.configTime(gmt); },
+      getLocalTime: (gmt) => (H.localTime ? H.localTime(gmt) : null),   // formatted time, or null until the first sync
       httpGet: async (url) => (H.http ? await H.http(url) : { code: -1, body: '' }),   // HTTPClient.GET(): status code (negative = failed) and body
       i2cProbe: (addr) => (H.i2cProbe ? !!H.i2cProbe(addr) : false),   // Wire.endTransmission() == 0 for this address
       lcd: (op, a, b) => (H.lcd ? H.lcd({ op, a, b }) : undefined),
@@ -966,6 +968,22 @@ export const PROGRAMS = {
         await rt.at(47); rt.println('Published home/temperature = 21.5');
       }
       await rt.yield();
+    }
+  },
+
+  async e_ntp(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(4); await rt.at(5); await rt.at(6); await rt.at(7); await rt.at(8);
+    await rt.at(11); rt.serialBegin(115200);
+    await rt.at(12); rt.wifiBegin();
+    while (rt.wifiStatus() !== 'connected') { await rt.at(13); await rt.delay(500); }
+    await rt.at(13);
+    await rt.at(14); rt.configTime(3600);
+    for (;;) {
+      await rt.at(17); await rt.at(18);
+      await rt.at(19); const t = rt.getLocalTime(3600);
+      if (t === null) { await rt.at(20); rt.println('Waiting for time...'); }
+      else { await rt.at(22); rt.println(t); }
+      await rt.at(24); await rt.delay(1000);
     }
   },
 

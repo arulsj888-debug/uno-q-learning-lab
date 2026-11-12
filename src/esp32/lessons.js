@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -37,6 +37,8 @@ const SRC = {
   httpmdn: { t: 'MDN: HTTP response status codes', u: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Status' },
   pubsub: { t: 'PubSubClient library (Arduino MQTT client) by Nick O’Leary', u: 'https://pubsubclient.knolleary.net/' },
   mqtt: { t: 'MQTT.org: what is MQTT (publish/subscribe, topics, broker)', u: 'https://mqtt.org/' },
+  ntppool: { t: 'NTP Pool Project: pool.ntp.org', u: 'https://www.ntppool.org/' },
+  cfgtime: { t: 'Arduino-ESP32 example: SimpleTime (configTime, getLocalTime)', u: 'https://github.com/espressif/arduino-esp32/tree/master/libraries/ESP32/examples/Time/SimpleTime' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -1460,5 +1462,46 @@ export const E32_LESSONS = [
       { q: 'What is the standard MQTT port without encryption?', a: ['80', '1883', '443', '22'], c: 1, why: '1883 (8883 is the encrypted one).' },
     ],
     sources: [SRC.pubsub, SRC.mqtt, SRC.wifihello],
+  },
+
+  // ================================================================== 27
+  {
+    id: 'e27', num: 27, module: 3, title: 'What time is it? Network time (NTP)', level: 'Intermediate', time: '20 min',
+    goal: 'Get the date and time from an NTP server with configTime() and getLocalTime(), and set the time zone.',
+    hardware: ['ESP32 DevKit V1', 'Micro-USB cable', 'Your Wi-Fi name and password'],
+    code: E32_NTP, file: 'NetworkTime.ino', program: 'e_ntp', fast: true, widgets: ['wifirouter', 'ntpserver'],
+    explain: {
+      2: '<b>time.h</b>: the standard C time functions (struct tm and strftime formats).',
+      6: 'The time server. <b>pool.ntp.org</b> is a public pool of NTP servers.',
+      7: 'Your <b>time zone</b> as seconds <b>east</b> of UTC (Greenwich): 3600 = UTC+1, -18000 = UTC−5, 19800 = UTC+5:30.',
+      8: 'Extra seconds for summer time (daylight saving), usually 3600 in summer and 0 in winter.',
+      12: 'Join the Wi-Fi first (Lesson 9). NTP needs the Internet.',
+      14: '<b>configTime()</b> starts the time sync in the background: the ESP32 asks the NTP server for the time.',
+      18: 'A <b>struct tm</b> holds year, month, day, hour, minute and second.',
+      19: '<b>getLocalTime(&timeinfo)</b> fills it in and returns <b>true</b>, or <b>false</b> if the time is not known yet.',
+      20: 'Not synchronised yet: the ESP32 has no battery-backed clock, so after power-up it does not know the date.',
+      22: 'Print the time with a <b>format</b>: %A weekday, %B month name, %d day, %Y year, %H:%M:%S the time of day.',
+      24: 'Once a second.',
+    },
+    steps: [
+      { title: 'A board that does not know the time', view: 'home', power: false,
+        body: `<p>An ESP32 has no battery-backed calendar clock: after power-up it does not know the date or time. But once it is on Wi-Fi it can <b>ask a time server</b> with the <b>Network Time Protocol (NTP)</b>.</p>` },
+      { title: 'UTC and your time zone', view: 'home', power: false,
+        body: `<p>NTP gives the time in <b>UTC</b>. To get your local time you give the <b>offset in seconds</b>: <code>gmtOffset_sec</code>.</p><ul><li>UTC+1 → <code>3600</code></li><li>UTC−5 → <code>-18000</code></li><li>UTC+5:30 → <code>19800</code></li></ul><p><code>daylightOffset_sec</code> adds one hour (3600) in summer time.</p>` },
+      { title: 'Read the sketch', view: 'home', power: true, action: 'ensurePower', showCode: true,
+        body: `<p>Click lines <b>14</b> and <b>19</b>. <code>configTime()</code> starts the sync; <code>getLocalTime()</code> returns false until it has worked.</p>` },
+      { title: 'Run it', view: 'home', power: true, showCode: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>. After the Wi-Fi connects you see “Waiting for time…” for a moment, then the date and time, updated every second.</p><p class="sim">The simulated time is your computer’s clock plus the 1 hour set in line 7 (UTC+1).</p>` },
+      { title: 'Run it: the time server cannot be reached', view: 'home', power: true, showCode: true, action: 'ensurePower',
+        body: `<p>Press <b>■ Stop</b>, set the time server to <b>unreachable</b> in the panel and run again: the ESP32 stays on “Waiting for time…”. Real programs should stop waiting after a while and say that the time is not available.</p>` },
+      { title: 'Summary', view: 'home', power: true,
+        body: `<ul><li><code>configTime(gmtOffset_sec, daylightOffset_sec, server)</code> then <code>getLocalTime(&amp;timeinfo)</code>.</li><li>The offset is in seconds east of UTC.</li><li>getLocalTime() is false until the first sync.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does NTP provide?', a: ['A Wi-Fi password', 'The current time from a time server', 'An IP address', 'A web page'], c: 1, why: 'The Network Time Protocol delivers the time.' },
+      { q: 'gmtOffset_sec for UTC+2 is…', a: ['2', '120', '7200', '-7200'], c: 2, why: '2 hours = 7200 seconds, positive east of UTC.' },
+      { q: 'getLocalTime() returns false. Why?', a: ['The time is not known yet (no sync)', 'The LED is off', 'The pin is wrong', 'The baud rate is wrong'], c: 0, why: 'It returns false until the first successful sync.' },
+    ],
+    sources: [SRC.ntppool, SRC.cfgtime, SRC.wifihello],
   },
 ];

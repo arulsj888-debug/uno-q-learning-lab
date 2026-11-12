@@ -615,3 +615,30 @@ void loop() {
     Serial.println("Published home/temperature = 21.5");
   }
 }`;
+
+// Lesson 27 — network time (NTP) with configTime() and getLocalTime() (shape of the SimpleTime example)
+export const E32_NTP = `#include <WiFi.h>
+#include <time.h>
+
+const char *ssid = "HomeNet";
+const char *password = "MyPassword";
+const char *ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 3600;        // your time zone: seconds east of UTC (3600 = UTC+1)
+const int daylightOffset_sec = 0;       // extra seconds in summer time
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) delay(500);
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);   // start the time sync
+}
+
+void loop() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {          // false until the time is known
+    Serial.println("Waiting for time...");
+  } else {
+    Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+  }
+  delay(1000);
+}`;
