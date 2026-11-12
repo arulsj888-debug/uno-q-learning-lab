@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18 } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -41,6 +41,8 @@ const SRC = {
   cfgtime: { t: 'Arduino-ESP32 example: SimpleTime (configTime, getLocalTime)', u: 'https://github.com/espressif/arduino-esp32/tree/master/libraries/ESP32/examples/Time/SimpleTime' },
   ds18: { t: 'DS18B20 datasheet (Dallas Semiconductor / Maxim): TO-92 pinout GND, DQ, VDD; 3.0 V to 5.5 V; 750 ms conversion', u: 'https://www.analog.com/en/products/ds18b20.html' },
   dallas: { t: 'DallasTemperature library (Miles Burton) and OneWire library (Paul Stoffregen)', u: 'https://github.com/milesburton/Arduino-Temperature-Control-Library' },
+  vishayir: { t: 'Vishay TSOP382.., TSOP384.. datasheet: pins OUT GND VS, 2.0 V to 5.5 V, 38 kHz variants', u: 'https://www.vishay.com/docs/82491/tsop382.pdf' },
+  irremote: { t: 'Arduino-IRremote library (version 4.x) by Armin Joachimsmeyer and contributors', u: 'https://github.com/Arduino-IRremote/Arduino-IRremote' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -161,6 +163,14 @@ const DS_PARTS_E = [
   { id: 'w73', type: 'wire', from: 'b12', to: 'b14', color: 'orange', lift: 12 },
 ];
 const DS_IDS_E = DS_PARTS_E.map(d => d.id);
+// 38 kHz IR receiver next to the LED circuit: OUT on GPIO4, VS from 3V3, GND
+const IR_PARTS_E = [
+  { id: 'ir1', type: 'irrx', row: 'e', col: 20 },
+  { id: 'w80', type: 'fwire', from: 'G4', to: 'a20', color: 'yellow', lift: 22 },
+  { id: 'w81', type: 'fwire', from: 'GND1', to: 'a21', color: 'black', lift: 18 },
+  { id: 'w82', type: 'fwire', from: '3V3', to: 'a22', color: 'red', lift: 14 },
+];
+const IR_IDS_E = IR_PARTS_E.map(d => d.id);
 // two LED branches behind 1N4007 diodes, the second diode turned round
 const D_PARTS_E = [
   { id: 'w1', type: 'fwire', from: 'G16', to: 'a10', color: 'yellow', lift: 14 },
@@ -1567,5 +1577,53 @@ export const E32_LESSONS = [
       { q: 'Which leg is DQ (flat face toward you)?', a: ['Left', 'Middle', 'Right', 'None'], c: 1, why: 'GND, DQ, VDD from the left.' },
     ],
     sources: [SRC.ds18, SRC.dallas, SRC.ds],
+  },
+
+  // ================================================================== 29
+  {
+    id: 'e29', num: 29, module: 7, title: 'IR remote control: decode the buttons', level: 'Intermediate', time: '25 min',
+    goal: 'Receive the code of an infrared remote with a 38 kHz receiver and the IRremote library, and switch an LED with the Power button.',
+    hardware: ['ESP32 DevKit V1', 'The LED circuit of Lesson 4', '38 kHz IR receiver (TSOP382-type, 3 legs)', 'An IR remote control (simulated here)', '3 × female–male jumper wires'],
+    code: E32_IR, file: 'IR_remote.ino', program: 'e_ir', fast: true, widgets: ['irremote'],
+    circuit: [...LED_CIRCUIT, ...IR_PARTS_E], io: { G16: IO_LED, G4: { kind: 'irrx', item: 'ir1', needs: IR_IDS_E } },
+    explain: {
+      1: 'The <b>IRremote</b> library (version 4.x), installed from the Library Manager.',
+      3: 'The receiver’s OUT wire is on <b>GPIO4</b>.',
+      4: 'The LED from Lesson 4 on GPIO16.',
+      5: 'Remembers whether the LED is on.',
+      8: 'Serial output on.',
+      9: 'The LED pin is an output.',
+      10: '<b>IrReceiver.begin(pin)</b> starts listening on the receiver’s pin.',
+      13: '<b>loop()</b> repeats forever. Nothing blocks: the library collects the pulses in the background.',
+      14: '<b>IrReceiver.decode()</b> is true when a complete code has arrived and was decoded.',
+      15: 'Print the label…',
+      16: '…and the <b>command</b> in hexadecimal. Every button of a remote has its own command number.',
+      17: 'Is it the Power button of our simulated remote (command 0x45)?',
+      18: 'Toggle the stored state…',
+      19: '…and write it to the LED.',
+      21: '<b>resume()</b>: tell the library it may receive the next code.',
+    },
+    steps: [
+      { title: 'How a remote control talks', view: 'bench', have: [], power: false,
+        body: `<p>An infrared remote has an <b>IR LED</b> that it switches on and off very fast, about <b>38 000 times per second</b> (the <b>carrier</b>), in a pattern that encodes the button. The light is invisible, but a phone camera can often show it. Many remotes use the <b>NEC protocol</b>: an <b>address</b> byte and a <b>command</b> byte (each followed by its inverse for error checking).</p>` },
+      { title: 'The IR receiver', view: 'breadboard', have: ['ir1'], power: false, holes: ['e20 · OUT', 'e21 · GND', 'e22 · VS'],
+        body: `<p>A <b>38 kHz IR receiver</b> contains the photodiode, an amplifier and a filter that only accepts light flickering at its carrier frequency. It outputs the pattern on <b>OUT</b>: <b>HIGH</b> when idle, <b>LOW</b> during a burst. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Pins (Vishay TSOP382 datasheet): <b>1 OUT, 2 GND, 3 VS</b>; with the dome toward you usually in this order from the left: check your part.</li><li>Supply <b>2.0 V to 5.5 V</b>.</li></ul>` },
+      { title: 'Wire the receiver', view: 'bench', have: [...LED_IDS, ...IR_IDS_E], power: false, pins: ['G4', '3V3', 'GND1'],
+        body: `<p>Keep the LED circuit from Lesson 4 and add the receiver at <b>e20 – e22</b>:</p><ul><li>Yellow: <b>GPIO4 → a20</b> (OUT)</li><li>Black: <b>GND → a21</b> (GND)</li><li>Red: <b>3V3 → a22</b> (VS)</li></ul>` },
+      { title: 'Install the library', view: 'bench', have: [...LED_IDS, ...IR_IDS_E],
+        body: `<p>In the Arduino IDE: <b>Sketch → Include Library → Manage Libraries…</b> and install <b>IRremote</b> (Arduino-IRremote, version 4.x). The functions changed between versions: this lesson uses the 4.x names (<code>IrReceiver.begin</code>, <code>IrReceiver.decode</code>).</p>` },
+      { title: 'The code', view: 'bench', have: [...LED_IDS, ...IR_IDS_E], showCode: true, power: true, body: `<p>Click lines <b>14</b>, <b>16</b> and <b>21</b>.</p>` },
+      { title: 'Run it and press a button', view: 'bench', have: [...LED_IDS, ...IR_IDS_E], showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>, then use the <b>simulated remote</b> in the panel. Each button prints its command (for example <code>Command: 0x45</code>); <b>Power</b> switches the LED on and off.</p><p class="sim">The remote and its codes are simulated: a real remote has its own codes, which you find by printing them like this.</p>` },
+      { title: 'Summary', view: 'bench', have: [...LED_IDS, ...IR_IDS_E], power: true,
+        body: `<ul><li>An IR remote flickers an LED at about 38 kHz in a coded pattern; the receiver outputs the pattern on OUT (active low).</li><li>IRremote: <code>IrReceiver.begin(pin)</code>, <code>decode()</code>, <code>decodedIRData.command</code>, <code>resume()</code>.</li><li>Print the commands of your own remote first, then use them in <code>if</code> tests.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What is the carrier frequency of this IR receiver?', a: ['38 Hz', '38 kHz', '38 MHz', '3.8 kHz'], c: 1, why: 'It is a 38 kHz receiver (TSOP38238-type).' },
+      { q: 'What does the receiver’s OUT pin do when a burst arrives?', a: ['Goes LOW', 'Goes HIGH', 'Stays floating', 'Turns the LED on directly'], c: 0, why: 'The output is active low and idles HIGH.' },
+      { q: 'What must you call after reading a code?', a: ['IrReceiver.resume()', 'delay(1000)', 'Serial.end()', 'analogRead()'], c: 0, why: 'resume() lets the library receive the next code.' },
+    ],
+    sources: [SRC.vishayir, SRC.irremote, SRC.ds],
   },
 ];

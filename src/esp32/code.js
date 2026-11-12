@@ -669,3 +669,28 @@ void loop() {
   }
   delay(1000);
 }`;
+
+// Lesson 29 — IR remote with the IRremote library (4.x): decode the command and toggle an LED
+export const E32_IR = `#include <IRremote.hpp>
+
+const int IR_RECEIVE_PIN = 4;
+const int ledPin = 16;
+bool ledOn = false;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  IrReceiver.begin(IR_RECEIVE_PIN);          // start the receiver on this pin
+}
+
+void loop() {
+  if (IrReceiver.decode()) {                 // true when a complete code arrived
+    Serial.print("Command: 0x");
+    Serial.println(IrReceiver.decodedIRData.command, HEX);
+    if (IrReceiver.decodedIRData.command == 0x45) {   // the Power button of the simulated remote
+      ledOn = !ledOn;
+      digitalWrite(ledPin, ledOn);
+    }
+    IrReceiver.resume();                     // get ready for the next code
+  }
+}`;

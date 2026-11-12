@@ -859,6 +859,7 @@ class App {
     if (w.includes('pikeys')) h += `<div class="io-block"><div class="io-title">Keys — click to play <span class="io-note">(GPIO17)</span></div><div class="pkeys">${[['C4', 60], ['D4', 62], ['E4', 64], ['F4', 65], ['G4', 67], ['A4', 69], ['B4', 71]].map(([n, m]) => `<button class="pkey" data-hz="${(440 * Math.pow(2, (m - 69) / 12)).toFixed(3)}" data-n="${n}">${n}</button>`).join('')}</div><div id="pk-note" class="io-note"></div></div>`;
     if (w.includes('piweb')) h += `<div class="io-block pirstat tight"><div><span>Phone browser</span><b id="w-ph">—</b></div><div class="arrow">→</div><div><span>${IS_E32 ? 'WebServer on the ESP32' : 'Flask on the Pi'}</span><b id="w-fl">—</b></div><div class="arrow">→</div><div><span>LED on ${IS_E32 ? 'GPIO16' : 'GPIO17'}</span><b id="w-led">—</b></div></div><div id="w-note" class="io-note"></div>`;
     if (w.includes('wifiscan')) h += `<div class="io-block"><div class="io-title">Signal of “HomeNet” <span class="io-note">(simulated)</span></div><input id="wf-rssi" type="range" min="-90" max="-30" step="1" value="${this.wf.rssi}"><div id="wf-val" class="io-val"></div><div class="io-note">RSSI = received signal strength in dBm. The closer to 0, the stronger the signal. The other networks are made up for this demo.</div></div>`;
+    if (w.includes('irremote')) { this.irq = []; h += `<div class="io-block"><div class="io-title">Simulated IR remote <span class="io-note">(NEC, address 0x00)</span></div><div class="io-tools"><button id="ir-45" class="hold small">⏻ Power 0x45</button><button id="ir-0c" class="hold small">1 · 0x0C</button><button id="ir-18" class="hold small">2 · 0x18</button><button id="ir-5e" class="hold small">3 · 0x5E</button></div><div id="ir-note" class="io-note"></div></div>`; }
     if (w.includes('ntpserver')) { this.wf.ntp = true; this.wf.ntpT0 = 0; h += `<div class="io-block"><div class="io-title">Time server <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="ntp-btn" class="hold small">🕒 pool.ntp.org: reachable</button></div></div>`; }
     if (w.includes('mqttbroker')) { this.mq = { up: true, conn: false, subs: new Set(), inbox: [], log: [] }; h += `<div class="io-block"><div class="io-title">MQTT broker and phone <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="mq-up" class="hold small">🖧 Broker: online</button><button id="mq-on" class="hold small">📱 Send ON</button><button id="mq-off" class="hold small">📱 Send OFF</button></div><div id="mq-log" class="io-val">Broker log: —</div></div>`; }
     if (w.includes('httpserver')) { this.wf.http = 'ok'; h += `<div class="io-block"><div class="io-title">The web server <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="hs-btn" class="hold small">🌐 Server: answers 200</button></div><div id="hs-last" class="io-val">—</div></div>`; }
@@ -900,6 +901,7 @@ class App {
       hold.addEventListener('pointerdown', dn); hold.addEventListener('pointerup', up); hold.addEventListener('pointerleave', up);
     }
     if ($('#wf-rssi')) { const upd = () => { $('#wf-val').innerHTML = `<b>${this.wf.rssi} dBm</b>`; }; $('#wf-rssi').oninput = e => { this.wf.rssi = +e.target.value; upd(); }; upd(); }
+    if ($('#ir-45')) { for (const [id, cmd] of [['#ir-45', 0x45], ['#ir-0c', 0x0C], ['#ir-18', 0x18], ['#ir-5e', 0x5E]]) $(id).onclick = () => { if (!this.sim.running) return; const io = Object.values((this.lesson && this.lesson.io) || {}).find(x => x.kind === 'irrx'); if (!(io && this.wired(io) && this.board.powered)) return; this.irq.push(cmd); const r = this.bench.get('ir1'); if (r && r.setActive) { r.setActive(true); setTimeout(() => r.setActive(false), 250); } }; }
     if ($('#ntp-btn')) { $('#ntp-btn').onclick = () => { if (!this.sim.running) this.wf.ntp = !this.wf.ntp; }; }
     if ($('#mq-up')) { $('#mq-up').onclick = () => { if (!this.sim.running) this.mq.up = !this.mq.up; }; const send = p => () => { const M = this.mq; if (!this.sim.running || !M.conn) return; M.log.push('home/led = ' + p); if (M.subs.has('home/led')) M.inbox.push({ topic: 'home/led', payload: p }); }; $('#mq-on').onclick = send('ON'); $('#mq-off').onclick = send('OFF'); }
     if ($('#hs-btn')) { $('#hs-btn').onclick = () => { if (!this.sim.running) this.wf.http = { ok: '404', '404': 'down', down: 'ok' }[this.wf.http]; }; }
@@ -1592,8 +1594,16 @@ class App {
     set('#q-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !this.sim.running ? 'Press <b>▶ Run</b>, then try another base resistor (stop the sketch to change it).' : c.state === 'partly' ? 'The base current is too small for this lamp: the collector current is limited to about 100 × the base current and the lamp is dim or dark.' : '');
     const sel = $('#q-r'); if (sel) sel.disabled = this.sim.running;
   }
+  // IR lesson: remote buttons are enabled while the sketch runs
+  irTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('irremote')) return;
+    const run = this.sim.running, set = (id, h) => { const e = $(id); if (e && e.innerHTML !== h) e.innerHTML = h; };
+    for (const id of ['#ir-45', '#ir-0c', '#ir-18', '#ir-5e']) { const e = $(id); if (e) e.disabled = !run; }
+    set('#ir-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>, then press a button of the remote.' : '');
+    if (!run) this.irq = [];
+  }
   displayTick() {
-    this.qTick(); this.mTick();
+    this.qTick(); this.mTick(); this.irTick();
     const L = this.lesson; if (!L) return;
     if (!this.sim.running && this.neoSt) this.neoSt.shown = null;
     if (L.io && Object.values(L.io).some(x => x.kind === 'neo')) {
@@ -2034,6 +2044,7 @@ class App {
       lcd: ev => this.lcdOp(ev),
       i2cProbe: a => (a === this.lcdAddr && this.i2cDispOk('lcd')) || (a === this.oledAddr && this.i2cDispOk('oled')),
       oled: ev => this.oledOp(ev),
+      ir: () => (this.irq && this.irq.length ? this.irq.shift() : null),
       ds18: () => {
         const L = this.lesson, pin = L && L.io ? Object.keys(L.io).find(p => L.io[p].kind === 'ds18b20') : null, io = pin && this.ioFor(pin);
         if (!(io && this.wired(io) && this.board.powered && !this.th.unplug)) return { ok: false };

@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18 } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1413,5 +1413,53 @@ export const U3_LESSONS_2 = [
       { q: 'Which leg is DQ (flat face toward you)?', a: ['Left', 'Middle', 'Right', 'None'], c: 1, why: 'GND, DQ, VDD from the left.' },
     ],
     sources: [SRC.ds18, SRC.dallas, SRC.ds],
+  },
+
+  // ================================================================== 30
+  {
+    id: 'u30', num: 30, module: 7, title: 'IR remote control: decode the buttons', level: 'Intermediate', time: '25 min',
+    goal: 'Receive the code of an infrared remote with a 38 kHz receiver and the IRremote library, and switch an LED with the Power button.',
+    hardware: ['Arduino UNO R3', 'The LED circuit of Lesson 4', '38 kHz IR receiver (TSOP382-type, 3 legs)', 'An IR remote control (simulated here)', '3 × jumper wires'],
+    code: U3_IR, file: 'IR_remote.ino', program: 'u3_ir', fast: true, widgets: ['irremote'],
+    circuit: [...LED_CIRCUIT, ...IR_PARTS], io: { D5: IO_LED, D2: { kind: 'irrx', item: 'ir1', needs: IR_IDS } },
+    explain: {
+      1: 'The <b>IRremote</b> library (version 4.x), installed from the Library Manager.',
+      3: 'The receiver’s OUT wire is on <b>pin 2</b>.',
+      4: 'The LED from Lesson 4 on pin 5.',
+      5: 'Remembers whether the LED is on.',
+      8: 'Serial output on.',
+      9: 'The LED pin is an output.',
+      10: '<b>IrReceiver.begin(pin)</b> starts listening on the receiver’s pin.',
+      13: '<b>loop()</b> repeats forever. Nothing blocks: the library collects the pulses in the background.',
+      14: '<b>IrReceiver.decode()</b> is true when a complete code has arrived and was decoded.',
+      15: 'Print the label…',
+      16: '…and the <b>command</b> in hexadecimal. Every button of a remote has its own command number.',
+      17: 'Is it the Power button of our simulated remote (command 0x45)?',
+      18: 'Toggle the stored state…',
+      19: '…and write it to the LED.',
+      21: '<b>resume()</b>: tell the library it may receive the next code.',
+    },
+    steps: [
+      { title: 'How a remote control talks', view: 'bench', have: [], power: false,
+        body: `<p>An infrared remote has an <b>IR LED</b> that it switches on and off very fast, about <b>38 000 times per second</b> (the <b>carrier</b>), in a pattern that encodes the button. The light is invisible, but a phone camera can often show it. Many remotes use the <b>NEC protocol</b>: an <b>address</b> byte and a <b>command</b> byte (each followed by its inverse for error checking).</p>` },
+      { title: 'The IR receiver', view: 'breadboard', have: ['ir1'], power: false, holes: ['e20 · OUT', 'e21 · GND', 'e22 · VS'],
+        body: `<p>A <b>38 kHz IR receiver</b> contains the photodiode, an amplifier and a filter that only accepts light flickering at its carrier frequency. It outputs the pattern on <b>OUT</b>: <b>HIGH</b> when idle, <b>LOW</b> during a burst. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Pins (Vishay TSOP382 datasheet): <b>1 OUT, 2 GND, 3 VS</b>; with the dome toward you usually in this order from the left: check your part.</li><li>Supply <b>2.0 V to 5.5 V</b>.</li></ul>` },
+      { title: 'Wire the receiver', view: 'bench', have: [...LED_IDS, ...IR_IDS], power: false, pins: ['D2', '5V', 'GND3'],
+        body: `<p>Keep the LED circuit from Lesson 4 and add the receiver at <b>e20 – e22</b>:</p><ul><li>Yellow: <b>pin 2 → a20</b> (OUT)</li><li>Black: <b>GND → a21</b> (GND)</li><li>Red: <b>5V → a22</b> (VS)</li></ul>` },
+      { title: 'Install the library', view: 'bench', have: [...LED_IDS, ...IR_IDS],
+        body: `<p>In the Arduino IDE: <b>Sketch → Include Library → Manage Libraries…</b> and install <b>IRremote</b> (Arduino-IRremote, version 4.x). The functions changed between versions: this lesson uses the 4.x names (<code>IrReceiver.begin</code>, <code>IrReceiver.decode</code>).</p>` },
+      { title: 'The code', view: 'bench', have: [...LED_IDS, ...IR_IDS], showCode: true, power: true, body: `<p>Click lines <b>14</b>, <b>16</b> and <b>21</b>.</p>` },
+      { title: 'Run it and press a button', view: 'bench', have: [...LED_IDS, ...IR_IDS], showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>, then use the <b>simulated remote</b> in the panel. Each button prints its command (for example <code>Command: 0x45</code>); <b>Power</b> switches the LED on and off.</p><p class="sim">The remote and its codes are simulated: a real remote has its own codes, which you find by printing them like this.</p>` },
+      { title: 'Summary', view: 'bench', have: [...LED_IDS, ...IR_IDS], power: true,
+        body: `<ul><li>An IR remote flickers an LED at about 38 kHz in a coded pattern; the receiver outputs the pattern on OUT (active low).</li><li>IRremote: <code>IrReceiver.begin(pin)</code>, <code>decode()</code>, <code>decodedIRData.command</code>, <code>resume()</code>.</li><li>Print the commands of your own remote first, then use them in <code>if</code> tests.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What is the carrier frequency of this IR receiver?', a: ['38 Hz', '38 kHz', '38 MHz', '3.8 kHz'], c: 1, why: 'It is a 38 kHz receiver (TSOP38238-type).' },
+      { q: 'What does the receiver’s OUT pin do when a burst arrives?', a: ['Goes LOW', 'Goes HIGH', 'Stays floating', 'Turns the LED on directly'], c: 0, why: 'The output is active low and idles HIGH.' },
+      { q: 'What must you call after reading a code?', a: ['IrReceiver.resume()', 'delay(1000)', 'Serial.end()', 'analogRead()'], c: 0, why: 'resume() lets the library receive the next code.' },
+    ],
+    sources: [SRC.vishayir, SRC.irremote, SRC.ds],
   },
 ];

@@ -48,6 +48,7 @@ function legs(d) {
     case 'encoder': return { [d.id + '.CLK']: `${d.row}${d.col}`, [d.id + '.DT']: `${d.row}${d.col + 1}`, [d.id + '.SW']: `${d.row}${d.col + 2}`, [d.id + '.VCC']: `${d.row}${d.col + 3}`, [d.id + '.GND']: `${d.row}${d.col + 4}` };
     case 'diode': return { [d.id + '.A']: d.a, [d.id + '.K']: d.k };
     case 'ds18b20': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.DQ']: `${d.row}${d.col + 1}`, [d.id + '.VDD']: `${d.row}${d.col + 2}` };
+    case 'irrx': return { [d.id + '.OUT']: `${d.row}${d.col}`, [d.id + '.GND']: `${d.row}${d.col + 1}`, [d.id + '.VS']: `${d.row}${d.col + 2}` };
     case 'mosfet': return { [d.id + '.G']: `${d.row}${d.col}`, [d.id + '.D']: `${d.row}${d.col + 1}`, [d.id + '.S']: `${d.row}${d.col + 2}` };
     case 'npn': return { [d.id + '.E']: `${d.row}${d.col}`, [d.id + '.B']: `${d.row}${d.col + 1}`, [d.id + '.C']: `${d.row}${d.col + 2}` };
     case 'rgbled': return { [d.id + '.R']: `${d.row}${d.col}`, [d.id + '.C']: `${d.row}${d.col + 1}`, [d.id + '.G']: `${d.row}${d.col + 2}`, [d.id + '.B']: `${d.row}${d.col + 3}` };
@@ -185,6 +186,12 @@ for (const L of list) {
       if (!r) bad(L, `${pin}: no resistor between the pin and the ${leg} leg of ${id}`);
       if (!N.same(id + '.C', G)) bad(L, `${pin}: common leg of ${id} is not on GND (common cathode)`);
       if (N.same(P, id + '.' + leg)) bad(L, `${pin}: the ${leg} leg is connected to the pin without a resistor`);
+    }
+    if (io.kind === 'irrx') {
+      const id = io.item;
+      if (!N.same(id + '.VS', 'PIN:' + SUP)) bad(L, `${pin}: IR receiver VS not on ${SUP}`);
+      if (!N.same(id + '.GND', G)) bad(L, `${pin}: IR receiver GND not on GND`);
+      if (!N.same(id + '.OUT', P)) bad(L, `${pin}: IR receiver OUT not on ${pin}`);
     }
     if (io.kind === 'ds18b20') {
       const id = io.item;

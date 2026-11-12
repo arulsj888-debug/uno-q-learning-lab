@@ -38,6 +38,8 @@ export const SRC = {
   wirelib: { t: 'Arduino reference: Wire library (beginTransmission / endTransmission)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
   ds18: { t: 'DS18B20 datasheet (Dallas Semiconductor / Maxim): TO-92 pinout GND, DQ, VDD; 3.0 V to 5.5 V; 750 ms conversion', u: 'https://www.analog.com/en/products/ds18b20.html' },
   dallas: { t: 'DallasTemperature library (Miles Burton) and OneWire library (Paul Stoffregen)', u: 'https://github.com/milesburton/Arduino-Temperature-Control-Library' },
+  vishayir: { t: 'Vishay TSOP382.., TSOP384.. datasheet: pins OUT GND VS, 2.0 V to 5.5 V, 38 kHz variants', u: 'https://www.vishay.com/docs/82491/tsop382.pdf' },
+  irremote: { t: 'Arduino-IRremote library (version 4.x) by Armin Joachimsmeyer and contributors', u: 'https://github.com/Arduino-IRremote/Arduino-IRremote' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -288,3 +290,12 @@ export const DS_PARTS = [
   { id: 'w73', type: 'wire', from: 'b12', to: 'b14', color: 'orange', lift: 12 },
 ];
 export const DS_IDS = DS_PARTS.map(d => d.id);
+
+// ---- Lesson 30: 38 kHz IR receiver on the right of the LED circuit (OUT on pin 2, VS from 5 V, GND3)
+export const IR_PARTS = [
+  { id: 'ir1', type: 'irrx', row: 'e', col: 20 },
+  { id: 'w80', type: 'wire', from: 'D2', to: 'a20', color: 'yellow', lift: 22 },
+  { id: 'w81', type: 'wire', from: 'GND3', to: 'a21', color: 'black', lift: 18 },
+  { id: 'w82', type: 'wire', from: '5V', to: 'a22', color: 'red', lift: 14 },
+];
+export const IR_IDS = IR_PARTS.map(d => d.id);

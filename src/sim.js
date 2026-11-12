@@ -70,6 +70,7 @@ export class Sim {
       i2cProbe: (addr) => (H.i2cProbe ? !!H.i2cProbe(addr) : false),   // Wire.endTransmission() == 0 for this address
       lcd: (op, a, b) => (H.lcd ? H.lcd({ op, a, b }) : undefined),
       oled: (op, a, b) => (H.oled ? H.oled({ op, a, b }) : false),
+      irDecode: () => (H.ir ? H.ir() : null),   // IrReceiver.decode(): the command of a received code, or null
       dsRead: () => (H.ds18 ? H.ds18() : { ok: false }),
       dhtRead: () => (H.dht ? H.dht() : { ok: false }),
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
@@ -1015,6 +1016,46 @@ export const PROGRAMS = {
       if (t === -127) { await rt.at(18); rt.println('Sensor not found!'); }
       else { await rt.at(20); rt.print('Temperature: '); await rt.at(21); rt.print(t, 2); await rt.at(22); rt.println(' C'); }
       await rt.at(24); await rt.delay(1000);
+    }
+  },
+
+  async u3_ir(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4); await rt.at(5);
+    await rt.at(8); rt.serialBegin(9600);
+    await rt.at(9); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(10);
+    let ledOn = 0;
+    for (;;) {
+      await rt.at(13);
+      await rt.at(14); const c = rt.irDecode();
+      if (c !== null) {
+        await rt.at(15); rt.print('Command: 0x');
+        await rt.at(16); rt.println(c.toString(16).toUpperCase());
+        await rt.at(17);
+        if (c === 0x45) { await rt.at(18); ledOn = ledOn ? 0 : 1; await rt.at(19); rt.digitalWrite('D5', ledOn); }
+        await rt.at(21);
+      }
+      await rt.yield();
+    }
+  },
+
+  async e_ir(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4); await rt.at(5);
+    await rt.at(8); rt.serialBegin(115200);
+    await rt.at(9); rt.pinMode('G16', 'OUTPUT');
+    await rt.at(10);
+    let ledOn = 0;
+    for (;;) {
+      await rt.at(13);
+      await rt.at(14); const c = rt.irDecode();
+      if (c !== null) {
+        await rt.at(15); rt.print('Command: 0x');
+        await rt.at(16); rt.println(c.toString(16).toUpperCase());
+        await rt.at(17);
+        if (c === 0x45) { await rt.at(18); ledOn = ledOn ? 0 : 1; await rt.at(19); rt.digitalWrite('G16', ledOn); }
+        await rt.at(21);
+      }
+      await rt.yield();
     }
   },
 
