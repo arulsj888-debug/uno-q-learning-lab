@@ -48,6 +48,7 @@ export const SRC = {
   adabmp: { t: 'Adafruit BMP280 library (Adafruit_BMP280)', u: 'https://github.com/adafruit/Adafruit_BMP280_Library' },
   soilsrc: { t: 'Vendor manuals for the capacitive soil moisture sensor v1.2: 3.3-5.5 V, analog AOUT, wetter = lower voltage, calibrate dry and wet', u: 'https://www.atomic14.com/esp32/sensors/capacitive-soil/' },
   sndsrc: { t: 'Arduino reference: analogRead(). The sound module itself has no standard datasheet: its values are typical', u: 'https://docs.arduino.cc/language-reference/en/functions/analog-io/analogRead/' },
+  keypadlib: { t: 'Keypad library (Mark Stanley, Alexander Brevig): makeKeymap, getKey', u: 'https://github.com/Chris--A/Keypad' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -366,3 +367,17 @@ export const PLANT_PARTS = [
   { id: 'w92', type: 'fwire', from: 'soil1.AOUT', to: 'A0', color: 'yellow', lift: 36 },
 ];
 export const PLANT_IDS = PLANT_PARTS.map(d => d.id);
+
+// ---- Lesson 37: 4x4 keypad on the desk, eight female jumpers: rows R1..R4 to pins 9..6, columns C1..C4 to pins 5..2
+export const KP_PARTS = [
+  { id: 'kp1', type: 'keypad', x: 85, z: 112 },
+  { id: 'w90', type: 'fwire', from: 'kp1.R1', to: 'D9', color: 'blue', lift: 24 },
+  { id: 'w91', type: 'fwire', from: 'kp1.R2', to: 'D8', color: 'green', lift: 28 },
+  { id: 'w92', type: 'fwire', from: 'kp1.R3', to: 'D7', color: 'yellow', lift: 32 },
+  { id: 'w93', type: 'fwire', from: 'kp1.R4', to: 'D6', color: 'orange', lift: 36 },
+  { id: 'w94', type: 'fwire', from: 'kp1.C1', to: 'D5', color: 'white', lift: 40 },
+  { id: 'w95', type: 'fwire', from: 'kp1.C2', to: 'D4', color: 'red', lift: 44 },
+  { id: 'w96', type: 'fwire', from: 'kp1.C3', to: 'D3', color: 'black', lift: 48 },
+  { id: 'w97', type: 'fwire', from: 'kp1.C4', to: 'D2', color: 'violet', lift: 52 },
+];
+export const KP_IDS = KP_PARTS.map(d => d.id);

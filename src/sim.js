@@ -74,6 +74,7 @@ export class Sim {
       mpuRead: () => (H.mpu ? H.mpu() : { ax: 0, ay: 0, az: 0, gz: 0 }),
       stepTick: (dir) => { if (H.stepTick) H.stepTick(dir); },
       bmpRead: () => (H.bmp ? H.bmp() : { t: 0, p: 0 }),
+      keypadKey: () => (H.keypad ? H.keypad() : null),
       dsRead: () => (H.ds18 ? H.ds18() : { ok: false }),
       dhtRead: () => (H.dht ? H.dht() : { ok: false }),
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
@@ -1334,6 +1335,30 @@ export const PROGRAMS = {
       await rt.at(25); await rt.at(26); await rt.at(27); rt.oled('println', 'Press: ' + m.p.toFixed(0) + ' hPa');
       await rt.at(28); rt.oled('display');
       await rt.at(29); await rt.delay(1000);
+    }
+  },
+
+  async u3_keypad(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4); await rt.at(5); await rt.at(11); await rt.at(12); await rt.at(13);
+    await rt.at(16); rt.serialBegin(9600);
+    for (;;) {
+      await rt.at(19);
+      await rt.at(20); const key = rt.keypadKey();
+      await rt.at(21);
+      if (key) { await rt.at(22); rt.print('Key: '); await rt.at(23); rt.println(key); }
+      await rt.yield();
+    }
+  },
+
+  async e_keypad(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(4); await rt.at(5); await rt.at(11); await rt.at(12); await rt.at(13);
+    await rt.at(16); rt.serialBegin(115200);
+    for (;;) {
+      await rt.at(19);
+      await rt.at(20); const key = rt.keypadKey();
+      await rt.at(21);
+      if (key) { await rt.at(22); rt.print('Key: '); await rt.at(23); rt.println(key); }
+      await rt.yield();
     }
   },
 

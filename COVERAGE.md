@@ -48,7 +48,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | IR receiver (38 kHz, TSOP382-type) + remote | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 30) | DONE (Build + lesson 29) | verified from the Vishay TSOP382/384 datasheet: pins OUT GND VS, 2.0-5.5 V, active-low output, 38 kHz variant; click the part to simulate a remote burst (steady LOW, not a real pulse train); IRremote/NEC decoding lesson TODO |
 | Flame, tilt, vibration, hall, line-follow IR | TODO | TODO | TODO | TODO | |
 | MPU6050 accelerometer / gyro (I2C) | TODO | TODO | DONE (lesson 31, lesson only) | DONE (lesson 30, lesson only) | InvenSense register map verified: sleep at power-up, WHO_AM_I 0x68, 16384 LSB/g, 131 LSB/(deg/s); I2C address 0x68/0x69 and GY-521 pin order from common knowledge (hedged in the text); Build part TODO |
-| Keypad 4x4 (matrix scan) | TODO | TODO | TODO | TODO | |
+| Keypad 4x4 (matrix scan) | TODO | TODO | DONE (lesson 37, lesson only) | DONE (lesson 38, lesson only) | no datasheet: standard 1 2 3 A / 4 5 6 B / 7 8 9 C / * 0 # D layout and R1-R4 C1-C4 pin order are typical (the lesson warns to check yours); Keypad library API not re-checked; Build part TODO |
 | RFID RC522 (SPI) | TODO | TODO | TODO | TODO | 3.3 V part |
 | GPS (UART, NEO-6M) | TODO | TODO | TODO | TODO | |
 | DS3231 real-time clock (I2C) | TODO | TODO | TODO | TODO | |

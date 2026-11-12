@@ -71,6 +71,7 @@ const VIEWS = {
   dispp: { t: new THREE.Vector3(55, 0, -40), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 330 },
   farpi: { t: new THREE.Vector3(100, 0, -30), d: new THREE.Vector3(-0.1, 0.92, 0.4), dist: 520 },
   qwq: { t: new THREE.Vector3(50, 0, 95), d: new THREE.Vector3(-0.1, 0.92, 0.38), dist: 420 },
+  keyv: { t: new THREE.Vector3(60, 0, 100), d: new THREE.Vector3(-0.1, 0.92, 0.4), dist: 330 },
   wxv: { t: new THREE.Vector3(60, 0, 125), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 260 },
   scanv: { t: new THREE.Vector3(40, 0, 95), d: new THREE.Vector3(-0.1, 0.92, 0.4), dist: 430 },
   bbwide: { t: new THREE.Vector3(0, 2, 68), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 150 },
@@ -860,6 +861,7 @@ class App {
     if (w.includes('pikeys')) h += `<div class="io-block"><div class="io-title">Keys — click to play <span class="io-note">(GPIO17)</span></div><div class="pkeys">${[['C4', 60], ['D4', 62], ['E4', 64], ['F4', 65], ['G4', 67], ['A4', 69], ['B4', 71]].map(([n, m]) => `<button class="pkey" data-hz="${(440 * Math.pow(2, (m - 69) / 12)).toFixed(3)}" data-n="${n}">${n}</button>`).join('')}</div><div id="pk-note" class="io-note"></div></div>`;
     if (w.includes('piweb')) h += `<div class="io-block pirstat tight"><div><span>Phone browser</span><b id="w-ph">—</b></div><div class="arrow">→</div><div><span>${IS_E32 ? 'WebServer on the ESP32' : 'Flask on the Pi'}</span><b id="w-fl">—</b></div><div class="arrow">→</div><div><span>LED on ${IS_E32 ? 'GPIO16' : 'GPIO17'}</span><b id="w-led">—</b></div></div><div id="w-note" class="io-note"></div>`;
     if (w.includes('wifiscan')) h += `<div class="io-block"><div class="io-title">Signal of “HomeNet” <span class="io-note">(simulated)</span></div><input id="wf-rssi" type="range" min="-90" max="-30" step="1" value="${this.wf.rssi}"><div id="wf-val" class="io-val"></div><div class="io-note">RSSI = received signal strength in dBm. The closer to 0, the stronger the signal. The other networks are made up for this demo.</div></div>`;
+    if (w.includes('keypad')) { this.kp = { q: [], cur: '', until: 0 }; h += `<div class="io-block"><div class="io-title">Keypad <span class="io-note">(simulated)</span></div><div class="kp-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${['1','2','3','A','4','5','6','B','7','8','9','C','*','0','#','D'].map(k => `<button class="hold small kp-key" data-k="${k}">${k}</button>`).join('')}</div><div id="kp-note" class="io-note"></div></div>`; }
     if (w.includes('clapsens')) { this.cl = { until: 0 }; h += `<div class="io-block"><div class="io-title">The room <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="cl-btn" class="hold small">👏 Clap</button></div><div id="cl-note" class="io-note"></div></div>`; }
     if (w.includes('soilsens')) { this.sm = { wet: 0 }; h += `<div class="io-block"><div class="io-title">The soil <span class="io-note">(simulated)</span></div><div class="throw"><label>Moisture</label><input id="sm-w" type="range" min="0" max="100" step="1" value="0"><b id="sm-wv">dry</b></div><div id="sm-v" class="io-val"></div></div>`; }
     if (w.includes('bmpsens')) { this.bp = { t: 22.5, p: 1013 }; h += `<div class="io-block"><div class="io-title">The air <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="bp-t" type="range" min="-20" max="60" step="0.5" value="22.5"><b id="bp-tv">22.5 °C</b></div><div class="throw"><label>Pressure</label><input id="bp-p" type="range" min="950" max="1050" step="1" value="1013"><b id="bp-pv">1013 hPa</b></div></div>`; }
@@ -907,6 +909,7 @@ class App {
       hold.addEventListener('pointerdown', dn); hold.addEventListener('pointerup', up); hold.addEventListener('pointerleave', up);
     }
     if ($('#wf-rssi')) { const upd = () => { $('#wf-val').innerHTML = `<b>${this.wf.rssi} dBm</b>`; }; $('#wf-rssi').oninput = e => { this.wf.rssi = +e.target.value; upd(); }; upd(); }
+    document.querySelectorAll('.kp-key').forEach(b => { b.onclick = () => { if (!this.sim.running || !this.kp) return; const k = b.dataset.k; this.kp.q.push(k); this.kp.cur = k; this.kp.until = performance.now() + 250; }; });
     if ($('#cl-btn')) { $('#cl-btn').onclick = () => { if (this.sim.running) this.cl.until = performance.now() + 120; }; }
     if ($('#sm-w')) { $('#sm-w').oninput = e => { this.sm.wet = +e.target.value; $('#sm-wv').textContent = this.sm.wet + ' % wet'; }; }
     if ($('#bp-t')) { const upd = () => { $('#bp-tv').textContent = this.bp.t + ' °C'; $('#bp-pv').textContent = this.bp.p + ' hPa'; }; $('#bp-t').oninput = e => { this.bp.t = +e.target.value; upd(); }; $('#bp-p').oninput = e => { this.bp.p = +e.target.value; upd(); }; }
@@ -1612,6 +1615,14 @@ class App {
     set('#ir-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>, then press a button of the remote.' : '');
     if (!run) this.irq = [];
   }
+  kpTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('keypad') || !this.kp) return;
+    const run = this.sim.running, o = this.bench.get('kp1'), K = this.kp, act = run && performance.now() < K.until;
+    if (o && o.setKey) o.setKey(act ? K.cur : null);
+    document.querySelectorAll('.kp-key').forEach(b => { b.disabled = !run; });
+    const i = '123A456B789C*0#D'.indexOf(K.cur), set = (id, h) => { const e = $(id); if (e && e.innerHTML !== h) e.innerHTML = h; };
+    set('#kp-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>.' : act && i >= 0 ? `Key <b>${K.cur}</b>: row <b>R${((i / 4) | 0) + 1}</b> is connected to column <b>C${(i % 4) + 1}</b>.` : 'Press a key.');
+  }
   stpTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('stepper') || !this.stp) return;
     const run = this.sim.running, S = this.stp, o = this.bench.get('stp1'), pw = this.board.powered;
@@ -1623,7 +1634,7 @@ class App {
     set('#stp-note', !pw ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>.' : '');
   }
   displayTick() {
-    this.qTick(); this.mTick(); this.irTick(); this.stpTick();
+    this.qTick(); this.mTick(); this.irTick(); this.stpTick(); this.kpTick();
     const L = this.lesson; if (!L) return;
     if (!this.sim.running && this.neoSt) this.neoSt.shown = null;
     if (L.io && Object.values(L.io).some(x => x.kind === 'neo')) {
@@ -2069,6 +2080,7 @@ class App {
       mpu: () => { const L = this.lesson, io = Object.values((L && L.io) || {}).find(x => x.kind === 'mpu'); if (!(io && this.wired(io) && this.board.powered)) return { ax: 0, ay: 0, az: 0, gz: 0 }; const g = 9.80665, p = this.mp.pitch * Math.PI / 180, r = this.mp.roll * Math.PI / 180, n = () => (Math.random() - 0.5) * 0.04; return { ax: -g * Math.sin(p) + n(), ay: g * Math.sin(r) * Math.cos(p) + n(), az: g * Math.cos(r) * Math.cos(p) + n(), gz: this.mp.rate * Math.PI / 180 }; },
       stepTick: dir => { const L = this.lesson, io = Object.values((L && L.io) || {}).find(x => x.kind === 'stepper'); if (this.stp && io && this.wired(io) && this.board.powered) this.stp.steps += dir; },
       bmp: () => { const L = this.lesson, io = Object.values((L && L.io) || {}).find(x => x.kind === 'bmp'); if (!(io && this.wired(io) && this.board.powered)) return { t: 0, p: 0 }; return { t: Math.round(this.bp.t * 100) / 100, p: Math.round(this.bp.p * 100) / 100 }; },
+      keypad: () => (this.kp && this.kp.q.length ? this.kp.q.shift() : null),
       ir: () => (this.irq && this.irq.length ? this.irq.shift() : null),
       ds18: () => {
         const L = this.lesson, pin = L && L.io ? Object.keys(L.io).find(p => L.io[p].kind === 'ds18b20') : null, io = pin && this.ioFor(pin);

@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT, E32_WX } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT, E32_WX, E32_KEYPAD } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -52,6 +52,7 @@ const SRC = {
   adabmp: { t: 'Adafruit BMP280 library (Adafruit_BMP280)', u: 'https://github.com/adafruit/Adafruit_BMP280_Library' },
   soilsrc: { t: 'Vendor manuals for the capacitive soil moisture sensor v1.2: 3.3-5.5 V, analog AOUT, wetter = lower voltage, calibrate dry and wet', u: 'https://www.atomic14.com/esp32/sensors/capacitive-soil/' },
   sndsrc: { t: 'Arduino reference: analogRead(). The sound module itself has no standard datasheet: its values are typical', u: 'https://docs.arduino.cc/language-reference/en/functions/analog-io/analogRead/' },
+  keypadlib: { t: 'Keypad library (Mark Stanley, Alexander Brevig): makeKeymap, getKey', u: 'https://github.com/Chris--A/Keypad' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -145,6 +146,11 @@ const WX_PARTS_E = [{ id: 'bmp1', type: 'bmp280', x: -30, z: 138 }, { id: 'oled1
   ...['VCC', 'GND', 'SCL', 'SDA'].map((n, i) => ({ id: 'm6' + i, type: 'fwire', from: 'oled1.' + n, to: 'c' + (10 + i), color: { VCC: 'orange', GND: 'black', SDA: 'white', SCL: 'green' }[n], lift: 40 + i * 2 })),
   ...['VCC', 'GND', 'SCL', 'SDA'].map((n, i) => ({ id: 'w5' + i, type: 'fwire', from: { VCC: '3V3', GND: 'GND2', SDA: 'G21', SCL: 'G22' }[n], to: 'b' + (10 + i), color: { VCC: 'red', GND: 'black', SDA: 'blue', SCL: 'yellow' }[n], lift: 22 + i * 3 }))];
 const WX_IDS_E = WX_PARTS_E.map(d => d.id);
+const KP_PINS_E = ['G13', 'G14', 'G27', 'G26', 'G25', 'G33', 'G32', 'G23'], KP_NAMES = ['R1', 'R2', 'R3', 'R4', 'C1', 'C2', 'C3', 'C4'];
+const KP_PARTS_E = [{ id: 'kp1', type: 'keypad', x: 85, z: 112 },
+  ...KP_NAMES.map((n, i) => ({ id: 'm4' + i, type: 'fwire', from: 'kp1.' + n, to: 'a' + (10 + i), color: ['blue', 'green', 'yellow', 'orange', 'white', 'red', 'black', 'violet'][i], lift: 16 + i * 2 })),
+  ...KP_NAMES.map((n, i) => ({ id: 'w4' + i, type: 'fwire', from: KP_PINS_E[i], to: 'b' + (10 + i), color: ['blue', 'green', 'yellow', 'orange', 'white', 'red', 'black', 'violet'][i], lift: 22 + i * 3 }))];
+const KP_IDS_E = KP_PARTS_E.map(d => d.id);
 const STEP_PARTS_E = [
   { id: 'stp1', type: 'stepper', x: 20, z: 138 },
   { id: 'w90', type: 'fwire', from: 'stp1.IN1', to: 'G16', color: 'blue', lift: 36 },
@@ -1990,5 +1996,44 @@ export const E32_LESSONS = [
       { q: 'readPressure() / 100.0 gives…', a: ['Pressure in hPa', 'Pressure in Pascal', 'Temperature', 'Altitude'], c: 0, why: 'Pascal divided by 100 is hPa.' },
     ],
     sources: [SRC.bmpds, SRC.adabmp, SRC.wire],
+  },
+
+  // ================================================================== 38
+  {
+    id: 'e38', num: 38, module: 7, title: 'Keypad: sixteen keys on eight wires', level: 'Intermediate', time: '25 min',
+    goal: 'Read a 4×4 matrix keypad with the Keypad library and understand how a matrix scan finds the pressed key.',
+    hardware: ['ESP32 DevKit V1', '4×4 matrix keypad (8 pins)', '16 × female–male jumper wires'],
+    code: E32_KEYPAD, file: 'KeypadRead.ino', program: 'e_keypad', fast: true, widgets: ['keypad'],
+    circuit: KP_PARTS_E, io: { G13: { kind: 'keypad', rows: ['G13', 'G14', 'G27', 'G26'], cols: ['G25', 'G33', 'G32', 'G23'], item: 'kp1', needs: KP_IDS_E } },
+    explain: {
+      1: 'The <b>Keypad</b> library (install it from the Library Manager).',
+      3: 'Four rows…',
+      4: '…and four columns.',
+      5: 'The characters of the keys, laid out like the keypad.',
+      11: 'The pins the four <b>row</b> wires are on.',
+      12: 'The pins the four <b>column</b> wires are on.',
+      13: 'Create the keypad: it handles the scanning and the debouncing for you.',
+      20: '<b>getKey()</b> returns the character of the pressed key, or 0 if none.',
+      21: 'A key was pressed.',
+      23: 'Print it.',
+    },
+    steps: [
+      { title: 'Sixteen keys, eight wires', view: 'keyv', have: [], power: false,
+        body: `<p>Wiring 16 keys to 16 pins would use almost every pin. A <b>matrix</b> uses <b>4 row wires and 4 column wires</b>: a key sits where a row crosses a column, and pressing it <b>connects that row to that column</b>. 4 + 4 = 8 wires for 16 keys.</p>` },
+      { title: 'How a scan finds the key', view: 'keyv', have: ['kp1'], power: false,
+        body: `<p>The program sets the <b>rows</b> as outputs one after another and reads the <b>columns</b> (with pull-ups). When row 2 is driven and column 3 reads active, the pressed key is at row 2, column 3: the key <b>6</b>. The library does this hundreds of times per second. <b>Click the keypad</b> in the 3D view.</p><p class="warn">The pin order of the eight pins differs between makers: check the printing on yours.</p>` },
+      { title: 'Wire it', view: 'keyv', have: KP_IDS_E, power: false, pins: ['G13', 'G14', 'G27', 'G26', 'G25', 'G33', 'G32', 'G23'], body: `<ul><li>Keypad pins to breadboard row a (columns 10 to 17: R1 R2 R3 R4 C1 C2 C3 C4)</li><li>Board wires in row b: rows → <b>GPIO13, GPIO14, GPIO27, GPIO26</b>, columns → <b>GPIO25, GPIO33, GPIO32, GPIO23</b></li></ul>` },
+      { title: 'The code', view: 'keyv', have: KP_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>11</b>, <b>12</b> and <b>20</b>.</p>` },
+      { title: 'Run it and press keys', view: 'keyv', have: KP_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>, then press keys on the keypad in the panel. The Serial Monitor prints each key, and the panel shows which <b>row and column</b> got connected.</p><p class="sim">Simulated keypad.</p>` },
+      { title: 'Summary', view: 'keyv', have: KP_IDS_E, power: true,
+        body: `<ul><li>A matrix keypad: rows × columns wires for rows × columns keys.</li><li>The scan drives one row and reads the columns; the crossing is the key.</li><li><code>keypad.getKey()</code> returns the character or 0.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How many wires does a 4×4 matrix keypad use?', a: ['4', '8', '16', '32'], c: 1, why: '4 rows + 4 columns.' },
+      { q: 'What does pressing a key do?', a: ['Connects its row to its column', 'Sends a Wi-Fi packet', 'Powers the keypad', 'Resets the board'], c: 0, why: 'The key is a switch between a row and a column.' },
+      { q: 'getKey() returns 0. What does it mean?', a: ['No key is pressed', 'Key 0 is pressed', 'The keypad is broken', 'The baud rate is wrong'], c: 0, why: 'It returns 0 when nothing is pressed.' },
+    ],
+    sources: [SRC.keypadlib, ],
   },
 ];

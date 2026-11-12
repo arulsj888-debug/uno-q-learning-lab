@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP, U3_SOIL, U3_SND, U3_PLANT } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP, U3_SOIL, U3_SND, U3_PLANT, U3_KEYPAD } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS, SOIL_PARTS, SOIL_IDS, SND_PARTS, SND_IDS, PLANT_PARTS, PLANT_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS, SOIL_PARTS, SOIL_IDS, SND_PARTS, SND_IDS, PLANT_PARTS, PLANT_IDS, KP_PARTS, KP_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1701,5 +1701,44 @@ export const U3_LESSONS_2 = [
       { q: 'Why not connect a pump straight to a pin?', a: ['It needs far more current than a pin gives', 'Pumps need AC', 'Pins are always LOW', 'It is allowed'], c: 0, why: 'Use a relay or MOSFET.' },
     ],
     sources: [SRC.soilsrc, SRC.ds],
+  },
+
+  // ================================================================== 37
+  {
+    id: 'u37', num: 37, module: 7, title: 'Keypad: sixteen keys on eight wires', level: 'Intermediate', time: '25 min',
+    goal: 'Read a 4×4 matrix keypad with the Keypad library and understand how a matrix scan finds the pressed key.',
+    hardware: ['Arduino UNO R3', '4×4 matrix keypad (8 pins)', '8 × jumper wires'],
+    code: U3_KEYPAD, file: 'KeypadRead.ino', program: 'u3_keypad', fast: true, widgets: ['keypad'],
+    circuit: KP_PARTS, io: { D9: { kind: 'keypad', rows: ['D9', 'D8', 'D7', 'D6'], cols: ['D5', 'D4', 'D3', 'D2'], item: 'kp1', needs: KP_IDS } },
+    explain: {
+      1: 'The <b>Keypad</b> library (install it from the Library Manager).',
+      3: 'Four rows…',
+      4: '…and four columns.',
+      5: 'The characters of the keys, laid out like the keypad.',
+      11: 'The pins the four <b>row</b> wires are on.',
+      12: 'The pins the four <b>column</b> wires are on.',
+      13: 'Create the keypad: it handles the scanning and the debouncing for you.',
+      20: '<b>getKey()</b> returns the character of the pressed key, or 0 if none.',
+      21: 'A key was pressed.',
+      23: 'Print it.',
+    },
+    steps: [
+      { title: 'Sixteen keys, eight wires', view: 'keyv', have: [], power: false,
+        body: `<p>Wiring 16 keys to 16 pins would use almost every pin. A <b>matrix</b> uses <b>4 row wires and 4 column wires</b>: a key sits where a row crosses a column, and pressing it <b>connects that row to that column</b>. 4 + 4 = 8 wires for 16 keys.</p>` },
+      { title: 'How a scan finds the key', view: 'keyv', have: ['kp1'], power: false,
+        body: `<p>The program sets the <b>rows</b> as outputs one after another and reads the <b>columns</b> (with pull-ups). When row 2 is driven and column 3 reads active, the pressed key is at row 2, column 3: the key <b>6</b>. The library does this hundreds of times per second. <b>Click the keypad</b> in the 3D view.</p><p class="warn">The pin order of the eight pins differs between makers: check the printing on yours.</p>` },
+      { title: 'Wire it', view: 'keyv', have: KP_IDS, power: false, pins: ['D9', 'D8', 'D7', 'D6', 'D5', 'D4', 'D3', 'D2'], body: `<ul><li>Rows R1 to R4 → pins <b>9, 8, 7, 6</b></li><li>Columns C1 to C4 → pins <b>5, 4, 3, 2</b></li></ul>` },
+      { title: 'The code', view: 'keyv', have: KP_IDS, showCode: true, power: true, body: `<p>Click lines <b>11</b>, <b>12</b> and <b>20</b>.</p>` },
+      { title: 'Run it and press keys', view: 'keyv', have: KP_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>, then press keys on the keypad in the panel. The Serial Monitor prints each key, and the panel shows which <b>row and column</b> got connected.</p><p class="sim">Simulated keypad.</p>` },
+      { title: 'Summary', view: 'keyv', have: KP_IDS, power: true,
+        body: `<ul><li>A matrix keypad: rows × columns wires for rows × columns keys.</li><li>The scan drives one row and reads the columns; the crossing is the key.</li><li><code>keypad.getKey()</code> returns the character or 0.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How many wires does a 4×4 matrix keypad use?', a: ['4', '8', '16', '32'], c: 1, why: '4 rows + 4 columns.' },
+      { q: 'What does pressing a key do?', a: ['Connects its row to its column', 'Sends a Wi-Fi packet', 'Powers the keypad', 'Resets the board'], c: 0, why: 'The key is a switch between a row and a column.' },
+      { q: 'getKey() returns 0. What does it mean?', a: ['No key is pressed', 'Key 0 is pressed', 'The keypad is broken', 'The baud rate is wrong'], c: 0, why: 'It returns 0 when nothing is pressed.' },
+    ],
+    sources: [SRC.keypadlib, ],
   },
 ];

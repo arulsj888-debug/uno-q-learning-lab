@@ -780,6 +780,33 @@ export class StepperULN2003 {
   }
 }
 
+// ---------------------------------------------------------------- 4x4 membrane keypad: 16 flat keys on a black plate, ribbon to an 8-pin header (R1..R4, C1..C4)
+export class KeypadModule {
+  constructor() {
+    const g = this.group = new THREE.Group(); this.hw = 'keypad';
+    const KEYS = ['1', '2', '3', 'A', '4', '5', '6', 'B', '7', '8', '9', 'C', '*', '0', '#', 'D'], W = 56, D = 64, PX = 14;
+    const plate = new THREE.Mesh(new RoundedBoxGeometry(W, 1.4, D, 1, 0.4), new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.6 })); plate.position.set(0, 2.2, 0); g.add(plate);
+    const tex = canvasTex(W * PX, D * PX, (c, w, h) => {
+      c.clearRect(0, 0, w, h);
+      KEYS.forEach((k, i) => { const col = i % 4, row = (i / 4) | 0, x = (6 + col * 12 + 5) * PX, y = (6 + row * 14 + 6) * PX; c.fillStyle = '#c9ccd2'; c.beginPath(); c.roundRect(x - 5 * PX, y - 5.5 * PX, 10 * PX, 11 * PX, 14); c.fill(); c.fillStyle = '#1b1d22'; c.font = '700 ' + (6 * PX) + 'px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(k, x, y + 0.5 * PX); });
+    });
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })); top.rotation.x = -Math.PI / 2; top.position.set(0, 2.92, 0); g.add(top);
+    this.hl = new THREE.Mesh(new THREE.PlaneGeometry(10, 11), new THREE.MeshBasicMaterial({ color: 0xffb02e, transparent: true, opacity: 0.8 })); this.hl.rotation.x = -Math.PI / 2; this.hl.visible = false; g.add(this.hl);
+    this.keyPos = {}; KEYS.forEach((k, i) => { this.keyPos[k] = [-W / 2 + 6 + (i % 4) * 12 + 5, -D / 2 + 6 + ((i / 4) | 0) * 14 + 6]; });
+    // ribbon to the header
+    const names = ['R1', 'R2', 'R3', 'R4', 'C1', 'C2', 'C3', 'C4'], y0 = 4.3, pinZ = -D / 2 - 14; this.pinZ = pinZ; this.pinTop = y0 + 8.2; this.pinX = {};
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(20.4, 0.3, 14), new THREE.MeshStandardMaterial({ color: 0xd9b85a, roughness: 0.6 })); rib.position.set(0, 2.4, -D / 2 - 7); g.add(rib);
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(8 * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0, pinZ); g.add(strip);
+    names.forEach((n, i) => { const x = (i - 3.5) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, y0 + 4.2, pinZ); g.add(p); });
+    tagHW(g, 'keypad');
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    return { pos: this.group.localToWorld(new THREE.Vector3(this.pinX[name], this.pinTop, this.pinZ)), dir: new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion())) };
+  }
+  setKey(k) { const p = k && this.keyPos[k]; this.hl.visible = !!p; if (p) this.hl.position.set(p[0], 2.95, p[1]); }
+}
+
 // ---------------------------------------------------------------- 38 kHz IR receiver (TSOP382-type, minicast 5.0 x 6.95 x 4.8 mm), dome toward you, legs OUT GND VS
 export class IRReceiver {
   constructor() {
@@ -2176,6 +2203,17 @@ export const HW_INFO = {
       'Power the driver board from the 5 V pin and share GND with the board.',
     ],
     src: 'Vendor datasheet copies of the 28BYJ-48 (no single manufacturer datasheet found); Arduino Stepper library',
+  },
+  keypad: {
+    name: '4×4 matrix keypad (membrane)', tag: 'Sixteen keys on eight wires',
+    summary: 'The 16 keys are arranged as 4 rows and 4 columns: pressing a key connects its row wire to its column wire. A program drives the rows one at a time and reads the columns to find which key is pressed. Eight wires instead of sixteen.',
+    points: [
+      'The eight header pins are usually R1 to R4 (rows) then C1 to C4 (columns), but the order differs between makers: check the printing or test with a continuity check.',
+      'Layout of the common keypad: 1 2 3 A / 4 5 6 B / 7 8 9 C / * 0 # D.',
+      'The Keypad library (Mark Stanley and Alexander Brevig) scans the matrix and debounces the keys: keypad.getKey() returns the key character, or 0.',
+      'It is a passive part: only switches, no supply voltage.',
+    ],
+    src: 'Keypad library reference; common 4×4 membrane keypad layout (vendor listings)',
   },
   irrx: {
     name: 'IR receiver, 38 kHz (TSOP382-type)', tag: 'Receives infrared remote controls',
