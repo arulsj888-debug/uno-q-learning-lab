@@ -190,6 +190,20 @@ r = rgbOK('uno3', u3, '✔ Diode'); ok(r.parts.d1.msg.startsWith('Conducting') &
   r = evaluate({ boardKind: 'uno3', pinInfo: u3, parts: noD, pinCfg: x.pins, powered: true, env, t: 0 }); ok(r.notes.some(n => /flyback diode/.test(n.text)), 'UNO R3: transistor switching a motor without a flyback diode is warned');
   const withD = noD.concat([{ id: 'd1', type: 'diode', a: 'a12', k: 'a16' }, { id: 'ld11', type: 'lead', from: 'mot1.M1', to: 'a16', color: 'red', lift: 14 }]);
   r = evaluate({ boardKind: 'uno3', pinInfo: u3, parts: withD, pinCfg: x.pins, powered: true, env, t: 0 }); ok(!r.notes.some(n => /flyback diode/.test(n.text)), 'UNO R3: a diode across the motor (anode on the collector side) removes the warning'); }
+// ---- IRLZ44N logic-level MOSFET
+for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3'], ['esp32', findPinE32, 'ESP32']]) {
+  r = rgbOK(kind, info, '✔ MOSFET switches a 6 V lamp'); ok(r.parts.q1.status === 'ok' && r.parts.lamp1.level > 0.5 && r.parts.q1.Id > 0.25, name + ': MOSFET with a gate resistor switches the 6 V lamp on (' + (r.parts.q1.Id * 1000).toFixed(0) + ' mA)');
+  r = rgbOK(kind, info, '✖ MOSFET gate not connected'); ok(r.parts.q1.status === 'warn' && r.parts.lamp1.level < 0.2, name + ': floating gate leaves the lamp off and warns');
+  r = rgbOK(kind, info, '✖ MOSFET drain and source swapped'); ok(r.parts.q1.status === 'warn' && r.parts.lamp1.level > 0.5 && r.notes.some(n => /body diode/.test(n.text)), name + ': swapped drain and source lights the lamp through the body diode and warns');
+  r = rgbOK(kind, info, '✖ MOSFET motor without'); ok(r.notes.some(n => /flyback diode/.test(n.text)), name + ': MOSFET motor without a flyback diode is warned');
+}
+r = rgbOK('uno3', u3, '✔ MOSFET switches a motor'); ok(r.parts.q1.status === 'ok' && r.parts.q1.Id > 0.8 && !r.notes.some(n => /flyback diode/.test(n.text)), 'UNO R3: MOSFET carries the motor current (about 1 A) with a flyback diode, no warning (' + (r.parts.q1.Id * 1000).toFixed(0) + ' mA)');
+r = rgbOK('uno3', u3, '✖ Transistor without'); ok(r.newDamage.has('D5'), 'UNO R3: (control) NPN without a base resistor still damages the pin');
+r = rgbOK('unoq', uno, '⚠ MOSFET switches a motor'); ok(r.parts.q1.status === 'warn' && r.notes.some(n => /4 V and above/.test(n.text)), 'UNO Q: 3.3 V gate with a 1 A motor warns that the datasheet gives no value below 4 V');
+{ const x = EXAMPLES('uno3').find(e => e.title.startsWith('✔ MOSFET switches a 6 V'));
+  const set = (pin, mode) => evaluate({ boardKind: 'uno3', pinInfo: u3, parts: x.parts, pinCfg: { D5: { mode } }, powered: true, env, t: 0 });
+  r = set('D5', 'out0'); ok(r.parts.lamp1.level < 0.2 && r.parts.q1.status === 'off', 'UNO R3: pin LOW switches the MOSFET and the lamp off');
+  r = set('D5', 'in'); ok(r.parts.q1.status === 'warn', 'UNO R3: gate pin set to input is warned'); }
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

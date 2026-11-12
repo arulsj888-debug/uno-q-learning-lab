@@ -38,6 +38,17 @@ export function EXAMPLES(boardKind) {
     w('w2', P.gnd, 'b10', 'black'),
     { id: 'bat1', type: 'battery' }, { id: 'lamp1', type: 'lamp' },
     ld('ld1', 'bat1.POS', 'lamp1.L1', 'red'), ld('ld2', 'lamp1.L2', 'c12', 'orange'), ld('ld3', 'bat1.NEG', 'c10', 'black')];
+  // IRLZ44N low-side switch: the pin drives the gate through 220 ohm, a 10 k pull-down holds it off, source column joined to GND and the battery minus
+  const mosParts = (pin, gnd, ldf, o = {}) => {
+    const load = o.motor ? 'mot1' : 'lamp1', t1 = o.motor ? 'M1' : 'L1', t2 = o.motor ? 'M2' : 'L2', dc = o.swap ? 'c12' : 'c11', sc = o.swap ? 'c11' : 'c12', gcol = o.swap ? 'b11' : 'b12';
+    return [
+      { id: 'q1', type: 'mosfet', row: 'e', col: 10 },
+      ...(o.nogate ? [] : [res('r1', 'a5', 'a10', 220), w('w1', pin, 'b5', 'yellow'), res('r2', 'd10', 'd14', 10000), w('w3', gnd, 'b14', 'black')]),
+      w('w2', gnd, gcol, 'black'),
+      { id: 'bat1', type: 'battery' }, { id: load, type: o.motor ? 'motor' : 'lamp' },
+      ldf('ld1', 'bat1.POS', load + '.' + t1, 'red'), ldf('ld2', load + '.' + t2, dc, 'orange'), ldf('ld3', 'bat1.NEG', sc, 'black'),
+      ...(o.diode ? [{ id: 'd1', type: 'diode', a: 'a11', k: 'a16' }, ldf('ld4', 'mot1.M1', 'a16', 'red')] : [])];
+  };
   const motorParts = ground => [{ id: 'u1', type: 'l293d', col: 12 }, { id: 'bat1', type: 'battery' }, { id: 'mot1', type: 'motor' },
     w('w1', '5V', 'a12', 'red'), w('w3', 'D5', 'j12', 'orange'), w('w4', 'D7', 'j13', 'yellow'), w('w5', 'D8', 'j18', 'blue'),
     ...(ground ? [w('w6', 'GND3', 'a15', 'black')] : []), ld('ld7', 'bat1.POS', 'j19', 'red'), ld('ld8', 'bat1.NEG', 'j16', 'black'), ld('ld9', 'mot1.M1', 'j14', 'white'), ld('ld10', 'mot1.M2', 'j17', 'green')];
@@ -101,6 +112,11 @@ export function EXAMPLES(boardKind) {
     { title: '✖ Base resistor too large (100 kΩ)', parts: qLamp(P.sig, 100000, false, false), pins: { [P.sig]: { mode: 'out1' } }, note: 'Only about 40 µA flows into the base, so the collector current is far too small and the lamp stays dark. For a switch the base current should be about one tenth of the load current.' },
     { title: '✖ Emitter and collector swapped', parts: qLamp(P.sig, u3 ? 1000 : 470, true, false), pins: { [P.sig]: { mode: 'out1' } }, note: 'The transistor is turned round: the PN2222A (flat side toward you) has emitter, base, collector from left to right. Swapped, nothing switches and the lamp stays dark. Other transistor types have a different pin order: always check the datasheet.' },
     { title: '✔ Diode: current flows one way', parts: [w('w1', P.v3, 'a10', 'orange'), { id: 'd1', type: 'diode', a: 'b10', k: 'b14' }, res('r1', 'c14', 'c18', 1000), led('led1', 'd18', 'd19'), w('w2', P.gnd, 'e19', 'black')], pins: {}, note: 'Current flows from the anode through the diode to the cathode (the end with the silver band): the LED lights, and the diode costs about 0.7 – 0.9 V of the supply. Delete the diode and place it the other way round: it blocks the current and the LED goes out.' },
+    { title: '✔ MOSFET switches a 6 V lamp', parts: mosParts(P.sig, P.gnd, ld), pins: { [P.sig]: { mode: 'out1' } }, note: 'The pin drives the GATE of an IRLZ44N through 220 Ω. The gate takes no steady current: only its voltage matters. The MOSFET lets the lamp current flow from the 6 V pack through the drain to the source and GND. The 10 kΩ resistor from gate to GND keeps it OFF while the pin is not yet an output. Set the pin to Output LOW and the lamp goes out.' },
+    { title: u3 ? '✔ MOSFET switches a motor (about 1 A) with a flyback diode' : '⚠ MOSFET switches a motor from a 3.3 V pin', parts: mosParts(P.sig, P.gnd, ld, { motor: true, diode: true }), pins: { [P.sig]: { mode: 'out1' } }, note: u3 ? 'The motor takes about 1 A, more than the 600 mA a PN2222A can carry: the MOSFET handles it easily (its on-resistance at 5 V is 25 mΩ). The 1N4007 across the motor (cathode band to the battery side) absorbs the voltage spike when the motor is switched off.' : 'The motor takes about 1 A. The IRLZ44N datasheet guarantees its on-resistance only for a gate voltage of 4 V and above (35 mΩ at 4 V) and gives no value at 3.3 V, so the app warns. Many real parts do switch at 3.3 V, but it is not guaranteed: for a motor use a 5 V gate drive or a gate driver.' },
+    { title: '✖ MOSFET motor without a flyback diode', parts: mosParts(P.sig, P.gnd, ld, { motor: true }), pins: { [P.sig]: { mode: 'out1' } }, note: 'When the motor is switched off, its coil keeps pushing current and makes a voltage spike far above the supply. Without a diode across the motor, the spike can destroy the MOSFET.' },
+    { title: '✖ MOSFET gate not connected', parts: mosParts(P.sig, P.gnd, ld, { nogate: true }), pins: {}, note: 'The gate is left floating. A MOSFET gate holds charge and can switch the load on or off by itself, even from a hand nearby. Always drive the gate from a pin and add a resistor from gate to GND.' },
+    { title: '✖ MOSFET drain and source swapped', parts: mosParts(P.sig, P.gnd, ld, { swap: true }), pins: { [P.sig]: { mode: 'out1' } }, note: 'The load is on the source leg and GND on the drain leg. The built-in body diode (source to drain) now conducts, so the lamp is on whatever the gate does and cannot be switched off. The TO-220 pins are gate, drain, source from left to right (text toward you).' },
     { title: '✖ Short circuit', parts: [w('w1', P.v5, 'r:top+:3', 'red'), w('w2', P.gnd, 'r:top+:4', 'black')], pins: {}, note: 'The 5 V pin and a GND pin are joined by the same power rail. Nothing limits the current, so the power would be cut (here the cable pops out).' },
   ];
   return list;
@@ -123,6 +139,17 @@ function EXAMPLES_E32() {
     w('w2', 'GND2', 'b10', 'black'),
     { id: 'bat1', type: 'battery' }, { id: 'lamp1', type: 'lamp' },
     ldE('ld1', 'bat1.POS', 'lamp1.L1', 'red'), ldE('ld2', 'lamp1.L2', 'c12', 'orange'), ldE('ld3', 'bat1.NEG', 'c10', 'black')];
+  // IRLZ44N low-side switch: the pin drives the gate through 220 ohm, a 10 k pull-down holds it off, source column joined to GND and the battery minus
+  const mosParts = (pin, gnd, ldf, o = {}) => {
+    const load = o.motor ? 'mot1' : 'lamp1', t1 = o.motor ? 'M1' : 'L1', t2 = o.motor ? 'M2' : 'L2', dc = o.swap ? 'c12' : 'c11', sc = o.swap ? 'c11' : 'c12', gcol = o.swap ? 'b11' : 'b12';
+    return [
+      { id: 'q1', type: 'mosfet', row: 'e', col: 10 },
+      ...(o.nogate ? [] : [res('r1', 'a5', 'a10', 220), w('w1', pin, 'b5', 'yellow'), res('r2', 'd10', 'd14', 10000), w('w3', gnd, 'b14', 'black')]),
+      w('w2', gnd, gcol, 'black'),
+      { id: 'bat1', type: 'battery' }, { id: load, type: o.motor ? 'motor' : 'lamp' },
+      ldf('ld1', 'bat1.POS', load + '.' + t1, 'red'), ldf('ld2', load + '.' + t2, dc, 'orange'), ldf('ld3', 'bat1.NEG', sc, 'black'),
+      ...(o.diode ? [{ id: 'd1', type: 'diode', a: 'a11', k: 'a16' }, ldf('ld4', 'mot1.M1', 'a16', 'red')] : [])];
+  };
   const neoE32 = (vcc, din, gnd) => [{ id: 'neo1', type: 'neopixel' }, ldE('ld1', 'neo1.VCC', 'a10', 'red'), ldE('ld2', 'neo1.DIN', 'a11', 'yellow'), ldE('ld3', 'neo1.GND', 'a12', 'black'), w('w1', vcc, 'b10', 'red'), w('w2', din, 'b11', 'yellow'), w('w3', gnd, 'b12', 'black')];
   return [
     { title: '✔ LED with a resistor (works)', parts: ledCircuit(false), pins: { G16: { mode: 'out1' } }, note: 'GPIO16 is set to <b>Output HIGH</b> (3.3 V), the 220 Ω resistor limits the current to about 5 mA, and the LED’s long leg (+) faces the pin. Try changing the pin to <b>Input</b>, or the resistor to 100 kΩ.' },
@@ -150,6 +177,11 @@ function EXAMPLES_E32() {
     { title: '✔ OLED 128×64 (SSD1306, I²C)', parts: i2cDispE('oled', 'oled1', '3V3', 'G21', 'G22'), pins: { G21: { mode: 'i2c' }, G22: { mode: 'i2c' } }, note: 'GND, VCC (3V3), SCL (GPIO22) and SDA (GPIO21). The display answers at address 0x3C (0x3D on some modules).' },
     { title: '✔ Transistor switches a 6 V lamp', parts: qLampE('G16', 470, false), pins: { G16: { mode: 'out1' } }, note: 'GPIO16 cannot drive a lamp that needs about 300 mA. It drives the BASE of a PN2222A through a 470 Ω resistor (about 5 mA); the transistor lets the lamp’s current flow from the 6 V pack through the collector to the emitter and GND. The battery − and the board GND are joined at the emitter column.' },
     { title: '✖ Transistor without a base resistor', parts: qLampE('G16', 0, false), pins: { G16: { mode: 'out1' } }, note: 'The base is wired straight to GPIO16. Nothing limits the current into the base-emitter junction: the pin has to deliver far more than it can and is damaged. Put a resistor in the base line.' },
+    { title: '⚠ MOSFET switches a motor from a 3.3 V pin', parts: mosParts('G16', 'GND2', ldE, { motor: true, diode: true }), pins: { G16: { mode: 'out1' } }, note: 'The motor takes about 1 A. The IRLZ44N datasheet guarantees its on-resistance only for a gate voltage of 4 V and above (35 mΩ at 4 V) and gives no value at 3.3 V, so the app warns. Many real parts do switch at 3.3 V, but it is not guaranteed: for a motor use a 5 V gate drive or a gate driver.' },
+    { title: '✔ MOSFET switches a 6 V lamp', parts: mosParts('G16', 'GND2', ldE), pins: { G16: { mode: 'out1' } }, note: 'GPIO16 drives the GATE of an IRLZ44N through 220 Ω. The gate takes no steady current: only its voltage matters. The lamp current flows from the 6 V pack through the drain and source to GND. The 10 kΩ resistor from gate to GND keeps it OFF while the pin is not yet an output.' },
+    { title: '✖ MOSFET motor without a flyback diode', parts: mosParts('G16', 'GND2', ldE, { motor: true }), pins: { G16: { mode: 'out1' } }, note: 'When the motor is switched off, its coil keeps pushing current and makes a voltage spike far above the supply. Without a diode across the motor, the spike can destroy the MOSFET.' },
+    { title: '✖ MOSFET gate not connected', parts: mosParts('G16', 'GND2', ldE, { nogate: true }), pins: {}, note: 'The gate is left floating. A MOSFET gate holds charge and can switch the load on or off by itself. Always drive the gate from a pin and add a resistor from gate to GND.' },
+    { title: '✖ MOSFET drain and source swapped', parts: mosParts('G16', 'GND2', ldE, { swap: true }), pins: { G16: { mode: 'out1' } }, note: 'The load is on the source leg and GND on the drain leg. The built-in body diode now conducts, so the lamp is on whatever the gate does. The TO-220 pins are gate, drain, source from left to right (text toward you).' },
     { title: '✖ EN pin wired to GND (chip held in reset)', parts: [...ledCircuit(false), w('w3', 'EN', 'a20', 'yellow'), w('w4', 'GND1', 'b20', 'black')], pins: { G16: { mode: 'out1' } }, note: 'GPIO16 is set to Output HIGH and the LED circuit is correct, but the EN pin is joined to GND. EN is the chip-enable (reset) input: while it is LOW the ESP32 does not run, so no pin is driven and the LED stays dark. This is what the EN button does while you hold it. Delete the EN wire and the LED lights.' },
     { title: '✖ 5 V on a 3.3 V pin', parts: [w('w1', 'VIN', 'a10', 'red'), w('w2', 'G17', 'b10', 'yellow')], pins: { G17: { mode: 'in' } }, note: 'VIN carries the 5 V from USB. ESP32 pins are 3.3 V only (3.6 V at most), so 5 V on a GPIO pin can damage the chip. Press “Replace broken parts”.' },
     { title: '✖ LED without a resistor', parts: [w('w1', 'VIN', 'a10', 'red'), led('led1', 'c10', 'c11'), w('w2', 'GND2', 'd11', 'black')], pins: {}, note: 'The LED is connected straight to the 5 V pin with no resistor. Nothing limits the current, so it burns out in a moment. Press “Replace broken parts”, then put a resistor in the path.' },

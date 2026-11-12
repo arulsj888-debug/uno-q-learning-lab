@@ -9,7 +9,7 @@
 //   { id:'t1', type:'tmp36', row:'e', col:18 }        legs +VS e18, VOUT e19, GND e20 (flat face toward +z)
 //   { id:'w1', type:'wire', from:'D5', to:'a10', color:'yellow' }
 import * as THREE from 'three';
-import { Resistor, LED5mm, RGBLED5mm, DHTSensor, NeoPixelStrip, Diode1N4007, TransistorPN2222A, LCD1602Module, OLED128x64Module, JoystickModule, EncoderModule, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
+import { Resistor, LED5mm, RGBLED5mm, DHTSensor, NeoPixelStrip, Diode1N4007, TransistorPN2222A, MOSFETIRLZ44N, LCD1602Module, OLED128x64Module, JoystickModule, EncoderModule, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
 
 import { resistorBands } from './freebuild/circuit.js';
 
@@ -85,6 +85,7 @@ export class Bench {
       case 'ldr': obj = new LDR(); break;
       case 'tmp36': obj = new TMP36(); break;
       case 'npn': obj = new TransistorPN2222A(); break;
+      case 'mosfet': obj = new MOSFETIRLZ44N(); break;
       case 'diode': obj = new Diode1N4007(this.point(d.a).distanceTo(this.point(d.k))); break;
       case 'sht31': obj = new SHT31Breakout(); break;
       case 'hcsr04': obj = new HCSR04(); break;
@@ -126,7 +127,7 @@ export class Bench {
       case 'pot': { return { pos: this.bb.hole(d.row, d.col + 2), rotY: 0 }; }
       case 'buzzer': { const p = P(d.plus), m = P(d.minus); return { pos: p.clone().lerp(m, 0.5), rotY: Math.atan2(-(m.z - p.z), m.x - p.x) }; }
       case 'ldr': { const a = P(d.a), b = P(d.b); return { pos: a.clone().lerp(b, 0.5), rotY: Math.atan2(-(b.z - a.z), b.x - a.x) }; }
-      case 'tmp36': case 'npn': return { pos: this.bb.hole(d.row, d.col + 1), rotY: d.flip ? Math.PI : 0 };
+      case 'tmp36': case 'npn': case 'mosfet': return { pos: this.bb.hole(d.row, d.col + 1), rotY: d.flip ? Math.PI : 0 };
       case 'diode': { const a = P(d.a), k = P(d.k); return { pos: a.clone().lerp(k, 0.5), rotY: Math.atan2(-(k.z - a.z), k.x - a.x) }; }
       case 'sht31': return { pos: this.bb.hole(d.row, d.col + 3), rotY: 0 };   // 7 pins in columns col … col+6
       case 'pir': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };

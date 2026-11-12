@@ -56,6 +56,7 @@ export function terminals(d) {
     case 'dht': return [['VCC', `${row}${c}`], ['DATA', `${row}${c + 1}`], ['NC', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'diode': return [['A', d.a], ['K', d.k]];
     case 'npn': return d.flip ? [['E', `${row}${c + 2}`], ['B', `${row}${c + 1}`], ['C', `${row}${c}`]] : [['E', `${row}${c}`], ['B', `${row}${c + 1}`], ['C', `${row}${c + 2}`]];
+    case 'mosfet': return d.flip ? [['S', `${row}${c + 2}`], ['D', `${row}${c + 1}`], ['G', `${row}${c}`]] : [['G', `${row}${c}`], ['D', `${row}${c + 1}`], ['S', `${row}${c + 2}`]];
     case 'rgbled': return [['R', `${row}${c}`], ['C', `${row}${c + 1}`], ['G', `${row}${c + 2}`], ['B', `${row}${c + 3}`]];
     case 'pir': return [['VCC', `${d.id}.VCC`], ['OUT', `${d.id}.OUT`], ['GND', `${d.id}.GND`]];
     case 'wire': case 'fwire': case 'lead': case 'qwiic': return [['from', d.from], ['to', d.to]];
@@ -107,6 +108,11 @@ export function solveDC(n, elems, temp = 25) {
         else if (vce < 0.3) { const K = tgt / 0.3; e.ic = K * Math.max(0, vce); G(e.c, e.e, K + 1e-9); }
         else { e.ic = tgt; G(e.c, e.e, 1e-9); I(e.c, -tgt); I(e.e, tgt); }
         e.ib = ib;
+      } else if (e.t === 'F') {   // logic-level N-MOSFET (IRLZ44N): gate takes no current; drain-source is a conductance set by VGS (datasheet RDS(on): 35 mohm at 4 V, 25 mohm at 5 V, 22 mohm at 10 V; off below about 1.5 V; linear ramp in between is an approximation)
+        const vgs = v[e.g] - v[e.s], vds = v[e.d] - v[e.s];
+        const rds = vgs >= 10 ? 0.022 : vgs >= 5 ? 0.025 - (vgs - 5) * 0.003 / 5 : 0.035 - (Math.max(vgs, 4) - 4) * 0.010;
+        const ramp = Math.min(1, Math.max(0, (vgs - 1.5) / 2.5)), g = ramp > 0 ? ramp / rds : 1e-9;
+        e.vgs = vgs; e.id = vds > 0 ? g * vds : 0; G(e.d, e.s, vds > 0 ? g + 1e-9 : 1e-9);
       } else if (e.t === 'D') {
         const old = dv.has(e) ? dv.get(e) : 0, ex = Math.exp(Math.min(old, 6) / NVT);
         const gd = e.Is / NVT * ex + 1e-12, id = e.Is * (ex - 1), ieq = id - gd * old;
@@ -300,6 +306,11 @@ export function evaluate(model) {
         if (!dead) elems.push(dbe, q);
         pe[d.id] = { b: B, c: C, e: E, q, dbe };
       }
+      else if (d.type === 'mosfet') {
+        const Gn = nid(T(d, 'G')), Dn = nid(T(d, 'D')), Sn = nid(T(d, 'S')), body = { t: 'D', a: Sn, b: Dn, Is: 1e-3 / Math.exp(0.7 / NVT) }, f = { t: 'F', g: Gn, d: Dn, s: Sn, vgs: 0, id: 0 };
+        if (!dead) { elems.push(body, f); }
+        pe[d.id] = { g: Gn, d: Dn, s: Sn, f, body };
+      }
       else if (d.type === 'rgbled') {
         // three LED dice with one common leg: common cathode (d.ca falsy) = colour pins are the anodes, common anode = colour pins are the cathodes
         const C = nid(T(d, 'C')), dice = ['R', 'G', 'B'].map(k => { const lt = RGB_VF[k], Is = 0.02 / Math.exp(lt / NVT), pin = nid(T(d, k)), e = d.ca ? { t: 'D', a: C, b: pin, Is } : { t: 'D', a: pin, b: C, Is }; if (!dead) elems.push(e); return { a: e.a, b: e.b, Is }; });
@@ -389,6 +400,7 @@ export function evaluate(model) {
       else if (d.type === 'neopixel' || d.type === 'lcd1602' || d.type === 'oled') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'diode') { const V = v[q.a] - v[q.b], I = burnt.has(d.id) ? 0 : q.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'Imax', I, 'max'); }
       else if (d.type === 'npn') { acc(d.id, 'Vbe', v[q.b] - v[q.e]); acc(d.id, 'Vce', v[q.c] - v[q.e]); acc(d.id, 'Ic', q.q.ic); acc(d.id, 'Ib', q.q.ib); acc(d.id, 'Icmax', q.q.ic, 'max'); }
+      else if (d.type === 'mosfet') { acc(d.id, 'Vgs', v[q.g] - v[q.s]); acc(d.id, 'Vgsmax', v[q.g] - v[q.s], 'max'); acc(d.id, 'Vgsmin', v[q.g] - v[q.s], 'min'); acc(d.id, 'Vds', v[q.d] - v[q.s]); acc(d.id, 'Id', q.f.id); acc(d.id, 'Idmax', q.f.id, 'max'); }
       else if (d.type === 'joystick') { acc(d.id, 'Vs', v[q.vn] - v[q.gn]); acc(d.id, 'Vx', v[q.jx] - v[q.gn]); acc(d.id, 'Vy', v[q.jy] - v[q.gn]); }
       else if (d.type === 'encoder') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'tmp36') { acc(d.id, 'Vs', v[q.vs] - v[q.g]); acc(d.id, 'Vout', v[q.out] - v[q.g]); }
@@ -478,6 +490,27 @@ export function evaluate(model) {
           const other = t1 === cn ? t2 : t1;
           const prot = parts.some(p => p.type === 'diode' && !burnt.has(p.id) && find(T(p, 'A')) === cn && find(T(p, 'K')) === other);
           if (!prot) note('warn', `${label} switches an inductive load (${nameOf(l)}) without a flyback diode. When the current stops, the coil makes a voltage spike far above the supply that can destroy the transistor. Put a diode across the load: cathode (band) to the supply side, anode to the transistor side.`, d.id);
+        }
+      }
+    } else if (d.type === 'mosfet') {
+      const Vgs = s.Vgs ?? 0, Vds = s.Vds ?? 0, Id = s.Id ?? 0, gn = find(T(d, 'G')), drv = gpioOn(d, 'G');
+      if (burnt.has(d.id)) { R.status = 'bad'; R.msg = 'Burnt out.'; note('bad', burnWhy[d.id] || `${label} is burnt out. Delete it and place a new one.`, d.id); }
+      else if ((s.Vgsmax ?? 0) > 16 || (s.Vgsmin ?? 0) < -16) burn(d.id, `${label} is destroyed: ${Math.max(s.Vgsmax ?? 0, -(s.Vgsmin ?? 0)).toFixed(1)} V between gate and source, but the IRLZ44N allows at most ±16 V.`);
+      else if (!powered) R.status = 'off';
+      else if (!drv.length && !supplyNets.has(gn)) { R.status = 'warn'; R.msg = 'Gate not connected.'; note('warn', `${label}: the gate is not connected to anything. A MOSFET gate that floats can pick up static charge and switch by itself. Drive it from a pin (through about 220 Ω) and add a 10 kΩ resistor from gate to GND so it stays OFF at start-up.`, d.id); }
+      else if (drv.length && drv.every(id => INPUT_MODES.includes(modeOf(id)))) { R.status = 'warn'; R.msg = 'Gate pin is an input.'; note('warn', `${label}: the gate is wired to a pin that is set to input, so nothing drives it and it floats. Set the pin to an output.`, d.id); }
+      else if (Vds < -0.3) { R.status = 'warn'; R.msg = `Body diode conducts (${(-Vds).toFixed(2)} V).`; note('warn', `${label}: current flows through the built-in body diode whatever the gate does, so the load cannot be switched off. Drain and source are swapped: the TO-220 pins are gate, drain, source from left to right (front toward you).`, d.id); }
+      else if (Vgs < 1.0) { R.status = 'off'; R.msg = `OFF: gate ${Vgs.toFixed(1)} V is below the threshold.`; note('info', `${label} is OFF: the gate is at ${Math.max(0, Vgs).toFixed(1)} V, below the gate threshold (VGS(th) is 1.0 to 2.0 V in the datasheet). Set the pin to Output HIGH to switch it on.`, d.id); }
+      else if (Vgs < 4 && Id > 0.5) { R.status = 'warn'; R.msg = `Gate only ${Vgs.toFixed(1)} V: ${(Id * 1000).toFixed(0)} mA.`; note('warn', `${label} switches ${(Id * 1000).toFixed(0)} mA with only ${Vgs.toFixed(1)} V on the gate. The IRLZ44N datasheet guarantees its on-resistance only for 4 V and above (35 mΩ at 4 V, 25 mΩ at 5 V, 22 mΩ at 10 V) and gives no value at 3.3 V, so this much current is not guaranteed to switch cleanly. Use a 5 V gate drive or a gate-driver / level shifter.`, d.id); }
+      else { R.msg = `ON: ${(Id * 1000).toFixed(0)} mA through the load, VGS ${Vgs.toFixed(1)} V, VDS ${Math.max(0, Vds).toFixed(2)} V.`; note('ok', `${label} is ON: ${(Id * 1000).toFixed(0)} mA flows from drain to source (the gate takes no current).${Vgs < 4 ? ' The gate is below 4 V: the datasheet gives no on-resistance there, which is fine for a small load like this.' : ''}`, d.id); }
+      if (powered && !burnt.has(d.id)) {
+        const cn = find(T(d, 'D'));
+        for (const l of parts) if (l.type === 'motor' || l.type === 'relay') {
+          const t1 = find(T(l, l.type === 'motor' ? 'M1' : 'DCP')), t2 = find(T(l, l.type === 'motor' ? 'M2' : 'DCN'));
+          if (t1 !== cn && t2 !== cn) continue;
+          const other = t1 === cn ? t2 : t1;
+          const prot = parts.some(p => p.type === 'diode' && !burnt.has(p.id) && find(T(p, 'A')) === cn && find(T(p, 'K')) === other);
+          if (!prot) note('warn', `${label} switches an inductive load (${nameOf(l)}) without a flyback diode. The voltage spike when the current stops can destroy the MOSFET. Put a diode across the load: cathode (band) to the supply side, anode to the MOSFET side.`, d.id);
         }
       }
     } else if (d.type === 'lcd1602' || d.type === 'oled') {
@@ -790,6 +823,13 @@ export function evaluate(model) {
     const sig = pi ? 'a GPIO pin' : e32 ? 'a GPIO pin (for example GPIO16)' : 'a digital pin (for example D7)';
     const adcTxt = pi ? 'a GPIO pin' : e32 ? 'an ADC pin (for example GPIO34)' : 'an analog pin A0–A5';
     // ECHO behind a voltage divider: the divider's lower resistor ends on GND, so the net legitimately reaches GND as well as one GPIO pin
+    // MOSFET gate: driven from one GPIO pin; a pull-down resistor to GND on the same net is correct and wanted
+    const gateItem = d => {
+      const what = sig + ' (through about 220 Ω; a 10 kΩ pull-down to GND is good)', ids = reachPins(d, 'G'), gp = ids.filter(id => usedPins.get(id).k === 'gpio');
+      if (gp.length === 1 && ids.every(id => ['gpio', 'gnd'].includes(usedPins.get(id).k))) return { ok: true, text: `G: ${what}` };
+      const have = ids.map(id => usedPins.get(id).name);
+      return { ok: false, text: ids.length ? `G is on ${have.join(', ')}, but it should go to ${what}.` : `G is not connected to a board pin yet. It should go to ${what}. A floating gate can switch by itself.` };
+    };
     const echoDivider = d => {
       const what = 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider', ids = reachPins(d, 'ECHO'), gp = ids.filter(id => usedPins.get(id).k === 'gpio');
       if (gp.length && ids.every(id => ['gpio', 'gnd'].includes(usedPins.get(id).k))) return { ok: true, text: `ECHO: ${what}` };
@@ -808,6 +848,7 @@ export function evaluate(model) {
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
       hcsr04: d => [item(d, 'VCC', ['5v'], name['5v'], 'The HC-SR04 is made for 5 V'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'TRIG', ['gpio'], sig), (pi || e32 ? echoDivider(d) : item(d, 'ECHO', ['gpio'], pi || e32 ? 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider' : u3 ? 'a digital pin (for example D8)' : 'D8 (a 5 V-tolerant pin)', pi || e32 ? 'Its 5 V echo would damage the pin directly' : u3 ? '' : 'Not D3 or A0–A5: they are 3.3 V only', (k, id) => !pi && !e32 ? !k.v3 : true))],
+      mosfet: d => [item(d, 'S', ['gnd'], name.gnd + ' (low-side switch: the source goes to GND)'), gateItem(d)],
       npn: d => [item(d, 'E', ['gnd'], name.gnd + ' (low-side switch: the emitter goes to GND)'), item(d, 'B', ['gpio'], sig + ' (through a base resistor)', 'A transistor needs a resistor in the base line')],
       lcd1602: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VCC', ['5v'], name['5v'] + ' (the LCD is made for 5 V)'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : u3 ? 'A4 (or SDA), the I²C data' : e32 ? 'GPIO21, the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda'), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : u3 ? 'A5 (or SCL), the I²C clock' : e32 ? 'GPIO22, the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl')],
       oled: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VCC', ['3v3', '5v'], name['3v3'] + ' (or 5 V: check your module)'), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : u3 ? 'A5 (or SCL), the I²C clock' : e32 ? 'GPIO22, the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : u3 ? 'A4 (or SDA), the I²C data' : e32 ? 'GPIO21, the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda')],
@@ -830,7 +871,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }

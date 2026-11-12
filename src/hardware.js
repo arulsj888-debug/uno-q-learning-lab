@@ -611,6 +611,27 @@ export class TransistorPN2222A {
   }
 }
 
+// ---------------------------------------------------------------- IRLZ44N logic-level MOSFET (TO-220)
+export class MOSFETIRLZ44N {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const W = 10.2, T = 4.5, H = 9.2, y0 = 5.2;   // TO-220 plastic body: about 10 x 4.5 mm, standing on its legs
+    const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), new THREE.MeshStandardMaterial({ color: 0x17171a, roughness: 0.6 }));
+    body.position.set(0, y0 + H / 2, 0); g.add(body);
+    // metal tab with the mounting hole, flush with the back of the body
+    const sh = new THREE.Shape(); sh.moveTo(-W / 2, 0); sh.lineTo(W / 2, 0); sh.lineTo(W / 2, 6.6); sh.lineTo(-W / 2, 6.6); sh.lineTo(-W / 2, 0);
+    const hole = new THREE.Path(); hole.absarc(0, 3.8, 1.9, 0, Math.PI * 2, true); sh.holes.push(hole);
+    const tab = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 1.3, bevelEnabled: false, curveSegments: 24 }), new THREE.MeshStandardMaterial({ color: 0xb9bcc0, metalness: 0.85, roughness: 0.35 }));
+    tab.position.set(0, y0 + H, -T / 2); g.add(tab);
+    const mark = canvasTex(512, 256, (c, w, h) => { c.clearRect(0, 0, w, h); c.fillStyle = 'rgba(214,216,218,0.92)'; c.font = '700 64px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('IRLZ44N', w / 2, h * 0.34); c.font = '600 34px Arial, Helvetica, sans-serif'; c.fillText('G    D    S', w / 2, h * 0.72); });
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(8.6, 4.3), new THREE.MeshBasicMaterial({ map: mark, transparent: true, depthWrite: false })); label.position.set(0, y0 + H / 2, T / 2 + 0.03); g.add(label);
+    for (const x of [-2.54, 0, 2.54]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.8, y0 + 3.2, 0.5), M.tin); leg.position.set(x, (y0 - 3.2) / 2, 0); g.add(leg);
+    }
+    tagHW(g, 'mosfet');
+  }
+}
+
 // ---------------------------------------------------------------- axial resistor
 const BAND = { black: 0x111111, brown: 0x6b3a1e, red: 0xc8231b, orange: 0xe26a12, yellow: 0xe8c618, green: 0x1f8a3a, blue: 0x1f55c4, violet: 0x7a3fb5, grey: 0x8a8a8a, white: 0xf0f0f0, gold: 0xc9a23f, silver: 0xc0c0c0 };
 export class Resistor {
@@ -1857,6 +1878,18 @@ export const HW_INFO = {
       'Flyback diode: connect it across the coil in the reverse direction, cathode to the supply side, anode to the switched side.',
     ],
     src: '1N4007 datasheets (Vishay, onsemi); general electronics practice',
+  },
+  mosfet: {
+    name: 'IRLZ44N logic-level N-channel MOSFET (TO-220)', tag: 'An electronic switch driven by voltage, not current',
+    summary: 'A voltage on the gate lets current flow from the drain to the source. The gate takes no steady current, so a GPIO pin can switch a large load such as a motor or an LED strip without a base-current calculation.',
+    points: [
+      'Pins of the TO-220, front (text) toward you, left to right: gate, drain, source. The metal tab is connected to the drain.',
+      'Datasheet (Infineon): 55 V drain-source, 47 A continuous at 25 °C case temperature, gate threshold 1.0 to 2.0 V, gate voltage ±16 V at most.',
+      'On-resistance is guaranteed only for 4 V and up: 35 mΩ at VGS = 4 V, 25 mΩ at 5 V, 22 mΩ at 10 V. At 3.3 V the datasheet gives no value, so check your load.',
+      'Use a gate resistor (about 220 Ω) and a 10 kΩ resistor from gate to GND so the MOSFET stays off while the pin is not yet an output.',
+      'It has a built-in body diode from source to drain. An inductive load (motor, relay coil) still needs a flyback diode across it.',
+    ],
+    src: 'Infineon IRLZ44NPbF datasheet',
   },
   npn: {
     name: 'PN2222A NPN transistor (TO-92)', tag: 'A small electronic switch',

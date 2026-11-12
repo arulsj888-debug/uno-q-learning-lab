@@ -46,6 +46,7 @@ function legs(d) {
     case 'sht31': return { [d.id + '.VIN']: `${d.row}${d.col}`, [d.id + '.GND']: `${d.row}${d.col + 1}`, [d.id + '.SCL']: `${d.row}${d.col + 2}`, [d.id + '.SDA']: `${d.row}${d.col + 3}`, [d.id + '.ADDR']: `${d.row}${d.col + 4}`, [d.id + '.RST']: `${d.row}${d.col + 5}`, [d.id + '.ALRT']: `${d.row}${d.col + 6}` };
     case 'joystick': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.VRX']: `${d.row}${d.col + 2}`, [d.id + '.VRY']: `${d.row}${d.col + 3}`, [d.id + '.SW']: `${d.row}${d.col + 4}` };
     case 'encoder': return { [d.id + '.CLK']: `${d.row}${d.col}`, [d.id + '.DT']: `${d.row}${d.col + 1}`, [d.id + '.SW']: `${d.row}${d.col + 2}`, [d.id + '.VCC']: `${d.row}${d.col + 3}`, [d.id + '.GND']: `${d.row}${d.col + 4}` };
+    case 'mosfet': return { [d.id + '.G']: `${d.row}${d.col}`, [d.id + '.D']: `${d.row}${d.col + 1}`, [d.id + '.S']: `${d.row}${d.col + 2}` };
     case 'npn': return { [d.id + '.E']: `${d.row}${d.col}`, [d.id + '.B']: `${d.row}${d.col + 1}`, [d.id + '.C']: `${d.row}${d.col + 2}` };
     case 'rgbled': return { [d.id + '.R']: `${d.row}${d.col}`, [d.id + '.C']: `${d.row}${d.col + 1}`, [d.id + '.G']: `${d.row}${d.col + 2}`, [d.id + '.B']: `${d.row}${d.col + 3}` };
     case 'dht': return { [d.id + '.VCC']: `${d.row}${d.col}`, [d.id + '.DATA']: `${d.row}${d.col + 1}`, [d.id + '.NC']: `${d.row}${d.col + 2}`, [d.id + '.GND']: `${d.row}${d.col + 3}` };
