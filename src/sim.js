@@ -1136,6 +1136,50 @@ export const PROGRAMS = {
     }
   },
 
+  async pi_lcd(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2);
+    await rt.at(4);
+    if (!rt.lcd('probe')) { rt.println('OSError: [Errno 121] Remote I/O error'); return; }
+    rt.lcd('init'); rt.lcd('backlight');
+    await rt.at(5); rt.lcd('cursor', 0, 0); rt.lcd('print', 'Hello, Pi 4!');
+    await rt.at(6); let seconds = 0;
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); rt.lcd('cursor', 0, 1);
+      await rt.at(10); rt.lcd('print', 'Seconds: ' + seconds);
+      await rt.at(11); seconds++;
+      await rt.at(12); await rt.delay(1000);
+    }
+  },
+  async pi_oled(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2);
+    await rt.at(4);
+    await rt.at(5);
+    if (!rt.oled('begin', 0x3C)) { rt.println('ValueError: No I2C device at address: 0x3c'); return; }
+    await rt.at(7); rt.oled('clear');
+    await rt.at(8); rt.oled('cursor', 0, 0); rt.oled('print', 'Hello, Pi 4!');
+    await rt.at(9); rt.oled('cursor', 0, 12); rt.oled('print', 'OLED 128 x 64');
+    await rt.at(10); rt.oled('display');
+    for (;;) await rt.delay(1000);     // the program ends on a real Pi, but the OLED keeps showing the picture
+  },
+  async pi_neo(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(3);
+    await rt.at(5); rt.neo('begin'); rt.neo('brightness', 38);
+    for (;;) {
+      await rt.at(7);
+      for (let i = 0; i < 8; i++) {
+        await rt.at(8);
+        await rt.at(9); rt.neo('clear');
+        await rt.at(10); rt.neo('set', i, 255, 0, 0);
+        await rt.at(11); rt.neo('show');
+        await rt.at(12); await rt.delay(150);
+      }
+    }
+  },
+
   async tmp36(rt) {
     await rt.at(2);
     await rt.at(4);

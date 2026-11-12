@@ -13,6 +13,7 @@ const PREFIX = { lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy',
 const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
 const TERMS = { lcd1602: ['GND', 'VCC', 'SDA', 'SCL'], oled: ['GND', 'VCC', 'SCL', 'SDA'], neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
+const DESK_SLOT_PI = { lcd1602: [125, 17], oled: [125, 17], neopixel: [110, 42] };
 const DESK_SLOT = { lcd1602: [20, 70], oled: [125, 70], neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
 const MOVABLE = new Set(['resistor', 'led', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
@@ -201,7 +202,7 @@ export class FreeBuild {
   }
   place3D(d) {
     if (d.type === 'pir' && d.x === undefined) { const bb = this.app.bb.center, used = this.parts.filter(p => p.type === 'pir' && p !== d && p.slot !== undefined).map(p => p.slot), k = [0, 1].find(i => !used.includes(i)) ?? 0; d.slot = k; d.x = bb.x + 92; d.z = bb.z - 30 - k * 52; }
-    if (DESK_SLOT[d.type] && d.x === undefined) { const bb = this.app.bb.center; d.x = bb.x + DESK_SLOT[d.type][0]; d.z = bb.z + DESK_SLOT[d.type][1]; }
+    if (DESK_SLOT[d.type] && d.x === undefined) { const bb = this.app.bb.center; const sl = (this.isPi && DESK_SLOT_PI[d.type]) || DESK_SLOT[d.type]; d.x = bb.x + sl[0]; d.z = bb.z + sl[1]; }
     if (d.type === 'servo' && d.bx === undefined) { const bb = this.app.bb.center; d.bx = bb.x + 80; d.bz = bb.z + 6; }
     const obj = this.app.bench.place(d);
     if (d.type === 'led' && this.burnt.has(d.id) && obj.setBurnt) obj.setBurnt(true);
@@ -262,7 +263,7 @@ export class FreeBuild {
   }
   placeDesk(type) {
     if (this.parts.some(p => p.type === type)) return this.toast('There is only one of these on the desk. Delete it first to place another.');
-    const bb = this.app.bb.center, [x, z] = DESK_SLOT[type];
+    const bb = this.app.bb.center, [x, z] = (this.isPi && DESK_SLOT_PI[type]) || DESK_SLOT[type];
     this.mutate(() => this.add({ id: this.nextId(type), type, x: bb.x + x, z: bb.z + z }));
     this.toast('Placed on the desk to the right. Its screw terminals take wires: click a terminal, then the other end.');
     this.app.view(this.isPi ? 'farpi' : (type === 'thermo' || type === 'pixels') ? 'qwq' : 'farq');

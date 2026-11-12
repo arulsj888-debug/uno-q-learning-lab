@@ -116,7 +116,7 @@ for (const L of list) {
       if (!w || w.type !== 'fwire' || w.from !== pin) bad(L, `${pin}: touch pad wire is not connected to the pin`);
     }
     if (io.kind === 'neo') {
-      const id = io.item, v = U3 ? 'PIN:5V' : 'PIN:VIN';
+      const id = io.item, v = (U3 || PI) ? 'PIN:5V' : 'PIN:VIN';
       if (!N.same(id + '.DIN', P)) bad(L, `neopixel DIN not on ${pin}`);
       if (!N.same(id + '.VCC', v)) bad(L, `neopixel VCC not on ${v.slice(4)}`);
       if (!N.same(id + '.GND', G)) bad(L, `neopixel GND not on GND`);
@@ -126,7 +126,7 @@ for (const L of list) {
       if (!N.same(id + '.SDA', 'PIN:' + sda)) bad(L, `${io.kind}: SDA not on ${sda}`);
       if (!N.same(id + '.SCL', 'PIN:' + scl)) bad(L, `${io.kind}: SCL not on ${scl}`);
       if (!N.same(id + '.GND', G)) bad(L, `${io.kind}: GND not on GND`);
-      const v = lcd ? (U3 ? 'PIN:5V' : 'PIN:VIN') : 'PIN:3V3';
+      const v = lcd ? ((U3 || PI) ? 'PIN:5V' : 'PIN:VIN') : (PI ? 'PIN:3V3' : 'PIN:3V3');
       if (!N.same(id + '.VCC', v)) bad(L, `${io.kind}: VCC not on ${v.slice(4)}${lcd ? ' (the LCD backpack is made for 5 V)' : ''}`);
     }
     if (io.kind === 'joyax') {

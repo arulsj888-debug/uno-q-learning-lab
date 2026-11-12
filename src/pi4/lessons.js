@@ -14,6 +14,10 @@ export const SRC_PI = {
   gpiozeroin: { t: 'GPIO Zero documentation: input devices (Button, RotaryEncoder)', u: 'https://gpiozero.readthedocs.io/en/stable/api_input.html' },
   dhtpy: { t: 'Adafruit CircuitPython DHT library documentation', u: 'https://docs.circuitpython.org/projects/dht/en/latest/' },
   dhtguide: { t: 'Adafruit: DHT11, DHT22 and AM2302 Sensors (specifications, wiring)', u: 'https://learn.adafruit.com/dht' },
+  rplcd: { t: 'RPLCD documentation: RPLCD.i2c.CharLCD', u: 'https://rplcd.readthedocs.io/en/stable/api.html' },
+  ssd1306py: { t: 'Adafruit CircuitPython SSD1306 library documentation', u: 'https://docs.circuitpython.org/projects/ssd1306/en/latest/' },
+  neopy: { t: 'Adafruit: NeoPixels on Raspberry Pi (Python usage)', u: 'https://learn.adafruit.com/neopixels-on-raspberry-pi/python-usage' },
+  neouber: { t: 'Adafruit NeoPixel Überguide: Powering NeoPixels', u: 'https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels' },
   cfg: { t: 'Raspberry Pi documentation — Configuration: enable or disable I2C', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#i2c' },
   remote: { t: 'Raspberry Pi documentation — Remote access (find your IP address, SSH)', u: 'https://www.raspberrypi.com/documentation/computers/remote-access.html' },
   kernel: { t: 'Raspberry Pi documentation — Linux kernel (check your kernel)', u: 'https://www.raspberrypi.com/documentation/computers/linux_kernel.html' },
@@ -335,7 +339,64 @@ export const PI_ENC_PARTS = [
 ];
 const ENC_IDS = PI_ENC_PARTS.map(d => d.id);
 
-export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project', 7: 'Module 7 — Extra: sound', 8: 'Module 8 — Camera', 9: 'Module 9 — Light and climate', 10: 'Module 10 — Controls' };
+export const PI_LCD = `from RPLCD.i2c import CharLCD
+from time import sleep
+
+lcd = CharLCD('PCF8574', 0x27, cols=16, rows=2)   # I2C expander, address 0x27, 16 x 2
+lcd.write_string("Hello, Pi 4!")                   # top line
+seconds = 0
+
+while True:
+    lcd.cursor_pos = (1, 0)                        # (row, column): bottom line, column 0
+    lcd.write_string(f"Seconds: {seconds}")
+    seconds += 1
+    sleep(1)`;
+
+export const PI_OLED = `import board
+import adafruit_ssd1306
+
+i2c = board.I2C()                                              # SCL = pin 5, SDA = pin 3
+oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3C)   # 128 x 64 pixels, address 0x3C
+
+oled.fill(0)                          # clear the buffer
+oled.text("Hello, Pi 4!", 0, 0, 1)    # text, x, y, colour (1 = pixel on)
+oled.text("OLED 128 x 64", 0, 12, 1)
+oled.show()                           # send the buffer to the screen`;
+
+export const PI_NEO = `import time
+import board
+import neopixel
+
+pixels = neopixel.NeoPixel(board.D18, 8, brightness=0.15, auto_write=False)   # 8 pixels, data on GPIO18
+
+while True:
+    for i in range(8):
+        pixels.fill((0, 0, 0))          # all pixels off
+        pixels[i] = (255, 0, 0)         # pixel i red
+        pixels.show()                   # send the colours to the strip
+        time.sleep(0.15)`;
+
+
+// ---- lessons 17-19: I2C displays and a NeoPixel strip on the desk, to the right of the Raspberry Pi
+const piDisp = (type, id, vcc, order, first) => [{ id, type, x: 125, z: -45 },
+  ...order.map((n, i) => ({ id: 'm' + first + i, type: 'fwire', from: id + '.' + n, to: 'a' + (10 + i), color: { GND: 'black', VCC: 'red', SDA: 'blue', SCL: 'yellow' }[n], lift: 16 + i * 2 })),
+  ...order.map((n, i) => ({ id: 'w' + first + i, type: 'fwire', from: { GND: 'p6', VCC: vcc, SDA: 'p3', SCL: 'p5' }[n], to: 'b' + (10 + i), color: { GND: 'black', VCC: 'red', SDA: 'blue', SCL: 'yellow' }[n], lift: 26 + i * 4 }))];
+export const PI_LCD_PARTS = piDisp('lcd1602', 'lcd1', 'p2', ['GND', 'VCC', 'SDA', 'SCL'], 9);
+const LCD_IDS = PI_LCD_PARTS.map(d => d.id);
+export const PI_OLED_PARTS = piDisp('oled', 'oled1', 'p1', ['GND', 'VCC', 'SCL', 'SDA'], 8);
+const OLED_IDS = PI_OLED_PARTS.map(d => d.id);
+export const PI_NEO_PARTS = [
+  { id: 'neo1', type: 'neopixel', x: 110, z: -20 },
+  { id: 'l60', type: 'lead', from: 'neo1.VCC', to: 'a10', color: 'red', lift: 20 },
+  { id: 'l61', type: 'lead', from: 'neo1.DIN', to: 'a11', color: 'yellow', lift: 24 },
+  { id: 'l62', type: 'lead', from: 'neo1.GND', to: 'a12', color: 'black', lift: 28 },
+  { id: 'w60', type: 'fwire', from: 'p2', to: 'b10', color: 'red', lift: 26 },
+  { id: 'w61', type: 'fwire', from: 'p12', to: 'b11', color: 'yellow', lift: 32 },
+  { id: 'w62', type: 'fwire', from: 'p6', to: 'b12', color: 'black', lift: 38 },
+];
+const NEO_IDS = PI_NEO_PARTS.map(d => d.id);
+
+export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project', 7: 'Module 7 — Extra: sound', 8: 'Module 8 — Camera', 9: 'Module 9 — Light and climate', 10: 'Module 10 — Controls', 11: 'Module 11 — Displays' };
 
 export const PI_LESSONS = [
   // ================================================================== P1
@@ -1344,6 +1405,134 @@ pause()</pre>
       { q: 'A real encoder counts too many steps sometimes. Why?', a: ['It is broken', 'The contacts bounce', 'The Pi is slow', 'The knob is loose'], c: 1, why: 'Mechanical contacts bounce.' },
     ],
     sources: [SRC_PI.gpiozeroin, SRC_PI.gpio, SRC_PI.usegpio],
+  },
+
+  // ================================================================== P17
+  {
+    id: 'p17', num: 17, module: 11, title: 'LCD 16×2: show text over I²C', level: 'Beginner', time: '25 min',
+    goal: 'Print text on a 16×2 character LCD with the RPLCD library, and find out why a display can stay blank.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'LCD 16×2 with I²C backpack (PCF8574)', '4 × male–male jumper wires'],
+    code: PI_LCD, file: 'lcd.py', program: 'pi_lcd', fast: true, widgets: ['lcdaddr'],
+    circuit: PI_LCD_PARTS, io: { p3: { kind: 'lcd', scl: 'p5', item: 'lcd1', needs: LCD_IDS } },
+    explain: {
+      1: '<b>RPLCD</b> is a Python library for HD44780 LCDs. <code>RPLCD.i2c.CharLCD</code> is the version for displays on an I²C backpack.',
+      2: '<code>sleep</code> pauses the program.',
+      4: 'Create the display: the backpack chip <b>PCF8574</b>, I²C <b>address 0x27</b>, <b>16 columns</b> and <b>2 rows</b>. The library’s defaults are 20 × 4, so pass cols and rows. The backlight is on by default.',
+      5: 'Write the first line.',
+      6: 'The seconds counter starts at 0.',
+      8: 'Repeat forever.',
+      9: '<b>cursor_pos = (row, column)</b>: row 1 is the bottom line.',
+      10: 'Write the label and the counter.',
+      11: 'Count up.',
+      12: 'Wait one second.',
+    },
+    steps: [
+      { title: 'The LCD and its I²C backpack', view: 'dispp', have: ['lcd1'], power: false,
+        body: `<p>A 16×2 LCD shows <b>16 columns × 2 rows</b> of characters, each a <b>5 × 8 dot matrix</b>. The blue <b>PCF8574</b> backpack on its back turns its many pins into <b>two I²C wires</b>. <b>Click the parts</b> in the 3D view.</p>
+        <ul><li>Four pins: <b>GND, VCC, SDA, SCL</b>. The backpack is made for <b>5 V</b>.</li><li>Address: usually <b>0x27</b>, on some <b>0x3F</b>.</li><li>The blue trimmer sets the <b>contrast</b>.</li></ul>` },
+      { title: 'Turn I²C on, wire the four pins', view: 'dispp', have: LCD_IDS, power: false, pins: ['p6', 'p2', 'p3', 'p5'],
+        body: `<p>Turn I²C on first (Control Centre → Interfaces, or <code>sudo raspi-config</code>, Lesson 9). Then use the breadboard rows <b>a10 – a13</b> and <b>b10 – b13</b>:</p>
+        <ul><li>GND → <b>pin 6</b></li><li>VCC → <b>pin 2 (5V)</b></li><li>SDA → <b>pin 3</b></li><li>SCL → <b>pin 5</b></li></ul>
+        <p class="warn">Many backpacks pull SDA and SCL up to VCC. On a Raspberry Pi, whose GPIO pins are <b>3.3 V only</b>, that could put 5 V on the pins: check your module, or use a level shifter.</p>` },
+      { title: 'Install the library', view: 'home', acc: [],
+        body: `<p>In the Terminal (inside a virtual environment, Lesson 8):</p><pre class="tree">pip3 install RPLCD</pre><p>RPLCD talks to the display through an I²C library (<b>smbus2</b>): follow the installation notes in the RPLCD documentation.</p>` },
+      { title: 'The program', view: 'dispp', have: LCD_IDS, showCode: true, power: true, body: `<p>Click lines 4, 9 and 10.</p>` },
+      { title: 'Run it', view: 'dispp', have: LCD_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The top line shows <b>Hello</b>, the bottom line counts the seconds. If you only see dark blocks on a real display, turn the contrast trimmer.</p><p class="sim">Simulated display.</p>` },
+      { title: 'Blank screen? Check the address', view: 'dispp', have: LCD_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Module address”</b> to switch it to <b>0x3F</b> and run again. The program uses 0x27 and nobody answers: Python stops with an error (typically an <code>OSError</code>) and the screen shows no text.</p><p>Find the real address with <code>i2cdetect -y 1</code> (Raspberry Pi documentation) and use it in <code>CharLCD('PCF8574', address, …)</code>.</p>` },
+      { title: 'Summary', view: 'dispp', have: LCD_IDS, power: true,
+        body: `<ul><li>Backpack: GND, VCC (5 V), SDA, SCL; address 0x27 or 0x3F.</li><li><code>CharLCD('PCF8574', 0x27, cols=16, rows=2)</code>, <code>write_string()</code>, <code>cursor_pos = (row, col)</code>.</li><li>Blank screen: wrong address, contrast or a loose wire.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does the PCF8574 backpack do?', a: ['Makes the LCD brighter', 'Turns the LCD pins into two I²C wires', 'Stores the text', 'Powers the Pi'], c: 1, why: 'It is an I²C port expander.' },
+      { q: 'lcd.cursor_pos = (1, 0) puts the cursor…', a: ['On the top line', 'On column 0 of the bottom line', 'At the end', 'Off the screen'], c: 1, why: '(row, column): row 1 is the second line.' },
+      { q: 'Why pass cols=16, rows=2?', a: ['They are decoration', 'The library defaults to a 20 × 4 display', 'To set the contrast', 'To set the address'], c: 1, why: 'RPLCD’s defaults are 20 columns and 4 rows.' },
+      { q: 'What is a risk of a 5 V LCD backpack on a Raspberry Pi?', a: ['None', 'Its pull-ups to 5 V could put 5 V on the 3.3 V-only GPIO pins', 'It draws too little current', 'The text is too bright'], c: 1, why: 'Check your module or use a level shifter.' },
+    ],
+    sources: [SRC_PI.rplcd, SRC_PI.cfg, SRC_PI.gpio],
+  },
+  // ================================================================== P18
+  {
+    id: 'p18', num: 18, module: 11, title: 'OLED 128×64: draw text with the SSD1306', level: 'Beginner', time: '25 min',
+    goal: 'Show text on a small OLED with the Adafruit CircuitPython SSD1306 library, and handle a display that does not answer.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'SSD1306 OLED 128×64 (I²C)', '4 × male–male jumper wires'],
+    code: PI_OLED, file: 'oled.py', program: 'pi_oled', fast: true, widgets: ['oledaddr'],
+    circuit: PI_OLED_PARTS, io: { p3: { kind: 'oled', scl: 'p5', item: 'oled1', needs: OLED_IDS } },
+    explain: {
+      1: '<b>board</b> (Adafruit Blinka) knows the Raspberry Pi’s pins.',
+      2: 'The SSD1306 driver library.',
+      4: '<b>board.I2C()</b> opens the I²C bus on <b>SCL (pin 5)</b> and <b>SDA (pin 3)</b>.',
+      5: 'Create the display: <b>128 × 64</b> pixels, the I²C bus, <b>address 0x3C</b>. If nobody answers, Python raises an error.',
+      7: '<b>fill(0)</b> clears the buffer (all pixels off).',
+      8: '<b>text(string, x, y, colour)</b> draws text into the buffer with a small built-in font.',
+      9: 'A second line, 12 pixels lower.',
+      10: '<b>show()</b> sends the buffer to the screen. Nothing appears before this call.',
+    },
+    steps: [
+      { title: 'The OLED', view: 'dispp', have: ['oled1'], power: false,
+        body: `<p>An <b>OLED</b> makes its own light: each of its <b>128 × 64 pixels</b> is a tiny LED. The <b>SSD1306</b> chip drives it over I²C. <b>Click the parts</b>.</p><ul><li>Four pins: <b>GND, VCC, SCL, SDA</b> (the order differs between makers: read the printing).</li><li>Address <b>0x3C</b>, on some modules <b>0x3D</b>.</li><li>Check whether your module accepts 3.3 V, 5 V or both.</li></ul>` },
+      { title: 'Turn I²C on, wire the four pins', view: 'dispp', have: OLED_IDS, power: false, pins: ['p6', 'p1', 'p5', 'p3'],
+        body: `<ul><li>GND → <b>pin 6</b></li><li>VCC → <b>pin 1 (3V3)</b></li><li>SCL → <b>pin 5</b></li><li>SDA → <b>pin 3</b></li></ul><p>Make sure I²C is turned on (Lesson 9).</p>` },
+      { title: 'Install the library', view: 'home', acc: [],
+        body: `<p>In the Terminal (inside a virtual environment):</p><pre class="tree">pip3 install adafruit-circuitpython-ssd1306</pre>` },
+      { title: 'The program', view: 'dispp', have: OLED_IDS, showCode: true, power: true, body: `<p>Click lines 5, 8 and 10. Note that nothing is shown until <code>show()</code>.</p>` },
+      { title: 'Run it', view: 'dispp', have: OLED_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Two lines of text appear on the OLED. The program ends, but the picture stays on the screen.</p><p class="sim">Simulated display.</p>` },
+      { title: 'What if the display does not answer?', view: 'dispp', have: OLED_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Module address”</b> to switch it to <b>0x3D</b> and run again. Nobody answers at 0x3C and Python stops with:</p><pre class="tree">ValueError: No I2C device at address: 0x3c</pre><p>Check the four wires, that I²C is on, and the address (<code>i2cdetect -y 1</code>).</p>` },
+      { title: 'Summary', view: 'dispp', have: OLED_IDS, power: true,
+        body: `<ul><li><code>board.I2C()</code>, <code>SSD1306_I2C(128, 64, i2c, addr=0x3C)</code>.</li><li><code>fill(0)</code>, <code>text(…)</code>, then <code>show()</code>.</li><li>“No I2C device” = wrong address, loose wire or I²C off.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'When does the text appear on the OLED?', a: ['At text()', 'After show()', 'After fill(0)', 'Never'], c: 1, why: 'Drawing goes into a buffer; show() sends it to the screen.' },
+      { q: 'Python says “No I2C device at address: 0x3c”. What do you check?', a: ['The I²C address, the wires and that I²C is on', 'The LED', 'The resistor colours', 'The Wi-Fi'], c: 0, why: 'Nobody answered at that address.' },
+      { q: 'How many pixels does this OLED have?', a: ['16 × 2', '128 × 64', '8 × 8', '320 × 240'], c: 1, why: '128 columns by 64 rows.' },
+      { q: 'Why has an OLED no backlight?', a: ['It is broken', 'Each pixel makes its own light', 'It uses sunlight', 'It is always off'], c: 1, why: 'OLED pixels are light-emitting.' },
+    ],
+    sources: [SRC_PI.ssd1306py, SRC_PI.cfg, SRC_PI.gpio],
+  },
+  // ================================================================== P19
+  {
+    id: 'p19', num: 19, module: 11, title: 'NeoPixel strip: one wire, eight colours', level: 'Intermediate', time: '30 min',
+    goal: 'Light an 8-pixel NeoPixel strip with the Adafruit CircuitPython NeoPixel library, and learn the power and 3.3 V data-level rules.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'NeoPixel (WS2812B) strip, 8 pixels', 'Breadboard and jumper wires', 'Capacitor 500 – 1000 µF (recommended)'],
+    code: PI_NEO, file: 'neopixel_test.py', program: 'pi_neo', fast: true, widgets: ['neolevel'], neoLow: true,
+    circuit: PI_NEO_PARTS, io: { p12: { kind: 'neo', item: 'neo1', needs: NEO_IDS } },
+    explain: {
+      1: 'The <b>time</b> library, for <code>sleep</code>.',
+      2: '<b>board</b> (Blinka) knows the Pi’s pin names.',
+      3: 'The Adafruit NeoPixel library.',
+      5: 'Create the strip: data pin <b>GPIO18</b> (the pin of Adafruit’s example), <b>8</b> pixels, brightness 0.15 to limit the current, <b>auto_write=False</b>: nothing is sent before <code>show()</code>.',
+      7: 'Repeat forever.',
+      8: 'Go through the pixels 0 … 7.',
+      9: 'All pixels off in memory.',
+      10: 'Pixel <b>i</b> red: (red, green, blue), each 0 … 255.',
+      11: '<b>show()</b> sends the colours to the strip.',
+      12: 'Wait 150 ms.',
+    },
+    steps: [
+      { title: 'An addressable LED strip', view: 'dispp', have: ['neo1'], power: false,
+        body: `<p>On a <b>NeoPixel</b> (WS2812B) strip every pixel has its own driver chip. The <b>data line</b> carries a colour for each pixel in turn, so <b>one pin controls the whole strip</b>.</p><ul><li>Three connections: <b>5 V</b>, <b>DIN</b>, <b>GND</b>.</li><li>Up to <b>60 mA per pixel</b> at full white, about 20 mA in typical use (Adafruit).</li></ul>` },
+      { title: 'Power and data-level rules', view: 'dispp', have: ['neo1'],
+        body: `<ul><li>8 pixels at full white can draw <b>480 mA</b>: keep the brightness low.</li><li>Connect <b>GND first</b> and add a <b>500 – 1000 µF capacitor</b> across + and − (Adafruit).</li><li>The strip wants <b>5 V</b>, and its data signal at least <b>70 %</b> of that: <b>3.5 V</b>. A Raspberry Pi pin gives <b>3.3 V</b>: use a <b>level shifter</b> or a lower strip voltage.</li></ul><p class="warn">The strip’s 5 V must never go to a GPIO pin. Only the data line goes to a pin, and it comes <b>from</b> the pin.</p>` },
+      { title: 'Wire the strip', view: 'dispp', have: NEO_IDS, power: false, pins: ['p2', 'p12', 'p6'],
+        body: `<ul><li>Strip VCC → <b>pin 2 (5V)</b></li><li>Strip DIN → <b>pin 12 (GPIO18)</b></li><li>Strip GND → <b>pin 6 (GND)</b></li></ul>` },
+      { title: 'Install the library', view: 'home', acc: [],
+        body: `<p>In the Terminal (inside a virtual environment):</p><pre class="tree">pip3 install adafruit-circuitpython-neopixel</pre><p>Adafruit’s guide says the NeoPixel library needs <b>root access</b>: run the program with <code>sudo</code> (for a virtual environment: <code>sudo -E env PATH=$PATH python3 file.py</code>).</p>` },
+      { title: 'The program', view: 'dispp', have: NEO_IDS, showCode: true, power: true, body: `<p>Click lines 5, 10 and 11. Nothing changes on the strip until <code>show()</code>.</p>` },
+      { title: 'Run it', view: 'dispp', have: NEO_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>A red dot should run along the 8 pixels. Use the <b>level shifter</b> button in the panel (stop the program first): without it the simulated strip shows a broken pattern, as it may on real hardware.</p><p class="sim">Simulated strip.</p>` },
+      { title: 'Summary', view: 'dispp', have: NEO_IDS, power: true,
+        body: `<ul><li>5 V, DIN, GND; one data pin; run with sudo.</li><li><code>neopixel.NeoPixel(board.D18, 8, brightness=…, auto_write=False)</code>, <code>pixels[i] = (r, g, b)</code>, <code>pixels.show()</code>.</li><li>60 mA per pixel at full white; data at least 70 % of the strip voltage.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'With auto_write=False, when do the pixels change?', a: ['At once', 'After pixels.show()', 'After fill()', 'Never'], c: 1, why: 'The colours stay in memory until show() sends them.' },
+      { q: 'How much current can a NeoPixel draw at full white?', a: ['About 1 mA', 'Up to 60 mA', 'About 1 A', 'Exactly 20 mA'], c: 1, why: 'Adafruit: up to 60 mA with all three colours at maximum.' },
+      { q: 'The data signal of a 5 V strip should be at least…', a: ['1 V', '70 % of the strip voltage (3.5 V)', '5 V exactly', '12 V'], c: 1, why: 'Adafruit recommends at least 70 % of the pixel voltage.' },
+      { q: 'What does the Adafruit guide say about running the NeoPixel library?', a: ['It needs root access (sudo)', 'It needs no permissions', 'It only runs on Windows', 'It needs a monitor'], c: 0, why: 'Adafruit: running code for the NeoPixel library requires root access.' },
+    ],
+    sources: [SRC_PI.neopy, SRC_PI.neouber, SRC_PI.gpio],
   },
 ];
 

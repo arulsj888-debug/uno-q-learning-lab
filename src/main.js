@@ -68,6 +68,7 @@ const VIEWS = {
   smart: { t: new THREE.Vector3(95, 0, 8), d: new THREE.Vector3(-0.12, 0.88, 0.46), dist: 430 },
   dispq: { t: new THREE.Vector3(30, 0, 105), d: new THREE.Vector3(-0.1, 0.88, 0.45), dist: 300 },
   farq: { t: new THREE.Vector3(110, 0, 50), d: new THREE.Vector3(-0.15, 0.9, 0.45), dist: 540 },
+  dispp: { t: new THREE.Vector3(55, 0, -40), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 330 },
   farpi: { t: new THREE.Vector3(100, 0, -30), d: new THREE.Vector3(-0.1, 0.92, 0.4), dist: 520 },
   qwq: { t: new THREE.Vector3(50, 0, 95), d: new THREE.Vector3(-0.1, 0.92, 0.38), dist: 420 },
   bigq: { t: new THREE.Vector3(30, 0, 36), d: new THREE.Vector3(-0.2, 0.85, 0.5), dist: 330 },
@@ -1531,7 +1532,8 @@ class App {
   // ---- lessons 18 / 19 / 21 / 22: I2C displays driven by the simulated sketch
   i2cDispOk(kind) { const io = Object.values((this.lesson && this.lesson.io) || {}).find(x => x.kind === kind); return !!(io && this.wired(io) && this.board.powered); }
   lcdOp({ op, a, b }) {
-    const S = this.lcdSt; if (!(this.lcdAddr === 0x27 && this.i2cDispOk('lcd'))) return;
+    const S = this.lcdSt; if (op === 'probe') return this.lcdAddr === 0x27 && this.i2cDispOk('lcd');
+    if (!(this.lcdAddr === 0x27 && this.i2cDispOk('lcd'))) return;
     if (op === 'init') { S.ready = true; S.rows = [' '.repeat(16), ' '.repeat(16)]; S.c = 0; S.r = 0; }
     else if (op === 'backlight') S.bl = true;
     else if (op === 'cursor') { S.c = a; S.r = b; }
@@ -1564,13 +1566,13 @@ class App {
       const S = this.lcdSt, okAddr = this.lcdAddr === 0x27, o = this.bench.get('lcd1');
       const b = $('#lcd-addr'); if (b) { b.disabled = run; b.textContent = `Module address: 0x${this.lcdAddr.toString(16).toUpperCase()}`; b.classList.toggle('on', !okAddr); }
       if (o && o.setContent) { const key = JSON.stringify([pw, run, S.bl, S.ready, okAddr, S.rows]); if (key !== this._lcdKey) { this._lcdKey = key; o.setContent({ powered: pw, backlight: pw && (S.bl || !okAddr), lines: pw && S.ready && okAddr ? S.rows : null }); } }
-      set('#lcd-note', !pw ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>. You can change the module address first (stop the sketch to change it).' : !okAddr ? 'The sketch talks to address <b>0x27</b>, but this module answers at <b>0x3F</b>: nobody answers and the screen stays blank.' : 'The module answers at 0x27 and shows the text.');
+      set('#lcd-note', !pw ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>. You can change the module address first (stop the sketch to change it).' : !okAddr ? `The ${IS_PI ? 'program' : 'sketch'} talks to address <b>0x27</b>, but this module answers at <b>0x3F</b>: nobody answers and the screen stays blank.` : 'The module answers at 0x27 and shows the text.');
     }
     if (w.includes('oledaddr')) {
       const S = this.oledSt, okAddr = this.oledAddr === 0x3C, o = this.bench.get('oled1');
       const b = $('#oled-addr'); if (b) { b.disabled = run; b.textContent = `Module address: 0x${this.oledAddr.toString(16).toUpperCase()}`; b.classList.toggle('on', !okAddr); }
       if (o && o.setContent) { const key = JSON.stringify([pw, run, S.shown, okAddr]); if (key !== this._oledKey) { this._oledKey = key; o.setContent({ powered: pw && run && !!S.shown, lines: pw && S.shown ? S.shown : null }); } }
-      set('#oled-note', !pw ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>. You can change the module address first.' : !okAddr ? 'The sketch calls begin() with 0x3C, but this module answers at <b>0x3D</b>: begin() returns false.' : 'The display answers at 0x3C; the text appears after display().');
+      set('#oled-note', !pw ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>. You can change the module address first.' : !okAddr ? (IS_PI ? 'The program uses address 0x3C, but this module answers at <b>0x3D</b>: Python raises an error.' : 'The sketch calls begin() with 0x3C, but this module answers at <b>0x3D</b>: begin() returns false.') : 'The display answers at 0x3C; the text appears after display().');
     }
   }
   ctlTick() {
