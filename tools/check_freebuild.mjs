@@ -255,6 +255,14 @@ for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3']
   r = rgbOK(kind, info, '✖ DS18B20 without'); ok(r.parts.ds1.status === 'warn' && /pull-up/.test(r.parts.ds1.msg), name + ': DS18B20 without the pull-up is flagged');
   r = rgbOK(kind, info, '✖ DS18B20 pin'); ok(r.parts.ds1.status === 'warn' && /1-Wire/.test(r.parts.ds1.msg), name + ': DS18B20 on a pin not set to 1-Wire is flagged');
 }
+// ---- IR receiver (38 kHz, TSOP382-type)
+for (const [kind, info, name, sig] of [['unoq', uno, 'UNO Q', 'D2'], ['uno3', u3, 'UNO R3', 'D2'], ['esp32', findPinE32, 'ESP32', 'G4']]) {
+  const ev = (title, sw) => { const x = EXAMPLES(kind).find(e => e.title.startsWith(title)); return evaluate({ boardKind: kind, pinInfo: info, parts: x.parts, pinCfg: x.pins, powered: true, env: { ...env, sw }, t: 0 }); };
+  r = ev('✔ IR receiver', { ir1: false }); ok(r.parts.ir1.status === 'ok' && r.pins[sig].read === 1, name + ': idle IR receiver reads HIGH on the pin (' + r.parts.ir1.msg + ')');
+  r = ev('✔ IR receiver', { ir1: true }); ok(r.pins[sig].read === 0 && r.parts.ir1.burst, name + ': a received burst pulls the pin LOW');
+  r = ev('✖ IR receiver with VS', {}); ok(r.parts.ir1.status === 'bad', name + ': VS and GND swapped is flagged');
+  r = ev('✖ IR receiver OUT', {}); ok(r.parts.ir1.status === 'warn', name + ': OUT on an output pin is flagged');
+}
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

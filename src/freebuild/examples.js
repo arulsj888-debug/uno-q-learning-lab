@@ -72,6 +72,10 @@ export function EXAMPLES(boardKind) {
     { id: 'ds1', type: 'ds18b20', row: 'e', col: 10 },
     w('w1', gnd, 'a10', 'black'), w('w2', data, 'a11', 'yellow'), w('w3', vdd, 'a12', 'red'),
     ...(o.noPull ? [] : [res('r1', 'c11', 'c14', 4700), { id: 'w4', type: 'wire', from: 'b12', to: 'b14', color: 'red', lift: 12 }])];
+  // 38 kHz IR receiver (TSOP382-type) on the breadboard: OUT, GND, VS in columns 10-12
+  const irParts = (out, vs, gnd, o = {}) => [
+    { id: 'ir1', type: 'irrx', row: 'e', col: 10 },
+    w('w1', out, 'a10', 'yellow'), w('w2', o.swap ? vs : gnd, 'a11', 'black'), w('w3', o.swap ? gnd : vs, 'a12', 'red')];
   const motorParts = ground => [{ id: 'u1', type: 'l293d', col: 12 }, { id: 'bat1', type: 'battery' }, { id: 'mot1', type: 'motor' },
     w('w1', '5V', 'a12', 'red'), w('w3', 'D5', 'j12', 'orange'), w('w4', 'D7', 'j13', 'yellow'), w('w5', 'D8', 'j18', 'blue'),
     ...(ground ? [w('w6', 'GND3', 'a15', 'black')] : []), ld('ld7', 'bat1.POS', 'j19', 'red'), ld('ld8', 'bat1.NEG', 'j16', 'black'), ld('ld9', 'mot1.M1', 'j14', 'white'), ld('ld10', 'mot1.M2', 'j17', 'green')];
@@ -155,6 +159,9 @@ export function EXAMPLES(boardKind) {
     { title: '✔ DS18B20 temperature sensor (1-Wire)', parts: dsParts(P.dhtPin, P.v3, P.gnd), pins: { [P.dhtPin]: { mode: 'onewire' } }, note: 'The DS18B20 sends the temperature as a number over one data wire (DQ). DQ is an open-drain line: the 4.7 kΩ resistor from DQ to VDD is what pulls it high. Flat face toward you, the legs are GND, DQ, VDD. Use the temperature slider to change what it measures.' },
     { title: '✖ DS18B20 without the pull-up resistor', parts: dsParts(P.dhtPin, P.v3, P.gnd, { noPull: true }), pins: { [P.dhtPin]: { mode: 'onewire' } }, note: 'Without the pull-up resistor between DQ and VDD the 1-Wire line cannot go high, so no reading arrives. (The sensor itself is fine.)' },
     { title: '✖ DS18B20 pin not set to 1-Wire', parts: dsParts(P.dhtPin, P.v3, P.gnd), pins: { [P.dhtPin]: { mode: 'in' } }, note: 'The wiring is right, but the pin on DQ is just a plain input: the program must talk the 1-Wire protocol on it (OneWire library). Set the pin to “1-Wire data”.' },
+    { title: '✔ IR receiver (38 kHz) on an input pin', parts: irParts(P.dhtPin, P.v3, P.gnd), sw: { ir1: true }, pins: { [P.dhtPin]: { mode: 'up' } }, note: 'The receiver idles HIGH and pulls OUT LOW while a 38 kHz burst from a remote arrives (click the receiver in the 3D view to press a remote button). Legs: OUT, GND, VS (3.0 V and 5 V both work: the datasheet allows 2.0 V to 5.5 V).' },
+    { title: '✖ IR receiver with VS and GND swapped', parts: irParts(P.dhtPin, P.v3, P.gnd, { swap: true }), pins: { [P.dhtPin]: { mode: 'up' } }, note: 'The supply and ground wires are on the wrong legs. A real receiver can be damaged this way: check the pin order of your part.' },
+    { title: '✖ IR receiver OUT on a pin set to output', parts: irParts(P.dhtPin, P.v3, P.gnd), pins: { [P.dhtPin]: { mode: 'out1' } }, note: 'OUT is an output of the receiver: the pin it goes to must be an input, otherwise two outputs fight each other.' },
     { title: '✖ Short circuit', parts: [w('w1', P.v5, 'r:top+:3', 'red'), w('w2', P.gnd, 'r:top+:4', 'black')], pins: {}, note: 'The 5 V pin and a GND pin are joined by the same power rail. Nothing limits the current, so the power would be cut (here the cable pops out).' },
   ];
   return list;
@@ -211,6 +218,10 @@ function EXAMPLES_E32() {
     { id: 'ds1', type: 'ds18b20', row: 'e', col: 10 },
     w('w1', gnd, 'a10', 'black'), w('w2', data, 'a11', 'yellow'), w('w3', vdd, 'a12', 'red'),
     ...(o.noPull ? [] : [res('r1', 'c11', 'c14', 4700), { id: 'w4', type: 'wire', from: 'b12', to: 'b14', color: 'red', lift: 12 }])];
+  // 38 kHz IR receiver (TSOP382-type) on the breadboard: OUT, GND, VS in columns 10-12
+  const irParts = (out, vs, gnd, o = {}) => [
+    { id: 'ir1', type: 'irrx', row: 'e', col: 10 },
+    w('w1', out, 'a10', 'yellow'), w('w2', o.swap ? vs : gnd, 'a11', 'black'), w('w3', o.swap ? gnd : vs, 'a12', 'red')];
   const neoE32 = (vcc, din, gnd) => [{ id: 'neo1', type: 'neopixel' }, ldE('ld1', 'neo1.VCC', 'a10', 'red'), ldE('ld2', 'neo1.DIN', 'a11', 'yellow'), ldE('ld3', 'neo1.GND', 'a12', 'black'), w('w1', vcc, 'b10', 'red'), w('w2', din, 'b11', 'yellow'), w('w3', gnd, 'b12', 'black')];
   return [
     { title: '✔ LED with a resistor (works)', parts: ledCircuit(false), pins: { G16: { mode: 'out1' } }, note: 'GPIO16 is set to <b>Output HIGH</b> (3.3 V), the 220 Ω resistor limits the current to about 5 mA, and the LED’s long leg (+) faces the pin. Try changing the pin to <b>Input</b>, or the resistor to 100 kΩ.' },
@@ -258,6 +269,9 @@ function EXAMPLES_E32() {
     { title: '✔ DS18B20 temperature sensor (1-Wire)', parts: dsParts('G4', '3V3', 'GND2'), pins: { ['G4']: { mode: 'onewire' } }, note: 'The DS18B20 sends the temperature as a number over one data wire (DQ). DQ is an open-drain line: the 4.7 kΩ resistor from DQ to VDD is what pulls it high. Flat face toward you, the legs are GND, DQ, VDD. Use the temperature slider to change what it measures.' },
     { title: '✖ DS18B20 without the pull-up resistor', parts: dsParts('G4', '3V3', 'GND2', { noPull: true }), pins: { ['G4']: { mode: 'onewire' } }, note: 'Without the pull-up resistor between DQ and VDD the 1-Wire line cannot go high, so no reading arrives. (The sensor itself is fine.)' },
     { title: '✖ DS18B20 pin not set to 1-Wire', parts: dsParts('G4', '3V3', 'GND2'), pins: { ['G4']: { mode: 'in' } }, note: 'The wiring is right, but the pin on DQ is just a plain input: the program must talk the 1-Wire protocol on it (OneWire library). Set the pin to “1-Wire data”.' },
+    { title: '✔ IR receiver (38 kHz) on an input pin', parts: irParts('G4', '3V3', 'GND2'), sw: { ir1: true }, pins: { ['G4']: { mode: 'up' } }, note: 'The receiver idles HIGH and pulls OUT LOW while a 38 kHz burst from a remote arrives (click the receiver in the 3D view to press a remote button). Legs: OUT, GND, VS (3.0 V and 5 V both work: the datasheet allows 2.0 V to 5.5 V).' },
+    { title: '✖ IR receiver with VS and GND swapped', parts: irParts('G4', '3V3', 'GND2', { swap: true }), pins: { ['G4']: { mode: 'up' } }, note: 'The supply and ground wires are on the wrong legs. A real receiver can be damaged this way: check the pin order of your part.' },
+    { title: '✖ IR receiver OUT on a pin set to output', parts: irParts('G4', '3V3', 'GND2'), pins: { ['G4']: { mode: 'out1' } }, note: 'OUT is an output of the receiver: the pin it goes to must be an input, otherwise two outputs fight each other.' },
     { title: '✖ EN pin wired to GND (chip held in reset)', parts: [...ledCircuit(false), w('w3', 'EN', 'a20', 'yellow'), w('w4', 'GND1', 'b20', 'black')], pins: { G16: { mode: 'out1' } }, note: 'GPIO16 is set to Output HIGH and the LED circuit is correct, but the EN pin is joined to GND. EN is the chip-enable (reset) input: while it is LOW the ESP32 does not run, so no pin is driven and the LED stays dark. This is what the EN button does while you hold it. Delete the EN wire and the LED lights.' },
     { title: '✖ 5 V on a 3.3 V pin', parts: [w('w1', 'VIN', 'a10', 'red'), w('w2', 'G17', 'b10', 'yellow')], pins: { G17: { mode: 'in' } }, note: 'VIN carries the 5 V from USB. ESP32 pins are 3.3 V only (3.6 V at most), so 5 V on a GPIO pin can damage the chip. Press “Replace broken parts”.' },
     { title: '✖ LED without a resistor', parts: [w('w1', 'VIN', 'a10', 'red'), led('led1', 'c10', 'c11'), w('w2', 'GND2', 'd11', 'black')], pins: {}, note: 'The LED is connected straight to the 5 V pin with no resistor. Nothing limits the current, so it burns out in a moment. Press “Replace broken parts”, then put a resistor in the path.' },

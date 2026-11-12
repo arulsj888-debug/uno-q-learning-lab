@@ -707,6 +707,21 @@ export class SlideSwitch {
   setPos(b) { this.knob.position.x = b ? 1.3 : -1.3; }
 }
 
+// ---------------------------------------------------------------- 38 kHz IR receiver (TSOP382-type, minicast 5.0 x 6.95 x 4.8 mm), dome toward you, legs OUT GND VS
+export class IRReceiver {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const W = 5.0, H = 6.95, D = 4.8, y0 = 3.4;
+    const body = new THREE.Mesh(new RoundedBoxGeometry(W, H, D, 2, 0.3), new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.5 })); body.position.set(0, y0 + H / 2, 0); g.add(body);
+    this.dome = new THREE.Mesh(new THREE.SphereGeometry(1.9, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshPhysicalMaterial({ color: 0x2a0a0c, roughness: 0.15, clearcoat: 1, emissive: 0x000000 }));
+    this.dome.rotation.x = Math.PI / 2; this.dome.position.set(0, y0 + H * 0.66, D / 2 - 0.2); g.add(this.dome);
+    const shield = new THREE.Mesh(new THREE.BoxGeometry(W * 0.9, 1.2, 0.2), new THREE.MeshStandardMaterial({ color: 0xb9bcc0, metalness: 0.8, roughness: 0.4 })); shield.position.set(0, y0 + 1.2, D / 2 + 0.02); g.add(shield);
+    for (const x of [-2.54, 0, 2.54]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.5, y0 + 3.2, 0.5), M.tin); leg.position.set(x, (y0 - 3.2) / 2, 0); g.add(leg); }
+    tagHW(g, 'irrx');
+  }
+  setActive(on) { this.dome.material.emissive.setRGB(on ? 0.7 : 0, on ? 0.02 : 0, on ? 0.02 : 0); }
+}
+
 // ---------------------------------------------------------------- radial aluminium electrolytic capacitor
 // Typical sizes only (maker series differ): 10 uF 5 x 11 mm, 100 uF 6.3 x 11 mm, 470 uF 8 x 12 mm; the long leg is +, the stripe marks the - side.
 export class ElectrolyticCap {
@@ -2033,6 +2048,17 @@ export const HW_INFO = {
     summary: 'Three legs: the middle leg (COM, common) is connected to one outer leg or to the other, depending on the slider position.',
     points: ['Left leg A, middle COM, right leg B (the app labels them in this order).', 'Used to select a mode or to switch a supply.'],
     src: 'General electronics practice',
+  },
+  irrx: {
+    name: 'IR receiver, 38 kHz (TSOP382-type)', tag: 'Receives infrared remote controls',
+    summary: 'A photodiode, amplifier and filter in one package. It reacts only to infrared light that is switched on and off at its carrier frequency (38 kHz for this type) and outputs the demodulated signal: the pin idles HIGH and goes LOW while a burst arrives.',
+    points: [
+      'Datasheet (Vishay TSOP382.., TSOP384..): pins 1 = OUT, 2 = GND, 3 = VS. Supply 2.0 V to 5.5 V (absolute maximum 6 V), about 0.35 mA at 3.3 V.',
+      'Typical use: with the dome toward you, the legs are OUT, GND, VS from the left: check the drawing of your part. Common “VS1838B” modules use the same order but are a different make.',
+      'Output is active low and has an internal 30 kΩ pull-up. Connect OUT to an input pin; a library such as IRremote decodes the pulse pattern (for example the NEC code).',
+      'It is made for remote controls, not for continuous light: the carrier frequency must match (38 kHz here).',
+    ],
+    src: 'Vishay TSOP382.., TSOP384.. datasheet (document 82491)',
   },
   cap: {
     name: 'Electrolytic capacitor', tag: 'Stores charge: smoothing and timing',

@@ -56,6 +56,7 @@ export function terminals(d) {
     case 'dht': return [['VCC', `${row}${c}`], ['DATA', `${row}${c + 1}`], ['NC', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'diode': return [['A', d.a], ['K', d.k]];
     case 'cap': return [['plus', d.a], ['minus', d.k]];
+    case 'irrx': return [['OUT', `${row}${c}`], ['GND', `${row}${c + 1}`], ['VS', `${row}${c + 2}`]];
     case 'ds18b20': return [['GND', `${row}${c}`], ['DQ', `${row}${c + 1}`], ['VDD', `${row}${c + 2}`]];
     case 'reed': case 'tilt': return [['a', d.a], ['b', d.k]];
     case 'sevenseg': return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'].concat(['COM']).map(n => [n, `${d.id}.${n}`]);
@@ -308,6 +309,12 @@ export function evaluate(model) {
         pe[d.id] = { vn, gn, ph };
       }
       else if (d.type === 'ds18b20') { const vn = nid(T(d, 'VDD')), gn = nid(T(d, 'GND')); if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 100000, load: true }); pe[d.id] = { vn, gn }; }
+      else if (d.type === 'irrx') {   // TSOP382-type: about 0.35 mA supply current, output idles high through an internal 30 kohm pull-up, pulled low during a burst
+        const vn = nid(T(d, 'VS')), gn = nid(T(d, 'GND')), on = nid(T(d, 'OUT'));
+        elems.push({ t: 'R', a: vn, b: gn, g: 1 / 10000, load: true }, { t: 'R', a: vn, b: on, g: 1 / 30000, load: true });
+        if (((env && env.sw) || {})[d.id]) elems.push({ t: 'R', a: on, b: gn, g: 1 / 150 });
+        pe[d.id] = { vn, gn };
+      }
       else if (d.type === 'dht') { const vn = nid(T(d, 'VCC')), gn = nid(T(d, 'GND')); if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 20000, load: true }); pe[d.id] = { vn, gn }; }
       else if (d.type === 'diode') { const Is = 0.02 / Math.exp(0.85 / NVT), e = { t: 'D', a: nid(T(d, 'A')), b: nid(T(d, 'K')), Is }; if (!dead) elems.push(e); pe[d.id] = { a: e.a, b: e.b, Is }; }   // 1.1 V at 1 A
       else if (d.type === 'npn') {
@@ -415,7 +422,7 @@ export function evaluate(model) {
       else if (d.type === 'rgbled') { q.dice.forEach((e, i) => { const V = v[e.a] - v[e.b], I = burnt.has(d.id) ? 0 : e.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V' + i, V); acc(d.id, 'I' + i, I); acc(d.id, 'Imax' + i, I, 'max'); }); }
       else if (d.type === 'buzzer') { const V = v[q.a] - v[q.b]; acc(d.id, 'Vmax', V, 'max'); acc(d.id, 'Vmin', V, 'min'); acc(d.id, 'V', V); }
       else if (d.type === 'pot') acc(d.id, 'Vw', v[q.W]);
-      else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo' || d.type === 'sht31' || d.type === 'dht' || d.type === 'ds18b20') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
+      else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo' || d.type === 'sht31' || d.type === 'dht' || d.type === 'ds18b20' || d.type === 'irrx') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'neopixel' || d.type === 'lcd1602' || d.type === 'oled') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'diode') { const V = v[q.a] - v[q.b], I = burnt.has(d.id) ? 0 : q.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'Imax', I, 'max'); }
       else if (d.type === 'npn') { acc(d.id, 'Vbe', v[q.b] - v[q.e]); acc(d.id, 'Vce', v[q.c] - v[q.e]); acc(d.id, 'Ic', q.q.ic); acc(d.id, 'Ib', q.q.ib); acc(d.id, 'Icmax', q.q.ic, 'max'); }
@@ -685,6 +692,18 @@ export function evaluate(model) {
           else note('ok', `${label} reads ${t.toFixed(2)} °C (12-bit resolution, 0.0625 °C steps; accurate to ±0.5 °C from −10 to +85 °C; a conversion takes up to 750 ms).`, d.id);
         }
       }
+    } else if (d.type === 'irrx') {
+      const vs = s.Vs ?? 0, out = gpioOn(d, 'OUT'), burst = !!((env && env.sw) || {})[d.id];
+      const bad = !out.length ? 'OUT is not connected to a board pin' : out.some(id => OUTPUT_MODES.includes(modeOf(id))) ? 'the pin on OUT is set to an output: it fights the receiver’s own output. Set it to an input' : null;
+      if (!powered) R.status = 'off';
+      else if (vs < -0.5) { R.status = 'bad'; R.msg = 'Connected backwards.'; note('bad', `${label} is connected backwards (VS and GND swapped). The legs are OUT, GND, VS (pins 1, 2, 3 of the datasheet); with the dome toward you they are usually in this order from the left: check the drawing of your part.`, d.id); }
+      else if (vs < 2.0) { R.status = 'off'; R.msg = `Only ${Math.max(0, vs).toFixed(1)} V`; note('bad', `${label} gets only ${Math.max(0, vs).toFixed(1)} V, but the TSOP382-type receiver needs 2.0 V to 5.5 V (Vishay datasheet): connect VS to the 3.3 V (or 5 V) pin and GND to GND.`, d.id); }
+      else if (vs > 5.5) { R.status = 'bad'; R.msg = 'Too much voltage.'; note('bad', `${label} gets ${vs.toFixed(1)} V, above its 5.5 V supply range (absolute maximum 6 V).`, d.id); }
+      else if (bad) { R.status = 'warn'; R.msg = bad[0].toUpperCase() + bad.slice(1) + '.'; note('bad', `${label}: ${bad}.`, d.id); }
+      else {
+        R.burst = burst; R.msg = burst ? 'Receiving a 38 kHz burst: OUT goes LOW.' : 'Idle: OUT stays HIGH.';
+        note('ok', `${label} ${burst ? 'is receiving a burst of 38 kHz infrared light from a remote: its OUT line is pulled LOW (the output is active low)' : 'sees no infrared remote: OUT idles HIGH (it has its own pull-up inside). Click the receiver to simulate a remote button press'}.`, d.id);
+      }
     } else if (d.type === 'rgbled') {
       const names = ['red', 'green', 'blue'], I = [0, 1, 2].map(i => s['I' + i] ?? 0), Ipk = [0, 1, 2].map(i => s['Imax' + i] ?? 0), V = [0, 1, 2].map(i => s['V' + i] ?? 0);
       R.levels = I.map(x => Math.pow(Math.min(1, Math.max(0, x / 0.015)), 0.6));
@@ -934,6 +953,7 @@ export function evaluate(model) {
       led: d => [item(d, 'anode', ['gpio', '3v3', '5v'], pi ? 'a GPIO pin (through a resistor)' : 'a pin (through a resistor)'), item(d, 'cathode', ['gnd'], name.gnd)],
       sevenseg: d => ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'].slice(0, 7).map(n => item(d, n, ['gpio'], sig + ' (through about 220 Ω)', n === 'A' ? 'Every segment needs its own resistor' : '')).concat([item(d, 'COM', ['gnd'], name.gnd + ' (common cathode: COM goes to GND)')]),
       ds18b20: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VDD', ['3v3', '5v'], name['3v3'] + ' (3.0 V to 5.5 V)'), ((ids, gp) => (gp.length && ids.every(id => ['gpio', '3v3', '5v'].includes(usedPins.get(id).k)) ? { ok: true, text: 'DQ: ' + sig + ' (plus a 4.7 kΩ pull-up resistor to VDD)' } : { ok: false, text: (ids.length ? 'DQ is on ' + ids.map(id => usedPins.get(id).name).join(', ') + ', but it should go to ' : 'DQ is not connected to a board pin yet. It should go to ') + sig + ' (plus a 4.7 kΩ pull-up resistor to VDD).' }))(reachPins(d, 'DQ'), reachPins(d, 'DQ').filter(id => usedPins.get(id).k === 'gpio'))],
+      irrx: d => [item(d, 'OUT', ['gpio'], sig + ' (set to an input)'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'VS', ['3v3', '5v'], name['3v3'] + ' (2.0 V to 5.5 V)', 'The legs are OUT, GND, VS')],
       buzzer: d => d.active ? [item(d, 'plus', ['gpio', '3v3', '5v'], sig + ' (or a supply pin)', 'The + leg is marked on the buzzer'), item(d, 'minus', ['gnd'], name.gnd)] : [item(d, 'plus', ['gpio'], sig), item(d, 'minus', ['gnd'], name.gnd)],
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
@@ -961,7 +981,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', ds18b20: 'DS18B20 sensor', cap: 'Capacitor', sevenseg: '7-segment display', reed: 'Reed switch', tilt: 'Tilt switch', slidesw: 'Slide switch', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', irrx: 'IR receiver', ds18b20: 'DS18B20 sensor', cap: 'Capacitor', sevenseg: '7-segment display', reed: 'Reed switch', tilt: 'Tilt switch', slidesw: 'Slide switch', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }
