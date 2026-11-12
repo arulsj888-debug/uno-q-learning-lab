@@ -1479,6 +1479,30 @@ export const PROGRAMS = {
     }
   },
 
+  async u3_car(rt) {
+    await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5); await rt.at(6);
+    await rt.at(9); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(10); rt.pinMode('D7', 'OUTPUT');
+    await rt.at(11); rt.pinMode('D8', 'OUTPUT');
+    await rt.at(12); rt.pinMode('D3', 'OUTPUT');
+    await rt.at(13); rt.pinMode('D2', 'INPUT');
+    await rt.at(14); rt.serialBegin(9600);
+    for (;;) {
+      await rt.at(17);
+      await rt.at(18); rt.digitalWrite('D3', 0);
+      await rt.at(19); await rt.delayMicroseconds(2);
+      await rt.at(20); rt.digitalWrite('D3', 1);
+      await rt.at(21); await rt.delayMicroseconds(10);
+      await rt.at(22); rt.digitalWrite('D3', 0);
+      await rt.at(23); const duration = await rt.pulseIn('D2', 1);
+      await rt.at(24); const cm = duration / 58.0;
+      await rt.at(26);
+      if (cm > 0 && cm < 20) { await rt.at(27); rt.analogWrite('D5', 0); await rt.at(28); rt.println('Obstacle: stop'); }
+      else { await rt.at(30); rt.digitalWrite('D7', 1); await rt.at(31); rt.digitalWrite('D8', 0); await rt.at(32); rt.analogWrite('D5', 200); await rt.at(33); rt.println('Clear: forward'); }
+      await rt.at(35); await rt.delay(200);
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

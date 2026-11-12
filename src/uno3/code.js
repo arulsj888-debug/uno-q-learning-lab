@@ -877,3 +877,41 @@ void loop() {
     }
   }
 }`;
+
+// Lesson 39 (project) — obstacle-stopping robot: L293D motor and HC-SR04
+export const U3_CAR = `// A robot that stops for obstacles: one motor (L293D) and an HC-SR04 distance sensor
+const int enablePin = 5;   // L293D 1,2EN: PWM = speed
+const int in1Pin = 7;      // L293D 1A
+const int in2Pin = 8;      // L293D 2A
+const int trigPin = 3;     // HC-SR04 TRIG
+const int echoPin = 2;     // HC-SR04 ECHO
+
+void setup() {
+  pinMode(enablePin, OUTPUT);
+  pinMode(in1Pin, OUTPUT);
+  pinMode(in2Pin, OUTPUT);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);        // a 10 microsecond pulse starts a measurement
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  long duration = pulseIn(echoPin, HIGH);
+  float cm = duration / 58.0;         // microseconds to centimetres
+
+  if (cm > 0 && cm < 20) {            // obstacle closer than 20 cm
+    analogWrite(enablePin, 0);        // stop
+    Serial.println("Obstacle: stop");
+  } else {
+    digitalWrite(in1Pin, HIGH);       // drive forward
+    digitalWrite(in2Pin, LOW);
+    analogWrite(enablePin, 200);
+    Serial.println("Clear: forward");
+  }
+  delay(200);
+}`;

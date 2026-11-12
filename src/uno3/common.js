@@ -390,3 +390,14 @@ export const LOCK_PARTS = [...KP_PARTS,
   { id: 'w99', type: 'wire', from: 'a26', to: 'GND3', color: 'black', lift: 9 },
 ];
 export const LOCK_IDS = LOCK_PARTS.map(d => d.id);
+
+// ---- Lesson 39 (project): the motor circuit of Lesson 14 plus the HC-SR04 moved to columns 23-26 (TRIG pin 3, ECHO pin 2; power taken from the L293D supply columns)
+export const CAR_PARTS = [...MOTOR_PARTS,
+  { id: 'us1', type: 'hcsr04', row: 'j', col: 23 },
+  { id: 'w40', type: 'wire', from: 'b12', to: 'f23', color: 'red', lift: 20 },
+  { id: 'w41', type: 'wire', from: 'D3', to: 'f24', color: 'green', lift: 26 },
+  { id: 'w42', type: 'wire', from: 'D2', to: 'f25', color: 'white', lift: 30 },
+  { id: 'w43', type: 'wire', from: 'b15', to: 'f26', color: 'black', lift: 18 },
+];
+export const CAR_IDS = CAR_PARTS.map(d => d.id);
+export const CAR_IO_M = { kind: 'motor', item: 'mot1', drv: 'u1', bat: 'bat1', en: 'D5', in1: 'D7', in2: 'D8', needs: CAR_IDS };

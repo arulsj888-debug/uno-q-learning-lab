@@ -1406,7 +1406,8 @@ class App {
     const total = trig + hear + burst + 320, X = ms => 92 + (w - 102) * ms / total;
     g.fillStyle = '#070b0e'; g.fillRect(0, 0, w, h);
     g.font = '12px Consolas, monospace'; g.textBaseline = 'middle';
-    const rows = [[IS_U3 ? 'TRIG (pin 7)' : 'TRIG (D7)', 18], ['Burst from T', 46], [IS_U3 ? 'ECHO (pin 8)' : 'ECHO (D8)', 74]];
+    const uio = Object.entries((this.lesson && this.lesson.io) || {}).find(([, x]) => x.kind === 'hcsr04'), echoN = IS_U3 && uio ? uio[0].slice(1) : '8', trigN = IS_U3 && uio ? uio[1].trig.slice(1) : '7';
+    const rows = [[IS_U3 ? `TRIG (pin ${trigN})` : `TRIG (D${trigN})`, 18], ['Burst from T', 46], [IS_U3 ? `ECHO (pin ${echoN})` : `ECHO (D${echoN})`, 74]];
     for (const [name, y] of rows) { g.fillStyle = '#8fa3b5'; g.fillText(name, 6, y); g.strokeStyle = 'rgba(255,255,255,0.08)'; g.lineWidth = 1; g.beginPath(); g.moveTo(92, y + 8); g.lineTo(w - 10, y + 8); g.stroke(); }
     const step = (y, segs, col) => { g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(92, y + 8); for (const [a, b] of segs) { g.lineTo(X(a), y + 8); g.lineTo(X(a), y - 6); g.lineTo(X(b), y - 6); g.lineTo(X(b), y + 8); } g.lineTo(w - 10, y + 8); g.stroke(); };
     step(18, [[0, trig * 0.8]], '#ffd34d');
@@ -2117,7 +2118,7 @@ class App {
       mode: (pin, mode) => { const rio = this.relayIo(); if (rio && this.rly && pin === 'D4') { this.rly.mode = mode; this.rly.level = null; } },
       pulse: async (pin) => {
         const io = this.ioFor(pin);
-        if (io && io.kind === 'hcsr04' && this.wired(io) && this.board.powered) { const us = this.pulseInUs(); await sleep(Math.max(1, us / 1000)); this.setPinLevel(`${pinName('D8')} ECHO: HIGH for ${Math.round(this.echoUs())} µs → pulseIn() = ${us} µs`); return us; }
+        if (io && io.kind === 'hcsr04' && this.wired(io) && this.board.powered) { const us = this.pulseInUs(); await sleep(Math.max(1, us / 1000)); this.setPinLevel(`${pinName(pin)} ECHO: HIGH for ${Math.round(this.echoUs())} µs → pulseIn() = ${us} µs`); return us; }
         await sleep(IS_U3 ? 1000 : 2000); return 0;       // pulseIn() default timeout: 1 s on the UNO R3 (AVR core)
       },
       serial: txt => {

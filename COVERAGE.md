@@ -87,6 +87,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Timers, EEPROM / preferences | TODO | TODO | TODO | TODO | |
 
 ## F. Projects (after the parts exist)
+DONE: Obstacle-stopping robot (UNO R3 lesson 39): L293D + one DC motor + HC-SR04 (TRIG pin 3, ECHO pin 2), stops under 20 cm. One motor only, no wheels or turning; ESP32/Pi versions TODO (the motor and L293D parts need 5 V handling there).
 DONE: Smart home node (ESP32 lesson 41): MQTT lamp command + state report, BMP280 telemetry every 3 s, on-device alert rule above 28 C (broker and phone simulated, broker address made up; no security or TLS).
 DONE: Data logger (ESP32 lesson 40): BMP280 readings appended to /log.csv in the ESP32 flash (LittleFS), read back after five lines; time column = running time (no RTC). SD card / RTC versions TODO. LittleFS calls from memory of the Arduino-ESP32 API, not re-checked.
 DONE: Keypad code lock (UNO R3 lesson 38, ESP32 lesson 39): keypad + passive buzzer, # = enter, * = clear; the secret is stored in the sketch (the lesson says a real lock must not). Security alarm with PIR and a real lock driver TODO.

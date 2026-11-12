@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP, U3_SOIL, U3_SND, U3_PLANT, U3_KEYPAD, U3_LOCK } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP, U3_SOIL, U3_SND, U3_PLANT, U3_KEYPAD, U3_LOCK, U3_CAR } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS, SOIL_PARTS, SOIL_IDS, SND_PARTS, SND_IDS, PLANT_PARTS, PLANT_IDS, KP_PARTS, KP_IDS, LOCK_PARTS, LOCK_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS, SOIL_PARTS, SOIL_IDS, SND_PARTS, SND_IDS, PLANT_PARTS, PLANT_IDS, KP_PARTS, KP_IDS, LOCK_PARTS, LOCK_IDS, CAR_PARTS, CAR_IDS, CAR_IO_M,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1782,5 +1782,44 @@ export const U3_LESSONS_2 = [
       { q: 'What does tone(pin, 300, 600) do?', a: ['Plays 300 Hz for 600 ms', 'Plays 600 Hz for 300 ms', 'Turns the pin on', 'Reads the pin'], c: 0, why: 'tone(pin, frequency, duration).' },
     ],
     sources: [SRC.keypadlib, ],
+  },
+
+  // ================================================================== 39
+  {
+    id: 'u39', num: 39, module: 5, title: 'Project: a robot that stops for obstacles', level: 'Intermediate', time: '35 min',
+    goal: 'Combine the motor driver and the ultrasonic sensor: drive forward and stop when something is closer than 20 cm.',
+    hardware: ['Arduino UNO R3', 'Breadboard', 'L293D motor driver', '“130” DC hobby motor', '4 × AA battery holder', 'HC-SR04 ultrasonic sensor', 'Jumper wires'],
+    code: U3_CAR, file: 'ObstacleRobot.ino', program: 'u3_car', fast: true, widgets: ['motor', 'distance'],
+    circuit: CAR_PARTS, io: { D5: CAR_IO_M, D2: { kind: 'hcsr04', item: 'us1', trig: 'D3', needs: CAR_IDS } },
+    explain: {
+      2: 'Motor speed pin (PWM), as in Lesson 14.',
+      3: 'Motor direction pins…',
+      5: 'The ultrasonic sensor’s trigger…',
+      6: '…and echo pins (Lesson 11). The motor uses pins 5, 7 and 8, so the sensor moves to pins 3 and 2.',
+      23: '<b>pulseIn()</b> times the echo: the longer the echo, the farther the obstacle.',
+      24: 'Microseconds to centimetres: divide by 58 (the HC-SR04 datasheet figure).',
+      26: 'The decision: is something closer than <b>20 cm</b>? A reading of 0 means no echo, so it is excluded.',
+      27: 'Obstacle: speed 0, the motor stops.',
+      30: 'Clear: set the direction pins for forward…',
+      32: '…and run at about three quarters of full speed (200 of 255).',
+      35: 'Measure five times a second.',
+    },
+    steps: [
+      { title: 'Sense, decide, act', view: 'bench', have: [], power: false,
+        body: `<p>A robot works in a loop: <b>sense</b> (distance), <b>decide</b> (is something in the way?) and <b>act</b> (drive or stop). This project joins two earlier lessons: the <b>L293D motor driver</b> (Lesson 14) and the <b>HC-SR04</b> (Lesson 11).</p><p class="warn">A real car needs two motors and wheels: this project has one motor on a desk, enough to learn the logic.</p>` },
+      { title: 'Wire it', view: 'bench', have: CAR_IDS, power: false, pins: ['D2', 'D3', 'D5', 'D7', 'D8'],
+        body: `<p>The motor circuit is exactly Lesson 14. The ultrasonic sensor sits in <b>columns 23 to 26</b> (VCC, TRIG, ECHO, GND). Its power comes from the same columns as the L293D’s logic supply (a link from <b>b12</b> to <b>f23</b> for VCC and from <b>b15</b> to <b>f26</b> for GND); TRIG goes to <b>pin 3</b> and ECHO to <b>pin 2</b>.</p>` },
+      { title: 'The code', view: 'bench', have: CAR_IDS, showCode: true, power: true, body: `<p>Click lines <b>23</b>, <b>26</b> and <b>32</b>.</p>` },
+      { title: 'Run it: bring an obstacle close', view: 'bench', have: CAR_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>With the obstacle far away (more than 20 cm) the motor runs and the Serial Monitor says <code>Clear: forward</code>. Slide the <b>obstacle</b> closer than 20 cm: the motor stops (<code>Obstacle: stop</code>). Move it away again and the motor restarts.</p><p class="sim">Simulated sensor and motor.</p>` },
+      { title: 'Summary', view: 'bench', have: CAR_IDS, power: true,
+        body: `<ul><li>Sense → decide → act in <code>loop()</code>.</li><li>Distance from the echo time: microseconds ÷ 58 = cm.</li><li>Stop by setting the PWM enable to 0.</li><li>Next steps: a second motor for turning, and a sensor reading that checks for 0 and noise.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How does the robot know the distance?', a: ['It times the ultrasonic echo', 'It reads the motor speed', 'It counts steps', 'It uses Wi-Fi'], c: 0, why: 'pulseIn() times the echo.' },
+      { q: 'How does the sketch stop the motor?', a: ['analogWrite(enablePin, 0)', 'delay(0)', 'Serial.end()', 'pinMode(enablePin, INPUT)'], c: 0, why: 'Enable at 0 switches the outputs off.' },
+      { q: 'Why is cm > 0 in the test?', a: ['No echo gives 0, which is not an obstacle', 'To save power', 'To make it faster', 'It is required by pulseIn'], c: 0, why: 'A reading of 0 means no echo came back.' },
+    ],
+    sources: [SRC.hcsr04, SRC.pulsein, SRC.l293, SRC.motor130, SRC.ds],
   },
 ];
