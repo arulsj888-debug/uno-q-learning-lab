@@ -57,6 +57,7 @@ export function terminals(d) {
     case 'diode': return [['A', d.a], ['K', d.k]];
     case 'cap': return [['plus', d.a], ['minus', d.k]];
     case 'reed': case 'tilt': return [['a', d.a], ['b', d.k]];
+    case 'sevenseg': return ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'].concat(['COM']).map(n => [n, `${d.id}.${n}`]);
     case 'slidesw': return [['A', `${row}${c}`], ['COM', `${row}${c + 1}`], ['B', `${row}${c + 2}`]];
     case 'npn': return d.flip ? [['E', `${row}${c + 2}`], ['B', `${row}${c + 1}`], ['C', `${row}${c}`]] : [['E', `${row}${c}`], ['B', `${row}${c + 1}`], ['C', `${row}${c + 2}`]];
     case 'mosfet': return d.flip ? [['S', `${row}${c + 2}`], ['D', `${row}${c + 1}`], ['G', `${row}${c}`]] : [['G', `${row}${c}`], ['D', `${row}${c + 1}`], ['S', `${row}${c + 2}`]];
@@ -319,6 +320,11 @@ export function evaluate(model) {
       }
       else if (d.type === 'reed' || d.type === 'tilt') { const a = nid(T(d, 'a')), b = nid(T(d, 'b')); if (((env && env.sw) || {})[d.id]) elems.push({ t: 'R', a, b, g: 20 }); pe[d.id] = {}; }   // closed contact: 0.05 ohm
       else if (d.type === 'slidesw') { const A = nid(T(d, 'A')), C = nid(T(d, 'COM')), B = nid(T(d, 'B')); elems.push({ t: 'R', a: C, b: ((env && env.sw) || {})[d.id] ? B : A, g: 20 }); pe[d.id] = {}; }
+      else if (d.type === 'sevenseg') {   // 5161AS common cathode, super red: 2.1 V typical at 20 mA per segment
+        const C = nid(T(d, 'COM')), dice = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'].map(n => ({ t: 'D', a: nid(T(d, n)), b: C, Is: 0.02 / Math.exp(2.1 / NVT) }));
+        if (!dead) elems.push(...dice);
+        pe[d.id] = { dice };
+      }
       else if (d.type === 'cap') { const a = nid(T(d, 'plus')), b = nid(T(d, 'minus')); if (!dead && dt > 0) elems.push({ t: 'C', a, b, c: (d.uf || 100) * 1e-6, dt, v0: capV[d.id] ?? 0 }); pe[d.id] = { a, b }; }
       else if (d.type === 'rgbled') {
         // three LED dice with one common leg: common cathode (d.ca falsy) = colour pins are the anodes, common anode = colour pins are the cathodes
@@ -411,6 +417,7 @@ export function evaluate(model) {
       else if (d.type === 'neopixel' || d.type === 'lcd1602' || d.type === 'oled') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'diode') { const V = v[q.a] - v[q.b], I = burnt.has(d.id) ? 0 : q.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'Imax', I, 'max'); }
       else if (d.type === 'npn') { acc(d.id, 'Vbe', v[q.b] - v[q.e]); acc(d.id, 'Vce', v[q.c] - v[q.e]); acc(d.id, 'Ic', q.q.ic); acc(d.id, 'Ib', q.q.ib); acc(d.id, 'Icmax', q.q.ic, 'max'); }
+      else if (d.type === 'sevenseg') q.dice.forEach((e, i) => { const I = burnt.has(d.id) ? 0 : e.Is * (Math.exp(Math.min(v[e.a] - v[e.b], 6) / NVT) - 1); acc(d.id, 'I' + i, I); acc(d.id, 'Imax' + i, I, 'max'); });
       else if (d.type === 'cap') { const V = v[q.a] - v[q.b]; acc(d.id, 'V', V); acc(d.id, 'Vmax', V, 'max'); acc(d.id, 'Vmin', V, 'min'); }
       else if (d.type === 'mosfet') { acc(d.id, 'Vgs', v[q.g] - v[q.s]); acc(d.id, 'Vgsmax', v[q.g] - v[q.s], 'max'); acc(d.id, 'Vgsmin', v[q.g] - v[q.s], 'min'); acc(d.id, 'Vds', v[q.d] - v[q.s]); acc(d.id, 'Id', q.f.id); acc(d.id, 'Idmax', q.f.id, 'max'); }
       else if (d.type === 'joystick') { acc(d.id, 'Vs', v[q.vn] - v[q.gn]); acc(d.id, 'Vx', v[q.jx] - v[q.gn]); acc(d.id, 'Vy', v[q.jy] - v[q.gn]); }
@@ -543,6 +550,20 @@ export function evaluate(model) {
         const dv = V - prev; R.V = V;
         R.msg = !powered && V < 0.05 ? 'Empty (0 V).' : dv > 0.004 ? `Charging: ${V.toFixed(2)} V.` : dv < -0.004 ? `Discharging: ${V.toFixed(2)} V.` : `Holding ${V.toFixed(2)} V.`;
         note('info', `${label} (${uf} µF): ${R.msg} A capacitor charges through a resistor with a time constant τ = R × C (about 63 % charged after one τ, almost full after 5 τ).`, d.id);
+      }
+    } else if (d.type === 'sevenseg') {
+      const SEG = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'], lv = SEG.map((n, i) => Math.min(1, (s['I' + i] ?? 0) / 0.012)), Imax = Math.max(...SEG.map((n, i) => s['Imax' + i] ?? 0)), on = lv.map(x => x > 0.03);
+      R.levels = lv;
+      const CH = { '1111110': '0', '0110000': '1', '1101101': '2', '1111001': '3', '0110011': '4', '1011011': '5', '1011111': '6', '1110000': '7', '1111111': '8', '1111011': '9', '1110111': 'A', '0011111': 'b', '1001110': 'C', '0111101': 'd', '1001111': 'E', '1000111': 'F' };
+      const shown = CH[on.slice(0, 7).map(x => (x ? 1 : 0)).join('')];
+      if (burnt.has(d.id)) { R.status = 'bad'; R.msg = 'Burnt out.'; note('bad', burnWhy[d.id] || `${label} is burnt out. Delete it and place a new one.`, d.id); }
+      else if (Imax > 0.1) burn(d.id, `${label} burns out: ${(Imax * 1000).toFixed(0)} mA flowed through one segment, but the 5161AS allows at most 100 mA peak (20 mA continuous). Every segment needs its own resistor (about 220 Ω).`);
+      else if (!powered) R.status = 'off';
+      else if (!on.some(Boolean)) { R.status = 'off'; R.msg = 'Dark.'; note('info', `${label} shows nothing: no segment gets current. Set a segment pin to Output HIGH and connect COM to GND (this is a common-cathode display).`, d.id); }
+      else {
+        R.msg = shown ? `Showing the digit ${shown}.` : `${on.filter(Boolean).length} segment(s) lit.`;
+        if (Imax > 0.0205) { R.status = 'warn'; note('warn', `${label}: a segment carries ${(Imax * 1000).toFixed(0)} mA, above the 20 mA continuous rating of the 5161AS. Use a larger resistor (about 220 Ω to 330 Ω).`, d.id); }
+        else note('ok', `${label} is lit: ${R.msg} (about ${(Imax * 1000).toFixed(0)} mA per segment).`, d.id);
       }
     } else if (d.type === 'lcd1602' || d.type === 'oled') {
       const lcd = d.type === 'lcd1602', vs = s.Vs ?? 0, sda = gpioOn(d, 'SDA'), scl = gpioOn(d, 'SCL'), kind = id => usedPins.get(id) || {}, addr = lcd ? '0x27' : '0x3C';
@@ -887,6 +908,7 @@ export function evaluate(model) {
     };
     const SPEC = {
       led: d => [item(d, 'anode', ['gpio', '3v3', '5v'], pi ? 'a GPIO pin (through a resistor)' : 'a pin (through a resistor)'), item(d, 'cathode', ['gnd'], name.gnd)],
+      sevenseg: d => ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'].slice(0, 7).map(n => item(d, n, ['gpio'], sig + ' (through about 220 Ω)', n === 'A' ? 'Every segment needs its own resistor' : '')).concat([item(d, 'COM', ['gnd'], name.gnd + ' (common cathode: COM goes to GND)')]),
       buzzer: d => d.active ? [item(d, 'plus', ['gpio', '3v3', '5v'], sig + ' (or a supply pin)', 'The + leg is marked on the buzzer'), item(d, 'minus', ['gnd'], name.gnd)] : [item(d, 'plus', ['gpio'], sig), item(d, 'minus', ['gnd'], name.gnd)],
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
@@ -914,7 +936,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', cap: 'Capacitor', reed: 'Reed switch', tilt: 'Tilt switch', slidesw: 'Slide switch', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', cap: 'Capacitor', sevenseg: '7-segment display', reed: 'Reed switch', tilt: 'Tilt switch', slidesw: 'Slide switch', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }

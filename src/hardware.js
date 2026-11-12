@@ -611,6 +611,51 @@ export class TransistorPN2222A {
   }
 }
 
+// ---------------------------------------------------------------- 7-segment display (5161AS, common cathode, 0.56 inch) on a small breakout board with a 9-pin header
+// Facts from the 5161AS datasheet: digit height 14.2 mm, body 12.6 x 19.0 mm, pin pitch 2.54 mm, super red, VF 2.1 V typ at 20 mA.
+export class SevenSegModule {
+  constructor() {
+    const g = this.group = new THREE.Group(); this.hw = 'sevenseg';
+    const edge = new THREE.MeshStandardMaterial({ color: 0x1d2a3f, roughness: 0.7 }), mask = new THREE.MeshStandardMaterial({ color: 0x1b4fb3, roughness: 0.45 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(34, 1.6, 40), [edge, edge, mask, mask, edge, edge]); pcb.position.set(0, 2.6, 0); g.add(pcb);
+    const PX = 16, tw = 34 * PX, th = 40 * PX, names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'].concat(['COM']);
+    const tex = canvasTex(tw, th, (c) => {
+      c.clearRect(0, 0, tw, th); c.strokeStyle = 'rgba(245,245,240,0.8)'; c.lineWidth = 3; c.strokeRect(8, 8, tw - 16, th - 16);
+      silk(c, '7-SEG 5161AS', 17 * PX, 4.2 * PX, 22, 'rgba(243,243,238,0.9)', 'center', 600);
+      names.forEach((n, i) => silk(c, n, (17 + (i - 4) * 2.54) * PX, 27.2 * PX, 17, '#f3f3ee', 'center', 600));
+    });
+    const lab = new THREE.Mesh(new THREE.PlaneGeometry(34, 40), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })); lab.rotation.x = -Math.PI / 2; lab.position.set(0, 3.42, 0); g.add(lab);
+    // the display body (12.6 x 19 mm, 8 mm high) with the black face and the seven segments + decimal point
+    const body = new THREE.Mesh(new RoundedBoxGeometry(12.6, 8, 19, 1, 0.3), new THREE.MeshStandardMaterial({ color: 0x151517, roughness: 0.5 })); body.position.set(0, 7.4, -6); g.add(body);
+    const top = 7.4 + 4.02, z0 = -6, off = 0x4d3333;
+    this.segs = [];
+    const hex = (L, t) => { const s = new THREE.Shape(); s.moveTo(-L / 2, 0); s.lineTo(-L / 2 + t / 2, t / 2); s.lineTo(L / 2 - t / 2, t / 2); s.lineTo(L / 2, 0); s.lineTo(L / 2 - t / 2, -t / 2); s.lineTo(-L / 2 + t / 2, -t / 2); s.closePath(); return new THREE.ShapeGeometry(s); };
+    const mk = (geo, x, z, rotZ) => { const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: off, emissive: 0x000000, roughness: 0.4 })); m.rotation.x = -Math.PI / 2; m.rotation.z = rotZ || 0; m.position.set(x, top, z); g.add(m); this.segs.push(m); };
+    const L = 5.6, t = 1.4;
+    mk(hex(L, t), 0, z0 - 6.2, 0);               // A
+    mk(hex(L, t), 3.5, z0 - 3.1, Math.PI / 2);   // B
+    mk(hex(L, t), 3.5, z0 + 3.1, Math.PI / 2);   // C
+    mk(hex(L, t), 0, z0 + 6.2, 0);               // D
+    mk(hex(L, t), -3.5, z0 + 3.1, Math.PI / 2);  // E
+    mk(hex(L, t), -3.5, z0 - 3.1, Math.PI / 2);  // F
+    mk(hex(L, t), 0, z0, 0);                     // G
+    mk(new THREE.CircleGeometry(0.75, 20), 5.0, z0 + 7.0, 0);   // DP
+    // 9-pin header standing up at the front edge
+    const y0 = 4.3, pinZ = 14.5; this.pinZ = pinZ; this.pinTop = y0 + 8.2; this.pinX = {};
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(9 * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0, pinZ); g.add(strip);
+    names.forEach((n, i) => { const x = (i - 4) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, y0 + 4.2, pinZ); g.add(p); });
+    tagHW(g, 'sevenseg'); this.setLevels(null);
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    return { pos: this.group.localToWorld(new THREE.Vector3(this.pinX[name], this.pinTop, this.pinZ)), dir: new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion())) };
+  }
+  /** levels: 8 numbers 0..1 (segments A..G, DP) or null (dark) */
+  setLevels(lv) {
+    this.segs.forEach((m, i) => { const k = lv ? Math.max(0, Math.min(1, lv[i] || 0)) : 0; m.material.color.setRGB(0.30 + 0.62 * k, 0.20 - 0.10 * k, 0.20 - 0.12 * k); m.material.emissive.setRGB(1.6 * k, 0.05 * k, 0.02 * k); });
+  }
+}
+
 // ---------------------------------------------------------------- switches: reed (glass capsule), tilt (ball), slide (SPDT)
 export class ReedSwitch {
   constructor(span = 12.7) {
@@ -1959,6 +2004,17 @@ export const HW_INFO = {
       'Flyback diode: connect it across the coil in the reverse direction, cathode to the supply side, anode to the switched side.',
     ],
     src: '1N4007 datasheets (Vishay, onsemi); general electronics practice',
+  },
+  sevenseg: {
+    name: '7-segment display 5161AS (common cathode)', tag: 'Seven LED bars and a decimal point',
+    summary: 'Eight LEDs (segments A to G and DP) share one common cathode pin (COM, pins 3 and 8 of the 5161AS). A segment lights when its pin is HIGH and COM is at GND; each segment needs its own resistor.',
+    points: [
+      'Datasheet (5161AS): common cathode, super red, 0.56 inch digit. Forward voltage 2.1 V typical (2.5 V max) at 20 mA; 20 mA continuous, 100 mA peak, 5 V reverse per segment.',
+      'Pin numbers: A 7, B 6, C 4, D 2, E 1, F 9, G 10, DP 5, COM 3 and 8. Here the display sits on a small breakout board with a 9-pin header labelled A to COM.',
+      'Resistor about 220 Ω per segment on a 5 V pin gives about 13 mA; on a 3.3 V pin about 5 mA (dimmer).',
+      'A common-anode type (5161BS) works the other way round: COM to the supply and the pins LOW.',
+    ],
+    src: '5161AS datasheet (manufacturer sheet, mantech.co.za)',
   },
   reed: {
     name: 'Reed switch', tag: 'A switch operated by a magnet',

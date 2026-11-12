@@ -2,7 +2,7 @@
 import { evaluate, resistorBands } from '../src/freebuild/circuit.js';
 let fail = 0;
 const ok = (c, m) => { if (!c) { fail++; console.log('FAIL', m); } else console.log('ok  ', m); };
-const uno = id => ({ D20: { id: 'D20' }, D21: { id: 'D21' }, D6: { id: 'D6', pwm: true }, D4: { id: 'D4' }, A1: { id: 'A1' }, D7: { id: 'D7' }, D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const uno = id => ({ D3: { id: 'D3' }, D20: { id: 'D20' }, D21: { id: 'D21' }, D6: { id: 'D6', pwm: true }, D4: { id: 'D4' }, A1: { id: 'A1' }, D7: { id: 'D7' }, D5: { id: 'D5', pwm: true }, D2: { id: 'D2' }, D8: { id: 'D8' }, D3: { id: 'D3' }, A0: { id: 'A0' }, '5V': { id: '5V' }, '3V3': { id: '3V3' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
 const pi = id => ({ p11: { gpio: 17 }, p3: { gpio: 2 }, p6: { label: 'GND', gpio: null }, p9: { label: 'GND', gpio: null }, p1: { label: '3V3', gpio: null }, p2: { label: '5V', gpio: null }, p12: { gpio: 18 } }[id]);
 const env = { lux: 300, tempC: 25, pressed: {}, pot: {} };
 const base = o => ({ boardKind: 'unoq', pinInfo: uno, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
@@ -97,7 +97,7 @@ r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: '
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: 'pixels' }, Q('c2', 'th1.QB', 'pix1.QA')] })); ok(r.parts.th1.status === 'off' && r.parts.pix1.status === 'off', 'modules without a cable to the board are off');
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'th2', type: 'thermo' }, Q('c1', 'QWIIC', 'th1.QA'), Q('c2', 'th1.QB', 'th2.QA')] })); ok(r.parts.th1.status === 'warn', 'two Thermos clash');
 // ---- Arduino UNO R3 (5 V logic)
-const u3 = id => ({ D8: { id: 'D8' }, D4: { id: 'D4' }, D6: { id: 'D6', pwm: true }, D7: { id: 'D7' }, D9: { id: 'D9', pwm: true }, A1: { id: 'A1' }, D5: { id: 'D5', pwm: true }, D13: { id: 'D13' }, D2: { id: 'D2' }, A0: { id: 'A0' }, A4: { id: 'A4' }, A5: { id: 'A5' }, SDA: { id: 'SDA' }, '5V': { id: '5V', kind: 'pwr' }, '3V3': { id: '3V3', kind: 'pwr' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const u3 = id => ({ D3: { id: 'D3' }, D8: { id: 'D8' }, D4: { id: 'D4' }, D6: { id: 'D6', pwm: true }, D7: { id: 'D7' }, D9: { id: 'D9', pwm: true }, A1: { id: 'A1' }, D5: { id: 'D5', pwm: true }, D13: { id: 'D13' }, D2: { id: 'D2' }, A0: { id: 'A0' }, A4: { id: 'A4' }, A5: { id: 'A5' }, SDA: { id: 'SDA' }, '5V': { id: '5V', kind: 'pwr' }, '3V3': { id: '3V3', kind: 'pwr' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
 const b3 = o => ({ boardKind: 'uno3', pinInfo: u3, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
 r = evaluate(b3({ parts: [W('w1', 'D5', 'a10'), res('r1', 'b10', 'b14', 220), led('l1', 'c14', 'c15'), W('w2', 'GND2', 'd15')], pinCfg: { D5: { mode: 'out1' } } }));
 ok(r.parts.l1.status === 'ok' && r.parts.l1.I > 0.010 && r.parts.l1.I < 0.016 && r.pins.D5.V > 4.3, 'UNO R3: 5 V pin + 220 ohm + LED gives about 12 mA');
@@ -241,6 +241,13 @@ for (const [kind, info, name, sig] of [['unoq', uno, 'UNO Q', 'D5'], ['uno3', u3
   r = ev('✔ Tilt switch', { tilt1: false }); ok(r.parts.led1.level < 0.05, name + ': upright tilt switch keeps the LED off');
   r = ev('✔ Slide switch', { ssw1: false }); ok(r.parts.led1.level > 0.2 && r.parts.led2.level < 0.05, name + ': slide switch at A lights LED 1 only');
   r = ev('✔ Slide switch', { ssw1: true }); ok(r.parts.led2.level > 0.2 && r.parts.led1.level < 0.05, name + ': slide switch at B lights LED 2 only');
+}
+// ---- 7-segment display (5161AS, common cathode)
+for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3'], ['esp32', findPinE32, 'ESP32']]) {
+  r = rgbOK(kind, info, '✔ 7-segment display shows'); const L = r.parts.seg1.levels;
+  ok([0, 2, 3, 5, 6].every(i => L[i] > 0.3) && [1, 4, 7].every(i => L[i] < 0.05) && /digit 5/.test(r.parts.seg1.msg), name + ': the display shows a 5 (segments A, C, D, F, G lit; ' + r.parts.seg1.msg + ')');
+  r = rgbOK(kind, info, '✖ 7-segment display without resistors'); ok(r.parts.seg1.status !== 'ok' || r.newDamage.size > 0 || r.newBurn.size > 0, name + ': no resistors overloads the segments or the pins');
+  r = rgbOK(kind, info, '✖ 7-segment display with COM'); ok(r.parts.seg1.levels.every(x => x < 0.03) && r.parts.seg1.status === 'off', name + ': COM not connected keeps the display dark');
 }
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');

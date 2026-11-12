@@ -9,12 +9,12 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 const RAILS = ['top+', 'top-', 'bot-', 'bot+'];
 const OHMS = [10, 100, 220, 330, 470, 1000, 2200, 4700, 10000, 47000, 100000, 1000000];
-const PREFIX = { reed: 'reed', tilt: 'tilt', slidesw: 'ssw', cap: 'cap', diode: 'd', npn: 'q', mosfet: 'fet', lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
+const PREFIX = { sevenseg: 'seg', reed: 'reed', tilt: 'tilt', slidesw: 'ssw', cap: 'cap', diode: 'd', npn: 'q', mosfet: 'fet', lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
 const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
-const TERMS = { lcd1602: ['GND', 'VCC', 'SDA', 'SCL'], oled: ['GND', 'VCC', 'SCL', 'SDA'], neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
-const DESK_SLOT_PI = { lcd1602: [125, 17], oled: [125, 17], neopixel: [110, 42] };
-const DESK_SLOT = { lcd1602: [20, 70], oled: [125, 70], neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
+const TERMS = { sevenseg: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP', 'COM'], lcd1602: ['GND', 'VCC', 'SDA', 'SCL'], oled: ['GND', 'VCC', 'SCL', 'SDA'], neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
+const DESK_SLOT_PI = { sevenseg: [100, 45], lcd1602: [125, 17], oled: [125, 17], neopixel: [110, 42] };
+const DESK_SLOT = { sevenseg: [72, 8], lcd1602: [20, 70], oled: [125, 70], neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
 const MOVABLE = new Set(['resistor', 'led', 'cap', 'reed', 'tilt', 'slidesw', 'diode', 'npn', 'mosfet', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
 
@@ -277,7 +277,7 @@ export class FreeBuild {
     this.modPts = [];
     for (const d of this.parts) if (TERMS[d.type]) {
       const it = this.app.bench.items[d.id]; if (!it) continue; it.group.updateMatrixWorld(true);
-      for (const name of TERMS[d.type]) { const q = { ref: `${d.id}.${name}`, pos: it.obj.pin(name).pos.clone(), kind: (d.type === 'pir' || d.type === 'lcd1602' || d.type === 'oled') ? 'modpin' : (d.type === 'thermo' || d.type === 'pixels') ? 'qwiic' : 'term', label: name }; this.modPts.push(q); this.byRef.set(q.ref, q); }
+      for (const name of TERMS[d.type]) { const q = { ref: `${d.id}.${name}`, pos: it.obj.pin(name).pos.clone(), kind: (d.type === 'pir' || d.type === 'lcd1602' || d.type === 'oled' || d.type === 'sevenseg') ? 'modpin' : (d.type === 'thermo' || d.type === 'pixels') ? 'qwiic' : 'term', label: name }; this.modPts.push(q); this.byRef.set(q.ref, q); }
     }
   }
   cancel() { this.tool = null; this.cand && (this.cand.count = 0); this.hover && (this.hover.visible = false); this.setHint(); this.renderSide && this.renderSide(); }
@@ -498,6 +498,7 @@ export class FreeBuild {
       else if (d.type === 'tilt') it.obj.setTilt(!!this.env.sw[d.id]);
       else if (d.type === 'slidesw') it.obj.setPos(!!this.env.sw[d.id]);
       else if (d.type === 'lcd1602' || d.type === 'oled') it.obj.setContent({ powered: this.powered() && !!R && R.status !== 'off' && R.status !== 'bad', backlight: !!(R && R.backlight), lines: R && R.show ? [this.env.disp1 ?? 'Hello, world!', this.env.disp2 ?? 'Free build'] : null });
+      else if (d.type === 'sevenseg') it.obj.setLevels(R && R.levels && this.powered() && R.status !== 'bad' ? R.levels : null);
       else if (d.type === 'neopixel') { if (it.obj.setColors) it.obj.setColors(R && R.colors && this.powered() ? R.colors : null); }
       else if (d.type === 'joystick') { const J = this.env.joy[d.id] || { x: 0.5, y: 0.5 }; it.obj.setStick(J.x, J.y, !!this.env.pressed[d.id]); }
       else if (d.type === 'encoder') it.obj.setPhase(this.env.enc[d.id] ?? 0, !!this.env.pressed[d.id]);
@@ -622,6 +623,7 @@ export class FreeBuild {
       <h3>Modules</h3>
       <div class="fb-row"><button class="fb-btn" data-tool="lcd1602">LCD 16×2 with I²C backpack</button></div>
       <div class="fb-row"><button class="fb-btn" data-tool="oled">OLED 128×64 (SSD1306, I²C)</button></div>
+      <div class="fb-row"><button class="fb-btn" data-tool="sevenseg">7-segment display (5161AS)</button></div>
       <div class="fb-row"><button class="fb-btn" data-tool="neopixel">NeoPixel strip, 8 pixels (WS2812B)</button></div>
       <div class="fb-row"><button class="fb-btn${on('joystick')}" data-tool="joystick">Joystick module${this.isPi ? ' (no ADC on Pi)' : ''}</button></div>
       <div class="fb-row"><button class="fb-btn${on('encoder')}" data-tool="encoder">Rotary encoder (KY-040)</button></div>
@@ -692,7 +694,7 @@ export class FreeBuild {
     this.select(null); this.tripMsg = null; this.exNote = ex.note; this.renderPanel();
     if (!this.powered()) this.app.plug(true).then(() => { this.dirty = true; this.renderSide(); });
     const wide = ex.parts.some(p => p.type === 'pir' || p.type === 'servo');
-    const far = ex.parts.some(p => ['relay', 'battery', 'lamp', 'motor', 'neopixel', 'lcd1602', 'oled'].includes(p.type)), qw = ex.parts.some(p => p.type === 'thermo' || p.type === 'pixels');
+    const far = ex.parts.some(p => ['relay', 'battery', 'lamp', 'motor', 'neopixel', 'lcd1602', 'oled', 'sevenseg'].includes(p.type)), qw = ex.parts.some(p => p.type === 'thermo' || p.type === 'pixels');
     this.app.view(this.isPi ? (far ? 'farpi' : wide ? 'bigpi' : 'pibb') : (qw ? 'qwq' : far ? 'farq' : wide ? 'bigq' : 'breadboard'));
   }
 
