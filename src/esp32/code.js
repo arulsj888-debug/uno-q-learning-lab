@@ -528,3 +528,39 @@ void loop() {
   }
   lastButton = button;
 }`;
+
+// Lesson 25 — HTTP client: ask a web server with HTTPClient (shape of the BasicHttpClient example)
+export const E32_HTTP = `#include <WiFi.h>
+#include <HTTPClient.h>
+
+const char *ssid = "HomeNet";
+const char *password = "MyPassword";
+const char *url = "http://api.example.com/temperature";   // a made-up address for this lesson
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+  Serial.println("Connected");
+
+  HTTPClient http;
+  http.begin(url);                 // the address to ask
+  int code = http.GET();           // send a GET request: returns the HTTP status code
+  if (code > 0) {                  // a negative number means the request itself failed
+    Serial.print("HTTP status: ");
+    Serial.println(code);
+    if (code == 200) {
+      String body = http.getString();
+      Serial.println(body);
+    }
+  } else {
+    Serial.print("Request failed: ");
+    Serial.println(http.errorToString(code));
+  }
+  http.end();                      // free the resources
+}
+
+void loop() {
+}`;

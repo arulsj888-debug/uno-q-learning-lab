@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -33,6 +33,8 @@ const SRC = {
   d1n4007: { t: 'Vishay 1N4001 to 1N4007 datasheet (average forward current 1 A; forward voltage 1.1 V at 1 A; up to 1000 V reverse for the 1N4007; the band marks the cathode)', u: 'https://www.vishay.com/docs/88503/1n4001.pdf' },
   millis: { t: 'Arduino reference: millis() (milliseconds since the program started)', u: 'https://docs.arduino.cc/language-reference/en/functions/time/millis/' },
   bwd: { t: 'Arduino example: Blink Without Delay', u: 'https://docs.arduino.cc/built-in-examples/digital/BlinkWithoutDelay/' },
+  httpc: { t: 'Arduino-ESP32 HTTPClient example: BasicHttpClient', u: 'https://github.com/espressif/arduino-esp32/tree/master/libraries/HTTPClient/examples/BasicHttpClient' },
+  httpmdn: { t: 'MDN: HTTP response status codes', u: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Status' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -1354,5 +1356,53 @@ export const E32_LESSONS = [
       { q: 'What does the variable previousMillis store?', a: ['The pin of the LED', 'The time of the last LED change', 'The button reading', 'The interval'], c: 1, why: 'It lets the sketch compute how long ago the last change was.' },
     ],
     sources: [SRC.millis, SRC.bwd, SRC.ds],
+  },
+
+  // ================================================================== 25
+  {
+    id: 'e25', num: 25, module: 3, title: 'HTTP client: ask a web server (GET)', level: 'Intermediate', time: '25 min',
+    goal: 'Send an HTTP GET request with HTTPClient, read the status code and the answer, and handle errors.',
+    hardware: ['ESP32 DevKit V1', 'Micro-USB cable', 'Your Wi-Fi name and password'],
+    code: E32_HTTP, file: 'HttpGet.ino', program: 'e_http', fast: true, widgets: ['wifirouter', 'httpserver'],
+    explain: {
+      1: '<b>WiFi.h</b>: the Wi-Fi library of the Arduino-ESP32 core.',
+      2: '<b>HTTPClient.h</b>: lets the ESP32 act as a web <b>client</b> (like a browser).',
+      6: 'The address to ask. This one is made up for the lesson: use a real address on a real board. Plain <b>http://</b> only: https:// needs a secure client.',
+      9: 'Serial output on.',
+      10: 'Start joining the Wi-Fi (Lesson 9).',
+      11: 'Wait until we are connected.',
+      14: 'Connected.',
+      16: 'An HTTPClient object.',
+      17: '<b>http.begin(url)</b>: choose the address.',
+      18: '<b>http.GET()</b> sends the request and waits for the answer. It returns the <b>HTTP status code</b> (200 = OK, 404 = not found), or a <b>negative number</b> if the request failed.',
+      19: 'A positive code: the server answered.',
+      20: 'Print the status code.',
+      22: '200 means success: the server sent data.',
+      23: '<b>http.getString()</b> returns the body of the answer as text.',
+      24: 'Print it.',
+      27: 'Negative: the request failed before any answer (for example no connection).',
+      28: '<b>errorToString(code)</b> turns the negative number into words.',
+      30: 'Always call <b>http.end()</b> to free the resources.',
+    },
+    steps: [
+      { title: 'Now the ESP32 is the client', view: 'home', power: false,
+        body: `<p>In the web-server lesson the ESP32 <b>answered</b> requests. Now it <b>asks</b>: it is a web client, like a browser. It sends a <b>GET request</b> to a web address (URL) and gets an <b>answer</b>: a <b>status code</b> and a <b>body</b>.</p>` },
+      { title: 'Status codes and the body', view: 'home', power: false,
+        body: `<ul><li><b>200 OK</b>: success, the body has the data (here a small JSON text).</li><li><b>404 Not Found</b>: the server is there, but has nothing at that address.</li><li><b>Negative number</b> from <code>GET()</code>: the request itself failed, there was no answer at all.</li></ul><p class="sim">In this simulation the server and its answer are made up; a real board would contact a real server.</p>` },
+      { title: 'Read the sketch', view: 'home', power: true, action: 'ensurePower', showCode: true,
+        body: `<p>Click lines <b>17 and 18</b>: <code>begin()</code> sets the address, <code>GET()</code> sends the request. The code first connects to Wi-Fi exactly like Lesson 9.</p>` },
+      { title: 'Run it: the server answers 200', view: 'home', power: true, showCode: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>. After the Wi-Fi connects (about 2.5 s) the ESP32 asks the server. With <b>“Server: answers 200”</b> you see <code>HTTP status: 200</code> and the data.</p>` },
+      { title: 'Run it: 404 and no answer', view: 'home', power: true, showCode: true, action: 'ensurePower',
+        body: `<p>Press <b>■ Stop</b>, click the server button to choose <b>“404 not found”</b> or <b>“down”</b>, then press <b>▶ Run</b> again.</p><ul><li><b>404</b>: <code>HTTP status: 404</code>, no data.</li><li><b>Server down</b>: <code>GET()</code> returns a negative number: <code>Request failed: connection refused</code>.</li></ul><p class="tip">A real sketch should always check the code before using the body.</p>` },
+      { title: 'Summary', view: 'home', power: true,
+        body: `<ul><li><code>http.begin(url); int code = http.GET();</code></li><li>code &gt; 0: the server answered (200 = OK, 404 = not found); code &lt; 0: the request failed.</li><li><code>http.getString()</code> reads the body; <code>http.end()</code> cleans up.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does http.GET() return?', a: ['The body of the answer', 'The HTTP status code (negative on failure)', 'The IP address', 'The Wi-Fi name'], c: 1, why: 'It returns the status code, or a negative number if the request failed.' },
+      { q: 'The server answers 404. What does that mean?', a: ['The server is switched off', 'The server has nothing at that address', 'The password is wrong', 'It worked'], c: 1, why: '404 means Not Found.' },
+      { q: 'GET() returns a negative number. What happened?', a: ['The request failed: no answer arrived', 'The server answered OK', 'The body is empty', 'The LED is on'], c: 0, why: 'Negative values are errors of the request itself.' },
+    ],
+    sources: [SRC.httpc, SRC.httpmdn, SRC.wifihello],
   },
 ];

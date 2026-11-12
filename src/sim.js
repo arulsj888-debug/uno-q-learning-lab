@@ -59,6 +59,7 @@ export class Sim {
       deepSleep: async (ms) => { for (const k of Object.keys(pins)) if (pins[k] && pins[k].mode === 'OUTPUT') H.pin(k, 0); for (const k of Object.keys(pins)) delete pins[k]; if (H.sleep) H.sleep(true, ms); await rt.delay(ms); if (H.sleep) H.sleep(false, ms); },
       ble: (stage, val) => { if (H.ble) H.ble({ stage, val }); },
       neo: (op, a, b, c, d) => (H.neo ? H.neo({ op, a, b, c, d }) : undefined),
+      httpGet: async (url) => (H.http ? await H.http(url) : { code: -1, body: '' }),   // HTTPClient.GET(): status code (negative = failed) and body
       i2cProbe: (addr) => (H.i2cProbe ? !!H.i2cProbe(addr) : false),   // Wire.endTransmission() == 0 for this address
       lcd: (op, a, b) => (H.lcd ? H.lcd({ op, a, b }) : undefined),
       oled: (op, a, b) => (H.oled ? H.oled({ op, a, b }) : false),
@@ -893,6 +894,31 @@ export const PROGRAMS = {
     await rt.at(19); rt.print(found);
     await rt.at(20); rt.println(' device(s)');
     await rt.at(23);
+    for (;;) await rt.delay(1000);
+  },
+
+  async e_http(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(4); await rt.at(5); await rt.at(6);
+    await rt.at(9); rt.serialBegin(115200);
+    await rt.at(10); rt.wifiBegin();
+    while (rt.wifiStatus() !== 'connected') { await rt.at(11); await rt.at(12); await rt.delay(500); }
+    await rt.at(11);
+    await rt.at(14); rt.println('Connected');
+    await rt.at(16);
+    await rt.at(17);
+    await rt.at(18); const r = await rt.httpGet('http://api.example.com/temperature');
+    await rt.at(19);
+    if (r.code > 0) {
+      await rt.at(20); rt.print('HTTP status: ');
+      await rt.at(21); rt.println(r.code);
+      await rt.at(22);
+      if (r.code === 200) { await rt.at(23); await rt.at(24); rt.println(r.body); }
+    } else {
+      await rt.at(27); rt.print('Request failed: ');
+      await rt.at(28); rt.println('connection refused');
+    }
+    await rt.at(30);
+    await rt.at(33); await rt.at(34);
     for (;;) await rt.delay(1000);
   },
 
