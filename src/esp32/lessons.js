@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -29,6 +29,7 @@ const SRC = {
   neouber: { t: 'Adafruit NeoPixel Überguide: Powering NeoPixels', u: 'https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels' },
   neolib: { t: 'Adafruit_NeoPixel library (examples: strandtest)', u: 'https://github.com/adafruit/Adafruit_NeoPixel' },
   pn2222: { t: 'onsemi PN2222 / PN2222A datasheet (TO-92: emitter, base, collector; 600 mA; VCE(sat) 0.3 V at 150 mA / 15 mA)', u: 'https://www.onsemi.com/pdf/datasheet/pn2222-d.pdf' },
+  irlz44n: { t: 'Infineon IRLZ44NPbF datasheet (TO-220: gate, drain, source; 55 V; RDS(on) 22 mΩ at 10 V, 25 mΩ at 5 V, 35 mΩ at 4 V; VGS(th) 1.0 to 2.0 V; VGS ±16 V)', u: 'https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlz44npbf-datasheet-en.pdf' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -125,6 +126,20 @@ const Q_PARTS_E = [
   { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c10', color: 'black', lift: 20 },
 ];
 const Q_IDS_E = Q_PARTS_E.map(d => d.id);
+// IRLZ44N low-side switch for a 6 V lamp: 220 ohm gate resistor from GPIO16, 10 k pull-down, battery pack and lamp on the desk
+const M_PARTS_E = [
+  { id: 'q1', type: 'mosfet', row: 'e', col: 10 },
+  { id: 'r1', type: 'resistor', a: 'a5', b: 'a10', ohms: 220 },
+  { id: 'w100', type: 'fwire', from: 'G16', to: 'b5', color: 'yellow', lift: 24 },
+  { id: 'r2', type: 'resistor', a: 'd10', b: 'd12', ohms: 10000 },
+  { id: 'w102', type: 'fwire', from: 'GND2', to: 'b12', color: 'black', lift: 18 },
+  { id: 'bat1', type: 'battery', x: 125, z: 12 },
+  { id: 'lamp1', type: 'lamp', x: 165, z: -26 },
+  { id: 'l100', type: 'lead', from: 'bat1.POS', to: 'lamp1.L1', color: 'red', lift: 14 },
+  { id: 'l101', type: 'lead', from: 'lamp1.L2', to: 'c11', color: 'orange', lift: 18 },
+  { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c12', color: 'black', lift: 20 },
+];
+const M_IDS_E = M_PARTS_E.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
@@ -1185,5 +1200,50 @@ export const E32_LESSONS = [
       { q: 'The base resistor is 100 kΩ. What happens?', a: ['The lamp is brighter', 'Too little base current: the lamp stays dark or dim', 'The pin burns', 'Nothing changes'], c: 1, why: 'Collector current is only about 100 times the small base current.' },
     ],
     sources: [SRC.pn2222, SRC.ds, SRC.pinmode],
+  },
+
+  // ================================================================== 22
+  {
+    id: 'e22', num: 22, module: 10, title: 'A MOSFET switches a lamp', level: 'Intermediate', time: '25 min',
+    goal: 'Switch a bigger load with a logic-level MOSFET: the gate takes a voltage, not a current.',
+    hardware: ['ESP32 DevKit V1', 'IRLZ44N MOSFET (TO-220)', 'Resistors (220 Ω and 10 kΩ)', 'Battery holder 4 × AA (about 6 V) and a 6 V lamp', 'Breadboard and jumper wires'],
+    code: E32_MOSW, file: 'MosfetSwitch.ino', program: 'e_qsw', fast: true, widgets: ['mosload'],
+    circuit: M_PARTS_E, io: { G16: { kind: 'mosfet', item: 'q1', lamp: 'lamp1', needs: M_IDS_E } },
+    explain: {
+      2: 'The pin is wired through the <b>gate resistor</b> to the <b>gate</b> of the MOSFET. The lamp is <b>not</b> connected to the pin.',
+      4: '<b>setup()</b> runs once.',
+      5: 'The pin is an output.',
+      8: '<b>loop()</b> repeats forever.',
+      9: 'HIGH: the gate gets 3.3 V. The MOSFET turns on and the lamp current flows from the drain to the source: <b>the lamp lights</b>. The gate takes no steady current.',
+      10: 'Wait one second.',
+      11: 'LOW: the gate goes to 0 V (the 10 kΩ resistor also holds it there). The MOSFET turns off, the lamp is off.',
+      12: 'Wait one second.',
+    },
+    steps: [
+      { title: 'A switch controlled by voltage', view: 'farq', have: [], power: false,
+        body: `<p>A 6 V lamp needs about <b>300 mA</b>. An ESP32 pin gives up to 40 mA source / 28 mA sink at the strongest drive setting (datasheet). A pin cannot drive it. Last lesson the PN2222A needed a <b>base current</b>. A <b>MOSFET</b> is controlled by the <b>voltage on its gate</b>: the gate takes no steady current, so no base-current calculation is needed.</p>
+        <p class="warn">Never connect a lamp, motor or relay coil straight to a pin.</p>` },
+      { title: 'The IRLZ44N', view: 'bigq', have: ['q1'], power: false, holes: ['e10 · gate', 'e11 · drain', 'e12 · source'],
+        body: `<p>The <b>IRLZ44N</b> in a TO-220 case. With the <b>text facing you</b>, the pins from the left are <b>gate, drain, source</b>. The metal tab is the drain. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Maximum <b>55 V</b> between drain and source, <b>47 A</b> continuous (Infineon datasheet).</li><li>Gate threshold <b>1.0 to 2.0 V</b>. The gate must never exceed <b>±16 V</b>.</li><li>It is a <b>logic-level</b> type: on-resistance <b>35 mΩ at 4 V</b>, <b>25 mΩ at 5 V</b> and <b>22 mΩ at 10 V</b> on the gate.</li></ul>
+        <p class="warn">The datasheet gives no on-resistance below 4 V. The ESP32 pin gives only <b>3.3 V</b>. The datasheet gives on-resistance values for 4 V and above, and none for 3.3 V: for a small lamp it works, for a big motor it is <b>not guaranteed</b>.</p>` },
+      { title: 'Gate resistor and pull-down', view: 'bigq', have: ['q1', 'r1', 'r2'], power: false, holes: ['a5 → a10', 'd10 → d12'],
+        body: `<p>The <b>220 Ω resistor</b> between the pin and the gate limits the short current that charges the gate when the pin switches. The <b>10 kΩ resistor</b> from the gate to GND holds the gate at 0 V while the pin is not yet an output (for example during start-up). A floating gate can switch the load by itself.</p>` },
+      { title: 'Wire it', view: 'farq', have: M_IDS_E, power: false, pins: ['G16', 'GND2'],
+        body: `<ul><li>Yellow: <b>RX2 (GPIO16) → b5</b> (to the 220 Ω gate resistor)</li><li>Black: <b>GND → b12</b> (the source column)</li></ul>
+        <p>The lamp circuit is separate: battery + → lamp → <b>drain</b> (column 11); battery − → the <b>source column</b> (column 12), which is also connected to the board’s GND. All the grounds must be joined.</p>` },
+      { title: 'The code', view: 'farq', have: M_IDS_E, showCode: true, power: true, body: `<p>Just a blink: the pin drives the gate. Click lines 9 and 11.</p>` },
+      { title: 'Run it and choose the load', view: 'farq', have: M_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>The lamp blinks. In the panel choose a <b>lamp (about 300 mA)</b> or a <b>motor (about 1 A)</b> and read the numbers: the MOSFET drops only a few millivolts and stays almost cold, far better than the PN2222A, which is limited to 600 mA.</p><p class="sim">Simplified model: drain-source resistance from the datasheet values (between 4 V and 10 V interpolated; below 4 V an estimate).</p>` },
+      { title: 'Summary', view: 'farq', have: M_IDS_E, power: true,
+        body: `<ul><li>Gate = a <b>voltage</b> input: no base current. Source to GND, load between the supply and the <b>drain</b> (low-side switch).</li><li>Use a gate resistor (about 220 Ω) and a 10 kΩ pull-down.</li><li>Logic-level: its on-resistance is guaranteed from 4 V up; 3.3 V pins need care for big loads.</li><li>A motor or relay coil still needs a flyback diode.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What controls a MOSFET?', a: ['A current into the gate', 'A voltage on the gate', 'Heat', 'Light'], c: 1, why: 'The gate takes no steady current: the voltage on it controls the channel.' },
+      { q: 'Which leg of the IRLZ44N (text toward you) is the gate?', a: ['The left one', 'The middle one', 'The right one', 'The metal tab'], c: 0, why: 'Gate, drain, source from the left. The tab is the drain.' },
+      { q: 'Why add a 10 kΩ resistor from the gate to GND?', a: ['To make it brighter', 'To keep the gate at 0 V so the load stays off at start-up', 'To cool the MOSFET', 'It is not needed ever'], c: 1, why: 'A floating gate can switch by itself.' },
+      { q: 'The datasheet gives the on-resistance for which gate voltages?', a: ['Only 3.3 V', '4 V, 5 V and 10 V', 'Only 1 V', 'All voltages from 0 V'], c: 1, why: '35 mΩ at 4 V, 25 mΩ at 5 V, 22 mΩ at 10 V.' },
+    ],
+    sources: [SRC.irlz44n, SRC.ds, SRC.pinmode],
   },
 ];

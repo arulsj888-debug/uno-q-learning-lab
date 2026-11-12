@@ -86,6 +86,8 @@ const checks = {
   E32_NEO: [E32.E32_NEO, [[1, 'Adafruit_NeoPixel.h'], [3, 'PIN'], [4, 'NUMPIXELS 8'], [6, 'Adafruit_NeoPixel strip'], [8, 'void setup'], [9, 'strip.begin()'], [10, 'setBrightness(40)'], [11, 'strip.show()'], [14, 'void loop'], [15, 'for (int i'], [16, 'strip.clear()'], [17, 'setPixelColor(i'], [18, 'strip.show()'], [19, 'delay(150)']]],
   U3_QSW: [U3.U3_QSW, [[2, 'basePin'], [4, 'void setup'], [5, 'pinMode(basePin'], [8, 'void loop'], [9, 'digitalWrite(basePin, HIGH)'], [10, 'delay(1000)'], [11, 'digitalWrite(basePin, LOW)'], [12, 'delay(1000)']]],
   E32_QSW: [E32.E32_QSW, [[2, 'basePin'], [4, 'void setup'], [5, 'pinMode(basePin'], [8, 'void loop'], [9, 'digitalWrite(basePin, HIGH)'], [10, 'delay(1000)'], [11, 'digitalWrite(basePin, LOW)'], [12, 'delay(1000)']]],
+  U3_MOSW: [U3.U3_MOSW, [[2, 'gatePin'], [4, 'void setup'], [5, 'pinMode(gatePin'], [8, 'void loop'], [9, 'digitalWrite(gatePin, HIGH)'], [10, 'delay(1000)'], [11, 'digitalWrite(gatePin, LOW)'], [12, 'delay(1000)']]],
+  E32_MOSW: [E32.E32_MOSW, [[2, 'gatePin'], [4, 'void setup'], [5, 'pinMode(gatePin'], [8, 'void loop'], [9, 'digitalWrite(gatePin, HIGH)'], [10, 'delay(1000)'], [11, 'digitalWrite(gatePin, LOW)'], [12, 'delay(1000)']]],
   BUZZER: [C.BUZZER, [[2, 'buzzerPin = D9'], [3, 'int notes[]'], [5, 'void setup'], [8, 'void loop'], [9, 'for (int i'], [10, 'tone(buzzerPin'], [11, 'delay(300)'], [13, 'noTone'], [14, 'delay(1000)']]],
 };
 let bad = 0;

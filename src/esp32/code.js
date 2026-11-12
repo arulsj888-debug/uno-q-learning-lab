@@ -468,3 +468,18 @@ void loop() {
   digitalWrite(basePin, LOW);    // no base current: the lamp is off
   delay(1000);
 }`;
+
+// Lesson 22 — IRLZ44N MOSFET switching a 6 V lamp
+export const E32_MOSW = `// A MOSFET switches a 6 V lamp: the pin drives the gate through a resistor
+const int gatePin = 16;
+
+void setup() {
+  pinMode(gatePin, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(gatePin, HIGH);   // gate voltage on: the lamp lights
+  delay(1000);
+  digitalWrite(gatePin, LOW);    // gate voltage off: the lamp is off
+  delay(1000);
+}`;

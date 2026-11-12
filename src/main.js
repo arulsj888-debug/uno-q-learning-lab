@@ -831,8 +831,9 @@ class App {
     const io = $('#dock-io');
     $('#dock').classList.toggle('with-io', w.length > 0);
     $('#dock').classList.toggle('no-serial', L.id === 'l9');
-    let h = ''; this.lcdSt = { rows: [' '.repeat(16), ' '.repeat(16)], c: 0, r: 0, bl: false, ready: false }; this.oledSt = { buf: ['', ''], cy: 0, shown: null }; this.lcdAddr = 0x27; this.oledAddr = 0x3C; this.neoSt = { px: Array.from({ length: 8 }, () => [0, 0, 0]), br: 255, shown: null }; this.qPin = 0; this.qR = (this.lesson && this.lesson.qdefault) || 1000; this.neoShift = false; this._neoKey = null; this._lcdKey = null; this._oledKey = null; this.joyPos = { x: 0.5, y: 0.5 }; this.joySw = false; this.encPh = 0; this.encSw = false; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
+    let h = ''; this.lcdSt = { rows: [' '.repeat(16), ' '.repeat(16)], c: 0, r: 0, bl: false, ready: false }; this.oledSt = { buf: ['', ''], cy: 0, shown: null }; this.lcdAddr = 0x27; this.oledAddr = 0x3C; this.neoSt = { px: Array.from({ length: 8 }, () => [0, 0, 0]), br: 255, shown: null }; this.qPin = 0; this.qR = (this.lesson && this.lesson.qdefault) || 1000; this.mLoad = 'lamp'; this.neoShift = false; this._neoKey = null; this._lcdKey = null; this._oledKey = null; this.joyPos = { x: 0.5, y: 0.5 }; this.joySw = false; this.encPh = 0; this.encSw = false; this.wf.router = true; this.wf.passOk = true;       // every lesson starts with a working simulated router
     if (w.includes('ble')) h += `<div class="io-block pirstat tight"><div><span>Phone app (client)</span><b id="bl-s1">—</b></div><div class="arrow">→</div><div><span>ESP32 (BLE server)</span><b id="bl-s2">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="bl-s3">—</b></div></div><div id="bl-note" class="io-note"></div>`;
+    if (w.includes('mosload')) h += `<div class="io-block"><div class="io-title">Load <span class="io-note">(simulated)</span></div><div class="io-tools"><select id="m-load"><option value="lamp">6 V lamp (about 300 mA)</option><option value="motor">DC motor (about 1 A)</option></select></div><div id="m-out" class="io-val"></div><div id="m-note" class="io-note"></div></div>`;
     if (w.includes('qbase')) h += `<div class="io-block"><div class="io-title">Base resistor <span class="io-note">(simulated)</span></div><div class="io-tools"><select id="q-r"><option value="220">220 Ω</option><option value="470">470 Ω</option><option value="1000">1 kΩ</option><option value="10000">10 kΩ</option><option value="100000">100 kΩ</option></select></div><div id="q-out" class="io-val"></div><div id="q-note" class="io-note"></div></div>`;
     if (w.includes('neolevel')) h += `<div class="io-block"><div class="io-title">Data line <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="neo-shift" class="hold small">Level shifter: absent</button></div><div id="neo-note" class="io-note"></div></div>`;
     if (w.includes('lcdaddr')) h += `<div class="io-block"><div class="io-title">LCD backpack <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="lcd-addr" class="hold small">Module address: 0x27</button></div><div id="lcd-note" class="io-note"></div></div>`;
@@ -895,6 +896,7 @@ class App {
     }
     if ($('#wf-rssi')) { const upd = () => { $('#wf-val').innerHTML = `<b>${this.wf.rssi} dBm</b>`; }; $('#wf-rssi').oninput = e => { this.wf.rssi = +e.target.value; upd(); }; upd(); }
     if ($('#wf-router')) { $('#wf-router').onclick = () => { if (!this.sim.running) this.wf.router = !this.wf.router; }; $('#wf-pass').onclick = () => { if (!this.sim.running) this.wf.passOk = !this.wf.passOk; }; }
+    if ($('#m-load')) { $('#m-load').value = this.mLoad; $('#m-load').onchange = e => { this.mLoad = e.target.value; }; }
     if ($('#q-r')) { $('#q-r').value = String(this.qR); $('#q-r').onchange = e => { this.qR = +e.target.value; }; }
     if ($('#neo-shift')) $('#neo-shift').onclick = () => { if (!this.sim.running) this.neoShift = !this.neoShift; };
     if ($('#lcd-addr')) $('#lcd-addr').onclick = () => { if (!this.sim.running) this.lcdAddr = this.lcdAddr === 0x27 ? 0x3F : 0x27; };
@@ -1560,6 +1562,18 @@ class App {
     const ib = Math.max(0, (V - 0.7) / (this.qR + rout)), want = 100 * ib, lamp = 5.8 / 20, ic = Math.min(want, lamp);
     return { ib, ic, state: want >= lamp ? 'saturated' : 'partly' };
   }
+  // lessons 22 / 25: IRLZ44N switching a lamp or a motor. Drain-source resistance from the Infineon datasheet: 35 mohm at 4 V, 25 mohm at 5 V, 22 mohm at 10 V (below 4 V no value: an estimate is used and labelled)
+  mTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('mosload')) return;
+    if (!this.sim.running) this.qPin = 0;
+    const on = this.sim.running && this.board.powered && this.qPin, V = LOGIC_V, motor = this.mLoad === 'motor';
+    const rds = V >= 5 ? 0.025 : 0.035 / Math.max(0.1, Math.min(1, (V - 1.5) / 2.5)), rl = motor ? 6 : 20, id = on ? 5.8 / (rl + rds) : 0, lamp = this.bench.get('lamp1');
+    if (lamp && lamp.set) lamp.set(!!on && !motor);
+    const set = (sel, h) => { const e = $(sel); if (e && e.innerHTML !== h) e.innerHTML = h; };
+    set('#m-out', !on ? 'Gate 0 V · load off' : `Gate <b>${V} V</b> (no gate current) → <b>${(id * 1000).toFixed(0)} mA</b> through the load · MOSFET drops <b>${(id * rds * 1000).toFixed(0)} mV</b> · heat <b>${(id * id * rds * 1000).toFixed(0)} mW</b>`);
+    set('#m-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !this.sim.running ? 'Press <b>▶ Run</b>.' : (V < 4 && motor) ? 'The gate gets only 3.3 V. The datasheet gives no on-resistance below 4 V, so a 1 A motor is not guaranteed to switch cleanly. Use a 5 V gate drive or a gate driver.' : motor ? 'A motor needs a flyback diode across it (not shown in this lesson).' : '');
+    const sel = $('#m-load'); if (sel) sel.disabled = this.sim.running;
+  }
   qTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('qbase')) return;
     if (!this.sim.running) this.qPin = 0;
@@ -1571,7 +1585,7 @@ class App {
     const sel = $('#q-r'); if (sel) sel.disabled = this.sim.running;
   }
   displayTick() {
-    this.qTick();
+    this.qTick(); this.mTick();
     const L = this.lesson; if (!L) return;
     if (!this.sim.running && this.neoSt) this.neoSt.shown = null;
     if (L.io && Object.values(L.io).some(x => x.kind === 'neo')) {
@@ -2054,7 +2068,7 @@ class App {
   ledFor(pin) { const io = this.ioFor(pin); return io && io.kind === 'led' ? { io, led: this.bench.get(io.item) } : null; }
 
   onDigital(pin, level) {
-    { const qo = this.ioFor(pin); if (qo && qo.kind === 'npn') this.qPin = level ? 1 : 0; }
+    { const qo = this.ioFor(pin); if (qo && (qo.kind === 'npn' || qo.kind === 'mosfet')) this.qPin = level ? 1 : 0; }
     { const rg = this.ioFor(pin); if (rg && rg.kind === 'rgb') this.rgbSet(rg, level ? 1 : 0); }
     if (IS_E32 && pin === 'G2') { this.br.led = !!level; if (this.board.powered) this.board.setLed('blue', !!level); }   // the blue LED is on GPIO2 (active high)
     if (IS_U3 && pin === 'LED_BUILTIN') {        // the yellow L LED on pin 13 is active-high

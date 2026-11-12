@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1176,5 +1176,50 @@ export const U3_LESSONS_2 = [
       { q: 'The base resistor is 100 kΩ. What happens?', a: ['The lamp is brighter', 'Too little base current: the lamp stays dark or dim', 'The pin burns', 'Nothing changes'], c: 1, why: 'Collector current is only about 100 times the small base current.' },
     ],
     sources: [SRC.pn2222, SRC.ds, SRC.pinmode],
+  },
+
+  // ================================================================== 25
+  {
+    id: 'u25', num: 25, module: 10, title: 'A MOSFET switches a lamp', level: 'Intermediate', time: '25 min',
+    goal: 'Switch a bigger load with a logic-level MOSFET: the gate takes a voltage, not a current.',
+    hardware: ['Arduino UNO R3', 'IRLZ44N MOSFET (TO-220)', 'Resistors (220 Ω and 10 kΩ)', 'Battery holder 4 × AA (about 6 V) and a 6 V lamp', 'Breadboard and jumper wires'],
+    code: U3_MOSW, file: 'MosfetSwitch.ino', program: 'u3_qsw', fast: true, widgets: ['mosload'],
+    circuit: M_PARTS, io: { D5: { kind: 'mosfet', item: 'q1', lamp: 'lamp1', needs: M_IDS } },
+    explain: {
+      2: 'The pin is wired through the <b>gate resistor</b> to the <b>gate</b> of the MOSFET. The lamp is <b>not</b> connected to the pin.',
+      4: '<b>setup()</b> runs once.',
+      5: 'The pin is an output.',
+      8: '<b>loop()</b> repeats forever.',
+      9: 'HIGH: the gate gets 5 V. The MOSFET turns on and the lamp current flows from the drain to the source: <b>the lamp lights</b>. The gate takes no steady current.',
+      10: 'Wait one second.',
+      11: 'LOW: the gate goes to 0 V (the 10 kΩ resistor also holds it there). The MOSFET turns off, the lamp is off.',
+      12: 'Wait one second.',
+    },
+    steps: [
+      { title: 'A switch controlled by voltage', view: 'farq', have: [], power: false,
+        body: `<p>A 6 V lamp needs about <b>300 mA</b>. The ATmega328P datasheet allows 40 mA absolute maximum per pin (20 mA recommended). A pin cannot drive it. Last lesson the PN2222A needed a <b>base current</b>. A <b>MOSFET</b> is controlled by the <b>voltage on its gate</b>: the gate takes no steady current, so no base-current calculation is needed.</p>
+        <p class="warn">Never connect a lamp, motor or relay coil straight to a pin.</p>` },
+      { title: 'The IRLZ44N', view: 'bigq', have: ['q1'], power: false, holes: ['e10 · gate', 'e11 · drain', 'e12 · source'],
+        body: `<p>The <b>IRLZ44N</b> in a TO-220 case. With the <b>text facing you</b>, the pins from the left are <b>gate, drain, source</b>. The metal tab is the drain. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Maximum <b>55 V</b> between drain and source, <b>47 A</b> continuous (Infineon datasheet).</li><li>Gate threshold <b>1.0 to 2.0 V</b>. The gate must never exceed <b>±16 V</b>.</li><li>It is a <b>logic-level</b> type: on-resistance <b>35 mΩ at 4 V</b>, <b>25 mΩ at 5 V</b> and <b>22 mΩ at 10 V</b> on the gate.</li></ul>
+        <p class="warn">The datasheet gives no on-resistance below 4 V. The UNO R3 pin gives <b>5 V</b>: the datasheet guarantees 25 mΩ at 5 V.</p>` },
+      { title: 'Gate resistor and pull-down', view: 'bigq', have: ['q1', 'r1', 'r2'], power: false, holes: ['a5 → a10', 'd10 → d12'],
+        body: `<p>The <b>220 Ω resistor</b> between the pin and the gate limits the short current that charges the gate when the pin switches. The <b>10 kΩ resistor</b> from the gate to GND holds the gate at 0 V while the pin is not yet an output (for example during start-up). A floating gate can switch the load by itself.</p>` },
+      { title: 'Wire it', view: 'farq', have: M_IDS, power: false, pins: ['D5', 'GND2'],
+        body: `<ul><li>Yellow: <b>pin 5 → b5</b> (to the 220 Ω gate resistor)</li><li>Black: <b>GND → b12</b> (the source column)</li></ul>
+        <p>The lamp circuit is separate: battery + → lamp → <b>drain</b> (column 11); battery − → the <b>source column</b> (column 12), which is also connected to the board’s GND. All the grounds must be joined.</p>` },
+      { title: 'The code', view: 'farq', have: M_IDS, showCode: true, power: true, body: `<p>Just a blink: the pin drives the gate. Click lines 9 and 11.</p>` },
+      { title: 'Run it and choose the load', view: 'farq', have: M_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The lamp blinks. In the panel choose a <b>lamp (about 300 mA)</b> or a <b>motor (about 1 A)</b> and read the numbers: the MOSFET drops only a few millivolts and stays almost cold, far better than the PN2222A, which is limited to 600 mA.</p><p class="sim">Simplified model: drain-source resistance from the datasheet values (between 4 V and 10 V interpolated; below 4 V an estimate).</p>` },
+      { title: 'Summary', view: 'farq', have: M_IDS, power: true,
+        body: `<ul><li>Gate = a <b>voltage</b> input: no base current. Source to GND, load between the supply and the <b>drain</b> (low-side switch).</li><li>Use a gate resistor (about 220 Ω) and a 10 kΩ pull-down.</li><li>Logic-level: its on-resistance is guaranteed from 4 V up; 3.3 V pins need care for big loads.</li><li>A motor or relay coil still needs a flyback diode.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What controls a MOSFET?', a: ['A current into the gate', 'A voltage on the gate', 'Heat', 'Light'], c: 1, why: 'The gate takes no steady current: the voltage on it controls the channel.' },
+      { q: 'Which leg of the IRLZ44N (text toward you) is the gate?', a: ['The left one', 'The middle one', 'The right one', 'The metal tab'], c: 0, why: 'Gate, drain, source from the left. The tab is the drain.' },
+      { q: 'Why add a 10 kΩ resistor from the gate to GND?', a: ['To make it brighter', 'To keep the gate at 0 V so the load stays off at start-up', 'To cool the MOSFET', 'It is not needed ever'], c: 1, why: 'A floating gate can switch by itself.' },
+      { q: 'The datasheet gives the on-resistance for which gate voltages?', a: ['Only 3.3 V', '4 V, 5 V and 10 V', 'Only 1 V', 'All voltages from 0 V'], c: 1, why: '35 mΩ at 4 V, 25 mΩ at 5 V, 22 mΩ at 10 V.' },
+    ],
+    sources: [SRC.irlz44n, SRC.ds, SRC.pinmode],
   },
 ];

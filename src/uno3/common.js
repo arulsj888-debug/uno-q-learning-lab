@@ -31,6 +31,7 @@ export const SRC = {
   neouber: { t: 'Adafruit NeoPixel Überguide: Powering NeoPixels', u: 'https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels' },
   neolib: { t: 'Adafruit_NeoPixel library (examples: strandtest)', u: 'https://github.com/adafruit/Adafruit_NeoPixel' },
   pn2222: { t: 'onsemi PN2222 / PN2222A datasheet (TO-92: emitter, base, collector; 600 mA; VCE(sat) 0.3 V at 150 mA / 15 mA)', u: 'https://www.onsemi.com/pdf/datasheet/pn2222-d.pdf' },
+  irlz44n: { t: 'Infineon IRLZ44NPbF datasheet (TO-220: gate, drain, source; 55 V; RDS(on) 22 mΩ at 10 V, 25 mΩ at 5 V, 35 mΩ at 4 V; VGS(th) 1.0 to 2.0 V; VGS ±16 V)', u: 'https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlz44npbf-datasheet-en.pdf' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -225,3 +226,18 @@ export const Q_PARTS = [
   { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c10', color: 'black', lift: 20 },
 ];
 export const Q_IDS = Q_PARTS.map(d => d.id);
+
+// ---- Lesson 25: IRLZ44N low-side switch for a 6 V lamp (gate resistor from pin 5, pull-down, battery pack and lamp on the desk)
+export const M_PARTS = [
+  { id: 'q1', type: 'mosfet', row: 'e', col: 10 },
+  { id: 'r1', type: 'resistor', a: 'a5', b: 'a10', ohms: 220 },
+  { id: 'w100', type: 'wire', from: 'D5', to: 'b5', color: 'yellow', lift: 24 },
+  { id: 'r2', type: 'resistor', a: 'd10', b: 'd12', ohms: 10000 },
+  { id: 'w102', type: 'wire', from: 'GND2', to: 'b12', color: 'black', lift: 18 },
+  { id: 'bat1', type: 'battery', x: 125, z: 12 },
+  { id: 'lamp1', type: 'lamp', x: 165, z: -26 },
+  { id: 'l100', type: 'lead', from: 'bat1.POS', to: 'lamp1.L1', color: 'red', lift: 14 },
+  { id: 'l101', type: 'lead', from: 'lamp1.L2', to: 'c11', color: 'orange', lift: 18 },
+  { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c12', color: 'black', lift: 20 },
+];
+export const M_IDS = M_PARTS.map(d => d.id);

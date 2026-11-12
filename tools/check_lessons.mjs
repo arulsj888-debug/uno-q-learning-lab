@@ -117,6 +117,16 @@ for (const L of list) {
       const w = byId[io.item];
       if (!w || w.type !== 'fwire' || w.from !== pin) bad(L, `${pin}: touch pad wire is not connected to the pin`);
     }
+    if (io.kind === 'mosfet') {
+      const id = io.item, r = all.find(d => d.type === 'resistor' && ((N.same(d.id + '.1', P) && N.same(d.id + '.2', id + '.G')) || (N.same(d.id + '.2', P) && N.same(d.id + '.1', id + '.G'))));
+      if (!r) bad(L, `${pin}: no gate resistor between the pin and the gate of ${id}`);
+      if (N.same(P, id + '.G') && !r) bad(L, `${pin}: the pin is wired straight to the gate`);
+      if (!all.some(d => d.type === 'resistor' && d.ohms >= 4700 && ((N.same(d.id + '.1', id + '.G') && N.same(d.id + '.2', G)) || (N.same(d.id + '.2', id + '.G') && N.same(d.id + '.1', G))))) bad(L, `${id}: no pull-down resistor from the gate to GND`);
+      if (!N.same(id + '.S', G)) bad(L, `${id}: source not on GND`);
+      if (!N.same(id + '.D', io.lamp + '.L2')) bad(L, `${id}: drain not on the lamp (L2)`);
+      if (!N.same(io.lamp + '.L1', 'bat1.POS')) bad(L, `lamp L1 not on the battery +`);
+      if (!N.same('bat1.NEG', G)) bad(L, `battery − not on GND (no common ground)`);
+    }
     if (io.kind === 'npn') {
       const id = io.item, r = all.find(d => d.type === 'resistor' && ((N.same(d.id + '.1', P) && N.same(d.id + '.2', id + '.B')) || (N.same(d.id + '.2', P) && N.same(d.id + '.1', id + '.B'))));
       if (!r) bad(L, `${pin}: no base resistor between the pin and the base of ${id}`);
