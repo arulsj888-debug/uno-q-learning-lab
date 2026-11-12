@@ -200,8 +200,8 @@ for (const L of list) {
       if (!N.same(id + '.VCC', 'PIN:' + (U3 ? '5V' : '3V3'))) bad(L, 'soil: VCC not on the supply pin');
     }
     if (io.kind === 'bmp') {
-      const id = io.item;
-      if (!N.same(id + '.SDA', 'PIN:' + pin)) bad(L, `bmp: SDA not on ${pin}`);
+      const id = io.item, sdaPin = io.sda || pin;
+      if (!N.same(id + '.SDA', 'PIN:' + sdaPin)) bad(L, `bmp: SDA not on ${sdaPin}`);
       if (!N.same(id + '.SCL', 'PIN:' + io.scl)) bad(L, `bmp: SCL not on ${io.scl}`);
       if (!N.same(id + '.GND', G)) bad(L, 'bmp: GND not on GND');
       if (!N.same(id + '.VCC', 'PIN:3V3')) bad(L, 'bmp: VCC not on 3V3');

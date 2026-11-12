@@ -1316,6 +1316,27 @@ export const PROGRAMS = {
     }
   },
 
+  async e_wx(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(6); await rt.at(7);
+    await rt.at(10); rt.serialBegin(115200);
+    await rt.at(11);
+    if (!rt.i2cProbe(0x76)) { rt.println('BMP280 not found'); for (;;) await rt.delay(1000); }
+    await rt.at(12);
+    if (!rt.oled('begin', 0x3C)) { rt.println('SSD1306 not found'); for (;;) await rt.delay(1000); }
+    await rt.at(13); await rt.at(14);
+    for (;;) {
+      await rt.at(17);
+      await rt.at(18); const m = rt.bmpRead();
+      await rt.at(19);
+      await rt.at(20); rt.oled('clear');
+      await rt.at(21); rt.oled('cursor', 0, 0);
+      await rt.at(22); await rt.at(23); await rt.at(24); rt.oled('println', 'Temp: ' + m.t.toFixed(1) + ' C');
+      await rt.at(25); await rt.at(26); await rt.at(27); rt.oled('println', 'Press: ' + m.p.toFixed(0) + ' hPa');
+      await rt.at(28); rt.oled('display');
+      await rt.at(29); await rt.delay(1000);
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

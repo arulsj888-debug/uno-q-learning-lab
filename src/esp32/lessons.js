@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT, E32_WX } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -140,6 +140,11 @@ const PLANT_PARTS_E = [{ id: 'soil1', type: 'soil', x: 20, z: 138 },
   ...['VCC', 'GND', 'AOUT'].map((n, i) => ({ id: 'm9' + i, type: 'fwire', from: 'soil1.' + n, to: 'a' + (20 + i), color: { VCC: 'red', GND: 'black', AOUT: 'yellow' }[n], lift: 16 + i * 2 })),
   ...['VCC', 'GND', 'AOUT'].map((n, i) => ({ id: 'w9' + i, type: 'fwire', from: { VCC: '3V3', GND: 'GND1', AOUT: 'G34' }[n], to: 'b' + (20 + i), color: { VCC: 'red', GND: 'black', AOUT: 'yellow' }[n], lift: 22 + i * 3 }))];
 const PLANT_IDS_E = PLANT_PARTS_E.map(d => d.id);
+const WX_PARTS_E = [{ id: 'bmp1', type: 'bmp280', x: -30, z: 138 }, { id: 'oled1', type: 'oled', x: 100, z: 138 },
+  ...['VCC', 'GND', 'SCL', 'SDA'].map((n, i) => ({ id: 'm5' + i, type: 'fwire', from: 'bmp1.' + n, to: 'a' + (10 + i), color: { VCC: 'red', GND: 'black', SDA: 'blue', SCL: 'yellow' }[n], lift: 16 + i * 2 })),
+  ...['VCC', 'GND', 'SCL', 'SDA'].map((n, i) => ({ id: 'm6' + i, type: 'fwire', from: 'oled1.' + n, to: 'c' + (10 + i), color: { VCC: 'orange', GND: 'black', SDA: 'white', SCL: 'green' }[n], lift: 40 + i * 2 })),
+  ...['VCC', 'GND', 'SCL', 'SDA'].map((n, i) => ({ id: 'w5' + i, type: 'fwire', from: { VCC: '3V3', GND: 'GND2', SDA: 'G21', SCL: 'G22' }[n], to: 'b' + (10 + i), color: { VCC: 'red', GND: 'black', SDA: 'blue', SCL: 'yellow' }[n], lift: 22 + i * 3 }))];
+const WX_IDS_E = WX_PARTS_E.map(d => d.id);
 const STEP_PARTS_E = [
   { id: 'stp1', type: 'stepper', x: 20, z: 138 },
   { id: 'w90', type: 'fwire', from: 'stp1.IN1', to: 'G16', color: 'blue', lift: 36 },
@@ -1944,5 +1949,46 @@ export const E32_LESSONS = [
       { q: 'Why not connect a pump straight to a pin?', a: ['It needs far more current than a pin gives', 'Pumps need AC', 'Pins are always LOW', 'It is allowed'], c: 0, why: 'Use a relay or MOSFET.' },
     ],
     sources: [SRC.soilsrc, SRC.ds],
+  },
+
+  // ================================================================== 37
+  {
+    id: 'e37', num: 37, module: 7, title: 'Project: a weather station (BMP280 + OLED)', level: 'Intermediate', time: '30 min',
+    goal: 'Put two I²C devices on one bus: read temperature and pressure from a BMP280 and show them on an OLED display.',
+    hardware: ['ESP32 DevKit V1', 'BMP280 breakout', 'SSD1306 OLED 128×64 (I²C)', 'Breadboard', '12 × female–male jumper wires'],
+    code: E32_WX, file: 'WeatherStation.ino', program: 'e_wx', fast: true, widgets: ['bmpsens'],
+    circuit: WX_PARTS_E, io: { G21: { kind: 'oled', scl: 'G22', item: 'oled1', needs: WX_IDS_E }, BMP: { kind: 'bmp', sda: 'G21', scl: 'G22', item: 'bmp1', needs: WX_IDS_E } },
+    explain: {
+      1: '<b>Wire.h</b>: the I²C library, shared by both devices.',
+      3: 'The OLED library (Lesson 19).',
+      4: 'The BMP280 library (Lesson 33).',
+      6: 'The display object: 128 × 64 pixels.',
+      7: 'The pressure sensor object.',
+      11: 'Start the BMP280 at address <b>0x76</b>. Stop if it does not answer.',
+      12: 'Start the display at address <b>0x3C</b>. Different address: no conflict on the shared bus.',
+      18: 'Read the temperature…',
+      19: '…and the pressure, in hPa.',
+      20: 'Clear the screen buffer before drawing the new values.',
+      22: 'Print the first line: label, temperature (one decimal), unit.',
+      25: 'The second line: pressure.',
+      28: '<b>display()</b> sends the finished picture to the screen.',
+    },
+    steps: [
+      { title: 'Two devices, one bus', view: 'scanv', have: [], power: false,
+        body: `<p>A weather station reads sensors and shows the numbers. Here the <b>BMP280</b> (address 0x76) and the <b>OLED</b> (address 0x3C) share the same two I²C wires, SDA and SCL. Because their addresses differ, they do not disturb each other (the I²C scanner lesson shows this).</p>` },
+      { title: 'Wire it', view: 'scanv', have: WX_IDS_E, power: false, pins: ['3V3', 'GND2', 'G21', 'G22'],
+        body: `<p>Both modules connect to the <b>same four breadboard columns</b> (10 to 13): VCC, GND, SCL, SDA. The ESP32 connects to those columns once: <b>3V3 → b10</b>, <b>GND → b11</b>, <b>GPIO22 → b12</b> (SCL), <b>GPIO21 → b13</b> (SDA).</p><p class="warn">Check the pin order printed on your own modules: it differs between makers. Both modules here run from 3.3 V.</p>` },
+      { title: 'The code', view: 'scanv', have: WX_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>11</b> and <b>12</b> (two devices, two addresses) and <b>22</b>.</p>` },
+      { title: 'Run it and change the weather', view: 'scanv', have: WX_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>The OLED shows the temperature and the pressure. Move the <b>temperature</b> and <b>pressure</b> sliders and watch the screen follow once a second.</p><p class="sim">Simulated sensor and display.</p>` },
+      { title: 'Summary', view: 'scanv', have: WX_IDS_E, power: true,
+        body: `<ul><li>Project = sensor + display on one I²C bus: devices need different addresses.</li><li>Read, clear, print, <code>display()</code>, repeat.</li><li>Ideas to extend: add the DS18B20, log values, publish over MQTT (Lesson 26).</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How can two devices share the same I²C wires?', a: ['They have different addresses', 'They take turns by luck', 'They must be the same model', 'They cannot'], c: 0, why: 'Each device answers only to its own address.' },
+      { q: 'What does display.display() do?', a: ['Sends the drawn picture to the screen', 'Clears the screen', 'Reads the sensor', 'Starts I²C'], c: 0, why: 'Drawing happens in memory first.' },
+      { q: 'readPressure() / 100.0 gives…', a: ['Pressure in hPa', 'Pressure in Pascal', 'Temperature', 'Altitude'], c: 0, why: 'Pascal divided by 100 is hPa.' },
+    ],
+    sources: [SRC.bmpds, SRC.adabmp, SRC.wire],
   },
 ];

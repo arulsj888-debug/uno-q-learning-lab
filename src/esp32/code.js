@@ -867,3 +867,35 @@ void loop() {
   Serial.println(pumpOn ? " %  pump ON" : " %  pump off");
   delay(1000);
 }`;
+
+// Lesson 37 (project) — weather station: BMP280 and SSD1306 OLED on one I2C bus
+export const E32_WX = `#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_BMP280.h>
+
+Adafruit_SSD1306 display(128, 64, &Wire, -1);
+Adafruit_BMP280 bmp;
+
+void setup() {
+  Serial.begin(115200);
+  if (!bmp.begin(0x76)) { Serial.println("BMP280 not found"); for (;;); }
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { Serial.println("SSD1306 not found"); for (;;); }
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+}
+
+void loop() {
+  float t = bmp.readTemperature();
+  float p = bmp.readPressure() / 100.0;   // hPa
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.print("Temp: ");
+  display.print(t, 1);
+  display.println(" C");
+  display.print("Press: ");
+  display.print(p, 0);
+  display.println(" hPa");
+  display.display();
+  delay(1000);
+}`;
