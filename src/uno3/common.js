@@ -46,6 +46,7 @@ export const SRC = {
   steplib: { t: 'Arduino reference: Stepper library (setSpeed, step)', u: 'https://docs.arduino.cc/libraries/stepper/' },
   bmpds: { t: 'Bosch BMP280 datasheet: 300-1100 hPa, -40..+85 C, supply 1.71-3.6 V, chip ID 0x58, address 0x76 (SDO to GND) or 0x77 (SDO to VDDIO)', u: 'https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf' },
   adabmp: { t: 'Adafruit BMP280 library (Adafruit_BMP280)', u: 'https://github.com/adafruit/Adafruit_BMP280_Library' },
+  soilsrc: { t: 'Vendor manuals for the capacitive soil moisture sensor v1.2: 3.3-5.5 V, analog AOUT, wetter = lower voltage, calibrate dry and wet', u: 'https://www.atomic14.com/esp32/sensors/capacitive-soil/' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -337,3 +338,12 @@ export const BMP_PARTS = [
   { id: 'w93', type: 'fwire', from: 'bmp1.SCL', to: 'A5', color: 'yellow', lift: 42 },
 ];
 export const BMP_IDS = BMP_PARTS.map(d => d.id);
+
+// ---- Lesson 34: capacitive soil sensor on the desk, three female jumpers to 5V, GND and A0
+export const SOIL_PARTS = [
+  { id: 'soil1', type: 'soil', x: 20, z: 138 },
+  { id: 'w90', type: 'fwire', from: 'soil1.GND', to: 'GND2', color: 'black', lift: 24 },
+  { id: 'w91', type: 'fwire', from: 'soil1.VCC', to: '5V', color: 'red', lift: 30 },
+  { id: 'w92', type: 'fwire', from: 'soil1.AOUT', to: 'A0', color: 'yellow', lift: 36 },
+];
+export const SOIL_IDS = SOIL_PARTS.map(d => d.id);

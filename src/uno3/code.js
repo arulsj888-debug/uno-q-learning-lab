@@ -737,3 +737,24 @@ void loop() {
   Serial.println(" hPa");
   delay(1000);
 }`;
+
+// Lesson 34 — capacitive soil moisture sensor read with analogRead and map
+export const U3_SOIL = `const int sensorPin = A0;   // AOUT of the soil moisture sensor
+const int dryValue = 512;    // reading in dry air: measure yours!
+const int wetValue = 205;    // reading in water: measure yours!
+
+void setup() {
+  Serial.begin(9600);
+}
+
+void loop() {
+  int raw = analogRead(sensorPin);
+  int percent = map(raw, dryValue, wetValue, 0, 100);   // wetter soil gives a LOWER reading
+  percent = constrain(percent, 0, 100);
+  Serial.print("raw ");
+  Serial.print(raw);
+  Serial.print("  moisture ");
+  Serial.print(percent);
+  Serial.println(" %");
+  delay(1000);
+}`;

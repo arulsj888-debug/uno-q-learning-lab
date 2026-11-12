@@ -2122,6 +2122,17 @@ export const HW_INFO = {
     points: ['Left leg A, middle COM, right leg B (the app labels them in this order).', 'Used to select a mode or to switch a supply.'],
     src: 'General electronics practice',
   },
+  soil: {
+    name: 'Capacitive soil moisture sensor (v1.2 style)', tag: 'Measures how wet the soil is',
+    summary: 'A thin board with copper tracks that forms a capacitor with the soil around it. Wetter soil changes the capacitance, and the on-board electronics turn that into an analog voltage on AOUT. Unlike the old two-prong resistive sensors, nothing touches the soil metal-to-metal, so it does not corrode.',
+    points: [
+      'Three connections: VCC, GND, AOUT. Listings give a supply of about 3.3 V to 5.5 V.',
+      'Wetter soil gives a LOWER voltage. Sellers quote different dry and wet values (one manual: about 2.5 V in air and 1.0 V in water; other listings differ): measure your own sensor and use those two numbers.',
+      'Keep the electronics above the soil line: only the marked part of the board should be in the soil.',
+      'Read it with analogRead() and convert with map() between your dry and wet readings.',
+    ],
+    src: 'Vendor manuals and listings of the capacitive soil moisture sensor v1.2 (no manufacturer datasheet found): values are typical and differ between units',
+  },
   bmp280: {
     name: 'BMP280 pressure and temperature sensor (breakout)', tag: 'Measures air pressure',
     summary: 'A small sensor that measures air pressure (300 to 1100 hPa) and temperature (−40 to +85 °C) and sends them over I²C. Pressure falls with height, so it can also give an estimate of altitude.',

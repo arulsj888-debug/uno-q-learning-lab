@@ -1202,6 +1202,42 @@ export const PROGRAMS = {
     }
   },
 
+  async u3_soil(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3);
+    await rt.at(6); rt.serialBegin(9600);
+    const dryV = 512, wetV = 205;
+    for (;;) {
+      await rt.at(9);
+      await rt.at(10); const raw = rt.analogRead('A0');
+      await rt.at(11); let pct = rt.map(raw, dryV, wetV, 0, 100);
+      await rt.at(12); pct = Math.min(100, Math.max(0, pct));
+      await rt.at(13); rt.print('raw ');
+      await rt.at(14); rt.print(raw);
+      await rt.at(15); rt.print('  moisture ');
+      await rt.at(16); rt.print(pct);
+      await rt.at(17); rt.println(' %');
+      await rt.at(18); await rt.delay(1000);
+    }
+  },
+
+  async e_soil(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3);
+    await rt.at(6); rt.serialBegin(115200);
+    const dryV = 3102, wetV = 1241;
+    for (;;) {
+      await rt.at(9);
+      await rt.at(10); const raw = rt.analogRead('G34');
+      await rt.at(11); let pct = rt.map(raw, dryV, wetV, 0, 100);
+      await rt.at(12); pct = Math.min(100, Math.max(0, pct));
+      await rt.at(13); rt.print('raw ');
+      await rt.at(14); rt.print(raw);
+      await rt.at(15); rt.print('  moisture ');
+      await rt.at(16); rt.print(pct);
+      await rt.at(17); rt.println(' %');
+      await rt.at(18); await rt.delay(1000);
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

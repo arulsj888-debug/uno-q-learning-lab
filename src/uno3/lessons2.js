@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP, U3_SOIL } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS, SOIL_PARTS, SOIL_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1583,5 +1583,45 @@ export const U3_LESSONS_2 = [
       { q: 'What does the SDO pin choose?', a: ['The I²C address (0x76 or 0x77)', 'The speed', 'The unit', 'The temperature range'], c: 0, why: 'SDO to GND gives 0x76, to VDDIO 0x77.' },
     ],
     sources: [SRC.bmpds, SRC.adabmp, SRC.wire],
+  },
+
+  // ================================================================== 34
+  {
+    id: 'u34', num: 34, module: 7, title: 'Soil moisture: when to water the plant', level: 'Beginner', time: '20 min',
+    goal: 'Read a capacitive soil moisture sensor, calibrate dry and wet readings, and show a moisture percentage.',
+    hardware: ['Arduino UNO R3', 'Capacitive soil moisture sensor (3 wires)', '3 × jumper wires', 'A cup of soil and some water (optional)'],
+    code: U3_SOIL, file: 'SoilMoisture.ino', program: 'u3_soil', fast: true, widgets: ['soilsens'],
+    circuit: SOIL_PARTS, io: { A0: { kind: 'soil', item: 'soil1', needs: SOIL_IDS } },
+    explain: {
+      1: 'The analog input where AOUT is connected.',
+      2: 'The reading with the sensor in <b>dry air</b>. These numbers belong to <b>your</b> sensor: measure them yourself.',
+      3: 'The reading with the sensor in <b>water</b>. It is <b>lower</b> than the dry one.',
+      6: 'Serial output on.',
+      10: '<b>analogRead()</b> gives a number that follows the sensor voltage.',
+      11: '<b>map()</b> converts the range dry..wet into 0..100 %. Because dry is the bigger number, the percentage still rises with moisture.',
+      12: '<b>constrain()</b> keeps the result between 0 and 100, even if the reading goes beyond your calibration.',
+      14: 'The raw number, then the percentage…',
+      16: '…so you can see both while calibrating.',
+    },
+    steps: [
+      { title: 'A sensor that does not corrode', view: 'scanv', have: [], power: false,
+        body: `<p>Plants need water, but not too much. The simple two-prong soil sensors corrode quickly because current flows through wet soil. A <b>capacitive</b> sensor measures the soil’s effect on a <b>capacitance</b> instead, with the copper covered, so it lasts much longer.</p>` },
+      { title: 'The sensor', view: 'scanv', have: ['soil1'], power: false,
+        body: `<p>Three wires: <b>VCC, GND, AOUT</b> (analog output). <b>Click it</b> in the 3D view.</p><ul><li>Seller listings give a supply of <b>3.3 V to 5.5 V</b>.</li><li><b>Wetter soil gives a lower voltage.</b></li></ul><p class="warn">There is no single official datasheet: one manual quotes about 2.5 V in air and 1.0 V in water, others differ. This is why you <b>calibrate</b> your own sensor.</p>` },
+      { title: 'Wire it', view: 'scanv', have: SOIL_IDS, power: false, pins: ['5V', 'GND2', 'A0'], body: `<ul><li><b>VCC → 5V</b>, <b>GND → GND</b>, <b>AOUT → A0</b></li></ul>` },
+      { title: 'The code', view: 'scanv', have: SOIL_IDS, showCode: true, power: true, body: `<p>Click lines <b>11</b> and <b>12</b>. The two constants at the top are your calibration.</p>` },
+      { title: 'Run it and wet the soil', view: 'scanv', have: SOIL_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Move the <b>soil moisture</b> slider from dry to wet. The raw reading <b>falls</b> and the percentage <b>rises</b>.</p><p class="sim">Simulated sensor: in this simulation dry = about 2.5 V and wet = about 1.0 V (example values from one manual). Your sensor will differ.</p>` },
+      { title: 'Calibrate your own', view: 'scanv', have: SOIL_IDS, power: true,
+        body: `<ol><li>Hold the sensor in dry air and write down the raw reading: <code>dryValue</code>.</li><li>Put it in water up to the line and write down the reading: <code>wetValue</code>.</li><li>Put the two numbers in the sketch.</li></ol><p>Then, for example, water the plant when the percentage falls under 30 %.</p>` },
+      { title: 'Summary', view: 'scanv', have: SOIL_IDS, power: true,
+        body: `<ul><li>Capacitive soil sensor: VCC, GND, AOUT; wetter = lower voltage.</li><li>Calibrate dry and wet readings, then <code>map()</code> and <code>constrain()</code>.</li><li>Only the marked part of the board goes into the soil.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'The soil gets wetter. What happens to the sensor voltage?', a: ['It rises', 'It falls', 'It stays the same', 'It becomes AC'], c: 1, why: 'Wetter soil gives a lower voltage.' },
+      { q: 'Why calibrate?', a: ['Sensors differ: the dry and wet readings are different for each unit', 'To make it faster', 'To save power', 'The library needs it'], c: 0, why: 'Dry and wet values vary between sensors.' },
+      { q: 'What does constrain(x, 0, 100) do?', a: ['Keeps x between 0 and 100', 'Multiplies x', 'Makes x an integer', 'Prints x'], c: 0, why: 'It clamps the value into the range.' },
+    ],
+    sources: [SRC.soilsrc, SRC.ds],
   },
 ];

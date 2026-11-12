@@ -92,6 +92,7 @@ export class Bench {
       case 'tilt': obj = new TiltSwitch(); break;
       case 'irrx': obj = new IRReceiver(); break;
       case 'mpu6050': obj = new MPU6050Module(); break;
+      case 'soil': obj = new MPU6050Module('SOIL v1.2', ['VCC', 'GND', 'AOUT'], 'soil'); break;
       case 'bmp280': obj = new MPU6050Module('BMP280', ['VCC', 'GND', 'SCL', 'SDA'], 'bmp280'); break;
       case 'stepper': obj = new StepperULN2003(); break;
       case 'sevenseg': obj = new SevenSegModule(); break;
@@ -149,7 +150,7 @@ export class Bench {
       case 'dht': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       case 'rgbled': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       case 'l293d': return { pos: this.bb.hole('e', d.col).lerp(this.bb.hole('f', d.col + 7), 0.5), rotY: 0 };
-      case 'battery': case 'motor': case 'relay': case 'lamp': case 'neopixel': case 'lcd1602': case 'oled': case 'sevenseg': case 'mpu6050': case 'bmp280': case 'stepper': case 'thermo': case 'pixels': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
+      case 'battery': case 'motor': case 'relay': case 'lamp': case 'neopixel': case 'lcd1602': case 'oled': case 'sevenseg': case 'mpu6050': case 'bmp280': case 'soil': case 'stepper': case 'thermo': case 'pixels': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
       case 'hcsr04': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       default: return null;
     }
