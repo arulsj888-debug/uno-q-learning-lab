@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP, U3_SOIL, U3_SND, U3_PLANT, U3_KEYPAD } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP, U3_SOIL, U3_SND, U3_PLANT, U3_KEYPAD, U3_LOCK } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS, SOIL_PARTS, SOIL_IDS, SND_PARTS, SND_IDS, PLANT_PARTS, PLANT_IDS, KP_PARTS, KP_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS, SOIL_PARTS, SOIL_IDS, SND_PARTS, SND_IDS, PLANT_PARTS, PLANT_IDS, KP_PARTS, KP_IDS, LOCK_PARTS, LOCK_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1738,6 +1738,48 @@ export const U3_LESSONS_2 = [
       { q: 'How many wires does a 4×4 matrix keypad use?', a: ['4', '8', '16', '32'], c: 1, why: '4 rows + 4 columns.' },
       { q: 'What does pressing a key do?', a: ['Connects its row to its column', 'Sends a Wi-Fi packet', 'Powers the keypad', 'Resets the board'], c: 0, why: 'The key is a switch between a row and a column.' },
       { q: 'getKey() returns 0. What does it mean?', a: ['No key is pressed', 'Key 0 is pressed', 'The keypad is broken', 'The baud rate is wrong'], c: 0, why: 'It returns 0 when nothing is pressed.' },
+    ],
+    sources: [SRC.keypadlib, ],
+  },
+
+  // ================================================================== 38
+  {
+    id: 'u38', num: 38, module: 7, title: 'Project: a keypad code lock', level: 'Intermediate', time: '30 min',
+    goal: 'Build a code lock: collect digits from a keypad, compare them with a secret code on #, and answer with different beeps.',
+    hardware: ['Arduino UNO R3', '4×4 matrix keypad', 'Passive buzzer and a 220 Ω resistor', 'Breadboard and jumper wires'],
+    code: U3_LOCK, file: 'CodeLock.ino', program: 'u3_lock', fast: true, widgets: ['keypad'],
+    circuit: LOCK_PARTS, io: { D9: { kind: 'keypad', rows: ['D9', 'D8', 'D7', 'D6'], cols: ['D5', 'D4', 'D3', 'D2'], item: 'kp1', needs: LOCK_IDS }, D10: { kind: 'buzzer', item: 'bz1', needs: LOCK_IDS } },
+    explain: {
+      1: 'The Keypad library (keypad lesson).',
+      13: 'The keypad object, wired as before.',
+      15: 'The buzzer pin.',
+      16: 'The secret code. Anyone who reads the sketch can see it: a real lock would not store it like this.',
+      17: 'The digits typed so far.',
+      24: 'Ask the keypad for a key (0 if none).',
+      26: '<b>#</b> means “enter”: compare now.',
+      27: 'Compare the typed digits with the secret. Strings can be compared with ==.',
+      28: 'Right code.',
+      29: 'A short <b>high</b> beep: 1500 Hz for 200 ms.',
+      31: 'Wrong code.',
+      32: 'A long <b>low</b> beep: 300 Hz for 600 ms.',
+      34: 'Start again after every try.',
+      35: '<b>*</b> means “clear”.',
+      39: 'Any other key: add it to the typed digits.',
+    },
+    steps: [
+      { title: 'A code lock in three parts', view: 'keyv', have: [], power: false,
+        body: `<p>Input (the <b>keypad</b>), a decision (<b>compare</b> the typed digits with the secret) and an output (a <b>buzzer</b> that beeps differently for right and wrong). Later you could add a relay or a servo to open a real lock.</p>` },
+      { title: 'Wire it', view: 'keyv', have: LOCK_IDS, power: false, pins: ['D9', 'D8', 'D7', 'D6', 'D5', 'D4', 'D3', 'D2', 'D10'], body: `<ul><li>Keypad: as in the keypad lesson (rows on pins 9–6, columns on pins 5–2)</li><li>Buzzer: pin <b>10</b> → resistor → buzzer +, buzzer − → GND (row 19 to 26)</li></ul><p class="warn">The buzzer needs a series resistor, as in the buzzer lesson.</p>` },
+      { title: 'The code', view: 'keyv', have: LOCK_IDS, showCode: true, power: true, body: `<p>Click lines <b>26</b>, <b>27</b>, <b>29</b> and <b>32</b>.</p>` },
+      { title: 'Run it: right and wrong', view: 'keyv', have: LOCK_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Type <b>1 2 3 4</b> then <b>#</b>: “Access granted” and a short high beep. Type <b>1 1 1 1 #</b>: “Wrong code” and a long low beep. <b>*</b> clears what you typed.</p><p class="sim">Simulated keypad. The secret is 1234 only in this demo.</p>` },
+      { title: 'Summary', view: 'keyv', have: LOCK_IDS, power: true,
+        body: `<ul><li>Collect keys in a <code>String</code>, decide on <code>#</code>, clear on <code>*</code>.</li><li>Different <code>tone()</code> pitches tell the user the result.</li><li>A real lock needs more: a hidden code, a lock-out after wrong tries, and a proper driver for the lock.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Which key submits the code in this sketch?', a: ['#', '*', 'A', '0'], c: 0, why: '# is “enter”.' },
+      { q: 'Why is storing the code in the sketch weak?', a: ['Anyone who can read the sketch can see it', 'It is too long', 'Strings cannot be compared', 'It uses too much memory'], c: 0, why: 'A real lock keeps the code protected.' },
+      { q: 'What does tone(pin, 300, 600) do?', a: ['Plays 300 Hz for 600 ms', 'Plays 600 Hz for 300 ms', 'Turns the pin on', 'Reads the pin'], c: 0, why: 'tone(pin, frequency, duration).' },
     ],
     sources: [SRC.keypadlib, ],
   },

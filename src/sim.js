@@ -1362,6 +1362,56 @@ export const PROGRAMS = {
     }
   },
 
+  async u3_lock(rt) {
+    await rt.at(1); await rt.at(13); await rt.at(15); await rt.at(16); await rt.at(17);
+    await rt.at(20); rt.serialBegin(9600);
+    let entered = '';
+    for (;;) {
+      await rt.at(23);
+      await rt.at(24); const key = rt.keypadKey();
+      await rt.at(25);
+      if (key) {
+        await rt.at(26);
+        if (key === '#') {
+          await rt.at(27);
+          if (entered === '1234') { await rt.at(28); rt.println('Access granted'); await rt.at(29); rt.tone('D10', 1500, 200); }
+          else { await rt.at(31); rt.println('Wrong code'); await rt.at(32); rt.tone('D10', 300, 600); }
+          await rt.at(34); entered = '';
+        } else {
+          await rt.at(35);
+          if (key === '*') { await rt.at(36); entered = ''; await rt.at(37); rt.println('Cleared'); }
+          else { await rt.at(39); entered += key; await rt.at(40); rt.println('digit entered'); }
+        }
+      }
+      await rt.yield();
+    }
+  },
+
+  async e_lock(rt) {
+    await rt.at(1); await rt.at(13); await rt.at(15); await rt.at(16); await rt.at(17);
+    await rt.at(20); rt.serialBegin(115200);
+    let entered = '';
+    for (;;) {
+      await rt.at(23);
+      await rt.at(24); const key = rt.keypadKey();
+      await rt.at(25);
+      if (key) {
+        await rt.at(26);
+        if (key === '#') {
+          await rt.at(27);
+          if (entered === '1234') { await rt.at(28); rt.println('Access granted'); await rt.at(29); rt.tone('G16', 1500, 200); }
+          else { await rt.at(31); rt.println('Wrong code'); await rt.at(32); rt.tone('G16', 300, 600); }
+          await rt.at(34); entered = '';
+        } else {
+          await rt.at(35);
+          if (key === '*') { await rt.at(36); entered = ''; await rt.at(37); rt.println('Cleared'); }
+          else { await rt.at(39); entered += key; await rt.at(40); rt.println('digit entered'); }
+        }
+      }
+      await rt.yield();
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

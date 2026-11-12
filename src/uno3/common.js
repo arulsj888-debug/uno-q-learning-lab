@@ -381,3 +381,12 @@ export const KP_PARTS = [
   { id: 'w97', type: 'fwire', from: 'kp1.C4', to: 'D2', color: 'violet', lift: 52 },
 ];
 export const KP_IDS = KP_PARTS.map(d => d.id);
+
+// ---- Lesson 38 (project): keypad plus a buzzer (series resistor, pin 10) on the breadboard
+export const LOCK_PARTS = [...KP_PARTS,
+  { id: 'rz1', type: 'resistor', a: 'c19', b: 'c23' },
+  { id: 'bz1', type: 'buzzer', plus: 'e23', minus: 'e26' },
+  { id: 'w98', type: 'wire', from: 'D10', to: 'a19', color: 'orange', lift: 12 },
+  { id: 'w99', type: 'wire', from: 'a26', to: 'GND3', color: 'black', lift: 9 },
+];
+export const LOCK_IDS = LOCK_PARTS.map(d => d.id);

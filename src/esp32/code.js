@@ -926,3 +926,48 @@ void loop() {
     Serial.println(key);
   }
 }`;
+
+// Lesson 39 (project) — keypad code lock with a buzzer
+export const E32_LOCK = `#include <Keypad.h>
+
+const byte ROWS = 4;
+const byte COLS = 4;
+char keys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+byte rowPins[ROWS] = {13, 14, 27, 26};
+byte colPins[COLS] = {25, 33, 32, 23};
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+const int buzzerPin = 16;
+const String secret = "1234";   // the code (visible in the sketch: this is a learning demo)
+String entered = "";
+
+void setup() {
+  Serial.begin(115200);
+}
+
+void loop() {
+  char key = keypad.getKey();
+  if (key) {
+    if (key == '#') {                    // # = enter
+      if (entered == secret) {
+        Serial.println("Access granted");
+        tone(buzzerPin, 1500, 200);       // short high beep
+      } else {
+        Serial.println("Wrong code");
+        tone(buzzerPin, 300, 600);        // long low beep
+      }
+      entered = "";
+    } else if (key == '*') {            // * = clear
+      entered = "";
+      Serial.println("Cleared");
+    } else {
+      entered += key;                    // add the digit
+      Serial.println("digit entered");
+    }
+  }
+}`;

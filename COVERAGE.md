@@ -87,6 +87,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Timers, EEPROM / preferences | TODO | TODO | TODO | TODO | |
 
 ## F. Projects (after the parts exist)
+DONE: Keypad code lock (UNO R3 lesson 38, ESP32 lesson 39): keypad + passive buzzer, # = enter, * = clear; the secret is stored in the sketch (the lesson says a real lock must not). Security alarm with PIR and a real lock driver TODO.
 DONE: Weather station (ESP32 lesson 37, BMP280 + SSD1306 OLED on one I2C bus; OLED text verified in the app state and in a screenshot).
 DONE: Plant watering controller (UNO R3 lesson 36, ESP32 lesson 36): soil sensor + hysteresis (on below 30 %, off above 60 %); an LED stands in for the relay and pump (the lesson says so; a real pump needs a relay/MOSFET and flyback diode). Real relay/pump version TODO.
 

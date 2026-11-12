@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT, E32_WX, E32_KEYPAD } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT, E32_WX, E32_KEYPAD, E32_LOCK } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -151,6 +151,12 @@ const KP_PARTS_E = [{ id: 'kp1', type: 'keypad', x: 85, z: 112 },
   ...KP_NAMES.map((n, i) => ({ id: 'm4' + i, type: 'fwire', from: 'kp1.' + n, to: 'a' + (10 + i), color: ['blue', 'green', 'yellow', 'orange', 'white', 'red', 'black', 'violet'][i], lift: 16 + i * 2 })),
   ...KP_NAMES.map((n, i) => ({ id: 'w4' + i, type: 'fwire', from: KP_PINS_E[i], to: 'b' + (10 + i), color: ['blue', 'green', 'yellow', 'orange', 'white', 'red', 'black', 'violet'][i], lift: 22 + i * 3 }))];
 const KP_IDS_E = KP_PARTS_E.map(d => d.id);
+const LOCK_PARTS_E = [...KP_PARTS_E,
+  { id: 'rz1', type: 'resistor', a: 'c19', b: 'c23' },
+  { id: 'bz1', type: 'buzzer', plus: 'e23', minus: 'e26' },
+  { id: 'w98', type: 'fwire', from: 'G16', to: 'a19', color: 'orange', lift: 24 },
+  { id: 'w99', type: 'fwire', from: 'GND2', to: 'a26', color: 'black', lift: 18 }];
+const LOCK_IDS_E = LOCK_PARTS_E.map(d => d.id);
 const STEP_PARTS_E = [
   { id: 'stp1', type: 'stepper', x: 20, z: 138 },
   { id: 'w90', type: 'fwire', from: 'stp1.IN1', to: 'G16', color: 'blue', lift: 36 },
@@ -2033,6 +2039,48 @@ export const E32_LESSONS = [
       { q: 'How many wires does a 4×4 matrix keypad use?', a: ['4', '8', '16', '32'], c: 1, why: '4 rows + 4 columns.' },
       { q: 'What does pressing a key do?', a: ['Connects its row to its column', 'Sends a Wi-Fi packet', 'Powers the keypad', 'Resets the board'], c: 0, why: 'The key is a switch between a row and a column.' },
       { q: 'getKey() returns 0. What does it mean?', a: ['No key is pressed', 'Key 0 is pressed', 'The keypad is broken', 'The baud rate is wrong'], c: 0, why: 'It returns 0 when nothing is pressed.' },
+    ],
+    sources: [SRC.keypadlib, ],
+  },
+
+  // ================================================================== 39
+  {
+    id: 'e39', num: 39, module: 7, title: 'Project: a keypad code lock', level: 'Intermediate', time: '30 min',
+    goal: 'Build a code lock: collect digits from a keypad, compare them with a secret code on #, and answer with different beeps.',
+    hardware: ['ESP32 DevKit V1', '4×4 matrix keypad', 'Passive buzzer and a 220 Ω resistor', 'Breadboard and jumper wires'],
+    code: E32_LOCK, file: 'CodeLock.ino', program: 'e_lock', fast: true, widgets: ['keypad'],
+    circuit: LOCK_PARTS_E, io: { G13: { kind: 'keypad', rows: ['G13', 'G14', 'G27', 'G26'], cols: ['G25', 'G33', 'G32', 'G23'], item: 'kp1', needs: LOCK_IDS_E }, G16: { kind: 'buzzer', item: 'bz1', needs: LOCK_IDS_E } },
+    explain: {
+      1: 'The Keypad library (keypad lesson).',
+      13: 'The keypad object, wired as before.',
+      15: 'The buzzer pin.',
+      16: 'The secret code. Anyone who reads the sketch can see it: a real lock would not store it like this.',
+      17: 'The digits typed so far.',
+      24: 'Ask the keypad for a key (0 if none).',
+      26: '<b>#</b> means “enter”: compare now.',
+      27: 'Compare the typed digits with the secret. Strings can be compared with ==.',
+      28: 'Right code.',
+      29: 'A short <b>high</b> beep: 1500 Hz for 200 ms.',
+      31: 'Wrong code.',
+      32: 'A long <b>low</b> beep: 300 Hz for 600 ms.',
+      34: 'Start again after every try.',
+      35: '<b>*</b> means “clear”.',
+      39: 'Any other key: add it to the typed digits.',
+    },
+    steps: [
+      { title: 'A code lock in three parts', view: 'keyv', have: [], power: false,
+        body: `<p>Input (the <b>keypad</b>), a decision (<b>compare</b> the typed digits with the secret) and an output (a <b>buzzer</b> that beeps differently for right and wrong). Later you could add a relay or a servo to open a real lock.</p>` },
+      { title: 'Wire it', view: 'keyv', have: LOCK_IDS_E, power: false, pins: ['G13', 'G14', 'G27', 'G26', 'G25', 'G33', 'G32', 'G23', 'G16'], body: `<ul><li>Keypad: as in the keypad lesson (columns 10 to 17 of the breadboard)</li><li>Buzzer: <b>GPIO16</b> → resistor → buzzer +, buzzer − → GND (columns 19 to 26)</li></ul><p class="warn">The buzzer needs a series resistor, as in the buzzer lesson.</p>` },
+      { title: 'The code', view: 'keyv', have: LOCK_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>26</b>, <b>27</b>, <b>29</b> and <b>32</b>.</p>` },
+      { title: 'Run it: right and wrong', view: 'keyv', have: LOCK_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Type <b>1 2 3 4</b> then <b>#</b>: “Access granted” and a short high beep. Type <b>1 1 1 1 #</b>: “Wrong code” and a long low beep. <b>*</b> clears what you typed.</p><p class="sim">Simulated keypad. The secret is 1234 only in this demo.</p>` },
+      { title: 'Summary', view: 'keyv', have: LOCK_IDS_E, power: true,
+        body: `<ul><li>Collect keys in a <code>String</code>, decide on <code>#</code>, clear on <code>*</code>.</li><li>Different <code>tone()</code> pitches tell the user the result.</li><li>A real lock needs more: a hidden code, a lock-out after wrong tries, and a proper driver for the lock.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Which key submits the code in this sketch?', a: ['#', '*', 'A', '0'], c: 0, why: '# is “enter”.' },
+      { q: 'Why is storing the code in the sketch weak?', a: ['Anyone who can read the sketch can see it', 'It is too long', 'Strings cannot be compared', 'It uses too much memory'], c: 0, why: 'A real lock keeps the code protected.' },
+      { q: 'What does tone(pin, 300, 600) do?', a: ['Plays 300 Hz for 600 ms', 'Plays 600 Hz for 300 ms', 'Turns the pin on', 'Reads the pin'], c: 0, why: 'tone(pin, frequency, duration).' },
     ],
     sources: [SRC.keypadlib, ],
   },
