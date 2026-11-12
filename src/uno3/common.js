@@ -36,6 +36,8 @@ export const SRC = {
   millis: { t: 'Arduino reference: millis() (milliseconds since the program started)', u: 'https://docs.arduino.cc/language-reference/en/functions/time/millis/' },
   bwd: { t: 'Arduino example: Blink Without Delay', u: 'https://docs.arduino.cc/built-in-examples/digital/BlinkWithoutDelay/' },
   wirelib: { t: 'Arduino reference: Wire library (beginTransmission / endTransmission)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
+  ds18: { t: 'DS18B20 datasheet (Dallas Semiconductor / Maxim): TO-92 pinout GND, DQ, VDD; 3.0 V to 5.5 V; 750 ms conversion', u: 'https://www.analog.com/en/products/ds18b20.html' },
+  dallas: { t: 'DallasTemperature library (Miles Burton) and OneWire library (Paul Stoffregen)', u: 'https://github.com/milesburton/Arduino-Temperature-Control-Library' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -275,3 +277,14 @@ export const SCAN_PARTS = [
   { id: 'w98', type: 'fwire', from: 'oled1.SDA', to: 'SDA', color: 'white', lift: 66 },
 ];
 export const SCAN_IDS = SCAN_PARTS.map(d => d.id);
+
+// ---- Lesson 29: DS18B20 on pin 2 from 5 V with a 4.7 kOhm pull-up between DQ and VDD
+export const DS_PARTS = [
+  { id: 'ds1', type: 'ds18b20', row: 'e', col: 10 },
+  { id: 'w70', type: 'wire', from: 'GND3', to: 'a10', color: 'black', lift: 18 },
+  { id: 'w71', type: 'wire', from: 'D2', to: 'a11', color: 'yellow', lift: 22 },
+  { id: 'w72', type: 'wire', from: '5V', to: 'a12', color: 'red', lift: 14 },
+  { id: 'r70', type: 'resistor', a: 'c11', b: 'c14', ohms: 4700 },
+  { id: 'w73', type: 'wire', from: 'b12', to: 'b14', color: 'orange', lift: 12 },
+];
+export const DS_IDS = DS_PARTS.map(d => d.id);

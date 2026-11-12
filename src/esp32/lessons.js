@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18 } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -39,6 +39,8 @@ const SRC = {
   mqtt: { t: 'MQTT.org: what is MQTT (publish/subscribe, topics, broker)', u: 'https://mqtt.org/' },
   ntppool: { t: 'NTP Pool Project: pool.ntp.org', u: 'https://www.ntppool.org/' },
   cfgtime: { t: 'Arduino-ESP32 example: SimpleTime (configTime, getLocalTime)', u: 'https://github.com/espressif/arduino-esp32/tree/master/libraries/ESP32/examples/Time/SimpleTime' },
+  ds18: { t: 'DS18B20 datasheet (Dallas Semiconductor / Maxim): TO-92 pinout GND, DQ, VDD; 3.0 V to 5.5 V; 750 ms conversion', u: 'https://www.analog.com/en/products/ds18b20.html' },
+  dallas: { t: 'DallasTemperature library (Miles Burton) and OneWire library (Paul Stoffregen)', u: 'https://github.com/milesburton/Arduino-Temperature-Control-Library' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -149,6 +151,16 @@ const M_PARTS_E = [
   { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c12', color: 'black', lift: 20 },
 ];
 const M_IDS_E = M_PARTS_E.map(d => d.id);
+// DS18B20 on GPIO4 from 3.3 V with a 4.7 k pull-up between DQ and VDD
+const DS_PARTS_E = [
+  { id: 'ds1', type: 'ds18b20', row: 'e', col: 10 },
+  { id: 'w70', type: 'fwire', from: 'GND2', to: 'a10', color: 'black', lift: 18 },
+  { id: 'w71', type: 'fwire', from: 'G4', to: 'a11', color: 'yellow', lift: 22 },
+  { id: 'w72', type: 'fwire', from: '3V3', to: 'a12', color: 'red', lift: 14 },
+  { id: 'r70', type: 'resistor', a: 'c11', b: 'c14', ohms: 4700 },
+  { id: 'w73', type: 'wire', from: 'b12', to: 'b14', color: 'orange', lift: 12 },
+];
+const DS_IDS_E = DS_PARTS_E.map(d => d.id);
 // two LED branches behind 1N4007 diodes, the second diode turned round
 const D_PARTS_E = [
   { id: 'w1', type: 'fwire', from: 'G16', to: 'a10', color: 'yellow', lift: 14 },
@@ -1503,5 +1515,57 @@ export const E32_LESSONS = [
       { q: 'getLocalTime() returns false. Why?', a: ['The time is not known yet (no sync)', 'The LED is off', 'The pin is wrong', 'The baud rate is wrong'], c: 0, why: 'It returns false until the first successful sync.' },
     ],
     sources: [SRC.ntppool, SRC.cfgtime, SRC.wifihello],
+  },
+
+  // ================================================================== 28
+  {
+    id: 'e28', num: 28, module: 7, title: 'DS18B20: a digital thermometer on one wire', level: 'Intermediate', time: '25 min',
+    goal: 'Wire a DS18B20 with its 4.7 kΩ pull-up and read the temperature with the OneWire and DallasTemperature libraries.',
+    hardware: ['ESP32 DevKit V1', 'Breadboard', 'DS18B20 temperature sensor (TO-92, 3 legs)', '4.7 kΩ resistor', '3 × female–male jumper wires', '1 × jumper wire'],
+    code: E32_DS18, file: 'DS18B20_read.ino', program: 'e_ds18', fast: true, widgets: ['pisens', 'nohum'], sdaWire: 'w71', dht: true, wn: 'DQ',
+    circuit: DS_PARTS_E, io: { G4: { kind: 'ds18b20', item: 'ds1', needs: DS_IDS_E } },
+    explain: {
+      1: '<b>OneWire</b> (by Paul Stoffregen): talks the 1-Wire protocol on a pin. Install it from the Library Manager.',
+      2: '<b>DallasTemperature</b> (by Miles Burton): reads the DS18B20 on top of OneWire. Install it too.',
+      4: 'The DQ wire is on <b>GPIO4</b>.',
+      6: 'A 1-Wire bus on that pin.',
+      7: 'The sensor library, using that bus. It can handle many sensors on one wire.',
+      10: 'Serial output on.',
+      11: 'Start the library: it searches the bus for sensors.',
+      15: '<b>requestTemperatures()</b> tells every sensor to measure. At 12-bit resolution this takes up to <b>750 ms</b> and the call waits for it.',
+      16: '<b>getTempCByIndex(0)</b> returns the temperature of the first sensor found, in °C.',
+      17: 'If no sensor answers, the library returns <b>-127</b> (<code>DEVICE_DISCONNECTED_C</code>).',
+      18: 'Tell the user: check the three wires and the pull-up resistor.',
+      20: 'Print the label…',
+      21: '…the temperature (two decimals)…',
+      22: '…and the unit.',
+    },
+    steps: [
+      { title: 'The DS18B20', view: 'breadboard', have: ['ds1'], power: false, holes: ['e10 · GND', 'e11 · DQ', 'e12 · VDD'],
+        body: `<p>The <b>DS18B20</b> is a <b>digital</b> thermometer in a small TO-92 case: it measures the temperature itself and sends it as a number on <b>one data wire</b>. With the <b>flat face (the text) toward you</b>, the legs from the left are <b>GND, DQ, VDD</b>. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Supply <b>3.0 V to 5.5 V</b>.</li><li>Range <b>−55 °C to +125 °C</b>, accurate to <b>±0.5 °C</b> from −10 °C to +85 °C (Maxim datasheet).</li><li>Resolution 9 to 12 bits; at 12 bits one measurement takes up to <b>750 ms</b>.</li></ul>
+        <p class="tip">No analog pin is needed: the sensor sends a number, not a voltage.</p>` },
+      { title: 'The pull-up resistor', view: 'bench', have: [],
+        body: `<p>The DQ line is <b>open-drain</b>: the sensor can pull it <b>low</b> but not high. A <b>pull-up resistor</b> between DQ and VDD holds it high. The datasheet says about <b>5 kΩ</b>; <b>4.7 kΩ</b> is the usual value. Without it the line never goes high and no reading arrives.</p>` },
+      { title: 'Step 1 — the sensor and the resistor', view: 'breadboard', have: ['ds1', 'r70', 'w73'], power: false, holes: ['c11 · resistor', 'c14 · resistor'],
+        body: `<p>Push the sensor into <b>e10 – e12</b>, flat face toward you. The <b>4.7 kΩ resistor</b> goes from <b>c11</b> (DQ column) to <b>c14</b>; a jumper from <b>b12</b> (VDD column) to <b>b14</b> joins the other end of the resistor to VDD.</p>` },
+      { title: 'Step 2 — power, data and ground', view: 'bench', have: DS_IDS_E, pins: ['3V3', 'G4', 'GND2'],
+        body: `<ul><li>Black: <b>GND → a10</b> (GND leg)</li><li>Yellow: <b>GPIO4 → a11</b> (DQ leg)</li><li>Red: <b>3V3 → a12</b> (VDD leg)</li></ul><p>The sensor works from 3.3 V here (3.0 V to 5.5 V).</p>` },
+      { title: 'Install the libraries', view: 'bench', have: DS_IDS_E,
+        body: `<p>In the Arduino IDE: <b>Sketch → Include Library → Manage Libraries…</b>, install <b>OneWire</b> (Paul Stoffregen) and <b>DallasTemperature</b> (Miles Burton).</p>` },
+      { title: 'The code', view: 'bench', have: DS_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>15</b>, <b>16</b> and <b>17</b>.</p>` },
+      { title: 'Run it and change the temperature', view: 'bench', have: DS_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Once a second the Serial Monitor prints the temperature. <b>Move the temperature slider</b> and watch the numbers follow: the values move in steps of 0.0625 °C (12-bit resolution).</p><p class="sim">Simulated values.</p>` },
+      { title: 'What if the data wire is loose?', view: 'bench', have: DS_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Unplug the DQ wire”</b> and run again. No sensor answers and the Serial Monitor shows <code>Sensor not found!</code> (the library returned −127).</p>` },
+      { title: 'Summary', view: 'bench', have: DS_IDS_E, power: true,
+        body: `<ul><li>DS18B20: legs GND, DQ, VDD (flat face toward you); 3.0 V to 5.5 V.</li><li>DQ needs a <b>4.7 kΩ pull-up</b> to VDD.</li><li><code>requestTemperatures()</code> then <code>getTempCByIndex(0)</code>; −127 means no sensor.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What is the pull-up resistor for?', a: ['To cool the sensor', 'To hold the open-drain DQ line high', 'To measure the temperature', 'To limit the LED current'], c: 1, why: 'The sensor can only pull DQ low.' },
+      { q: 'getTempCByIndex(0) returns -127. What happened?', a: ['It is -127 °C', 'No sensor answered', 'The sensor is too hot', 'The baud rate is wrong'], c: 1, why: '-127 is DEVICE_DISCONNECTED_C.' },
+      { q: 'Which leg is DQ (flat face toward you)?', a: ['Left', 'Middle', 'Right', 'None'], c: 1, why: 'GND, DQ, VDD from the left.' },
+    ],
+    sources: [SRC.ds18, SRC.dallas, SRC.ds],
   },
 ];

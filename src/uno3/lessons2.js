@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18 } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1361,5 +1361,57 @@ export const U3_LESSONS_2 = [
       { q: 'Two devices have the same address. What happens?', a: ['Nothing', 'They collide on the bus', 'The faster one wins always', 'Wire.h fixes it'], c: 1, why: 'Each device on a bus needs its own address.' },
     ],
     sources: [SRC.wirelib, SRC.wire, SRC.ds],
+  },
+
+  // ================================================================== 29
+  {
+    id: 'u29', num: 29, module: 7, title: 'DS18B20: a digital thermometer on one wire', level: 'Intermediate', time: '25 min',
+    goal: 'Wire a DS18B20 with its 4.7 kΩ pull-up and read the temperature with the OneWire and DallasTemperature libraries.',
+    hardware: ['Arduino UNO R3', 'Breadboard', 'DS18B20 temperature sensor (TO-92, 3 legs)', '4.7 kΩ resistor', '3 × jumper wires', '1 × jumper wire'],
+    code: U3_DS18, file: 'DS18B20_read.ino', program: 'u3_ds18', fast: true, widgets: ['pisens', 'nohum'], sdaWire: 'w71', dht: true, wn: 'DQ',
+    circuit: DS_PARTS, io: { D2: { kind: 'ds18b20', item: 'ds1', needs: DS_IDS } },
+    explain: {
+      1: '<b>OneWire</b> (by Paul Stoffregen): talks the 1-Wire protocol on a pin. Install it from the Library Manager.',
+      2: '<b>DallasTemperature</b> (by Miles Burton): reads the DS18B20 on top of OneWire. Install it too.',
+      4: 'The DQ wire is on <b>pin 2</b>.',
+      6: 'A 1-Wire bus on that pin.',
+      7: 'The sensor library, using that bus. It can handle many sensors on one wire.',
+      10: 'Serial output on.',
+      11: 'Start the library: it searches the bus for sensors.',
+      15: '<b>requestTemperatures()</b> tells every sensor to measure. At 12-bit resolution this takes up to <b>750 ms</b> and the call waits for it.',
+      16: '<b>getTempCByIndex(0)</b> returns the temperature of the first sensor found, in °C.',
+      17: 'If no sensor answers, the library returns <b>-127</b> (<code>DEVICE_DISCONNECTED_C</code>).',
+      18: 'Tell the user: check the three wires and the pull-up resistor.',
+      20: 'Print the label…',
+      21: '…the temperature (two decimals)…',
+      22: '…and the unit.',
+    },
+    steps: [
+      { title: 'The DS18B20', view: 'breadboard', have: ['ds1'], power: false, holes: ['e10 · GND', 'e11 · DQ', 'e12 · VDD'],
+        body: `<p>The <b>DS18B20</b> is a <b>digital</b> thermometer in a small TO-92 case: it measures the temperature itself and sends it as a number on <b>one data wire</b>. With the <b>flat face (the text) toward you</b>, the legs from the left are <b>GND, DQ, VDD</b>. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Supply <b>3.0 V to 5.5 V</b>.</li><li>Range <b>−55 °C to +125 °C</b>, accurate to <b>±0.5 °C</b> from −10 °C to +85 °C (Maxim datasheet).</li><li>Resolution 9 to 12 bits; at 12 bits one measurement takes up to <b>750 ms</b>.</li></ul>
+        <p class="tip">No analog pin is needed: the sensor sends a number, not a voltage.</p>` },
+      { title: 'The pull-up resistor', view: 'bench', have: [],
+        body: `<p>The DQ line is <b>open-drain</b>: the sensor can pull it <b>low</b> but not high. A <b>pull-up resistor</b> between DQ and VDD holds it high. The datasheet says about <b>5 kΩ</b>; <b>4.7 kΩ</b> is the usual value. Without it the line never goes high and no reading arrives.</p>` },
+      { title: 'Step 1 — the sensor and the resistor', view: 'breadboard', have: ['ds1', 'r70', 'w73'], power: false, holes: ['c11 · resistor', 'c14 · resistor'],
+        body: `<p>Push the sensor into <b>e10 – e12</b>, flat face toward you. The <b>4.7 kΩ resistor</b> goes from <b>c11</b> (DQ column) to <b>c14</b>; a jumper from <b>b12</b> (VDD column) to <b>b14</b> joins the other end of the resistor to VDD.</p>` },
+      { title: 'Step 2 — power, data and ground', view: 'bench', have: DS_IDS, pins: ['5V', 'D2', 'GND3'],
+        body: `<ul><li>Black: <b>GND → a10</b> (GND leg)</li><li>Yellow: <b>pin 2 → a11</b> (DQ leg)</li><li>Red: <b>5V → a12</b> (VDD leg)</li></ul><p>The sensor works from 5 V here (3.0 V to 5.5 V).</p>` },
+      { title: 'Install the libraries', view: 'bench', have: DS_IDS,
+        body: `<p>In the Arduino IDE: <b>Sketch → Include Library → Manage Libraries…</b>, install <b>OneWire</b> (Paul Stoffregen) and <b>DallasTemperature</b> (Miles Burton).</p>` },
+      { title: 'The code', view: 'bench', have: DS_IDS, showCode: true, power: true, body: `<p>Click lines <b>15</b>, <b>16</b> and <b>17</b>.</p>` },
+      { title: 'Run it and change the temperature', view: 'bench', have: DS_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Once a second the Serial Monitor prints the temperature. <b>Move the temperature slider</b> and watch the numbers follow: the values move in steps of 0.0625 °C (12-bit resolution).</p><p class="sim">Simulated values.</p>` },
+      { title: 'What if the data wire is loose?', view: 'bench', have: DS_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Unplug the DQ wire”</b> and run again. No sensor answers and the Serial Monitor shows <code>Sensor not found!</code> (the library returned −127).</p>` },
+      { title: 'Summary', view: 'bench', have: DS_IDS, power: true,
+        body: `<ul><li>DS18B20: legs GND, DQ, VDD (flat face toward you); 3.0 V to 5.5 V.</li><li>DQ needs a <b>4.7 kΩ pull-up</b> to VDD.</li><li><code>requestTemperatures()</code> then <code>getTempCByIndex(0)</code>; −127 means no sensor.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What is the pull-up resistor for?', a: ['To cool the sensor', 'To hold the open-drain DQ line high', 'To measure the temperature', 'To limit the LED current'], c: 1, why: 'The sensor can only pull DQ low.' },
+      { q: 'getTempCByIndex(0) returns -127. What happened?', a: ['It is -127 °C', 'No sensor answered', 'The sensor is too hot', 'The baud rate is wrong'], c: 1, why: '-127 is DEVICE_DISCONNECTED_C.' },
+      { q: 'Which leg is DQ (flat face toward you)?', a: ['Left', 'Middle', 'Right', 'None'], c: 1, why: 'GND, DQ, VDD from the left.' },
+    ],
+    sources: [SRC.ds18, SRC.dallas, SRC.ds],
   },
 ];

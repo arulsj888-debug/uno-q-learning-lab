@@ -70,6 +70,7 @@ export class Sim {
       i2cProbe: (addr) => (H.i2cProbe ? !!H.i2cProbe(addr) : false),   // Wire.endTransmission() == 0 for this address
       lcd: (op, a, b) => (H.lcd ? H.lcd({ op, a, b }) : undefined),
       oled: (op, a, b) => (H.oled ? H.oled({ op, a, b }) : false),
+      dsRead: () => (H.ds18 ? H.ds18() : { ok: false }),
       dhtRead: () => (H.dht ? H.dht() : { ok: false }),
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
       analogReadResolution: (b) => { readBits = Math.min(31, Math.max(1, b)); },
@@ -983,6 +984,36 @@ export const PROGRAMS = {
       await rt.at(19); const t = rt.getLocalTime(3600);
       if (t === null) { await rt.at(20); rt.println('Waiting for time...'); }
       else { await rt.at(22); rt.println(t); }
+      await rt.at(24); await rt.delay(1000);
+    }
+  },
+
+  async u3_ds18(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(4); await rt.at(6); await rt.at(7);
+    await rt.at(10); rt.serialBegin(9600);
+    await rt.at(11);
+    for (;;) {
+      await rt.at(14);
+      await rt.at(15); await rt.delay(750);
+      await rt.at(16); const r = rt.dsRead(); const t = r.ok ? r.t : -127;
+      await rt.at(17);
+      if (t === -127) { await rt.at(18); rt.println('Sensor not found!'); }
+      else { await rt.at(20); rt.print('Temperature: '); await rt.at(21); rt.print(t, 2); await rt.at(22); rt.println(' C'); }
+      await rt.at(24); await rt.delay(1000);
+    }
+  },
+
+  async e_ds18(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(4); await rt.at(6); await rt.at(7);
+    await rt.at(10); rt.serialBegin(115200);
+    await rt.at(11);
+    for (;;) {
+      await rt.at(14);
+      await rt.at(15); await rt.delay(750);
+      await rt.at(16); const r = rt.dsRead(); const t = r.ok ? r.t : -127;
+      await rt.at(17);
+      if (t === -127) { await rt.at(18); rt.println('Sensor not found!'); }
+      else { await rt.at(20); rt.print('Temperature: '); await rt.at(21); rt.print(t, 2); await rt.at(22); rt.println(' C'); }
       await rt.at(24); await rt.delay(1000);
     }
   },

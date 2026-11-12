@@ -642,3 +642,30 @@ void loop() {
   }
   delay(1000);
 }`;
+
+// Lesson 28 — DS18B20 temperature sensor with OneWire and DallasTemperature
+export const E32_DS18 = `#include <OneWire.h>
+#include <DallasTemperature.h>
+
+#define ONE_WIRE_BUS 4          // the pin the DQ wire is on
+
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+void setup() {
+  Serial.begin(115200);
+  sensors.begin();
+}
+
+void loop() {
+  sensors.requestTemperatures();            // start a conversion (takes up to 750 ms)
+  float t = sensors.getTempCByIndex(0);     // read the first sensor, in Celsius
+  if (t == DEVICE_DISCONNECTED_C) {          // -127: no sensor answered
+    Serial.println("Sensor not found!");
+  } else {
+    Serial.print("Temperature: ");
+    Serial.print(t);
+    Serial.println(" C");
+  }
+  delay(1000);
+}`;

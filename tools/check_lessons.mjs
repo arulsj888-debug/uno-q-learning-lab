@@ -47,6 +47,7 @@ function legs(d) {
     case 'joystick': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.VRX']: `${d.row}${d.col + 2}`, [d.id + '.VRY']: `${d.row}${d.col + 3}`, [d.id + '.SW']: `${d.row}${d.col + 4}` };
     case 'encoder': return { [d.id + '.CLK']: `${d.row}${d.col}`, [d.id + '.DT']: `${d.row}${d.col + 1}`, [d.id + '.SW']: `${d.row}${d.col + 2}`, [d.id + '.VCC']: `${d.row}${d.col + 3}`, [d.id + '.GND']: `${d.row}${d.col + 4}` };
     case 'diode': return { [d.id + '.A']: d.a, [d.id + '.K']: d.k };
+    case 'ds18b20': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.DQ']: `${d.row}${d.col + 1}`, [d.id + '.VDD']: `${d.row}${d.col + 2}` };
     case 'mosfet': return { [d.id + '.G']: `${d.row}${d.col}`, [d.id + '.D']: `${d.row}${d.col + 1}`, [d.id + '.S']: `${d.row}${d.col + 2}` };
     case 'npn': return { [d.id + '.E']: `${d.row}${d.col}`, [d.id + '.B']: `${d.row}${d.col + 1}`, [d.id + '.C']: `${d.row}${d.col + 2}` };
     case 'rgbled': return { [d.id + '.R']: `${d.row}${d.col}`, [d.id + '.C']: `${d.row}${d.col + 1}`, [d.id + '.G']: `${d.row}${d.col + 2}`, [d.id + '.B']: `${d.row}${d.col + 3}` };
@@ -184,6 +185,14 @@ for (const L of list) {
       if (!r) bad(L, `${pin}: no resistor between the pin and the ${leg} leg of ${id}`);
       if (!N.same(id + '.C', G)) bad(L, `${pin}: common leg of ${id} is not on GND (common cathode)`);
       if (N.same(P, id + '.' + leg)) bad(L, `${pin}: the ${leg} leg is connected to the pin without a resistor`);
+    }
+    if (io.kind === 'ds18b20') {
+      const id = io.item;
+      if (!N.same(id + '.VDD', 'PIN:' + SUP)) bad(L, `${pin}: DS18B20 VDD not on ${SUP}`);
+      if (!N.same(id + '.GND', G)) bad(L, `${pin}: DS18B20 GND not on GND`);
+      if (!N.same(id + '.DQ', P)) bad(L, `${pin}: DS18B20 DQ not on ${pin}`);
+      const pull = all.find(d => d.type === 'resistor' && ((N.same(d.id + '.1', id + '.DQ') && N.same(d.id + '.2', id + '.VDD')) || (N.same(d.id + '.2', id + '.DQ') && N.same(d.id + '.1', id + '.VDD'))));
+      if (!pull) bad(L, `${pin}: no pull-up resistor between DS18B20 DQ and VDD`);
     }
     if (io.kind === 'dht') {
       const id = io.item;

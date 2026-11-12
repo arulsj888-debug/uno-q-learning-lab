@@ -864,7 +864,7 @@ class App {
     if (w.includes('httpserver')) { this.wf.http = 'ok'; h += `<div class="io-block"><div class="io-title">The web server <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="hs-btn" class="hold small">🌐 Server: answers 200</button></div><div id="hs-last" class="io-val">—</div></div>`; }
     if (w.includes('wifirouter')) { this.wf.router = true; this.wf.passOk = true; h += `<div class="io-block"><div class="io-title">Your router <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="wf-router" class="hold small">📶 Router: ON</button><button id="wf-pass" class="hold small">🔑 Password: correct</button></div></div>
         <div class="io-block pirstat tight"><div><span>WiFi.begin()</span><b id="wf-s1">—</b></div><div class="arrow">→</div><div><span>Router</span><b id="wf-s2">—</b></div><div class="arrow">→</div><div><span>WiFi.status()</span><b id="wf-s3">—</b></div></div><div id="wf-note" class="io-note"></div>`; }
-    if (w.includes('pisens')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="-10" max="60" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div><div class="throw"><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
+    if (w.includes('pisens')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="-10" max="60" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div><div class="throw" ${w.includes('nohum') ? 'style="display:none"' : ''}><label>Humidity</label><input id="th-h" type="range" min="0" max="100" step="1" value="${this.th.h}"><b id="th-hv"></b></div></div>
         <div class="io-tools"><button id="th-plug" class="hold small">🔌 Unplug the SDA wire</button></div><div id="ps-note" class="io-note"></div>`;
     if (w.includes('bridge2')) h += `<div class="io-block"><div class="io-title">The air around the sensor <span class="io-note">(simulated)</span></div><div class="throw"><label>Temperature</label><input id="th-t" type="range" min="10" max="40" step="0.5" value="${this.th.t}"><b id="th-tv"></b></div></div>
         <div class="io-block pirstat tight"><div><span>Sketch · Thermo</span><b id="b2-sk">—</b></div><div class="arrow">→</div><div><span>Bridge</span><b id="b2-br">—</b></div><div class="arrow">→</div><div><span>Python · decides</span><b id="b2-py">—</b></div><div class="arrow">→</div><div><span>RGB LED 3</span><b id="b2-led">—</b></div></div><div id="b2-note" class="io-note"></div>`;
@@ -1703,7 +1703,7 @@ class App {
   pisensTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('pisens')) return;
     const run = this.sim.running, w = this.bench.get(L.sdaWire || 'w4'); if (w) w.group.visible = !this.th.unplug;
-    const b = $('#th-plug'); if (b) { b.disabled = run; b.textContent = L.dht ? (this.th.unplug ? '🔌 Plug the DATA wire back in' : '🔌 Unplug the DATA wire') : this.th.unplug ? '🔌 Plug the SDA wire back in' : '🔌 Unplug the SDA wire'; b.classList.toggle('on', this.th.unplug); }
+    const b = $('#th-plug'); if (b) { b.disabled = run; b.textContent = L.dht ? (this.th.unplug ? '🔌 Plug the ' + (L.wn || 'DATA') + ' wire back in' : '🔌 Unplug the ' + (L.wn || 'DATA') + ' wire') : this.th.unplug ? '🔌 Plug the SDA wire back in' : '🔌 Unplug the SDA wire'; b.classList.toggle('on', this.th.unplug); }
     const n = $('#ps-note'); if (n) { const h = !this.board.powered ? (IS_U3 || IS_E32 ? 'USB is not plugged in — the board has no power.' : 'USB-C is not plugged in — the Raspberry Pi has no power.') : this.th.unplug ? (L.dht ? 'The DATA wire is out: no reading arrives and the library returns NaN.' : 'The SDA wire is out: nobody answers at 0x44.') : !run ? 'Press <b>▶ Run</b>, then move the sliders.' : (L.dht ? 'The sensor answers on its data wire; the program reads it every 2 seconds (the DHT11 gives whole numbers, the DHT22 one decimal).' : L.sdaWire && !IS_U3 ? 'The sensor answers at address 0x44; it is read each time the page is built (every 5 seconds).' : 'The sensor answers at address 0x44; the program reads it every 2 seconds.'); if (n.innerHTML !== h) n.innerHTML = h; }
   }
   thermoTick() {
@@ -2034,6 +2034,11 @@ class App {
       lcd: ev => this.lcdOp(ev),
       i2cProbe: a => (a === this.lcdAddr && this.i2cDispOk('lcd')) || (a === this.oledAddr && this.i2cDispOk('oled')),
       oled: ev => this.oledOp(ev),
+      ds18: () => {
+        const L = this.lesson, pin = L && L.io ? Object.keys(L.io).find(p => L.io[p].kind === 'ds18b20') : null, io = pin && this.ioFor(pin);
+        if (!(io && this.wired(io) && this.board.powered && !this.th.unplug)) return { ok: false };
+        return { ok: true, t: Math.round(Math.min(125, Math.max(-55, this.th.t)) / 0.0625) * 0.0625 };
+      },
       dht: () => {
         const L = this.lesson, pin = L && L.io ? Object.keys(L.io).find(p => L.io[p].kind === 'dht') : null, io = pin && this.ioFor(pin);
         if (!(io && this.wired(io) && this.board.powered && !this.th.unplug)) return { ok: false };

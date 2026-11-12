@@ -38,7 +38,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | SHT31 (I2C) | DONE | DONE | DONE | build only | |
 | Modulino Thermo / Pixels (Qwiic) | DONE | n/a | n/a | n/a | UNO Q only |
 | DHT11 / DHT22 | Build DONE (library reported to return NaN on the UNO Q: lesson TODO, check first) | DONE (Build + lesson 15) | DONE (Build + lesson 18) | DONE (Build + lesson 15) | 4-pin sensor with external pull-up; specs from the Adafruit guide; Pi uses adafruit-circuitpython-dht |
-| DS18B20 (1-Wire) | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | verified from the Dallas/Maxim datasheet (copy on a university mirror; the Analog Devices PDF was not reachable): TO-92 GND DQ VDD, 3.0-5.5 V, -55..+125 C, +-0.5 C from -10..+85 C, 9-12 bit, 750 ms max; pull-up about 5 kOhm (4.7 k usual); parasite power not modelled; Pi default 1-Wire pin GPIO4 |
+| DS18B20 (1-Wire) | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 29) | DONE (Build + lesson 28) | verified from the Dallas/Maxim datasheet (copy on a university mirror; the Analog Devices PDF was not reachable): TO-92 GND DQ VDD, 3.0-5.5 V, -55..+125 C, +-0.5 C from -10..+85 C, 9-12 bit, 750 ms max; pull-up about 5 kOhm (4.7 k usual); parasite power not modelled; Pi default 1-Wire pin GPIO4 |
 | BMP280 / BME280 pressure (I2C/SPI) | TODO | TODO | TODO | TODO | |
 | Soil moisture (analog), rain, water level | TODO | n/a (no ADC) | TODO | TODO | |
 | Gas MQ-2 / MQ-135 (analog + digital) | TODO | n/a | TODO | TODO | heater needs 5 V |
