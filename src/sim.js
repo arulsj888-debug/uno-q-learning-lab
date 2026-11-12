@@ -71,6 +71,7 @@ export class Sim {
       lcd: (op, a, b) => (H.lcd ? H.lcd({ op, a, b }) : undefined),
       oled: (op, a, b) => (H.oled ? H.oled({ op, a, b }) : false),
       irDecode: () => (H.ir ? H.ir() : null),   // IrReceiver.decode(): the command of a received code, or null
+      mpuRead: () => (H.mpu ? H.mpu() : { ax: 0, ay: 0, az: 0, gz: 0 }),
       dsRead: () => (H.ds18 ? H.ds18() : { ok: false }),
       dhtRead: () => (H.dht ? H.dht() : { ok: false }),
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
@@ -1056,6 +1057,52 @@ export const PROGRAMS = {
         await rt.at(21);
       }
       await rt.yield();
+    }
+  },
+
+  async u3_mpu(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(5);
+    await rt.at(8); rt.serialBegin(9600);
+    await rt.at(9);
+    if (!rt.i2cProbe(0x68)) { await rt.at(10); rt.println('MPU6050 not found!'); for (;;) await rt.delay(10); }
+    await rt.at(13); rt.println('MPU6050 ready');
+    for (;;) {
+      await rt.at(16); await rt.at(17);
+      await rt.at(18); const m = rt.mpuRead();
+      await rt.at(19); rt.print('Acceleration X: ');
+      await rt.at(20); rt.print(m.ax, 2);
+      await rt.at(21); rt.print(', Y: ');
+      await rt.at(22); rt.print(m.ay, 2);
+      await rt.at(23); rt.print(', Z: ');
+      await rt.at(24); rt.print(m.az, 2);
+      await rt.at(25); rt.println(' m/s^2');
+      await rt.at(26); rt.print('Rotation Z: ');
+      await rt.at(27); rt.print(m.gz, 2);
+      await rt.at(28); rt.println(' rad/s');
+      await rt.at(29); await rt.delay(500);
+    }
+  },
+
+  async e_mpu(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(5);
+    await rt.at(8); rt.serialBegin(115200);
+    await rt.at(9);
+    if (!rt.i2cProbe(0x68)) { await rt.at(10); rt.println('MPU6050 not found!'); for (;;) await rt.delay(10); }
+    await rt.at(13); rt.println('MPU6050 ready');
+    for (;;) {
+      await rt.at(16); await rt.at(17);
+      await rt.at(18); const m = rt.mpuRead();
+      await rt.at(19); rt.print('Acceleration X: ');
+      await rt.at(20); rt.print(m.ax, 2);
+      await rt.at(21); rt.print(', Y: ');
+      await rt.at(22); rt.print(m.ay, 2);
+      await rt.at(23); rt.print(', Z: ');
+      await rt.at(24); rt.print(m.az, 2);
+      await rt.at(25); rt.println(' m/s^2');
+      await rt.at(26); rt.print('Rotation Z: ');
+      await rt.at(27); rt.print(m.gz, 2);
+      await rt.at(28); rt.println(' rad/s');
+      await rt.at(29); await rt.delay(500);
     }
   },
 

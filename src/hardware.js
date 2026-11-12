@@ -707,6 +707,36 @@ export class SlideSwitch {
   setPos(b) { this.knob.position.x = b ? 1.3 : -1.3; }
 }
 
+// ---------------------------------------------------------------- MPU6050 breakout (GY-521 style): small blue board, the QFN chip with X/Y axis marks, 8-pin header VCC GND SCL SDA XDA XCL AD0 INT
+export class MPU6050Module {
+  constructor() {
+    const g = this.group = new THREE.Group(); this.hw = 'mpu6050';
+    const edge = new THREE.MeshStandardMaterial({ color: 0x14264a, roughness: 0.7 }), mask = new THREE.MeshStandardMaterial({ color: 0x1d4fb8, roughness: 0.45 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(21, 1.4, 16), [edge, edge, mask, mask, edge, edge]); pcb.position.set(0, 2.6, 0); g.add(pcb);
+    const names = ['VCC', 'GND', 'SCL', 'SDA', 'XDA', 'XCL', 'AD0', 'INT'], PX = 30;
+    const tex = canvasTex(21 * PX, 16 * PX, (c, w, h) => {
+      c.clearRect(0, 0, w, h); c.strokeStyle = 'rgba(245,245,240,0.8)'; c.lineWidth = 3; c.strokeRect(6, 6, w - 12, h - 12);
+      names.forEach((n, i) => silk(c, n, (10.5 + (i - 3.5) * 2.54) * PX, 12.6 * PX, 12, '#f3f3ee', 'center', 600));
+      silk(c, 'GY-521', 6.2 * PX, 2.2 * PX, 15, 'rgba(243,243,238,0.9)', 'center', 600);
+      // axis marks printed next to the chip
+      c.strokeStyle = '#f3f3ee'; c.fillStyle = '#f3f3ee'; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(14 * PX, 8 * PX); c.lineTo(18 * PX, 8 * PX); c.stroke(); silk(c, 'X', 18.8 * PX, 8 * PX, 14, '#f3f3ee', 'center', 700);
+      c.beginPath(); c.moveTo(14 * PX, 8 * PX); c.lineTo(14 * PX, 4 * PX); c.stroke(); silk(c, 'Y', 14 * PX, 3.2 * PX, 14, '#f3f3ee', 'center', 700);
+    });
+    const lab = new THREE.Mesh(new THREE.PlaneGeometry(21, 16), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })); lab.rotation.x = -Math.PI / 2; lab.position.set(0, 3.32, 0); g.add(lab);
+    const chip = new THREE.Mesh(new RoundedBoxGeometry(4, 0.9, 4, 1, 0.15), new THREE.MeshStandardMaterial({ color: 0x151517, roughness: 0.5 })); chip.position.set(-2, 3.5, -1.2); g.add(chip);
+    const reg = new THREE.Mesh(new RoundedBoxGeometry(2.6, 1, 1.6, 1, 0.1), new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.5 })); reg.position.set(-7, 3.5, -3.5); g.add(reg);
+    const y0 = 4.3, pinZ = 6.2; this.pinZ = pinZ; this.pinTop = y0 + 8.2; this.pinX = {};
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(8 * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0, pinZ); g.add(strip);
+    names.forEach((n, i) => { const x = (i - 3.5) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, y0 + 4.2, pinZ); g.add(p); });
+    tagHW(g, 'mpu6050');
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    return { pos: this.group.localToWorld(new THREE.Vector3(this.pinX[name], this.pinTop, this.pinZ)), dir: new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion())) };
+  }
+}
+
 // ---------------------------------------------------------------- 38 kHz IR receiver (TSOP382-type, minicast 5.0 x 6.95 x 4.8 mm), dome toward you, legs OUT GND VS
 export class IRReceiver {
   constructor() {
@@ -2048,6 +2078,17 @@ export const HW_INFO = {
     summary: 'Three legs: the middle leg (COM, common) is connected to one outer leg or to the other, depending on the slider position.',
     points: ['Left leg A, middle COM, right leg B (the app labels them in this order).', 'Used to select a mode or to switch a supply.'],
     src: 'General electronics practice',
+  },
+  mpu6050: {
+    name: 'MPU6050 accelerometer + gyroscope (GY-521 style breakout)', tag: 'Measures tilt, movement and rotation',
+    summary: 'One chip with a 3-axis accelerometer and a 3-axis gyroscope, read over I²C. The accelerometer measures acceleration including gravity (about 9.8 m/s² straight down when the board lies flat), the gyroscope measures how fast the board turns.',
+    points: [
+      'Register map (InvenSense): the chip starts in sleep mode and must be woken (the Adafruit library does it in begin()); WHO_AM_I reads 0x68. The usual I²C address is 0x68 (0x69 when the AD0 pin is high).',
+      'Sensitivity: ±2 g range = 16384 counts per g; gyroscope ±250 °/s = 131 counts per °/s (the defaults are selectable; the Adafruit library defaults to ±2 g and ±250 °/s as of its examples).',
+      'Header order on this breakout: VCC, GND, SCL, SDA, XDA, XCL, AD0, INT. Check the printing on your own board. The chip itself works at about 3.3 V; many breakouts add a regulator.',
+      'The X and Y arrows printed on the board show the sensor axes.',
+    ],
+    src: 'MPU-6000/MPU-6050 Register Map and Descriptions (InvenSense, rev 4.0)',
   },
   irrx: {
     name: 'IR receiver, 38 kHz (TSOP382-type)', tag: 'Receives infrared remote controls',

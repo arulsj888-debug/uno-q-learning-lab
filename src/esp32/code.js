@@ -694,3 +694,35 @@ void loop() {
     IrReceiver.resume();                     // get ready for the next code
   }
 }`;
+
+// Lesson 30 — MPU6050 accelerometer and gyroscope with Adafruit_MPU6050
+export const E32_MPU = `#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+
+Adafruit_MPU6050 mpu;
+
+void setup() {
+  Serial.begin(115200);
+  if (!mpu.begin()) {                 // address 0x68; also wakes the chip from sleep
+    Serial.println("MPU6050 not found!");
+    while (1) delay(10);
+  }
+  Serial.println("MPU6050 ready");
+}
+
+void loop() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);        // read accelerometer, gyroscope and temperature
+  Serial.print("Acceleration X: ");
+  Serial.print(a.acceleration.x);
+  Serial.print(", Y: ");
+  Serial.print(a.acceleration.y);
+  Serial.print(", Z: ");
+  Serial.print(a.acceleration.z);
+  Serial.println(" m/s^2");
+  Serial.print("Rotation Z: ");
+  Serial.print(g.gyro.z);
+  Serial.println(" rad/s");
+  delay(500);
+}`;

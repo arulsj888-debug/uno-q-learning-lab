@@ -40,6 +40,8 @@ export const SRC = {
   dallas: { t: 'DallasTemperature library (Miles Burton) and OneWire library (Paul Stoffregen)', u: 'https://github.com/milesburton/Arduino-Temperature-Control-Library' },
   vishayir: { t: 'Vishay TSOP382.., TSOP384.. datasheet: pins OUT GND VS, 2.0 V to 5.5 V, 38 kHz variants', u: 'https://www.vishay.com/docs/82491/tsop382.pdf' },
   irremote: { t: 'Arduino-IRremote library (version 4.x) by Armin Joachimsmeyer and contributors', u: 'https://github.com/Arduino-IRremote/Arduino-IRremote' },
+  mpureg: { t: 'MPU-6000/MPU-6050 Register Map and Descriptions (InvenSense): sleep mode at power-up, WHO_AM_I 0x68, 16384 LSB/g, 131 LSB/(deg/s)', u: 'https://cdn.sparkfun.com/datasheets/Sensors/Accelerometers/RM-MPU-6000A.pdf' },
+  adampu: { t: 'Adafruit MPU6050 library (Adafruit_MPU6050, Adafruit_Sensor)', u: 'https://github.com/adafruit/Adafruit_MPU6050' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -299,3 +301,13 @@ export const IR_PARTS = [
   { id: 'w82', type: 'wire', from: '5V', to: 'a22', color: 'red', lift: 14 },
 ];
 export const IR_IDS = IR_PARTS.map(d => d.id);
+
+// ---- Lesson 31: MPU6050 breakout on the desk, four female jumpers to 3V3, GND, A4 (SDA), A5 (SCL)
+export const MPU_PARTS = [
+  { id: 'mpu1', type: 'mpu6050', x: 20, z: 138 },
+  { id: 'w90', type: 'fwire', from: 'mpu1.GND', to: 'GND2', color: 'black', lift: 24 },
+  { id: 'w91', type: 'fwire', from: 'mpu1.VCC', to: '3V3', color: 'red', lift: 30 },
+  { id: 'w92', type: 'fwire', from: 'mpu1.SDA', to: 'A4', color: 'blue', lift: 36 },
+  { id: 'w93', type: 'fwire', from: 'mpu1.SCL', to: 'A5', color: 'yellow', lift: 42 },
+];
+export const MPU_IDS = MPU_PARTS.map(d => d.id);

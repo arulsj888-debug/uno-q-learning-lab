@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -43,6 +43,8 @@ const SRC = {
   dallas: { t: 'DallasTemperature library (Miles Burton) and OneWire library (Paul Stoffregen)', u: 'https://github.com/milesburton/Arduino-Temperature-Control-Library' },
   vishayir: { t: 'Vishay TSOP382.., TSOP384.. datasheet: pins OUT GND VS, 2.0 V to 5.5 V, 38 kHz variants', u: 'https://www.vishay.com/docs/82491/tsop382.pdf' },
   irremote: { t: 'Arduino-IRremote library (version 4.x) by Armin Joachimsmeyer and contributors', u: 'https://github.com/Arduino-IRremote/Arduino-IRremote' },
+  mpureg: { t: 'MPU-6000/MPU-6050 Register Map and Descriptions (InvenSense): sleep mode at power-up, WHO_AM_I 0x68, 16384 LSB/g, 131 LSB/(deg/s)', u: 'https://cdn.sparkfun.com/datasheets/Sensors/Accelerometers/RM-MPU-6000A.pdf' },
+  adampu: { t: 'Adafruit MPU6050 library (Adafruit_MPU6050, Adafruit_Sensor)', u: 'https://github.com/adafruit/Adafruit_MPU6050' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -115,6 +117,8 @@ const LCD_PARTS_E = dispE('lcd1602', 'lcd1', 'VIN', ['GND', 'VCC', 'SDA', 'SCL']
 const LCD_IDS_E = LCD_PARTS_E.map(d => d.id);
 const OLED_PARTS_E = dispE('oled', 'oled1', '3V3', ['GND', 'VCC', 'SCL', 'SDA'], 8);
 const OLED_IDS_E = OLED_PARTS_E.map(d => d.id);
+const MPU_PARTS_E = dispE('mpu6050', 'mpu1', '3V3', ['VCC', 'GND', 'SCL', 'SDA'], 7);
+const MPU_IDS_E = MPU_PARTS_E.map(d => d.id);
 // NeoPixel strip on the desk: leads to breadboard holes a10..a12, board pins (VIN, GPIO16, GND) to b10..b12
 const NEO_PARTS_E = [
   { id: 'neo1', type: 'neopixel', x: 35, z: 140 },
@@ -1625,5 +1629,49 @@ export const E32_LESSONS = [
       { q: 'What must you call after reading a code?', a: ['IrReceiver.resume()', 'delay(1000)', 'Serial.end()', 'analogRead()'], c: 0, why: 'resume() lets the library receive the next code.' },
     ],
     sources: [SRC.vishayir, SRC.irremote, SRC.ds],
+  },
+
+  // ================================================================== 30
+  {
+    id: 'e30', num: 30, module: 7, title: 'MPU6050: tilt and rotation (accelerometer + gyroscope)', level: 'Intermediate', time: '25 min',
+    goal: 'Read acceleration and rotation from an MPU6050 over I²C, and see how gravity shows up in the numbers.',
+    hardware: ['ESP32 DevKit V1', 'MPU6050 breakout (GY-521 style)', '8 × female–male jumper wires'],
+    code: E32_MPU, file: 'MPU6050_read.ino', program: 'e_mpu', fast: true, widgets: ['mpusens'],
+    circuit: MPU_PARTS_E, io: { G21: { kind: 'mpu', scl: 'G22', item: 'mpu1', needs: MPU_IDS_E } },
+    explain: {
+      1: 'The <b>Adafruit MPU6050</b> library (install it with its dependencies from the Library Manager).',
+      3: '<b>Wire.h</b>: the I²C library.',
+      5: 'The sensor object.',
+      8: 'Serial output on.',
+      9: '<b>mpu.begin()</b> talks to the chip at address <b>0x68</b>, wakes it up (it starts in sleep mode) and returns false if nothing answers.',
+      10: 'No answer: check power, SDA/SCL (not swapped) and the address.',
+      17: 'Three “events” that will hold the readings.',
+      18: '<b>getEvent()</b> reads the accelerometer, the gyroscope and the temperature in one go.',
+      20: '<b>a.acceleration.x</b> is in <b>m/s²</b> (the library converts the raw counts for you).',
+      24: 'Lying flat, Z reads about <b>9.8 m/s²</b>: that is gravity, 1 g pointing up through the sensor.',
+      27: '<b>g.gyro.z</b> is the rotation speed around Z in <b>rad/s</b> (0 when the board does not turn).',
+    },
+    steps: [
+      { title: 'Two sensors in one chip', view: 'farq', have: [], power: false,
+        body: `<p>The <b>MPU6050</b> contains a <b>3-axis accelerometer</b> and a <b>3-axis gyroscope</b>. The accelerometer measures <b>acceleration, including gravity</b>: lying flat it reads about <b>9.8 m/s²</b> on Z, so it also tells you <b>how the board is tilted</b>. The gyroscope measures <b>how fast it rotates</b>.</p>` },
+      { title: 'The breakout board', view: 'farq', have: ['mpu1'], power: false,
+        body: `<p>The chip sits on a small board (often called <b>GY-521</b>) with an 8-pin header: <b>VCC, GND, SCL, SDA, XDA, XCL, AD0, INT</b>. We only need the first four. <b>Click it</b> in the 3D view. The printed <b>X</b> and <b>Y</b> arrows show the axes.</p>
+        <p class="warn">Pin order and supply voltage differ between makers: read the printing on your board. The chip runs at about 3.3 V; many breakouts have a regulator, but powering from 3.3 V is the safe choice.</p>` },
+      { title: 'Wire it', view: 'farq', have: MPU_IDS_E, power: false, pins: ['3V3', 'GND2', 'G21', 'G22'],
+        body: `<ul><li>Module pins to breadboard row a (VCC a10, GND a11, SCL a12, SDA a13), board wires in row b: <b>3V3 → b10</b>, <b>GND → b11</b>, <b>GPIO22 (SCL) → b12</b>, <b>GPIO21 (SDA) → b13</b></li></ul>` },
+      { title: 'The code', view: 'farq', have: MPU_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>9</b>, <b>18</b> and <b>24</b>.</p>` },
+      { title: 'Run it and tilt the board', view: 'farq', have: MPU_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>The Serial Monitor prints the acceleration twice a second. Move the <b>pitch</b> and <b>roll</b> sliders (tilt the board) and watch how the gravity <b>moves from Z to X or Y</b>: the three numbers always add up to about 9.8 m/s². Set a <b>rotation speed</b> to see the gyro value.</p><p class="sim">Simulated board and readings.</p>` },
+      { title: 'What if it is not wired?', view: 'farq', have: MPU_IDS_E, showCode: true, power: true, action: 'ensurePower',
+        body: `<p>If <code>mpu.begin()</code> finds no chip (a loose SDA/SCL wire, no power), it returns false and the sketch prints <code>MPU6050 not found!</code> and stops. This is the first thing to check when an I²C sensor gives nothing (see the I²C scanner lesson).</p>` },
+      { title: 'Summary', view: 'farq', have: MPU_IDS_E, power: true,
+        body: `<ul><li>Accelerometer: acceleration including gravity (≈ 9.8 m/s² on the axis pointing up); gyroscope: rotation speed.</li><li>I²C address 0x68; the chip wakes from sleep when the library starts it.</li><li><code>mpu.getEvent(&amp;a, &amp;g, &amp;temp)</code> returns everything in SI units.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'The board lies flat and still. What does Z read?', a: ['0', 'About 9.8 m/s²', 'About 98 m/s²', 'It changes randomly'], c: 1, why: 'Gravity: about 9.8 m/s² (1 g).' },
+      { q: 'What does the gyroscope measure?', a: ['Temperature', 'How fast the board rotates', 'Magnetic field', 'Distance'], c: 1, why: 'Rotation speed around each axis.' },
+      { q: 'mpu.begin() returns false. What is the most likely cause?', a: ['The LED is off', 'The chip does not answer: wiring or power', 'The baud rate', 'The delay is too long'], c: 1, why: 'No I²C answer: check power and the SDA/SCL wires.' },
+    ],
+    sources: [SRC.mpureg, SRC.adampu, SRC.wire],
   },
 ];

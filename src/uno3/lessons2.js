@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1461,5 +1461,49 @@ export const U3_LESSONS_2 = [
       { q: 'What must you call after reading a code?', a: ['IrReceiver.resume()', 'delay(1000)', 'Serial.end()', 'analogRead()'], c: 0, why: 'resume() lets the library receive the next code.' },
     ],
     sources: [SRC.vishayir, SRC.irremote, SRC.ds],
+  },
+
+  // ================================================================== 31
+  {
+    id: 'u31', num: 31, module: 7, title: 'MPU6050: tilt and rotation (accelerometer + gyroscope)', level: 'Intermediate', time: '25 min',
+    goal: 'Read acceleration and rotation from an MPU6050 over I²C, and see how gravity shows up in the numbers.',
+    hardware: ['Arduino UNO R3', 'MPU6050 breakout (GY-521 style)', '4 × jumper wires'],
+    code: U3_MPU, file: 'MPU6050_read.ino', program: 'u3_mpu', fast: true, widgets: ['mpusens'],
+    circuit: MPU_PARTS, io: { A4: { kind: 'mpu', scl: 'A5', item: 'mpu1', needs: MPU_IDS } },
+    explain: {
+      1: 'The <b>Adafruit MPU6050</b> library (install it with its dependencies from the Library Manager).',
+      3: '<b>Wire.h</b>: the I²C library.',
+      5: 'The sensor object.',
+      8: 'Serial output on.',
+      9: '<b>mpu.begin()</b> talks to the chip at address <b>0x68</b>, wakes it up (it starts in sleep mode) and returns false if nothing answers.',
+      10: 'No answer: check power, SDA/SCL (not swapped) and the address.',
+      17: 'Three “events” that will hold the readings.',
+      18: '<b>getEvent()</b> reads the accelerometer, the gyroscope and the temperature in one go.',
+      20: '<b>a.acceleration.x</b> is in <b>m/s²</b> (the library converts the raw counts for you).',
+      24: 'Lying flat, Z reads about <b>9.8 m/s²</b>: that is gravity, 1 g pointing up through the sensor.',
+      27: '<b>g.gyro.z</b> is the rotation speed around Z in <b>rad/s</b> (0 when the board does not turn).',
+    },
+    steps: [
+      { title: 'Two sensors in one chip', view: 'farq', have: [], power: false,
+        body: `<p>The <b>MPU6050</b> contains a <b>3-axis accelerometer</b> and a <b>3-axis gyroscope</b>. The accelerometer measures <b>acceleration, including gravity</b>: lying flat it reads about <b>9.8 m/s²</b> on Z, so it also tells you <b>how the board is tilted</b>. The gyroscope measures <b>how fast it rotates</b>.</p>` },
+      { title: 'The breakout board', view: 'farq', have: ['mpu1'], power: false,
+        body: `<p>The chip sits on a small board (often called <b>GY-521</b>) with an 8-pin header: <b>VCC, GND, SCL, SDA, XDA, XCL, AD0, INT</b>. We only need the first four. <b>Click it</b> in the 3D view. The printed <b>X</b> and <b>Y</b> arrows show the axes.</p>
+        <p class="warn">Pin order and supply voltage differ between makers: read the printing on your board. The chip runs at about 3.3 V; many breakouts have a regulator, but powering from 3.3 V is the safe choice.</p>` },
+      { title: 'Wire it', view: 'farq', have: MPU_IDS, power: false, pins: ['3V3', 'GND2', 'A4', 'A5'],
+        body: `<ul><li><b>VCC → 3V3</b>, <b>GND → GND</b></li><li><b>SDA → A4</b>, <b>SCL → A5</b> (the I²C pins of the UNO R3)</li></ul>` },
+      { title: 'The code', view: 'farq', have: MPU_IDS, showCode: true, power: true, body: `<p>Click lines <b>9</b>, <b>18</b> and <b>24</b>.</p>` },
+      { title: 'Run it and tilt the board', view: 'farq', have: MPU_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The Serial Monitor prints the acceleration twice a second. Move the <b>pitch</b> and <b>roll</b> sliders (tilt the board) and watch how the gravity <b>moves from Z to X or Y</b>: the three numbers always add up to about 9.8 m/s². Set a <b>rotation speed</b> to see the gyro value.</p><p class="sim">Simulated board and readings.</p>` },
+      { title: 'What if it is not wired?', view: 'farq', have: MPU_IDS, showCode: true, power: true, action: 'ensurePower',
+        body: `<p>If <code>mpu.begin()</code> finds no chip (a loose SDA/SCL wire, no power), it returns false and the sketch prints <code>MPU6050 not found!</code> and stops. This is the first thing to check when an I²C sensor gives nothing (see the I²C scanner lesson).</p>` },
+      { title: 'Summary', view: 'farq', have: MPU_IDS, power: true,
+        body: `<ul><li>Accelerometer: acceleration including gravity (≈ 9.8 m/s² on the axis pointing up); gyroscope: rotation speed.</li><li>I²C address 0x68; the chip wakes from sleep when the library starts it.</li><li><code>mpu.getEvent(&amp;a, &amp;g, &amp;temp)</code> returns everything in SI units.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'The board lies flat and still. What does Z read?', a: ['0', 'About 9.8 m/s²', 'About 98 m/s²', 'It changes randomly'], c: 1, why: 'Gravity: about 9.8 m/s² (1 g).' },
+      { q: 'What does the gyroscope measure?', a: ['Temperature', 'How fast the board rotates', 'Magnetic field', 'Distance'], c: 1, why: 'Rotation speed around each axis.' },
+      { q: 'mpu.begin() returns false. What is the most likely cause?', a: ['The LED is off', 'The chip does not answer: wiring or power', 'The baud rate', 'The delay is too long'], c: 1, why: 'No I²C answer: check power and the SDA/SCL wires.' },
+    ],
+    sources: [SRC.mpureg, SRC.adampu, SRC.wire],
   },
 ];

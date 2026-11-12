@@ -47,7 +47,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Rotary encoder KY-040 | Build DONE, lesson TODO | DONE (Build + lesson 16) | DONE (Build + lesson 20) | DONE (Build + lesson 17) | module pull-ups described inconsistently by sources: the model relies on INPUT_PULLUP |
 | IR receiver (38 kHz, TSOP382-type) + remote | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 30) | DONE (Build + lesson 29) | verified from the Vishay TSOP382/384 datasheet: pins OUT GND VS, 2.0-5.5 V, active-low output, 38 kHz variant; click the part to simulate a remote burst (steady LOW, not a real pulse train); IRremote/NEC decoding lesson TODO |
 | Flame, tilt, vibration, hall, line-follow IR | TODO | TODO | TODO | TODO | |
-| MPU6050 accelerometer / gyro (I2C) | TODO | TODO | TODO | TODO | |
+| MPU6050 accelerometer / gyro (I2C) | TODO | TODO | DONE (lesson 31, lesson only) | DONE (lesson 30, lesson only) | InvenSense register map verified: sleep at power-up, WHO_AM_I 0x68, 16384 LSB/g, 131 LSB/(deg/s); I2C address 0x68/0x69 and GY-521 pin order from common knowledge (hedged in the text); Build part TODO |
 | Keypad 4x4 (matrix scan) | TODO | TODO | TODO | TODO | |
 | RFID RC522 (SPI) | TODO | TODO | TODO | TODO | 3.3 V part |
 | GPS (UART, NEO-6M) | TODO | TODO | TODO | TODO | |

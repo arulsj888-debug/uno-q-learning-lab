@@ -85,7 +85,7 @@ for (const L of list) {
     const ends = isWire(d) ? [d.from, d.to] : Object.values(legs(d));
     for (const e of ends) {
       if (isHole(e)) { const [, , c] = HOLE.exec(e); if (+c < 1 || +c > 30) bad(L, `${d.id}: hole ${e} out of range`); (used[e] ??= []).push(d.id); }
-      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo', 'pixels', 'lcd1602', 'oled', 'neopixel'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
+      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo', 'pixels', 'lcd1602', 'oled', 'neopixel', 'mpu6050'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
       else if (!PINS.has(e)) bad(L, `${d.id}: unknown header pin ${e}`);
     }
   }
@@ -186,6 +186,13 @@ for (const L of list) {
       if (!r) bad(L, `${pin}: no resistor between the pin and the ${leg} leg of ${id}`);
       if (!N.same(id + '.C', G)) bad(L, `${pin}: common leg of ${id} is not on GND (common cathode)`);
       if (N.same(P, id + '.' + leg)) bad(L, `${pin}: the ${leg} leg is connected to the pin without a resistor`);
+    }
+    if (io.kind === 'mpu') {
+      const id = io.item, sda = pin, scl = io.scl;
+      if (!N.same(id + '.SDA', 'PIN:' + sda)) bad(L, `mpu: SDA not on ${sda}`);
+      if (!N.same(id + '.SCL', 'PIN:' + scl)) bad(L, `mpu: SCL not on ${scl}`);
+      if (!N.same(id + '.GND', G)) bad(L, `mpu: GND not on GND`);
+      if (!N.same(id + '.VCC', 'PIN:3V3')) bad(L, `mpu: VCC not on 3V3`);
     }
     if (io.kind === 'irrx') {
       const id = io.item;
