@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -31,6 +31,8 @@ const SRC = {
   pn2222: { t: 'onsemi PN2222 / PN2222A datasheet (TO-92: emitter, base, collector; 600 mA; VCE(sat) 0.3 V at 150 mA / 15 mA)', u: 'https://www.onsemi.com/pdf/datasheet/pn2222-d.pdf' },
   irlz44n: { t: 'Infineon IRLZ44NPbF datasheet (TO-220: gate, drain, source; 55 V; RDS(on) 22 mΩ at 10 V, 25 mΩ at 5 V, 35 mΩ at 4 V; VGS(th) 1.0 to 2.0 V; VGS ±16 V)', u: 'https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlz44npbf-datasheet-en.pdf' },
   d1n4007: { t: 'Vishay 1N4001 to 1N4007 datasheet (average forward current 1 A; forward voltage 1.1 V at 1 A; up to 1000 V reverse for the 1N4007; the band marks the cathode)', u: 'https://www.vishay.com/docs/88503/1n4001.pdf' },
+  millis: { t: 'Arduino reference: millis() (milliseconds since the program started)', u: 'https://docs.arduino.cc/language-reference/en/functions/time/millis/' },
+  bwd: { t: 'Arduino example: Blink Without Delay', u: 'https://docs.arduino.cc/built-in-examples/digital/BlinkWithoutDelay/' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -158,7 +160,7 @@ const D_IDS_E = D_PARTS_E.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
-export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays', 10: 'Module 10 — Switching loads' };
+export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays', 10: 'Module 10 — Switching loads', 11: 'Module 11 — Timing' };
 export const E32_COMING = [];
 
 export const E32_LESSONS = [
@@ -1303,5 +1305,54 @@ export const E32_LESSONS = [
       { q: 'Current flows through a diode from…', a: ['cathode to anode', 'anode to cathode', 'either way', 'neither way'], c: 1, why: 'Forward direction is anode to cathode.' },
     ],
     sources: [SRC.d1n4007, SRC.ds, SRC.pinmode],
+  },
+
+  // ================================================================== 24
+  {
+    id: 'e24', num: 24, module: 11, title: 'Blink without delay(): millis()', level: 'Intermediate', time: '20 min',
+    goal: 'Keep a program responsive: do two things at once by checking the clock instead of waiting with delay().',
+    hardware: ['ESP32 DevKit V1', 'LED circuit and push button from Lesson 5', 'Breadboard and jumper wires'],
+    code: E32_MILLIS, file: 'BlinkWithoutDelay.ino', program: 'e_millis', fast: true, widgets: ['button'],
+    circuit: [...LED_CIRCUIT, ...BUTTON_PARTS], io: { G16: IO_LED, G17: { kind: 'button', item: 'btn1', needs: BUTTON_IDS } },
+    explain: {
+      2: 'The LED from the earlier lessons (GPIO16).',
+      3: 'The push button (GPIO17).',
+      4: 'A variable that remembers <b>when</b> the LED last changed. <b>unsigned long</b> because millis() returns an unsigned long.',
+      5: 'How long to wait between changes: 1000 ms.',
+      6: 'The current LED state, HIGH or LOW.',
+      7: 'The previous button reading, to notice the moment it changes.',
+      10: 'The LED pin is an output.',
+      11: 'The button pin uses the internal pull-up: pressed reads LOW.',
+      12: 'Serial output on.',
+      16: '<b>millis()</b> returns the number of milliseconds since the program started. It does not stop the program.',
+      17: 'Has one interval passed since the last change? If not, <b>skip the block and carry on</b>: loop() runs again at once.',
+      18: 'Remember this moment as the last change.',
+      19: 'Toggle the stored state.',
+      20: 'Write it to the LED.',
+      23: 'Read the button <b>every time</b> loop() runs.',
+      24: 'LOW now and HIGH before = the button was <b>just pressed</b>.',
+      25: 'Report it at once: with delay(1000) this could take up to a second.',
+      27: 'Remember this reading for the next pass.',
+    },
+    steps: [
+      { title: 'The problem with delay()', view: 'bench', have: [], power: false,
+        body: `<p>In the button lesson the sketch used <code>delay()</code>: during a delay the board <b>does nothing else</b>. A button pressed in that time is not noticed. To blink an LED <b>and</b> watch a button, the program must never wait.</p>` },
+      { title: 'The idea: look at the clock', view: 'bench', have: [], power: false,
+        body: `<p><code>millis()</code> returns the time since the program started. Instead of sleeping for 1000 ms, keep the time of the last change and ask each pass of <code>loop()</code>: <b>has 1000 ms passed?</b> If yes, toggle the LED; if not, carry on and read the button.</p>` },
+      { title: 'Use the circuit from the button lesson', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], power: false, pins: ['G16', 'G17'],
+        body: `<p>The LED on GPIO16 and the push button on GPIO17 are wired as before. Nothing new to wire.</p>` },
+      { title: 'The code', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], showCode: true, power: true,
+        body: `<p>Click lines <b>16 and 17</b>: the heart of the technique. The only variable that matters is <code>previousMillis</code>.</p>` },
+      { title: 'Run it and press the button', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], showCode: true, power: true, action: 'run',
+        body: `<p>The LED blinks every second. Now <b>press and hold the button</b> (in the 3D view or with “Hold to press”): the Serial Monitor shows the message <b>at once</b>, even in the middle of a blink interval. With <code>delay()</code> the press could wait up to a second.</p><p class="sim">The simulator runs loop() about 100 times per second; a real board runs it much faster.</p>` },
+      { title: 'Summary', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], power: true,
+        body: `<ul><li><code>delay()</code> blocks everything; <code>millis()</code> does not.</li><li>Pattern: <code>if (millis() - previous &gt;= interval) { previous = millis(); … }</code></li><li>Remember the last state to detect a change (the button press).</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does millis() return?', a: ['The pin number', 'Milliseconds since the program started', 'The current time of day', 'The LED state'], c: 1, why: 'It counts the time since the program started.' },
+      { q: 'Why is delay() a problem when you also read a button?', a: ['It uses too much power', 'The board does nothing else during the delay', 'It only works once', 'It needs a pull-up'], c: 1, why: 'The sketch cannot read the button while it waits.' },
+      { q: 'What does the variable previousMillis store?', a: ['The pin of the LED', 'The time of the last LED change', 'The button reading', 'The interval'], c: 1, why: 'It lets the sketch compute how long ago the last change was.' },
+    ],
+    sources: [SRC.millis, SRC.bwd, SRC.ds],
   },
 ];

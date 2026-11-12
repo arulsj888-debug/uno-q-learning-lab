@@ -40,7 +40,7 @@ export class Sim {
     let readBits = H.adcBits || 10, writeBits = 8, serialOn = false, gray = 1, lineBuf = '';
     // Arduino Print::print(float, digits): fixed number of decimals (default 2)
     const fmt = (v, digits) => (typeof v === 'number' && digits !== undefined ? v.toFixed(digits) : String(v));
-    const slow = opts.slow !== false;
+    const slow = opts.slow !== false, t0 = performance.now();
     const pxBuf = Array.from({ length: 8 }, () => [0, 0, 0, 0]);
     const rt = {
       at: async (n) => { check(); H.line(n); if (slow) await frame(); check(); },
@@ -50,6 +50,8 @@ export class Sim {
         const id = setTimeout(() => { tok.timers.delete(id); tok.wake.delete(wake); res(); }, ms);
         tok.timers.add(id); tok.wake.add(wake);
       }),
+      millis: () => Math.floor(performance.now() - t0),   // milliseconds since the program started
+      yield: () => rt.delay(8),   // simulator pacing: one pass of loop() takes about 8 ms here
       pinMode: (pin, mode) => { pins[pin] = { mode }; if (H.mode) H.mode(pin, mode); },
       digitalWrite: (pin, level) => { if (!pins[pin] || pins[pin].mode !== 'OUTPUT') return; H.pin(pin, level); },
       digitalRead: (pin) => H.read(pin, pins[pin] ? pins[pin].mode : 'INPUT'),
@@ -824,6 +826,50 @@ export const PROGRAMS = {
       await rt.at(10); await rt.delay(1000);
       await rt.at(11); rt.digitalWrite('G16', 0);
       await rt.at(12); await rt.delay(1000);
+    }
+  },
+
+  async u3_millis(rt) {
+    await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5); await rt.at(6); await rt.at(7);
+    await rt.at(10); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(11); rt.pinMode('D4', 'INPUT_PULLUP');
+    await rt.at(12); rt.serialBegin(9600);
+    let prev = 0, ledState = 0, last = 1;
+    for (;;) {
+      await rt.at(16); const cur = rt.millis();
+      await rt.at(17);
+      if (cur - prev >= 1000) {
+        await rt.at(18); prev = cur;
+        await rt.at(19); ledState = ledState ? 0 : 1;
+        await rt.at(20); rt.digitalWrite('D5', ledState);
+      }
+      await rt.at(23); const button = rt.digitalRead('D4');
+      await rt.at(24);
+      if (button === 0 && last === 1) { await rt.at(25); rt.println('Button pressed: noticed at once'); }
+      await rt.at(27); last = button;
+      await rt.yield();
+    }
+  },
+
+  async e_millis(rt) {
+    await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5); await rt.at(6); await rt.at(7);
+    await rt.at(10); rt.pinMode('G16', 'OUTPUT');
+    await rt.at(11); rt.pinMode('G17', 'INPUT_PULLUP');
+    await rt.at(12); rt.serialBegin(115200);
+    let prev = 0, ledState = 0, last = 1;
+    for (;;) {
+      await rt.at(16); const cur = rt.millis();
+      await rt.at(17);
+      if (cur - prev >= 1000) {
+        await rt.at(18); prev = cur;
+        await rt.at(19); ledState = ledState ? 0 : 1;
+        await rt.at(20); rt.digitalWrite('G16', ledState);
+      }
+      await rt.at(23); const button = rt.digitalRead('G17');
+      await rt.at(24);
+      if (button === 0 && last === 1) { await rt.at(25); rt.println('Button pressed: noticed at once'); }
+      await rt.at(27); last = button;
+      await rt.yield();
     }
   },
 

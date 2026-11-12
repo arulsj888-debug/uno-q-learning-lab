@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1264,5 +1264,54 @@ export const U3_LESSONS_2 = [
       { q: 'Current flows through a diode from…', a: ['cathode to anode', 'anode to cathode', 'either way', 'neither way'], c: 1, why: 'Forward direction is anode to cathode.' },
     ],
     sources: [SRC.d1n4007, SRC.ds, SRC.pinmode],
+  },
+
+  // ================================================================== 27
+  {
+    id: 'u27', num: 27, module: 11, title: 'Blink without delay(): millis()', level: 'Intermediate', time: '20 min',
+    goal: 'Keep a program responsive: do two things at once by checking the clock instead of waiting with delay().',
+    hardware: ['Arduino UNO R3', 'LED circuit and push button from Lesson 5', 'Breadboard and jumper wires'],
+    code: U3_MILLIS, file: 'BlinkWithoutDelay.ino', program: 'u3_millis', fast: true, widgets: ['button'],
+    circuit: [...LED_CIRCUIT, ...BUTTON_PARTS], io: { D5: IO_LED, D4: { kind: 'button', item: 'btn1', needs: BUTTON_IDS } },
+    explain: {
+      2: 'The LED from the earlier lessons (pin 5).',
+      3: 'The push button (pin 4).',
+      4: 'A variable that remembers <b>when</b> the LED last changed. <b>unsigned long</b> because millis() returns an unsigned long.',
+      5: 'How long to wait between changes: 1000 ms.',
+      6: 'The current LED state, HIGH or LOW.',
+      7: 'The previous button reading, to notice the moment it changes.',
+      10: 'The LED pin is an output.',
+      11: 'The button pin uses the internal pull-up: pressed reads LOW.',
+      12: 'Serial output on.',
+      16: '<b>millis()</b> returns the number of milliseconds since the program started. It does not stop the program.',
+      17: 'Has one interval passed since the last change? If not, <b>skip the block and carry on</b>: loop() runs again at once.',
+      18: 'Remember this moment as the last change.',
+      19: 'Toggle the stored state.',
+      20: 'Write it to the LED.',
+      23: 'Read the button <b>every time</b> loop() runs.',
+      24: 'LOW now and HIGH before = the button was <b>just pressed</b>.',
+      25: 'Report it at once: with delay(1000) this could take up to a second.',
+      27: 'Remember this reading for the next pass.',
+    },
+    steps: [
+      { title: 'The problem with delay()', view: 'bench', have: [], power: false,
+        body: `<p>In the button lesson the sketch used <code>delay()</code>: during a delay the board <b>does nothing else</b>. A button pressed in that time is not noticed. To blink an LED <b>and</b> watch a button, the program must never wait.</p>` },
+      { title: 'The idea: look at the clock', view: 'bench', have: [], power: false,
+        body: `<p><code>millis()</code> returns the time since the program started. Instead of sleeping for 1000 ms, keep the time of the last change and ask each pass of <code>loop()</code>: <b>has 1000 ms passed?</b> If yes, toggle the LED; if not, carry on and read the button.</p>` },
+      { title: 'Use the circuit from the button lesson', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], power: false, pins: ['D5', 'D4'],
+        body: `<p>The LED on pin 5 and the push button on pin 4 are wired as before. Nothing new to wire.</p>` },
+      { title: 'The code', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], showCode: true, power: true,
+        body: `<p>Click lines <b>16 and 17</b>: the heart of the technique. The only variable that matters is <code>previousMillis</code>.</p>` },
+      { title: 'Run it and press the button', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], showCode: true, power: true, action: 'run',
+        body: `<p>The LED blinks every second. Now <b>press and hold the button</b> (in the 3D view or with “Hold to press”): the Serial Monitor shows the message <b>at once</b>, even in the middle of a blink interval. With <code>delay()</code> the press could wait up to a second.</p><p class="sim">The simulator runs loop() about 100 times per second; a real board runs it much faster.</p>` },
+      { title: 'Summary', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], power: true,
+        body: `<ul><li><code>delay()</code> blocks everything; <code>millis()</code> does not.</li><li>Pattern: <code>if (millis() - previous &gt;= interval) { previous = millis(); … }</code></li><li>Remember the last state to detect a change (the button press).</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does millis() return?', a: ['The pin number', 'Milliseconds since the program started', 'The current time of day', 'The LED state'], c: 1, why: 'It counts the time since the program started.' },
+      { q: 'Why is delay() a problem when you also read a button?', a: ['It uses too much power', 'The board does nothing else during the delay', 'It only works once', 'It needs a pull-up'], c: 1, why: 'The sketch cannot read the button while it waits.' },
+      { q: 'What does the variable previousMillis store?', a: ['The pin of the LED', 'The time of the last LED change', 'The button reading', 'The interval'], c: 1, why: 'It lets the sketch compute how long ago the last change was.' },
+    ],
+    sources: [SRC.millis, SRC.bwd, SRC.ds],
   },
 ];

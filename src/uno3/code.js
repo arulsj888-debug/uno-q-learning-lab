@@ -551,3 +551,33 @@ void loop() {
   digitalWrite(ledPin, LOW);   // 0 V: no current
   delay(1000);
 }`;
+
+// Lesson 27 — blink without delay() using millis()
+export const U3_MILLIS = `// Blink an LED without delay(): loop() keeps running, so the button is read all the time
+const int ledPin = 5;
+const int buttonPin = 4;
+unsigned long previousMillis = 0;   // time of the last LED change
+const long interval = 1000;         // blink every 1000 ms
+int ledState = LOW;
+int lastButton = HIGH;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT_PULLUP);
+  Serial.begin(9600);
+}
+
+void loop() {
+  unsigned long currentMillis = millis();   // milliseconds since the program started
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    ledState = !ledState;                   // toggle the LED state
+    digitalWrite(ledPin, ledState);
+  }
+
+  int button = digitalRead(buttonPin);
+  if (button == LOW && lastButton == HIGH) {
+    Serial.println("Button pressed: noticed at once");
+  }
+  lastButton = button;
+}`;

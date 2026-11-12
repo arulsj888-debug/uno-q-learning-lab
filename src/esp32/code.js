@@ -498,3 +498,33 @@ void loop() {
   digitalWrite(ledPin, LOW);   // 0 V: no current
   delay(1000);
 }`;
+
+// Lesson 24 — blink without delay() using millis()
+export const E32_MILLIS = `// Blink an LED without delay(): loop() keeps running, so the button is read all the time
+const int ledPin = 16;
+const int buttonPin = 17;
+unsigned long previousMillis = 0;   // time of the last LED change
+const long interval = 1000;         // blink every 1000 ms
+int ledState = LOW;
+int lastButton = HIGH;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT_PULLUP);
+  Serial.begin(115200);
+}
+
+void loop() {
+  unsigned long currentMillis = millis();   // milliseconds since the program started
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    ledState = !ledState;                   // toggle the LED state
+    digitalWrite(ledPin, ledState);
+  }
+
+  int button = digitalRead(buttonPin);
+  if (button == LOW && lastButton == HIGH) {
+    Serial.println("Button pressed: noticed at once");
+  }
+  lastButton = button;
+}`;
