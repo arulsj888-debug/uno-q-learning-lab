@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -136,6 +136,10 @@ const SND_PARTS_E = [{ id: 'snd1', type: 'snd', x: 20, z: 138 },
   ...['AO', 'GND', 'VCC'].map((n, i) => ({ id: 'm8' + i, type: 'fwire', from: 'snd1.' + n, to: 'a' + (20 + i), color: { VCC: 'red', GND: 'black', AO: 'yellow' }[n], lift: 16 + i * 2 })),
   ...['AO', 'GND', 'VCC'].map((n, i) => ({ id: 'w8' + i, type: 'fwire', from: { VCC: '3V3', GND: 'GND1', AO: 'G34' }[n], to: 'b' + (20 + i), color: { VCC: 'red', GND: 'black', AO: 'yellow' }[n], lift: 22 + i * 3 }))];
 const SND_IDS_E = SND_PARTS_E.map(d => d.id);
+const PLANT_PARTS_E = [{ id: 'soil1', type: 'soil', x: 20, z: 138 },
+  ...['VCC', 'GND', 'AOUT'].map((n, i) => ({ id: 'm9' + i, type: 'fwire', from: 'soil1.' + n, to: 'a' + (20 + i), color: { VCC: 'red', GND: 'black', AOUT: 'yellow' }[n], lift: 16 + i * 2 })),
+  ...['VCC', 'GND', 'AOUT'].map((n, i) => ({ id: 'w9' + i, type: 'fwire', from: { VCC: '3V3', GND: 'GND1', AOUT: 'G34' }[n], to: 'b' + (20 + i), color: { VCC: 'red', GND: 'black', AOUT: 'yellow' }[n], lift: 22 + i * 3 }))];
+const PLANT_IDS_E = PLANT_PARTS_E.map(d => d.id);
 const STEP_PARTS_E = [
   { id: 'stp1', type: 'stepper', x: 20, z: 138 },
   { id: 'w90', type: 'fwire', from: 'stp1.IN1', to: 'G16', color: 'blue', lift: 36 },
@@ -1901,5 +1905,44 @@ export const E32_LESSONS = [
       { q: 'What is the delay(300) for?', a: ['To ignore the echo of the clap', 'To warm up the sensor', 'To save power', 'To read Serial'], c: 0, why: 'Otherwise one clap could toggle the LED several times.' },
     ],
     sources: [SRC.sndsrc, SRC.ds],
+  },
+
+  // ================================================================== 36
+  {
+    id: 'e36', num: 36, module: 7, title: 'Project: plant watering controller', level: 'Intermediate', time: '25 min',
+    goal: 'Combine the soil sensor and an output into a controller that waters when the soil is dry, using two thresholds (hysteresis).',
+    hardware: ['ESP32 DevKit V1', 'The LED circuit of Lesson 4 (it stands in for the pump)', 'Capacitive soil moisture sensor', 'Jumper wires'],
+    code: E32_PLANT, file: 'PlantWatering.ino', program: 'e_plant', fast: true, widgets: ['soilsens'],
+    circuit: [...LED_CIRCUIT, ...PLANT_PARTS_E], io: { G16: IO_LED, G34: { kind: 'soil', item: 'soil1', needs: PLANT_IDS_E } },
+    explain: {
+      1: 'The soil sensor on an analog input (Lesson 34).',
+      2: 'The output. In a real project a <b>relay or MOSFET</b> switches a pump; here the LED from Lesson 4 shows when the pump would run.',
+      3: 'Your calibration from Lesson 34: the dry reading…',
+      4: '…and the wet reading.',
+      5: 'Remembers whether the pump is running. This memory is what makes hysteresis possible.',
+      14: 'The moisture in percent (0 = dry, 100 = wet).',
+      15: 'Below <b>30 %</b>: too dry, switch the pump on.',
+      16: 'Above <b>60 %</b>: wet enough, switch it off. Between 30 and 60 the state does <b>not change</b>.',
+      17: 'Write the state to the output.',
+      20: 'Print the state too, so you can watch the logic.',
+    },
+    steps: [
+      { title: 'The idea', view: 'scanv', have: [], power: false,
+        body: `<p>A plant-watering controller measures the soil moisture and switches a pump when it is dry. Two things matter: a <b>sensor</b> you can trust (Lesson 34) and a <b>switch</b> for the pump (a relay or a MOSFET, as in the earlier lessons). Here an <b>LED stands in for the pump</b> so you can see the logic safely.</p>` },
+      { title: 'Why two thresholds?', view: 'scanv', have: [], power: false,
+        body: `<p>If the pump switched on at 40 % and off at 40 %, the reading would hover around 40 % and the pump would <b>chatter</b> on and off. With <b>two</b> thresholds, <b>on below 30 %</b> and <b>off above 60 %</b>, the pump keeps running until the soil is clearly wet. This is called <b>hysteresis</b>.</p>` },
+      { title: 'Wire it', view: 'scanv', have: [...LED_IDS, ...PLANT_IDS_E], power: false, pins: ['G34', '3V3', 'GND1'], body: `<ul><li>Sensor to breadboard row a (VCC a20, GND a21, AOUT a22); board wires in row b: <b>3V3 → b20</b>, <b>GND → b21</b>, <b>GPIO34 → b22</b>; the LED stays on GPIO16 as in Lesson 4</li></ul><p class="warn">A real pump needs its own supply and a relay or MOSFET with a flyback diode: never connect a pump to a pin.</p>` },
+      { title: 'The code', view: 'scanv', have: [...LED_IDS, ...PLANT_IDS_E], showCode: true, power: true, body: `<p>Click lines <b>15</b> and <b>16</b>: the two thresholds.</p>` },
+      { title: 'Run it: dry, wetter, wet, drying', view: 'scanv', have: [...LED_IDS, ...PLANT_IDS_E], showCode: true, power: true, action: 'run',
+        body: `<p>Start with the soil <b>dry</b>: the “pump” (LED) is on. Slide the moisture to about <b>45 %</b>: it stays on (not wet enough yet). Go above <b>60 %</b>: it turns off. Slide back to <b>45 %</b>: it stays off. Below <b>30 %</b> it turns on again.</p><p class="sim">Simulated soil. Thresholds are examples: tune them for your plant.</p>` },
+      { title: 'Summary', view: 'scanv', have: [...LED_IDS, ...PLANT_IDS_E], power: true,
+        body: `<ul><li>Project = sensor + decision + output.</li><li>Two thresholds (hysteresis) stop the output from chattering.</li><li>Real pumps need a relay or MOSFET, their own supply and a flyback diode.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What is hysteresis?', a: ['Using two thresholds so the output does not chatter', 'A kind of sensor', 'A Wi-Fi mode', 'A resistor value'], c: 0, why: 'On at one level, off at another.' },
+      { q: 'Moisture is 45 % and the pump is running. What happens?', a: ['It stays on', 'It turns off', 'It resets', 'It blinks'], c: 0, why: 'It only turns off above 60 %.' },
+      { q: 'Why not connect a pump straight to a pin?', a: ['It needs far more current than a pin gives', 'Pumps need AC', 'Pins are always LOW', 'It is allowed'], c: 0, why: 'Use a relay or MOSFET.' },
+    ],
+    sources: [SRC.soilsrc, SRC.ds],
   },
 ];

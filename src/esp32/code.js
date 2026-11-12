@@ -843,3 +843,27 @@ void loop() {
     delay(300);                  // ignore the echo
   }
 }`;
+
+// Lesson 36 — project: plant watering controller with hysteresis
+export const E32_PLANT = `const int sensorPin = 34;
+const int pumpLed = 16;      // an LED stands in for the relay and pump
+const int dryValue = 3102;
+const int wetValue = 1241;
+bool pumpOn = false;
+
+void setup() {
+  pinMode(pumpLed, OUTPUT);
+  Serial.begin(115200);
+}
+
+void loop() {
+  int raw = analogRead(sensorPin);
+  int percent = constrain(map(raw, dryValue, wetValue, 0, 100), 0, 100);
+  if (percent < 30) pumpOn = true;     // too dry: start watering
+  if (percent > 60) pumpOn = false;    // wet enough: stop
+  digitalWrite(pumpLed, pumpOn);
+  Serial.print("moisture ");
+  Serial.print(percent);
+  Serial.println(pumpOn ? " %  pump ON" : " %  pump off");
+  delay(1000);
+}`;

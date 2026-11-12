@@ -357,3 +357,12 @@ export const SND_PARTS = [
   { id: 'w92', type: 'fwire', from: 'snd1.AO', to: 'A0', color: 'yellow', lift: 36 },
 ];
 export const SND_IDS = SND_PARTS.map(d => d.id);
+
+// ---- Lesson 36 (project): soil sensor on the desk (AOUT A0, VCC 5V, GND1) next to the LED circuit of Lesson 4 (the LED stands in for the pump)
+export const PLANT_PARTS = [
+  { id: 'soil1', type: 'soil', x: 20, z: 138 },
+  { id: 'w90', type: 'fwire', from: 'soil1.GND', to: 'GND1', color: 'black', lift: 24 },
+  { id: 'w91', type: 'fwire', from: 'soil1.VCC', to: '5V', color: 'red', lift: 30 },
+  { id: 'w92', type: 'fwire', from: 'soil1.AOUT', to: 'A0', color: 'yellow', lift: 36 },
+];
+export const PLANT_IDS = PLANT_PARTS.map(d => d.id);

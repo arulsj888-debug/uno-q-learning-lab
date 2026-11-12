@@ -1278,6 +1278,44 @@ export const PROGRAMS = {
     }
   },
 
+  async u3_plant(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5);
+    await rt.at(8); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(9); rt.serialBegin(9600);
+    let pumpOn = false;
+    for (;;) {
+      await rt.at(12);
+      await rt.at(13); const raw = rt.analogRead('A0');
+      await rt.at(14); const pct = Math.min(100, Math.max(0, rt.map(raw, 512, 205, 0, 100)));
+      await rt.at(15); if (pct < 30) pumpOn = true;
+      await rt.at(16); if (pct > 60) pumpOn = false;
+      await rt.at(17); rt.digitalWrite('D5', pumpOn ? 1 : 0);
+      await rt.at(18); rt.print('moisture ');
+      await rt.at(19); rt.print(pct);
+      await rt.at(20); rt.println(pumpOn ? ' %  pump ON' : ' %  pump off');
+      await rt.at(21); await rt.delay(1000);
+    }
+  },
+
+  async e_plant(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5);
+    await rt.at(8); rt.pinMode('G16', 'OUTPUT');
+    await rt.at(9); rt.serialBegin(115200);
+    let pumpOn = false;
+    for (;;) {
+      await rt.at(12);
+      await rt.at(13); const raw = rt.analogRead('G34');
+      await rt.at(14); const pct = Math.min(100, Math.max(0, rt.map(raw, 3102, 1241, 0, 100)));
+      await rt.at(15); if (pct < 30) pumpOn = true;
+      await rt.at(16); if (pct > 60) pumpOn = false;
+      await rt.at(17); rt.digitalWrite('G16', pumpOn ? 1 : 0);
+      await rt.at(18); rt.print('moisture ');
+      await rt.at(19); rt.print(pct);
+      await rt.at(20); rt.println(pumpOn ? ' %  pump ON' : ' %  pump off');
+      await rt.at(21); await rt.delay(1000);
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

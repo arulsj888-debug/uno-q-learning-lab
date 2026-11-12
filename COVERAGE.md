@@ -87,6 +87,8 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Timers, EEPROM / preferences | TODO | TODO | TODO | TODO | |
 
 ## F. Projects (after the parts exist)
+DONE: Plant watering controller (UNO R3 lesson 36, ESP32 lesson 36): soil sensor + hysteresis (on below 30 %, off above 60 %); an LED stands in for the relay and pump (the lesson says so; a real pump needs a relay/MOSFET and flyback diode). Real relay/pump version TODO.
+
 Weather station (DHT + OLED + MQTT), security alarm (PIR + buzzer + keypad), plant watering (soil + relay/pump), smart door
 (RFID + servo), robot car (2 motors + HC-SR04), home automation over Wi-Fi/MQTT, data logger (RTC + SD).
 
