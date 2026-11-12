@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -35,6 +35,8 @@ const SRC = {
   bwd: { t: 'Arduino example: Blink Without Delay', u: 'https://docs.arduino.cc/built-in-examples/digital/BlinkWithoutDelay/' },
   httpc: { t: 'Arduino-ESP32 HTTPClient example: BasicHttpClient', u: 'https://github.com/espressif/arduino-esp32/tree/master/libraries/HTTPClient/examples/BasicHttpClient' },
   httpmdn: { t: 'MDN: HTTP response status codes', u: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Status' },
+  pubsub: { t: 'PubSubClient library (Arduino MQTT client) by Nick O’Leary', u: 'https://pubsubclient.knolleary.net/' },
+  mqtt: { t: 'MQTT.org: what is MQTT (publish/subscribe, topics, broker)', u: 'https://mqtt.org/' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -1404,5 +1406,59 @@ export const E32_LESSONS = [
       { q: 'GET() returns a negative number. What happened?', a: ['The request failed: no answer arrived', 'The server answered OK', 'The body is empty', 'The LED is on'], c: 0, why: 'Negative values are errors of the request itself.' },
     ],
     sources: [SRC.httpc, SRC.httpmdn, SRC.wifihello],
+  },
+
+  // ================================================================== 26
+  {
+    id: 'e26', num: 26, module: 3, title: 'MQTT: publish a value and listen to a topic', level: 'Intermediate', time: '30 min',
+    goal: 'Use a broker: publish a temperature to a topic, subscribe to another topic, and switch the LED from a message.',
+    hardware: ['ESP32 DevKit V1 with the Lesson 4 LED circuit (GPIO16)', 'Your Wi-Fi name and password', 'An MQTT broker (simulated here)'],
+    code: E32_MQTT, file: 'MqttDemo.ino', program: 'e_mqtt', fast: true, widgets: ['wifirouter', 'mqttbroker'],
+    circuit: LED_CIRCUIT, io: { G16: IO_LED },
+    explain: {
+      1: '<b>WiFi.h</b>: the Wi-Fi library.',
+      2: '<b>PubSubClient.h</b>: an MQTT client library for Arduino (install “PubSubClient” by Nick O’Leary from the Library Manager).',
+      6: 'The address of the <b>broker</b>. Made up for this lesson: use your own broker on a real board.',
+      7: 'The LED from Lesson 4 on GPIO16.',
+      8: 'Remembers when we last published (the millis() pattern from the timing lesson).',
+      13: 'The <b>callback</b>: PubSubClient calls it every time a message arrives on a topic we subscribed to.',
+      14: 'Build the message text from the payload bytes.',
+      16: 'Show where the message came from…',
+      19: '…and what it said.',
+      20: 'Message “ON” switches the LED on, anything else switches it off.',
+      26: 'Join the Wi-Fi first (Lesson 9).',
+      28: '<b>setServer(host, port)</b>: where the broker is. <b>1883</b> is the standard MQTT port (8883 for the encrypted one).',
+      29: 'Tell the library which function handles incoming messages.',
+      33: 'Are we connected to the broker? If not, connect (and reconnect after a drop).',
+      34: '<b>client.connect(id)</b> logs in to the broker. Each client needs its own ID.',
+      35: '<b>subscribe(topic)</b>: ask the broker to send us everything published on <b>home/led</b>.',
+      39: 'Could not connect: wait and try again (without blocking everything else for long).',
+      43: '<b>client.loop()</b> must run often: it receives messages and keeps the connection alive.',
+      44: 'Every 3 seconds (no delay(): the loop keeps running).',
+      46: '<b>publish(topic, payload)</b>: send a value to the topic <b>home/temperature</b>. Everyone subscribed to it receives it.',
+    },
+    steps: [
+      { title: 'Publish and subscribe', view: 'home', power: false,
+        body: `<p><b>MQTT</b> is a light messaging protocol for the Internet of Things. Devices do not talk to each other directly: they talk to a <b>broker</b>. A device <b>publishes</b> a message to a <b>topic</b> (like <code>home/temperature</code>); every device that <b>subscribed</b> to that topic receives it.</p>` },
+      { title: 'Topics and payloads', view: 'home', power: false,
+        body: `<div class="ptree"><div class="pt-row"><span class="pt in">ESP32</span></div><div class="pt-arrow">publish home/temperature = 21.5 ↑ ↓ subscribe home/led</div><div class="pt-row"><span class="pt">Broker</span></div><div class="pt-arrow">↑ publish home/led = ON (from a phone app)</div><div class="pt-row"><span class="pt">Phone</span></div></div>
+        <p>A message is a <b>topic</b> (text, with slashes) and a <b>payload</b> (the data, here text like <code>21.5</code> or <code>ON</code>).</p>` },
+      { title: 'The LED circuit', view: 'bench', power: false, have: LED_IDS, pins: ['G16'],
+        body: `<p>The same LED circuit as Lesson 4 (LED with a resistor on <b>GPIO16</b>). The LED will follow the messages on the topic <code>home/led</code>.</p>` },
+      { title: 'Read the sketch', view: 'bench', power: true, action: 'ensurePower', showCode: true, have: LED_IDS,
+        body: `<p>Click lines <b>34</b>, <b>35</b> and <b>46</b>. The broker address is made up: on a real board you use the address of your own broker.</p><p class="sim">The broker and the phone app are simulated here.</p>` },
+      { title: 'Run it: publish and listen', view: 'bench', power: true, showCode: true, action: 'run', have: LED_IDS,
+        body: `<p>Press <b>▶ Run</b>. After the Wi-Fi connects the ESP32 prints <b>MQTT connected</b> and publishes the temperature every 3 seconds (see the broker log in the panel). Now press <b>“Send ON”</b> in the panel (the phone app): the ESP32 prints <code>Received on home/led: ON</code> and the <b>LED lights</b>. “Send OFF” switches it off.</p>` },
+      { title: 'Run it: the broker is offline', view: 'bench', power: true, showCode: true, action: 'ensurePower', have: LED_IDS,
+        body: `<p>Press <b>■ Stop</b>, switch the broker to <b>offline</b> and run again: the ESP32 cannot connect and prints <code>MQTT connect failed, trying again in 2 s</code> over and over. A robust sketch always reconnects.</p>` },
+      { title: 'Summary', view: 'bench', power: true, have: LED_IDS,
+        body: `<ul><li>Devices talk through a <b>broker</b>: <b>publish</b> to a topic, <b>subscribe</b> to receive.</li><li>PubSubClient: <code>setServer</code>, <code>setCallback</code>, <code>connect</code>, <code>subscribe</code>, <code>publish</code>, and <code>client.loop()</code> in every pass.</li><li>Standard port 1883 (8883 with encryption).</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Who receives a message published to a topic?', a: ['Every client subscribed to that topic', 'Only the sender', 'Nobody', 'Only the broker owner'], c: 0, why: 'The broker forwards it to all subscribers of the topic.' },
+      { q: 'What does client.loop() do?', a: ['Repeats the sketch', 'Receives messages and keeps the connection alive', 'Resets the ESP32', 'Opens a topic'], c: 1, why: 'It must run often so incoming messages are handled.' },
+      { q: 'What is the standard MQTT port without encryption?', a: ['80', '1883', '443', '22'], c: 1, why: '1883 (8883 is the encrypted one).' },
+    ],
+    sources: [SRC.pubsub, SRC.mqtt, SRC.wifihello],
   },
 ];

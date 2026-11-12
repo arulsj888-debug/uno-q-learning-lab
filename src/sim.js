@@ -59,6 +59,11 @@ export class Sim {
       deepSleep: async (ms) => { for (const k of Object.keys(pins)) if (pins[k] && pins[k].mode === 'OUTPUT') H.pin(k, 0); for (const k of Object.keys(pins)) delete pins[k]; if (H.sleep) H.sleep(true, ms); await rt.delay(ms); if (H.sleep) H.sleep(false, ms); },
       ble: (stage, val) => { if (H.ble) H.ble({ stage, val }); },
       neo: (op, a, b, c, d) => (H.neo ? H.neo({ op, a, b, c, d }) : undefined),
+      mqttConnected: () => !!(H.mqtt && H.mqtt({ op: 'connected' })),
+      mqttConnect: async () => !!(H.mqtt && await H.mqtt({ op: 'connect' })),
+      mqttSubscribe: (topic) => { if (H.mqtt) H.mqtt({ op: 'subscribe', topic }); },
+      mqttPublish: (topic, payload) => { if (H.mqtt) H.mqtt({ op: 'publish', topic, payload }); },
+      mqttPoll: () => (H.mqtt ? H.mqtt({ op: 'poll' }) : null),
       httpGet: async (url) => (H.http ? await H.http(url) : { code: -1, body: '' }),   // HTTPClient.GET(): status code (negative = failed) and body
       i2cProbe: (addr) => (H.i2cProbe ? !!H.i2cProbe(addr) : false),   // Wire.endTransmission() == 0 for this address
       lcd: (op, a, b) => (H.lcd ? H.lcd({ op, a, b }) : undefined),
@@ -920,6 +925,48 @@ export const PROGRAMS = {
     await rt.at(30);
     await rt.at(33); await rt.at(34);
     for (;;) await rt.delay(1000);
+  },
+
+  async e_mqtt(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(4); await rt.at(5); await rt.at(6); await rt.at(7); await rt.at(8);
+    await rt.at(24); rt.serialBegin(115200);
+    await rt.at(25); rt.pinMode('G16', 'OUTPUT');
+    await rt.at(26); rt.wifiBegin();
+    while (rt.wifiStatus() !== 'connected') { await rt.at(27); await rt.delay(500); }
+    await rt.at(27);
+    await rt.at(28); await rt.at(29);
+    let lastSend = 0;
+    for (;;) {
+      await rt.at(33);
+      if (!rt.mqttConnected()) {
+        await rt.at(34);
+        if (await rt.mqttConnect()) {
+          await rt.at(35); rt.mqttSubscribe('home/led');
+          await rt.at(36); rt.println('MQTT connected');
+        } else {
+          await rt.at(38); rt.println('MQTT connect failed, trying again in 2 s');
+          await rt.at(39); await rt.delay(2000);
+          await rt.at(40); continue;
+        }
+      }
+      await rt.at(43);
+      const m = rt.mqttPoll();
+      if (m) {
+        await rt.at(13); await rt.at(14); await rt.at(15);
+        await rt.at(16); rt.print('Received on ');
+        await rt.at(17); rt.print(m.topic);
+        await rt.at(18); rt.print(': ');
+        await rt.at(19); rt.println(m.payload);
+        await rt.at(20); rt.digitalWrite('G16', m.payload === 'ON' ? 1 : 0);
+      }
+      await rt.at(44);
+      if (rt.millis() - lastSend > 3000) {
+        await rt.at(45); lastSend = rt.millis();
+        await rt.at(46); rt.mqttPublish('home/temperature', '21.5');
+        await rt.at(47); rt.println('Published home/temperature = 21.5');
+      }
+      await rt.yield();
+    }
   },
 
   async thermo(rt) {

@@ -75,7 +75,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | UART between two boards | TODO | TODO | TODO | TODO | 3.3 V / 5 V level shifting |
 | Wi-Fi scan / connect / web server | partly (dashboard) | DONE (web) | n/a | DONE | |
 | HTTP client (fetch a web API, weather) | TODO | TODO | n/a | DONE (lesson 25: GET, status codes 200/404, failure; server is simulated and the address made up) | HTTPClient from the Arduino-ESP32 core; https needs a secure client (not covered) |
-| MQTT publish / subscribe + dashboard | TODO | TODO | n/a | TODO | biggest IoT gap |
+| MQTT publish / subscribe | TODO | TODO | n/a | DONE (lesson 26: PubSubClient, publish home/temperature, subscribe home/led, LED switched by a message; broker and phone simulated) | dashboard TODO; PubSubClient API as in its documentation; made-up broker address |
 | NTP time, OTA update | n/a | n/a | n/a | TODO | |
 | Bluetooth LE | n/a (not verified) | TODO | n/a | DONE | |
 | Bluetooth classic (HC-05 on R3/UQ, built in E32) | TODO | n/a | TODO | TODO | |

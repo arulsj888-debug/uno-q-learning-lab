@@ -564,3 +564,54 @@ void setup() {
 
 void loop() {
 }`;
+
+// Lesson 26 — MQTT with PubSubClient: publish a value and subscribe to a topic
+export const E32_MQTT = `#include <WiFi.h>
+#include <PubSubClient.h>
+
+const char *ssid = "HomeNet";
+const char *password = "MyPassword";
+const char *mqttServer = "broker.example.com";   // a made-up address for this lesson
+const int ledPin = 16;
+unsigned long lastSend = 0;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void callback(char *topic, byte *payload, unsigned int length) {   // runs for every message that arrives
+  String message;
+  for (unsigned int i = 0; i < length; i++) message += (char)payload[i];
+  Serial.print("Received on ");
+  Serial.print(topic);
+  Serial.print(": ");
+  Serial.println(message);
+  digitalWrite(ledPin, message == "ON" ? HIGH : LOW);
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) delay(500);
+  client.setServer(mqttServer, 1883);   // 1883 is the standard MQTT port
+  client.setCallback(callback);
+}
+
+void loop() {
+  if (!client.connected()) {
+    if (client.connect("esp32-demo")) {   // a client ID for this device
+      client.subscribe("home/led");       // listen to this topic
+      Serial.println("MQTT connected");
+    } else {
+      Serial.println("MQTT connect failed, trying again in 2 s");
+      delay(2000);
+      return;
+    }
+  }
+  client.loop();                          // handle incoming messages
+  if (millis() - lastSend > 3000) {
+    lastSend = millis();
+    client.publish("home/temperature", "21.5");
+    Serial.println("Published home/temperature = 21.5");
+  }
+}`;
