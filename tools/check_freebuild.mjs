@@ -232,6 +232,16 @@ r = rgbOK('uno3', u3, '✔ Active buzzer'); ok(r.notes.some(n => /20 mA per pin/
   const q = run('uno3', u3, '✔ Capacitor charges', 40);
   ok(q.res.parts.led1.level > 0.2, 'UNO R3: LED glows once the capacitor is charged');
 }
+// ---- reed, tilt and slide switches
+for (const [kind, info, name, sig] of [['unoq', uno, 'UNO Q', 'D5'], ['uno3', u3, 'UNO R3', 'D5'], ['esp32', findPinE32, 'ESP32', 'G16']]) {
+  const ev = (title, sw) => { const x = EXAMPLES(kind).find(e => e.title.startsWith(title)); return evaluate({ boardKind: kind, pinInfo: info, parts: x.parts, pinCfg: x.pins, powered: true, env: { ...env, sw }, t: 0 }); };
+  r = ev('✔ Reed switch', { reed1: true }); ok(r.pins[sig].read === 0, name + ': closed reed switch pulls the input LOW');
+  r = ev('✔ Reed switch', { reed1: false }); ok(r.pins[sig].read === 1, name + ': open reed switch lets the pull-up read HIGH');
+  r = ev('✔ Tilt switch', { tilt1: true }); ok(r.parts.led1.status === 'ok' && r.parts.led1.level > 0.2, name + ': tilted switch lights the LED');
+  r = ev('✔ Tilt switch', { tilt1: false }); ok(r.parts.led1.level < 0.05, name + ': upright tilt switch keeps the LED off');
+  r = ev('✔ Slide switch', { ssw1: false }); ok(r.parts.led1.level > 0.2 && r.parts.led2.level < 0.05, name + ': slide switch at A lights LED 1 only');
+  r = ev('✔ Slide switch', { ssw1: true }); ok(r.parts.led2.level > 0.2 && r.parts.led1.level < 0.05, name + ': slide switch at B lights LED 2 only');
+}
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

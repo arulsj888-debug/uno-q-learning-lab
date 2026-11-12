@@ -9,7 +9,7 @@
 //   { id:'t1', type:'tmp36', row:'e', col:18 }        legs +VS e18, VOUT e19, GND e20 (flat face toward +z)
 //   { id:'w1', type:'wire', from:'D5', to:'a10', color:'yellow' }
 import * as THREE from 'three';
-import { Resistor, LED5mm, RGBLED5mm, DHTSensor, NeoPixelStrip, Diode1N4007, TransistorPN2222A, MOSFETIRLZ44N, ElectrolyticCap, LCD1602Module, OLED128x64Module, JoystickModule, EncoderModule, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
+import { Resistor, LED5mm, RGBLED5mm, DHTSensor, NeoPixelStrip, Diode1N4007, TransistorPN2222A, MOSFETIRLZ44N, ElectrolyticCap, ReedSwitch, TiltSwitch, SlideSwitch, LCD1602Module, OLED128x64Module, JoystickModule, EncoderModule, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
 
 import { resistorBands } from './freebuild/circuit.js';
 
@@ -87,6 +87,9 @@ export class Bench {
       case 'npn': obj = new TransistorPN2222A(); break;
       case 'mosfet': obj = new MOSFETIRLZ44N(); break;
       case 'cap': obj = new ElectrolyticCap(d.uf || 100); break;
+      case 'reed': obj = new ReedSwitch(this.point(d.a).distanceTo(this.point(d.k))); break;
+      case 'tilt': obj = new TiltSwitch(); break;
+      case 'slidesw': obj = new SlideSwitch(); break;
       case 'diode': obj = new Diode1N4007(this.point(d.a).distanceTo(this.point(d.k))); break;
       case 'sht31': obj = new SHT31Breakout(); break;
       case 'hcsr04': obj = new HCSR04(); break;
@@ -123,6 +126,8 @@ export class Bench {
     const P = r => this.point(r);
     switch (d.type) {
       case 'resistor': { const a = P(d.a), b = P(d.b); return { pos: a.clone().lerp(b, 0.5), rotY: Math.atan2(-(b.z - a.z), b.x - a.x) }; }
+      case 'slidesw': return { pos: this.bb.hole(d.row, d.col + 1), rotY: 0 };
+      case 'reed': case 'tilt': { const a = P(d.a), c = P(d.k); return { pos: a.clone().lerp(c, 0.5), rotY: Math.atan2(-(c.z - a.z), c.x - a.x) }; }
       case 'cap': { const a = P(d.a), c = P(d.k); return { pos: a.clone().lerp(c, 0.5), rotY: Math.atan2(-(a.z - c.z), a.x - c.x) }; }
       case 'led': { const a = P(d.anode), c = P(d.cathode); return { pos: a.clone().lerp(c, 0.5), rotY: Math.atan2(-(a.z - c.z), a.x - c.x) }; }
       case 'button': { const a = this.bb.hole('e', d.col), b = this.bb.hole('f', d.col + 2); return { pos: a.clone().lerp(b, 0.5), rotY: 0 }; }

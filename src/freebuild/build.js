@@ -9,13 +9,13 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 const RAILS = ['top+', 'top-', 'bot-', 'bot+'];
 const OHMS = [10, 100, 220, 330, 470, 1000, 2200, 4700, 10000, 47000, 100000, 1000000];
-const PREFIX = { cap: 'cap', diode: 'd', npn: 'q', mosfet: 'fet', lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
+const PREFIX = { reed: 'reed', tilt: 'tilt', slidesw: 'ssw', cap: 'cap', diode: 'd', npn: 'q', mosfet: 'fet', lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
 const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
 const TERMS = { lcd1602: ['GND', 'VCC', 'SDA', 'SCL'], oled: ['GND', 'VCC', 'SCL', 'SDA'], neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
 const DESK_SLOT_PI = { lcd1602: [125, 17], oled: [125, 17], neopixel: [110, 42] };
 const DESK_SLOT = { lcd1602: [20, 70], oled: [125, 70], neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
-const MOVABLE = new Set(['resistor', 'led', 'cap', 'diode', 'npn', 'mosfet', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
+const MOVABLE = new Set(['resistor', 'led', 'cap', 'reed', 'tilt', 'slidesw', 'diode', 'npn', 'mosfet', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
 
 export class FreeBuild {
@@ -23,7 +23,7 @@ export class FreeBuild {
     this.app = app; this.isPi = isPi; this.boardKind = boardKind || (isPi ? 'pi4' : 'unoq'); this.isU3 = this.boardKind === 'uno3'; this.isE32 = this.boardKind === 'esp32'; this.fw = !!isPi || this.isE32; this.pinInfo = pinInfo;
     this.active = false;
     this.parts = []; this.pinCfg = {}; this.burnt = new Set(); this.damaged = new Set(); this.burnWhy = {};
-    this.env = { disp1: 'Hello, world!', disp2: 'Free build', joy: {}, enc: {}, lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: true, touched: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
+    this.env = { disp1: 'Hello, world!', disp2: 'Free build', joy: {}, enc: {}, lux: 300, tempC: 25, pressed: {}, sw: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: true, touched: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
     this.seq = {}; this.undoStack = []; this.tool = null; this.selected = null; this.probe = null; this.probeOn = false;
     this.capV = {}; this.lastCapT = 0;
     this.opts = { uf: 100, bzActive: false, dht: 'dht11', rgbCA: false, ohms: 220, color: 'red', wire: 'auto', flip: false };
@@ -106,7 +106,7 @@ export class FreeBuild {
         };
         const up = ev => {
           window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); app.viewer.controls.enabled = true; this.hover.visible = false;
-          if (!dragging) { this.select(d.id); return; }
+          if (!dragging) { if (['reed', 'tilt', 'slidesw'].includes(d.type)) { this.env.sw[d.id] = !this.env.sw[d.id]; this.dirty = true; this.toast(d.type === 'slidesw' ? (this.env.sw[d.id] ? 'Slid to B.' : 'Slid to A.') : this.env.sw[d.id] ? 'Closed.' : 'Open.'); } this.select(d.id); return; }
           const n = this.nearest(ev, 14); if (!n || n.kind !== 'hole') return;
           const nd = this.autoPlace(d.type, n.ref, d); if (!nd) return this.toast('The part does not fit there.');
           this.mutate(() => { Object.assign(nd, { id: d.id }); this.parts = this.parts.map(p => (p.id === d.id ? nd : p)); this.rebuild3D(); }); this.select(d.id);
@@ -234,13 +234,14 @@ export class FreeBuild {
       if (fp) { if (fp.refs.every(r => this.free(r))) { def = { ...fp.def }; if (type === 'tmp36' && old) def.flip = old.flip; } }
       else if (this.firstOk(type, ref)) {
         const cands = this.second(type, ref), p = this.byRef.get(ref);
-        const pref = { diode: [4, -4, 5, -5, 3, -3], resistor: [4, -4, 5, -5, 3, -3], led: [1, -1], ldr: [1, -1], cap: [1, -1], buzzer: [3, -3] }[type] || [];
+        const pref = { reed: [5, -5, 4, -4], tilt: [1, -1], diode: [4, -4, 5, -5, 3, -3], resistor: [4, -4, 5, -5, 3, -3], led: [1, -1], ldr: [1, -1], cap: [1, -1], buzzer: [3, -3] }[type] || [];
         let b = null; for (const dc of pref) { const r = p.row + (p.col + dc); if (cands.includes(r)) { b = r; break; } }
         if (!b && (type === 'resistor' || type === 'diode') && cands.length) b = cands[0];
         if (b) {
           if (type === 'resistor') def = { type, a: ref, b, ohms: old ? old.ohms : this.opts.ohms };
           else if (type === 'led') { const c = old ? old.color : this.opts.color; def = { type, anode: ref, cathode: b, color: c, hex: LED_TYPES[c].hex }; }
           else if (type === 'diode') def = { type, a: ref, k: b };
+          else if (type === 'reed' || type === 'tilt') def = { type, a: ref, k: b };
           else if (type === 'ldr') def = { type, a: ref, b };
           else if (type === 'cap') def = { type, a: ref, k: b, uf: old ? old.uf : this.opts.uf };
           else if (type === 'buzzer') def = { type, plus: ref, minus: b, ...(((old && old.active) || (!old && this.opts.bzActive)) ? { active: true } : {}) };
@@ -296,6 +297,7 @@ export class FreeBuild {
     if (type === 'rgbled') { if (col > 27) return null; return { def: { type, row, col, ca: this.opts.rgbCA }, refs: [at(row, col), at(row, col + 1), at(row, col + 2), at(row, col + 3)] }; }
     if (type === 'servo') { if (col > 28) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     if (type === 'mosfet') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
+    if (type === 'slidesw') { if (col > 28) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     if (type === 'npn') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     if (type === 'tmp36') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     return null;
@@ -310,6 +312,8 @@ export class FreeBuild {
       if (p.kind !== 'hole') continue;
       const dx = Math.abs(p.pos.x - f.pos.x), dz = Math.abs(p.pos.z - f.pos.z), dist = Math.hypot(dx, dz);
       if (type === 'resistor' || type === 'diode') { if (dist >= 7.4 && dist <= 26) out.push(p.ref); }
+      else if (type === 'reed') { if (p.row === f.row && Math.abs(p.col - f.col) >= 4 && Math.abs(p.col - f.col) <= 6) out.push(p.ref); }
+      else if (type === 'tilt') { if (p.row === f.row && Math.abs(p.col - f.col) === 1) out.push(p.ref); }
       else if (type === 'led' || type === 'ldr' || type === 'cap') { if (p.row === f.row && Math.abs(p.col - f.col) === 1) out.push(p.ref); }
       else if (type === 'buzzer') { if (p.row === f.row && Math.abs(p.col - f.col) === 3) out.push(p.ref); }
     }
@@ -345,7 +349,7 @@ export class FreeBuild {
   }
   click(ref) {
     const T = this.tool; if (!T) return; this.occ = this.occupied();
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet'].includes(T.type)) {
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw'].includes(T.type)) {
       const fp = this.footprint(T.type, ref);
       if (!fp) return this.toast('That part does not fit there (it needs more holes to the right).');
       if (fp.refs.some(r => !this.free(r))) return this.toast('One of the holes is already used.');
@@ -362,6 +366,7 @@ export class FreeBuild {
     if (T.type === 'resistor') def = { type: 'resistor', a, b: ref, ohms: this.opts.ohms };
     else if (T.type === 'led') def = { type: 'led', anode: a, cathode: ref, color: this.opts.color, hex: LED_TYPES[this.opts.color].hex };
     else if (T.type === 'diode') def = { type: 'diode', a, k: ref };
+    else if (T.type === 'reed' || T.type === 'tilt') def = { type: T.type, a, k: ref };
     else if (T.type === 'ldr') def = { type: 'ldr', a, b: ref };
     else if (T.type === 'cap') def = { type: 'cap', a, k: ref, uf: this.opts.uf };
     else if (T.type === 'buzzer') def = { type: 'buzzer', plus: a, minus: ref, ...(this.opts.bzActive ? { active: true } : {}) };
@@ -428,13 +433,13 @@ export class FreeBuild {
   }
   hoverOk(ref) {
     const T = this.tool; this.occ = this.occupied();
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet'].includes(T.type)) { const fp = this.footprint(T.type, ref); return !!fp && fp.refs.every(r => this.free(r)); }
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw'].includes(T.type)) { const fp = this.footprint(T.type, ref); return !!fp && fp.refs.every(r => this.free(r)); }
     if (T.step === 0) return this.firstOk(T.type, ref) && this.second(T.type, ref).length > 0;
     return this.second(T.type, T.first).includes(ref);
   }
   previewFoot(ref) {
     const T = this.tool; if (!T) return;
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet'].includes(T.type)) { const fp = ref && this.footprint(T.type, ref); this.occ = this.occupied(); if (fp) this.setMarks(fp.refs.filter(r => this.free(r)), fp.refs.filter(r => !this.free(r))); else this.cand.count = 0; }
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw'].includes(T.type)) { const fp = ref && this.footprint(T.type, ref); this.occ = this.occupied(); if (fp) this.setMarks(fp.refs.filter(r => this.free(r)), fp.refs.filter(r => !this.free(r))); else this.cand.count = 0; }
   }
   pointName(q) {
     if (q.kind === 'hole') return `Hole ${q.ref} (column ${q.col}, row ${q.row})`;
@@ -489,6 +494,9 @@ export class FreeBuild {
       if (d.type === 'led') it.obj.set(!!R && R.level > 0.02 && !this.burnt.has(d.id), R ? Math.max(0.15, R.level) : 0);
       else if (d.type === 'rgbled') it.obj.setRGB(R && R.levels && !this.burnt.has(d.id) ? R.levels.map(x => (x > 0.02 ? Math.max(0.15, x) : 0)) : [0, 0, 0], this.burnt.has(d.id));
       else if (d.type === 'button') it.obj.setPressed(!!this.env.pressed[d.id]);
+      else if (d.type === 'reed') it.obj.setActive(!!this.env.sw[d.id]);
+      else if (d.type === 'tilt') it.obj.setTilt(!!this.env.sw[d.id]);
+      else if (d.type === 'slidesw') it.obj.setPos(!!this.env.sw[d.id]);
       else if (d.type === 'lcd1602' || d.type === 'oled') it.obj.setContent({ powered: this.powered() && !!R && R.status !== 'off' && R.status !== 'bad', backlight: !!(R && R.backlight), lines: R && R.show ? [this.env.disp1 ?? 'Hello, world!', this.env.disp2 ?? 'Free build'] : null });
       else if (d.type === 'neopixel') { if (it.obj.setColors) it.obj.setColors(R && R.colors && this.powered() ? R.colors : null); }
       else if (d.type === 'joystick') { const J = this.env.joy[d.id] || { x: 0.5, y: 0.5 }; it.obj.setStick(J.x, J.y, !!this.env.pressed[d.id]); }
@@ -514,9 +522,9 @@ export class FreeBuild {
     const T = this.tool, h = $('#fb-hint'); let t;
     if (!T) t = this.probeOn ? 'Voltmeter: click any hole or board pin to measure the voltage there.' : 'Drag a part from the left onto the breadboard (or click it, then click holes). Drag from a board pin to a hole to make a wire. Drag a placed part to move it. Hold a push button to press it; drag a knob to turn it.';
     else if (T.type === 'wire') t = T.step ? 'Click the other end of the wire (green = free).' : 'Click where the wire starts: a board pin, a breadboard hole or a power rail.';
-    else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet'].includes(T.type)) t = { mosfet: 'Click a hole for the GATE leg: the three legs go in columns n, n+1, n+2 of one row: gate, drain, source (front with the text toward you, metal tab at the back). Tick “turn round” to swap gate and source.', npn: 'Click a hole for the EMITTER leg: the three legs go in columns n, n+1, n+2 of one row: emitter, base, collector (flat side toward you). Tick “turn round” to swap emitter and collector.', joystick: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: GND, VCC, VRx, VRy, SW. The module lies over the breadboard towards you.', encoder: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: CLK, DT, SW, +, GND.', dht: 'Click a hole for the VCC pin: the 4 pins go in columns n … n+3 of one row: VCC, DATA, (not connected), GND. The grille faces you. DATA needs a pull-up resistor to VCC.', rgbled: 'Click the hole for the red leg: the 4 legs go in columns n … n+3 of one row: red, common (the longest leg), green, blue. Each colour needs its own resistor.', l293d: 'Click a hole: the 16-pin chip straddles the middle gap over 8 columns (n … n+7). Pin 1 is at the left of the row nearest you (row f); the notch marks the pin-1 end.', sht31: 'Click a hole in row f to j for the VIN pin: the breakout has 7 pins in columns n … n+6: VIN, GND, SCL, SDA, ADDR, RST, ALRT. The board lies over the middle of the breadboard.', hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
+    else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn', 'mosfet', 'slidesw'].includes(T.type)) t = { slidesw: 'Click a hole for the first leg (A): the three legs go in columns n, n+1, n+2 of one row: A, COM (middle), B. Click the switch in the 3D view to slide it.', mosfet: 'Click a hole for the GATE leg: the three legs go in columns n, n+1, n+2 of one row: gate, drain, source (front with the text toward you, metal tab at the back). Tick “turn round” to swap gate and source.', npn: 'Click a hole for the EMITTER leg: the three legs go in columns n, n+1, n+2 of one row: emitter, base, collector (flat side toward you). Tick “turn round” to swap emitter and collector.', joystick: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: GND, VCC, VRx, VRy, SW. The module lies over the breadboard towards you.', encoder: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: CLK, DT, SW, +, GND.', dht: 'Click a hole for the VCC pin: the 4 pins go in columns n … n+3 of one row: VCC, DATA, (not connected), GND. The grille faces you. DATA needs a pull-up resistor to VCC.', rgbled: 'Click the hole for the red leg: the 4 legs go in columns n … n+3 of one row: red, common (the longest leg), green, blue. Each colour needs its own resistor.', l293d: 'Click a hole: the 16-pin chip straddles the middle gap over 8 columns (n … n+7). Pin 1 is at the left of the row nearest you (row f); the notch marks the pin-1 end.', sht31: 'Click a hole in row f to j for the VIN pin: the breakout has 7 pins in columns n … n+6: VIN, GND, SCL, SDA, ADDR, RST, ALRT. The board lies over the middle of the breadboard.', hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
     else if (T.type === 'qwiic') t = T.step ? 'Click the other Qwiic socket (green).' : 'Click a Qwiic socket: the one on the board (left edge) or one of a module. The cable fits only one way.';
-    else t = T.step ? { cap: 'Click the neighbouring hole for the SHORT leg (−, next to the stripe). The first hole is the long leg (+).', diode: 'Click the hole for the CATHODE (the end with the silver band). The first hole is the anode.', led: 'Click the neighbouring hole for the SHORT leg (cathode, −). The first hole is the long leg (anode, +).', buzzer: 'Click the hole 3 columns away for the − leg. The first hole is +.', resistor: 'Click the hole for the other leg (a resistor has no polarity).', ldr: 'Click the neighbouring hole for the other leg.' }[T.type] : { cap: 'Click the hole for the LONG leg (+). The leg next to the stripe on the can (−) goes to the lower voltage.', diode: 'Click the hole for the ANODE (the end without the band).', led: 'Click the hole for the LONG leg (anode, +).', buzzer: 'Click the hole for the + leg.', resistor: 'Click the hole for one leg.', ldr: 'Click the hole for one leg.' }[T.type];
+    else t = T.step ? { reed: 'Click the hole for the other end of the glass capsule (4 to 6 holes away in the same row).', tilt: 'Click the neighbouring hole for the second leg.', cap: 'Click the neighbouring hole for the SHORT leg (−, next to the stripe). The first hole is the long leg (+).', diode: 'Click the hole for the CATHODE (the end with the silver band). The first hole is the anode.', led: 'Click the neighbouring hole for the SHORT leg (cathode, −). The first hole is the long leg (anode, +).', buzzer: 'Click the hole 3 columns away for the − leg. The first hole is +.', resistor: 'Click the hole for the other leg (a resistor has no polarity).', ldr: 'Click the neighbouring hole for the other leg.' }[T.type] : { reed: 'Click a hole for one end of the reed switch (no polarity).', tilt: 'Click a hole for the first leg of the tilt switch (no polarity).', cap: 'Click the hole for the LONG leg (+). The leg next to the stripe on the can (−) goes to the lower voltage.', diode: 'Click the hole for the ANODE (the end without the band).', led: 'Click the hole for the LONG leg (anode, +).', buzzer: 'Click the hole for the + leg.', resistor: 'Click the hole for one leg.', ldr: 'Click the hole for one leg.' }[T.type];
     if (h) h.textContent = t;
     if (this.active) $('#legend').textContent = t;
   }
@@ -602,6 +610,9 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('button')}" data-tool="button">Push button</button></div>
       <div class="fb-row"><button class="fb-btn${on('pot')}" data-tool="pot">Potentiometer 10 kΩ${this.isPi ? ' (no ADC on Pi)' : ''}</button></div>
       <div class="fb-row"><button class="fb-btn${on('buzzer')}" data-tool="buzzer">Buzzer</button><select data-opt="bzActive"><option value="0"${this.opts.bzActive ? '' : ' selected'}>passive</option><option value="1"${this.opts.bzActive ? ' selected' : ''}>active</option></select></div>
+      <div class="fb-row"><button class="fb-btn${on('reed')}" data-tool="reed">Reed switch (magnet)</button></div>
+      <div class="fb-row"><button class="fb-btn${on('tilt')}" data-tool="tilt">Tilt switch</button></div>
+      <div class="fb-row"><button class="fb-btn${on('slidesw')}" data-tool="slidesw">Slide switch (SPDT)</button></div>
       <div class="fb-row"><button class="fb-btn${on('cap')}" data-tool="cap">Capacitor</button><select data-opt="uf"><option value="10"${this.opts.uf === 10 ? ' selected' : ''}>10 µF</option><option value="100"${this.opts.uf === 100 ? ' selected' : ''}>100 µF</option><option value="470"${this.opts.uf === 470 ? ' selected' : ''}>470 µF</option></select></div>
       <div class="fb-row"><button class="fb-btn${on('diode')}" data-tool="diode">Diode 1N4007</button></div>
       <div class="fb-row"><button class="fb-btn${on('npn')}" data-tool="npn">Transistor NPN (PN2222A)</button></div>
@@ -677,7 +688,7 @@ export class FreeBuild {
   }
   loadExample(i) {
     const ex = EXAMPLES(this.boardKind)[i]; this.cancel();
-    this.mutate(() => { this.parts = ex.parts.map(p => ({ ...p, ...(p.type === 'led' ? { hex: LED_TYPES[p.color || 'red'].hex } : {}) })); this.pinCfg = JSON.parse(JSON.stringify(ex.pins || {})); this.capV = { ...(ex.caps || {}) }; this.burnt.clear(); this.damaged.clear(); this.burnWhy = {}; this.env.pot = {}; this.env.joy = {}; this.env.enc = {}; this.seq = {}; for (const p of this.parts) { const m = /^([a-z]+)(\d+)$/.exec(p.id); if (m) this.seq[m[1]] = Math.max(this.seq[m[1]] || 0, +m[2]); } this.rebuild3D(); });
+    this.mutate(() => { this.parts = ex.parts.map(p => ({ ...p, ...(p.type === 'led' ? { hex: LED_TYPES[p.color || 'red'].hex } : {}) })); this.pinCfg = JSON.parse(JSON.stringify(ex.pins || {})); this.capV = { ...(ex.caps || {}) }; this.env.sw = { ...(ex.sw || {}) }; this.burnt.clear(); this.damaged.clear(); this.burnWhy = {}; this.env.pot = {}; this.env.joy = {}; this.env.enc = {}; this.seq = {}; for (const p of this.parts) { const m = /^([a-z]+)(\d+)$/.exec(p.id); if (m) this.seq[m[1]] = Math.max(this.seq[m[1]] || 0, +m[2]); } this.rebuild3D(); });
     this.select(null); this.tripMsg = null; this.exNote = ex.note; this.renderPanel();
     if (!this.powered()) this.app.plug(true).then(() => { this.dirty = true; this.renderSide(); });
     const wide = ex.parts.some(p => p.type === 'pir' || p.type === 'servo');

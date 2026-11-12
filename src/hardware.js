@@ -611,6 +611,57 @@ export class TransistorPN2222A {
   }
 }
 
+// ---------------------------------------------------------------- switches: reed (glass capsule), tilt (ball), slide (SPDT)
+export class ReedSwitch {
+  constructor(span = 12.7) {
+    const g = this.group = new THREE.Group(), y0 = 2.4, len = Math.max(6, Math.min(14, span - 1.2));
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, len, 24), new THREE.MeshPhysicalMaterial({ color: 0xdfeee9, transparent: true, opacity: 0.55, roughness: 0.05, clearcoat: 1 }));
+    glass.rotation.z = Math.PI / 2; glass.position.set(0, y0, 0); g.add(glass);
+    this.reedA = new THREE.Mesh(new THREE.BoxGeometry(len * 0.46, 0.22, 0.7), M.steelSatin); this.reedB = this.reedA.clone();
+    this.reedA.position.set(-len * 0.26, y0 + 0.1, 0); this.reedB.position.set(len * 0.26, y0 - 0.1, 0); g.add(this.reedA, this.reedB);
+    for (const s of [-1, 1]) {
+      const h2 = span / 2, ex = s * len / 2;
+      const path = new THREE.CatmullRomCurve3([new THREE.Vector3(ex, y0, 0), new THREE.Vector3(s * h2, y0, 0), new THREE.Vector3(s * h2, y0 - 1, 0), new THREE.Vector3(s * h2, -3.0, 0)]);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(path, 16, 0.25, 6, false), M.tin));
+    }
+    // a small bar magnet that appears above the glass when the switch is closed
+    this.magnet = new THREE.Group();
+    const n = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 2.4), new THREE.MeshStandardMaterial({ color: 0xc8231b, roughness: 0.5 })), so = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 2.4), new THREE.MeshStandardMaterial({ color: 0xd0d3d8, roughness: 0.4, metalness: 0.6 }));
+    n.position.x = -1.5; so.position.x = 1.5; this.magnet.add(n, so); this.magnet.position.set(0, y0 + 4.2, 0); this.magnet.visible = false; g.add(this.magnet);
+    tagHW(g, 'reed');
+  }
+  setActive(on) { this.magnet.visible = !!on; this.reedA.position.y = on ? 2.4 : 2.65; this.reedB.position.y = on ? 2.4 : 2.15; }
+}
+
+export class TiltSwitch {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    this.can = new THREE.Group();
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 8.5, 28), new THREE.MeshStandardMaterial({ color: 0xc4c7cc, metalness: 0.85, roughness: 0.3 }));
+    can.position.y = 4.25 + 0.3; this.can.add(can);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(1.95, 1.95, 0.5, 28), new THREE.MeshStandardMaterial({ color: 0x15151a, roughness: 0.7 })); cap.position.y = 0.55; this.can.add(cap);
+    const top = new THREE.Mesh(new THREE.SphereGeometry(1.9, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc4c7cc, metalness: 0.85, roughness: 0.3 })); top.position.y = 8.55; this.can.add(top);
+    g.add(this.can);
+    for (const x of [-1.27, 1.27]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 4.0, 8), M.tin); leg.position.set(x, -1.0, 0); g.add(leg); }
+    tagHW(g, 'tilt');
+  }
+  setTilt(on) { this.can.rotation.z = on ? 0.62 : 0; this.can.position.x = on ? -1.4 : 0; }
+}
+
+export class SlideSwitch {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const body = new THREE.Mesh(new RoundedBoxGeometry(8.6, 3.4, 4.0, 2, 0.15), new THREE.MeshStandardMaterial({ color: 0xcfd2d6, metalness: 0.8, roughness: 0.35 }));
+    body.position.y = 1.7 + 1.0; g.add(body);
+    const slot = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.12, 1.3), new THREE.MeshStandardMaterial({ color: 0x0d0d0f })); slot.position.y = 4.46; g.add(slot);
+    this.knob = new THREE.Mesh(new RoundedBoxGeometry(2.6, 2.6, 2.6, 2, 0.2), new THREE.MeshStandardMaterial({ color: 0x1b1b1d, roughness: 0.6 })); this.knob.position.set(-1.3, 5.6, 0); g.add(this.knob);
+    for (let i = -1; i <= 1; i++) { const rib = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.5, 2.7), new THREE.MeshStandardMaterial({ color: 0x2d2d30 })); rib.position.set(i * 0.7, 0, 0); this.knob.add(rib); }
+    for (const x of [-2.54, 0, 2.54]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.7, 4.3, 0.4), M.tin); leg.position.set(x, -1.15, 0); g.add(leg); }
+    tagHW(g, 'slidesw');
+  }
+  setPos(b) { this.knob.position.x = b ? 1.3 : -1.3; }
+}
+
 // ---------------------------------------------------------------- radial aluminium electrolytic capacitor
 // Typical sizes only (maker series differ): 10 uF 5 x 11 mm, 100 uF 6.3 x 11 mm, 470 uF 8 x 12 mm; the long leg is +, the stripe marks the - side.
 export class ElectrolyticCap {
@@ -1908,6 +1959,24 @@ export const HW_INFO = {
       'Flyback diode: connect it across the coil in the reverse direction, cathode to the supply side, anode to the switched side.',
     ],
     src: '1N4007 datasheets (Vishay, onsemi); general electronics practice',
+  },
+  reed: {
+    name: 'Reed switch', tag: 'A switch operated by a magnet',
+    summary: 'Two thin metal contacts sealed in a glass capsule. A magnet near the glass makes them touch (the switch closes); without the magnet they spring apart (open).',
+    points: ['It has no polarity and no moving parts you can see.', 'Wire it like a button: one leg to a pin set to input with pull-up, the other to GND. Closed reads LOW.', 'Used in door and window sensors.'],
+    src: 'General electronics practice',
+  },
+  tilt: {
+    name: 'Ball tilt switch', tag: 'A switch operated by tilting',
+    summary: 'A small metal ball rolls inside a can. Tilted one way it touches the contacts and the switch closes; upright it rolls away and the switch opens.',
+    points: ['It has no polarity. Wire it like a button (pin with pull-up, other leg to GND).', 'The ball bounces for a moment: real code should debounce the reading.'],
+    src: 'General electronics practice',
+  },
+  slidesw: {
+    name: 'Slide switch (SPDT)', tag: 'Chooses between two circuits',
+    summary: 'Three legs: the middle leg (COM, common) is connected to one outer leg or to the other, depending on the slider position.',
+    points: ['Left leg A, middle COM, right leg B (the app labels them in this order).', 'Used to select a mode or to switch a supply.'],
+    src: 'General electronics practice',
   },
   cap: {
     name: 'Electrolytic capacitor', tag: 'Stores charge: smoothing and timing',

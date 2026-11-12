@@ -15,7 +15,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Capacitor (electrolytic 10/100/470 uF: RC charging, polarity, inrush) | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | time-dependent solver (backward Euler, state in env.capV) plus an inrush solve for pin damage; ratings and sizes are typical values (16 V assumed); ceramic decoupling cap TODO |
 | NPN transistor PN2222A low-side switch (TO-92 E B C) | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 24) | DONE (Build + lesson 21) | base resistor, saturation, pin order, flyback-diode warning; max 600 mA |
 | MOSFET switch (IRLZ44N, TO-220 G D S) | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 25) | DONE (Build + lesson 22) | values from the Infineon datasheet (RDS(on) 35/25/22 mOhm at 4/5/10 V, VGS(th) 1.0-2.0 V, 47 A, +-16 V); no datasheet value at 3.3 V, so a 1 A load from a 3.3 V gate warns; body diode and flyback-diode warnings; 5 examples |
-| Slide switch, toggle, tilt switch, reed switch | TODO | TODO | TODO | TODO | |
+| Slide switch (SPDT), tilt switch, reed switch | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | click the part in 3D to switch it (env.sw); generic parts, no part numbers or ratings claimed; toggle switch TODO |
 | Battery + breadboard power supply | partly (battery pack) | partly | partly | partly | |
 
 ## B. Light and display

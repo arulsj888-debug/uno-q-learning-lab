@@ -56,6 +56,8 @@ export function terminals(d) {
     case 'dht': return [['VCC', `${row}${c}`], ['DATA', `${row}${c + 1}`], ['NC', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
     case 'diode': return [['A', d.a], ['K', d.k]];
     case 'cap': return [['plus', d.a], ['minus', d.k]];
+    case 'reed': case 'tilt': return [['a', d.a], ['b', d.k]];
+    case 'slidesw': return [['A', `${row}${c}`], ['COM', `${row}${c + 1}`], ['B', `${row}${c + 2}`]];
     case 'npn': return d.flip ? [['E', `${row}${c + 2}`], ['B', `${row}${c + 1}`], ['C', `${row}${c}`]] : [['E', `${row}${c}`], ['B', `${row}${c + 1}`], ['C', `${row}${c + 2}`]];
     case 'mosfet': return d.flip ? [['S', `${row}${c + 2}`], ['D', `${row}${c + 1}`], ['G', `${row}${c}`]] : [['G', `${row}${c}`], ['D', `${row}${c + 1}`], ['S', `${row}${c + 2}`]];
     case 'rgbled': return [['R', `${row}${c}`], ['C', `${row}${c + 1}`], ['G', `${row}${c + 2}`], ['B', `${row}${c + 3}`]];
@@ -315,6 +317,8 @@ export function evaluate(model) {
         if (!dead) { elems.push(body, f); }
         pe[d.id] = { g: Gn, d: Dn, s: Sn, f, body };
       }
+      else if (d.type === 'reed' || d.type === 'tilt') { const a = nid(T(d, 'a')), b = nid(T(d, 'b')); if (((env && env.sw) || {})[d.id]) elems.push({ t: 'R', a, b, g: 20 }); pe[d.id] = {}; }   // closed contact: 0.05 ohm
+      else if (d.type === 'slidesw') { const A = nid(T(d, 'A')), C = nid(T(d, 'COM')), B = nid(T(d, 'B')); elems.push({ t: 'R', a: C, b: ((env && env.sw) || {})[d.id] ? B : A, g: 20 }); pe[d.id] = {}; }
       else if (d.type === 'cap') { const a = nid(T(d, 'plus')), b = nid(T(d, 'minus')); if (!dead && dt > 0) elems.push({ t: 'C', a, b, c: (d.uf || 100) * 1e-6, dt, v0: capV[d.id] ?? 0 }); pe[d.id] = { a, b }; }
       else if (d.type === 'rgbled') {
         // three LED dice with one common leg: common cathode (d.ca falsy) = colour pins are the anodes, common anode = colour pins are the cathodes
@@ -520,6 +524,13 @@ export function evaluate(model) {
           const prot = parts.some(p => p.type === 'diode' && !burnt.has(p.id) && find(T(p, 'A')) === cn && find(T(p, 'K')) === other);
           if (!prot) note('warn', `${label} switches an inductive load (${nameOf(l)}) without a flyback diode. The voltage spike when the current stops can destroy the MOSFET. Put a diode across the load: cathode (band) to the supply side, anode to the MOSFET side.`, d.id);
         }
+      }
+    } else if (d.type === 'reed' || d.type === 'tilt' || d.type === 'slidesw') {
+      const on = !!((env && env.sw) || {})[d.id];
+      if (d.type === 'slidesw') { R.msg = on ? 'Slid to B: COM is connected to B.' : 'Slid to A: COM is connected to A.'; if (powered) note('info', `${label}: ${R.msg} Click it to slide the knob.`, d.id); }
+      else {
+        R.closed = on; const what = d.type === 'reed' ? (on ? 'closed: a magnet is near the glass' : 'open: no magnet near') : (on ? 'closed: tilted, the ball touches the contacts' : 'open: upright, the ball is away from the contacts');
+        R.msg = what[0].toUpperCase() + what.slice(1) + '.'; if (powered) note('info', `${label} is ${what}. Click it to ${d.type === 'reed' ? 'bring the magnet near or take it away' : 'tilt it or stand it upright'}.`, d.id);
       }
     } else if (d.type === 'cap') {
       const V = s.V ?? 0, uf = d.uf || 100, prev = (model.capV || {})[d.id] ?? 0, dn = dangling(d, 'plus') ? '+' : dangling(d, 'minus') ? '−' : null;
@@ -903,7 +914,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', cap: 'Capacitor', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', cap: 'Capacitor', reed: 'Reed switch', tilt: 'Tilt switch', slidesw: 'Slide switch', mosfet: 'MOSFET IRLZ44N', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }
