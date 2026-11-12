@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -30,6 +30,7 @@ const SRC = {
   neolib: { t: 'Adafruit_NeoPixel library (examples: strandtest)', u: 'https://github.com/adafruit/Adafruit_NeoPixel' },
   pn2222: { t: 'onsemi PN2222 / PN2222A datasheet (TO-92: emitter, base, collector; 600 mA; VCE(sat) 0.3 V at 150 mA / 15 mA)', u: 'https://www.onsemi.com/pdf/datasheet/pn2222-d.pdf' },
   irlz44n: { t: 'Infineon IRLZ44NPbF datasheet (TO-220: gate, drain, source; 55 V; RDS(on) 22 mΩ at 10 V, 25 mΩ at 5 V, 35 mΩ at 4 V; VGS(th) 1.0 to 2.0 V; VGS ±16 V)', u: 'https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlz44npbf-datasheet-en.pdf' },
+  d1n4007: { t: 'Vishay 1N4001 to 1N4007 datasheet (average forward current 1 A; forward voltage 1.1 V at 1 A; up to 1000 V reverse for the 1N4007; the band marks the cathode)', u: 'https://www.vishay.com/docs/88503/1n4001.pdf' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -140,6 +141,20 @@ const M_PARTS_E = [
   { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c12', color: 'black', lift: 20 },
 ];
 const M_IDS_E = M_PARTS_E.map(d => d.id);
+// two LED branches behind 1N4007 diodes, the second diode turned round
+const D_PARTS_E = [
+  { id: 'w1', type: 'fwire', from: 'G16', to: 'a10', color: 'yellow', lift: 14 },
+  { id: 'r1', type: 'resistor', a: 'c10', b: 'c13', ohms: 100 },
+  { id: 'd1', type: 'diode', a: 'b13', k: 'b17' },
+  { id: 'led1', type: 'led', anode: 'c17', cathode: 'c18' },
+  { id: 'w2', type: 'fwire', from: 'GND2', to: 'a18', color: 'black', lift: 10 },
+  { id: 'w3', type: 'wire', from: 'b10', to: 'b21', color: 'orange', lift: 12 },
+  { id: 'r2', type: 'resistor', a: 'c21', b: 'c24', ohms: 100 },
+  { id: 'd2', type: 'diode', a: 'b28', k: 'b24' },
+  { id: 'led2', type: 'led', anode: 'c28', cathode: 'c29' },
+  { id: 'w4', type: 'wire', from: 'b18', to: 'b29', color: 'black', lift: 12 },
+];
+const D_IDS_E = D_PARTS_E.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
@@ -1245,5 +1260,48 @@ export const E32_LESSONS = [
       { q: 'The datasheet gives the on-resistance for which gate voltages?', a: ['Only 3.3 V', '4 V, 5 V and 10 V', 'Only 1 V', 'All voltages from 0 V'], c: 1, why: '35 mΩ at 4 V, 25 mΩ at 5 V, 22 mΩ at 10 V.' },
     ],
     sources: [SRC.irlz44n, SRC.ds, SRC.pinmode],
+  },
+
+  // ================================================================== 23
+  {
+    id: 'e23', num: 23, module: 10, title: 'A diode: current flows one way', level: 'Beginner', time: '15 min',
+    goal: 'See that a diode lets current through in one direction only, and read its band.',
+    hardware: ['ESP32 DevKit V1', '2 × diode 1N4007', '2 × 5 mm red LED', '2 × 100 Ω resistor', 'Breadboard and jumper wires'],
+    code: E32_DIODE, file: 'DiodeDemo.ino', program: 'e_extled', fast: true,
+    circuit: D_PARTS_E, io: { G16: { kind: 'led', item: 'led1', diode: 'd1', rev: { r: 'r2', diode: 'd2', led: 'led2' }, needs: D_IDS_E } },
+    explain: {
+      2: 'One pin feeds <b>both</b> branches through a resistor each.',
+      4: '<b>setup()</b> runs once.',
+      5: 'The pin is an output.',
+      8: '<b>loop()</b> repeats forever.',
+      9: 'HIGH (3.3 V): in the first branch the current goes through the diode in its <b>forward</b> direction and the LED lights. In the second branch the diode is turned round and <b>blocks</b>: that LED stays dark.',
+      10: 'Wait one second.',
+      11: 'LOW: no current anywhere.',
+      12: 'Wait one second.',
+    },
+    steps: [
+      { title: 'A one-way valve for current', view: 'bbwide', have: [], power: false,
+        body: `<p>A <b>diode</b> lets current flow in <b>one direction only</b>, like a one-way valve. It has two legs: the <b>anode</b> (+) and the <b>cathode</b> (−). Current flows from the anode to the cathode, not the other way.</p>` },
+      { title: 'The 1N4007', view: 'bigq', have: ['d1'], power: false,
+        body: `<p>The <b>1N4007</b> is a common power diode. The <b>silver band</b> marks the <b>cathode</b>. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Average forward current <b>1 A</b>; forward voltage <b>1.1 V at 1 A</b> (Vishay datasheet).</li><li>It blocks up to <b>1000 V</b> in the reverse direction.</li></ul>
+        <p>Part of the voltage supply is lost in a forward-biased diode (a little under a volt at small currents).</p>` },
+      { title: 'Two branches, one turned round', view: 'bbwide', have: ['r1', 'd1', 'led1', 'r2', 'd2', 'led2'], power: false,
+        body: `<p>Both branches are the same: resistor, diode, LED. In the <b>first</b> branch the band is on the <b>LED side</b> (anode toward the pin): current can flow. In the <b>second</b> branch the diode is <b>turned round</b> (band toward the resistor): it blocks.</p>` },
+      { title: 'Wire it', view: 'bbwide', have: D_IDS_E, power: false, pins: ['G16', 'GND2'],
+        body: `<ul><li>Yellow: <b>RX2 (GPIO16) → a10</b></li><li>Orange: <b>b10 → b21</b> (feeds the second branch)</li><li>Black: <b>GND → a18</b>, and a black link <b>b18 → b29</b> joins the two LED cathodes</li></ul>
+        <p>Each resistor (100 Ω) limits the current of its LED.</p>` },
+      { title: 'The code', view: 'bbwide', have: D_IDS_E, showCode: true, power: true, body: `<p>Just a blink on one pin. Click lines 9 and 11.</p>` },
+      { title: 'Run it', view: 'bbwide', have: D_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>When the pin is HIGH, only the <b>first LED</b> lights. The second one stays dark: its diode points the wrong way. Same parts, same wiring, only the diode is turned round.</p>` },
+      { title: 'Summary', view: 'bbwide', have: D_IDS_E, power: true,
+        body: `<ul><li>Current flows from the <b>anode</b> to the <b>cathode</b> (the end with the band).</li><li>A turned-round diode blocks.</li><li>Diodes protect circuits: wrong polarity, and a <b>flyback diode</b> across a motor or relay coil.</li><li>1N4007: 1 A, 1.1 V at 1 A, 1000 V reverse.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Which end of a 1N4007 is the cathode?', a: ['The end without a mark', 'The end with the silver band', 'The longer leg', 'Either'], c: 1, why: 'The band marks the cathode.' },
+      { q: 'The diode is turned round in a series circuit. What happens?', a: ['It conducts more', 'It blocks the current', 'It burns', 'Nothing'], c: 1, why: 'A reverse-biased diode blocks.' },
+      { q: 'Current flows through a diode from…', a: ['cathode to anode', 'anode to cathode', 'either way', 'neither way'], c: 1, why: 'Forward direction is anode to cathode.' },
+    ],
+    sources: [SRC.d1n4007, SRC.ds, SRC.pinmode],
   },
 ];

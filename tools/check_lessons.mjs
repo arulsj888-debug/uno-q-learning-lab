@@ -46,6 +46,7 @@ function legs(d) {
     case 'sht31': return { [d.id + '.VIN']: `${d.row}${d.col}`, [d.id + '.GND']: `${d.row}${d.col + 1}`, [d.id + '.SCL']: `${d.row}${d.col + 2}`, [d.id + '.SDA']: `${d.row}${d.col + 3}`, [d.id + '.ADDR']: `${d.row}${d.col + 4}`, [d.id + '.RST']: `${d.row}${d.col + 5}`, [d.id + '.ALRT']: `${d.row}${d.col + 6}` };
     case 'joystick': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.VRX']: `${d.row}${d.col + 2}`, [d.id + '.VRY']: `${d.row}${d.col + 3}`, [d.id + '.SW']: `${d.row}${d.col + 4}` };
     case 'encoder': return { [d.id + '.CLK']: `${d.row}${d.col}`, [d.id + '.DT']: `${d.row}${d.col + 1}`, [d.id + '.SW']: `${d.row}${d.col + 2}`, [d.id + '.VCC']: `${d.row}${d.col + 3}`, [d.id + '.GND']: `${d.row}${d.col + 4}` };
+    case 'diode': return { [d.id + '.A']: d.a, [d.id + '.K']: d.k };
     case 'mosfet': return { [d.id + '.G']: `${d.row}${d.col}`, [d.id + '.D']: `${d.row}${d.col + 1}`, [d.id + '.S']: `${d.row}${d.col + 2}` };
     case 'npn': return { [d.id + '.E']: `${d.row}${d.col}`, [d.id + '.B']: `${d.row}${d.col + 1}`, [d.id + '.C']: `${d.row}${d.col + 2}` };
     case 'rgbled': return { [d.id + '.R']: `${d.row}${d.col}`, [d.id + '.C']: `${d.row}${d.col + 1}`, [d.id + '.G']: `${d.row}${d.col + 2}`, [d.id + '.B']: `${d.row}${d.col + 3}` };
@@ -104,7 +105,22 @@ for (const L of list) {
   for (const [pin, io] of Object.entries(L.io || {})) {
     for (const id of io.needs) if (!byId[id]) bad(L, `io ${pin} needs missing part ${id}`);
     const P = 'PIN:' + pin, G = 'PIN:GND';
-    if (io.kind === 'led') {
+    if (io.kind === 'led' && io.diode) {
+      const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));
+      if (!r) { bad(L, `${pin}: no resistor connected to the pin`); continue; }
+      const far = N.same(r.id + '.1', P) ? r.id + '.2' : r.id + '.1', D1 = io.diode;
+      if (!N.same(far, D1 + '.A')) bad(L, `${pin}: resistor does not reach the anode of ${D1}`);
+      if (!N.same(D1 + '.K', io.item + '.A')) bad(L, `${D1}: cathode does not reach the LED anode`);
+      if (!N.same(io.item + '.K', G)) bad(L, `${pin}: LED cathode is not on GND`);
+      const rv = io.rev;
+      if (rv) {
+        if (!N.same(rv.r + '.1', P) && !N.same(rv.r + '.2', P)) bad(L, `${rv.r} is not fed from the pin`);
+        const f2 = N.same(rv.r + '.1', P) ? rv.r + '.2' : rv.r + '.1';
+        if (!N.same(f2, rv.diode + '.K')) bad(L, `${rv.diode}: cathode should face the resistor (turned round)`);
+        if (!N.same(rv.diode + '.A', rv.led + '.A')) bad(L, `${rv.diode}: anode does not reach ${rv.led}`);
+        if (!N.same(rv.led + '.K', G)) bad(L, `${rv.led}: cathode not on GND`);
+      }
+    } else if (io.kind === 'led') {
       const r = all.find(d => d.type === 'resistor' && (N.same(d.id + '.1', P) || N.same(d.id + '.2', P)));
       if (!r) { bad(L, `${pin}: no resistor connected to the pin`); continue; }
       const far = N.same(r.id + '.1', P) ? r.id + '.2' : r.id + '.1';

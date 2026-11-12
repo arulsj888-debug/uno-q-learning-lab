@@ -88,6 +88,8 @@ const checks = {
   E32_QSW: [E32.E32_QSW, [[2, 'basePin'], [4, 'void setup'], [5, 'pinMode(basePin'], [8, 'void loop'], [9, 'digitalWrite(basePin, HIGH)'], [10, 'delay(1000)'], [11, 'digitalWrite(basePin, LOW)'], [12, 'delay(1000)']]],
   U3_MOSW: [U3.U3_MOSW, [[2, 'gatePin'], [4, 'void setup'], [5, 'pinMode(gatePin'], [8, 'void loop'], [9, 'digitalWrite(gatePin, HIGH)'], [10, 'delay(1000)'], [11, 'digitalWrite(gatePin, LOW)'], [12, 'delay(1000)']]],
   E32_MOSW: [E32.E32_MOSW, [[2, 'gatePin'], [4, 'void setup'], [5, 'pinMode(gatePin'], [8, 'void loop'], [9, 'digitalWrite(gatePin, HIGH)'], [10, 'delay(1000)'], [11, 'digitalWrite(gatePin, LOW)'], [12, 'delay(1000)']]],
+  U3_DIODE: [U3.U3_DIODE, [[2, 'ledPin'], [4, 'void setup'], [5, 'pinMode(ledPin'], [8, 'void loop'], [9, 'digitalWrite(ledPin, HIGH)'], [10, 'delay(1000)'], [11, 'digitalWrite(ledPin, LOW)'], [12, 'delay(1000)']]],
+  E32_DIODE: [E32.E32_DIODE, [[2, 'ledPin'], [4, 'void setup'], [5, 'pinMode(ledPin'], [8, 'void loop'], [9, 'digitalWrite(ledPin, HIGH)'], [10, 'delay(1000)'], [11, 'digitalWrite(ledPin, LOW)'], [12, 'delay(1000)']]],
   BUZZER: [C.BUZZER, [[2, 'buzzerPin = D9'], [3, 'int notes[]'], [5, 'void setup'], [8, 'void loop'], [9, 'for (int i'], [10, 'tone(buzzerPin'], [11, 'delay(300)'], [13, 'noTone'], [14, 'delay(1000)']]],
 };
 let bad = 0;

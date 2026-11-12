@@ -32,6 +32,7 @@ export const SRC = {
   neolib: { t: 'Adafruit_NeoPixel library (examples: strandtest)', u: 'https://github.com/adafruit/Adafruit_NeoPixel' },
   pn2222: { t: 'onsemi PN2222 / PN2222A datasheet (TO-92: emitter, base, collector; 600 mA; VCE(sat) 0.3 V at 150 mA / 15 mA)', u: 'https://www.onsemi.com/pdf/datasheet/pn2222-d.pdf' },
   irlz44n: { t: 'Infineon IRLZ44NPbF datasheet (TO-220: gate, drain, source; 55 V; RDS(on) 22 mΩ at 10 V, 25 mΩ at 5 V, 35 mΩ at 4 V; VGS(th) 1.0 to 2.0 V; VGS ±16 V)', u: 'https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlz44npbf-datasheet-en.pdf' },
+  d1n4007: { t: 'Vishay 1N4001 to 1N4007 datasheet (average forward current 1 A; forward voltage 1.1 V at 1 A; up to 1000 V reverse for the 1N4007; the band marks the cathode)', u: 'https://www.vishay.com/docs/88503/1n4001.pdf' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -241,3 +242,18 @@ export const M_PARTS = [
   { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c12', color: 'black', lift: 20 },
 ];
 export const M_IDS = M_PARTS.map(d => d.id);
+
+// ---- Lesson 26: two LED branches, the second diode is turned round
+export const D_PARTS = [
+  { id: 'w1', type: 'wire', from: 'D5', to: 'a10', color: 'yellow', lift: 14 },
+  { id: 'r1', type: 'resistor', a: 'c10', b: 'c13', ohms: 220 },
+  { id: 'd1', type: 'diode', a: 'b13', k: 'b17' },
+  { id: 'led1', type: 'led', anode: 'c17', cathode: 'c18' },
+  { id: 'w2', type: 'wire', from: 'GND2', to: 'a18', color: 'black', lift: 10 },
+  { id: 'w3', type: 'wire', from: 'b10', to: 'b21', color: 'orange', lift: 12 },
+  { id: 'r2', type: 'resistor', a: 'c21', b: 'c24', ohms: 220 },
+  { id: 'd2', type: 'diode', a: 'b28', k: 'b24' },
+  { id: 'led2', type: 'led', anode: 'c28', cathode: 'c29' },
+  { id: 'w4', type: 'wire', from: 'b18', to: 'b29', color: 'black', lift: 12 },
+];
+export const D_IDS = D_PARTS.map(d => d.id);

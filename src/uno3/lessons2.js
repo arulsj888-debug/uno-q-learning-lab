@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1221,5 +1221,48 @@ export const U3_LESSONS_2 = [
       { q: 'The datasheet gives the on-resistance for which gate voltages?', a: ['Only 3.3 V', '4 V, 5 V and 10 V', 'Only 1 V', 'All voltages from 0 V'], c: 1, why: '35 mΩ at 4 V, 25 mΩ at 5 V, 22 mΩ at 10 V.' },
     ],
     sources: [SRC.irlz44n, SRC.ds, SRC.pinmode],
+  },
+
+  // ================================================================== 26
+  {
+    id: 'u26', num: 26, module: 10, title: 'A diode: current flows one way', level: 'Beginner', time: '15 min',
+    goal: 'See that a diode lets current through in one direction only, and read its band.',
+    hardware: ['Arduino UNO R3', '2 × diode 1N4007', '2 × 5 mm red LED', '2 × 220 Ω resistor', 'Breadboard and jumper wires'],
+    code: U3_DIODE, file: 'DiodeDemo.ino', program: 'extled', fast: true,
+    circuit: D_PARTS, io: { D5: { kind: 'led', item: 'led1', diode: 'd1', rev: { r: 'r2', diode: 'd2', led: 'led2' }, needs: D_IDS } },
+    explain: {
+      2: 'One pin feeds <b>both</b> branches through a resistor each.',
+      4: '<b>setup()</b> runs once.',
+      5: 'The pin is an output.',
+      8: '<b>loop()</b> repeats forever.',
+      9: 'HIGH (5 V): in the first branch the current goes through the diode in its <b>forward</b> direction and the LED lights. In the second branch the diode is turned round and <b>blocks</b>: that LED stays dark.',
+      10: 'Wait one second.',
+      11: 'LOW: no current anywhere.',
+      12: 'Wait one second.',
+    },
+    steps: [
+      { title: 'A one-way valve for current', view: 'bbwide', have: [], power: false,
+        body: `<p>A <b>diode</b> lets current flow in <b>one direction only</b>, like a one-way valve. It has two legs: the <b>anode</b> (+) and the <b>cathode</b> (−). Current flows from the anode to the cathode, not the other way.</p>` },
+      { title: 'The 1N4007', view: 'bigq', have: ['d1'], power: false,
+        body: `<p>The <b>1N4007</b> is a common power diode. The <b>silver band</b> marks the <b>cathode</b>. <b>Click it</b> in the 3D view.</p>
+        <ul><li>Average forward current <b>1 A</b>; forward voltage <b>1.1 V at 1 A</b> (Vishay datasheet).</li><li>It blocks up to <b>1000 V</b> in the reverse direction.</li></ul>
+        <p>Part of the voltage supply is lost in a forward-biased diode (a little under a volt at small currents).</p>` },
+      { title: 'Two branches, one turned round', view: 'bbwide', have: ['r1', 'd1', 'led1', 'r2', 'd2', 'led2'], power: false,
+        body: `<p>Both branches are the same: resistor, diode, LED. In the <b>first</b> branch the band is on the <b>LED side</b> (anode toward the pin): current can flow. In the <b>second</b> branch the diode is <b>turned round</b> (band toward the resistor): it blocks.</p>` },
+      { title: 'Wire it', view: 'bbwide', have: D_IDS, power: false, pins: ['D5', 'GND2'],
+        body: `<ul><li>Yellow: <b>pin 5 → a10</b></li><li>Orange: <b>b10 → b21</b> (feeds the second branch)</li><li>Black: <b>GND → a18</b>, and a black link <b>b18 → b29</b> joins the two LED cathodes</li></ul>
+        <p>Each resistor (220 Ω) limits the current of its LED.</p>` },
+      { title: 'The code', view: 'bbwide', have: D_IDS, showCode: true, power: true, body: `<p>Just a blink on one pin. Click lines 9 and 11.</p>` },
+      { title: 'Run it', view: 'bbwide', have: D_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>When the pin is HIGH, only the <b>first LED</b> lights. The second one stays dark: its diode points the wrong way. Same parts, same wiring, only the diode is turned round.</p>` },
+      { title: 'Summary', view: 'bbwide', have: D_IDS, power: true,
+        body: `<ul><li>Current flows from the <b>anode</b> to the <b>cathode</b> (the end with the band).</li><li>A turned-round diode blocks.</li><li>Diodes protect circuits: wrong polarity, and a <b>flyback diode</b> across a motor or relay coil.</li><li>1N4007: 1 A, 1.1 V at 1 A, 1000 V reverse.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Which end of a 1N4007 is the cathode?', a: ['The end without a mark', 'The end with the silver band', 'The longer leg', 'Either'], c: 1, why: 'The band marks the cathode.' },
+      { q: 'The diode is turned round in a series circuit. What happens?', a: ['It conducts more', 'It blocks the current', 'It burns', 'Nothing'], c: 1, why: 'A reverse-biased diode blocks.' },
+      { q: 'Current flows through a diode from…', a: ['cathode to anode', 'anode to cathode', 'either way', 'neither way'], c: 1, why: 'Forward direction is anode to cathode.' },
+    ],
+    sources: [SRC.d1n4007, SRC.ds, SRC.pinmode],
   },
 ];

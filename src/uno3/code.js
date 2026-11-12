@@ -536,3 +536,18 @@ void loop() {
   digitalWrite(gatePin, LOW);    // gate voltage off: the lamp is off
   delay(1000);
 }`;
+
+// Lesson 26 — 1N4007 diode: current flows one way
+export const U3_DIODE = `// Two LEDs, each behind a diode: only the one with the diode the right way round lights
+const int ledPin = 5;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(ledPin, HIGH);  // 5 V: current flows through the forward diode
+  delay(1000);
+  digitalWrite(ledPin, LOW);   // 0 V: no current
+  delay(1000);
+}`;
