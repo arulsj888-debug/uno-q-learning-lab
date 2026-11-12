@@ -570,6 +570,47 @@ export class OLED128x64Module extends I2CDisplayBase {
   }
 }
 
+// ---------------------------------------------------------------- 1N4007 rectifier diode (DO-41): black body, silver band at the cathode end
+export class Diode1N4007 {
+  constructor(span = 12.7) {
+    const g = this.group = new THREE.Group(), y0 = 3.2;
+    const bodyMat = new THREE.MeshPhysicalMaterial({ color: 0x17181a, roughness: 0.5, clearcoat: 0.3 });
+    const prof = [[0, 0], [1.2, 0.05], [1.35, 0.5], [1.35, 4.7], [1.2, 5.15], [0, 5.2]].map(([r, y]) => new THREE.Vector2(r, y));
+    const geo = new THREE.LatheGeometry(prof, 36); geo.rotateZ(Math.PI / 2); geo.translate(-2.6, 0, 0);
+    const body = new THREE.Mesh(geo, bodyMat); body.position.set(0, y0, 0); g.add(body);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(1.38, 1.38, 0.85, 36, 1, true), new THREE.MeshStandardMaterial({ color: 0xcfd1d4, roughness: 0.3, metalness: 0.9 }));
+    band.rotation.z = Math.PI / 2; band.position.set(1.65, y0, 0); g.add(band);
+    const mark = canvasTex(256, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.fillStyle = 'rgba(214,216,218,0.85)'; c.font = '700 40px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('1N4007', w / 2, h / 2); });
+    const lab = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.85), new THREE.MeshBasicMaterial({ map: mark, transparent: true, depthWrite: false })); lab.position.set(-0.8, y0, 1.37); g.add(lab);
+    const h2 = span / 2;
+    const path = new THREE.CatmullRomCurve3([new THREE.Vector3(-h2, -3.0, 0), new THREE.Vector3(-h2, 1.8, 0), new THREE.Vector3(-h2 + 0.4, y0 - 0.25, 0), new THREE.Vector3(-h2 + 1.4, y0, 0), new THREE.Vector3(-2.7, y0, 0)]);
+    const path2 = new THREE.CatmullRomCurve3(path.points.map(p => new THREE.Vector3(-p.x, p.y, p.z)));
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(path, 32, 0.3, 8, false), M.tin)); g.add(new THREE.Mesh(new THREE.TubeGeometry(path2, 32, 0.3, 8, false), M.tin));
+    tagHW(g, 'diode');
+  }
+}
+
+// ---------------------------------------------------------------- PN2222A NPN transistor in a TO-92 case: flat face toward you, pins 1 2 3 = emitter, base, collector (left to right)
+export class TransistorPN2222A {
+  constructor() {
+    const g = this.group = new THREE.Group();
+    const r = 2.4, flat = 1.0, a = Math.asin(flat / r), fx = r * Math.cos(a);
+    const sh = new THREE.Shape();
+    sh.moveTo(-fx, flat); sh.lineTo(fx, flat); sh.absarc(0, 0, r, a, Math.PI - a, true);
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: 4.7, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.08, bevelSegments: 2, curveSegments: 32 });
+    geo.rotateX(Math.PI / 2); geo.translate(0, 4.7, 0);
+    const body = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x1b1b1d, roughness: 0.55 })); body.position.y = 3.2; g.add(body);
+    const mark = canvasTex(256, 256, (c, w, h) => { c.clearRect(0, 0, w, h); c.fillStyle = 'rgba(214,216,218,0.9)'; c.font = '700 46px Arial, Helvetica, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('PN2222A', w / 2, h * 0.38); c.font = '600 30px Arial, Helvetica, sans-serif'; c.fillText('E  B  C', w / 2, h * 0.66); });
+    const label = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 4.0), new THREE.MeshBasicMaterial({ map: mark, transparent: true, depthWrite: false })); label.position.set(0, 3.2 + 2.35, flat + 0.12); g.add(label);
+    for (const [i, x] of [[0, -2.54], [1, 0], [2, 2.54]]) {
+      const bx = (i - 1) * 1.27;
+      const path = new THREE.CatmullRomCurve3([new THREE.Vector3(bx, 3.3, 0), new THREE.Vector3(bx, 2.2, 0), new THREE.Vector3(x, 0.9, 0), new THREE.Vector3(x, -3.0, 0)]);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(path, 16, 0.22, 6, false), M.tin));
+    }
+    tagHW(g, 'npn');
+  }
+}
+
 // ---------------------------------------------------------------- axial resistor
 const BAND = { black: 0x111111, brown: 0x6b3a1e, red: 0xc8231b, orange: 0xe26a12, yellow: 0xe8c618, green: 0x1f8a3a, blue: 0x1f55c4, violet: 0x7a3fb5, grey: 0x8a8a8a, white: 0xf0f0f0, gold: 0xc9a23f, silver: 0xc0c0c0 };
 export class Resistor {
@@ -1807,6 +1848,26 @@ export const HW_INFO = {
       'Check whether your module accepts 3.3 V, 5 V or both before choosing VCC.',
     ],
     src: 'Adafruit_SSD1306 examples; module descriptions',
+  },
+  diode: {
+    name: '1N4007 rectifier diode', tag: 'Current flows one way: anode → cathode',
+    summary: 'A diode lets current pass from the anode to the cathode (the end with the silver band) and blocks it the other way. Across a motor or a relay coil it absorbs the voltage spike that appears when the current is switched off (a flyback diode).',
+    points: [
+      'The silver band marks the cathode (−). Forward voltage about 1.1 V at 1 A; average forward current 1 A; reverse voltage up to 1000 V (datasheets).',
+      'Flyback diode: connect it across the coil in the reverse direction, cathode to the supply side, anode to the switched side.',
+    ],
+    src: '1N4007 datasheets (Vishay, onsemi); general electronics practice',
+  },
+  npn: {
+    name: 'PN2222A NPN transistor (TO-92)', tag: 'A small electronic switch',
+    summary: 'A small current into the base lets a much larger current flow from the collector to the emitter. It lets a GPIO pin switch a lamp, motor or relay that the pin could never drive directly.',
+    points: [
+      'Pins of the TO-92 PN2222A, flat face toward you, left to right: 1 emitter, 2 base, 3 collector. Other versions (for example the P2N2222A) have another order: C, B, E. Read the datasheet of your part.',
+      'Always put a resistor in the base line. Rule of thumb for a switch: base current about one tenth of the collector current (the datasheet gives VCE(sat) = 0.3 V at 150 mA with 15 mA of base current).',
+      'Continuous collector current 600 mA (onsemi datasheet). Emitter to GND for a low-side switch; the load goes between the supply and the collector.',
+      'An inductive load (motor, relay coil) needs a flyback diode across it.',
+    ],
+    src: 'onsemi PN2222A datasheet',
   },
   neopixel: {
     name: 'NeoPixel (WS2812B) strip, 8 pixels', tag: 'Addressable RGB LEDs on one data wire',

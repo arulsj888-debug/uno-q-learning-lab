@@ -54,6 +54,8 @@ export function terminals(d) {
     case 'joystick': return [['GND', `${row}${c}`], ['VCC', `${row}${c + 1}`], ['VRX', `${row}${c + 2}`], ['VRY', `${row}${c + 3}`], ['SW', `${row}${c + 4}`]];
     case 'encoder': return [['CLK', `${row}${c}`], ['DT', `${row}${c + 1}`], ['SW', `${row}${c + 2}`], ['VCC', `${row}${c + 3}`], ['GND', `${row}${c + 4}`]];
     case 'dht': return [['VCC', `${row}${c}`], ['DATA', `${row}${c + 1}`], ['NC', `${row}${c + 2}`], ['GND', `${row}${c + 3}`]];
+    case 'diode': return [['A', d.a], ['K', d.k]];
+    case 'npn': return d.flip ? [['E', `${row}${c + 2}`], ['B', `${row}${c + 1}`], ['C', `${row}${c}`]] : [['E', `${row}${c}`], ['B', `${row}${c + 1}`], ['C', `${row}${c + 2}`]];
     case 'rgbled': return [['R', `${row}${c}`], ['C', `${row}${c + 1}`], ['G', `${row}${c + 2}`], ['B', `${row}${c + 3}`]];
     case 'pir': return [['VCC', `${d.id}.VCC`], ['OUT', `${d.id}.OUT`], ['GND', `${d.id}.GND`]];
     case 'wire': case 'fwire': case 'lead': case 'qwiic': return [['from', d.from], ['to', d.to]];
@@ -99,6 +101,12 @@ export function solveDC(n, elems, temp = 25) {
       } else if (e.t === 'M') {   // module output: voltage out = fn(supply voltage), measured against the module's own GND
         const out = e.fn(v[e.vs] - v[e.gnd]), g = 1 / (e.r || 100);
         G(e.out, e.gnd, g); I(e.out, out * g); I(e.gnd, -out * g);
+      } else if (e.t === 'Q') {   // NPN: base-emitter diode is a separate D element; collector current = beta x base current, ohmic (a conductance) while VCE is below the 0.3 V saturation voltage
+        const vbe = v[e.b] - v[e.e], ib = Math.max(0, e.dbe.Is * (Math.exp(Math.min(vbe, 0.9) / NVT) - 1)), vce = v[e.c] - v[e.e], tgt = e.beta * ib;
+        if (tgt < 1e-9) { e.ic = 0; G(e.c, e.e, 1e-9); }
+        else if (vce < 0.3) { const K = tgt / 0.3; e.ic = K * Math.max(0, vce); G(e.c, e.e, K + 1e-9); }
+        else { e.ic = tgt; G(e.c, e.e, 1e-9); I(e.c, -tgt); I(e.e, tgt); }
+        e.ib = ib;
       } else if (e.t === 'D') {
         const old = dv.has(e) ? dv.get(e) : 0, ex = Math.exp(Math.min(old, 6) / NVT);
         const gd = e.Is / NVT * ex + 1e-12, id = e.Is * (ex - 1), ieq = id - gd * old;
@@ -286,6 +294,12 @@ export function evaluate(model) {
         pe[d.id] = { vn, gn, ph };
       }
       else if (d.type === 'dht') { const vn = nid(T(d, 'VCC')), gn = nid(T(d, 'GND')); if (!dead) elems.push({ t: 'R', a: vn, b: gn, g: 1 / 20000, load: true }); pe[d.id] = { vn, gn }; }
+      else if (d.type === 'diode') { const Is = 0.02 / Math.exp(0.85 / NVT), e = { t: 'D', a: nid(T(d, 'A')), b: nid(T(d, 'K')), Is }; if (!dead) elems.push(e); pe[d.id] = { a: e.a, b: e.b, Is }; }   // 1.1 V at 1 A
+      else if (d.type === 'npn') {
+        const E = nid(T(d, 'E')), B = nid(T(d, 'B')), C = nid(T(d, 'C')), dbe = { t: 'D', a: B, b: E, Is: 1e-3 / Math.exp(0.7 / NVT) }, q = { t: 'Q', b: B, c: C, e: E, beta: 100, dbe, ic: 0, ib: 0 };
+        if (!dead) elems.push(dbe, q);
+        pe[d.id] = { b: B, c: C, e: E, q, dbe };
+      }
       else if (d.type === 'rgbled') {
         // three LED dice with one common leg: common cathode (d.ca falsy) = colour pins are the anodes, common anode = colour pins are the cathodes
         const C = nid(T(d, 'C')), dice = ['R', 'G', 'B'].map(k => { const lt = RGB_VF[k], Is = 0.02 / Math.exp(lt / NVT), pin = nid(T(d, k)), e = d.ca ? { t: 'D', a: C, b: pin, Is } : { t: 'D', a: pin, b: C, Is }; if (!dead) elems.push(e); return { a: e.a, b: e.b, Is }; });
@@ -373,6 +387,8 @@ export function evaluate(model) {
       else if (d.type === 'pot') acc(d.id, 'Vw', v[q.W]);
       else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo' || d.type === 'sht31' || d.type === 'dht') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'neopixel' || d.type === 'lcd1602' || d.type === 'oled') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
+      else if (d.type === 'diode') { const V = v[q.a] - v[q.b], I = burnt.has(d.id) ? 0 : q.Is * (Math.exp(Math.min(V, 6) / NVT) - 1); acc(d.id, 'V', V); acc(d.id, 'I', I); acc(d.id, 'Imax', I, 'max'); }
+      else if (d.type === 'npn') { acc(d.id, 'Vbe', v[q.b] - v[q.e]); acc(d.id, 'Vce', v[q.c] - v[q.e]); acc(d.id, 'Ic', q.q.ic); acc(d.id, 'Ib', q.q.ib); acc(d.id, 'Icmax', q.q.ic, 'max'); }
       else if (d.type === 'joystick') { acc(d.id, 'Vs', v[q.vn] - v[q.gn]); acc(d.id, 'Vx', v[q.jx] - v[q.gn]); acc(d.id, 'Vy', v[q.jy] - v[q.gn]); }
       else if (d.type === 'encoder') acc(d.id, 'Vs', v[q.vn] - v[q.gn]);
       else if (d.type === 'tmp36') { acc(d.id, 'Vs', v[q.vs] - v[q.g]); acc(d.id, 'Vout', v[q.out] - v[q.g]); }
@@ -430,6 +446,39 @@ export function evaluate(model) {
         else if (Math.abs(V) <= 0.3) why = 'there is no voltage across it: the circuit is not complete (check the wires and the power, and that the pin is set to Output HIGH)';
         else why = 'almost no current flows (is the resistor much too large?)';
         R.msg = 'Off: ' + why + '.'; note('bad', `${label} stays dark: ${why}.`, d.id);
+      }
+    } else if (d.type === 'diode') {
+      const I = s.I ?? 0, V = s.V ?? 0, Ipk = s.Imax ?? 0;
+      if (burnt.has(d.id)) { R.status = 'bad'; R.msg = 'Burnt out.'; note('bad', burnWhy[d.id] || `${label} is burnt out. Delete it and place a new one.`, d.id); }
+      else if (Ipk > 1.0) { R.status = 'bad'; burn(d.id, `${label} burns out: ${(Ipk * 1000).toFixed(0)} mA flowed through it, but a 1N4007 is rated for 1 A average forward current.`); }
+      else if (I > 0.0005) R.msg = `Conducting: ${(I * 1000).toFixed(1)} mA, ${V.toFixed(2)} V across it.`;
+      else if (V < -0.5) R.msg = `Blocking: ${(-V).toFixed(1)} V in the reverse direction.`;
+      else R.msg = powered ? 'Not conducting.' : '';
+    } else if (d.type === 'npn') {
+      const Vbe = s.Vbe ?? 0, Vce = s.Vce ?? 0, Ic = s.Ic ?? 0, Ib = s.Ib ?? 0, Icpk = s.Icmax ?? 0;
+      const bnet = find(T(d, 'B')), baseDriven = [...usedPins].some(([id, k]) => k.k === 'gpio' && gpioOn(d, 'B').includes(id));
+      if (burnt.has(d.id)) { R.status = 'bad'; R.msg = 'Burnt out.'; note('bad', burnWhy[d.id] || `${label} is burnt out. Delete it and place a new one.`, d.id); }
+      else if (Icpk > 0.6) { R.status = 'bad'; burn(d.id, `${label} burns out: ${(Icpk * 1000).toFixed(0)} mA collector current, but the PN2222A is rated for 600 mA continuous.`); }
+      else if (!powered) R.status = 'off';
+      else if (Ib < 1e-5) {
+        R.status = 'off'; R.msg = 'OFF: no base current.';
+        if (baseDriven && gpioOn(d, 'B').some(id => ['out1', 'pwm', 'blink'].includes(modeOf(id)))) note('warn', `${label}: the base is driven but no current flows. Check the pin order (this is a PN2222A: emitter, base, collector, flat side toward you) and that the emitter goes to GND.`, d.id);
+        else note('info', `${label} is OFF: no current flows into its base (a pin set to Output HIGH, through a resistor, would switch it on).`, d.id);
+      } else if (Vce < 0.35) { R.msg = `ON (saturated): ${(Ic * 1000).toFixed(0)} mA through the load, base current ${(Ib * 1000).toFixed(1)} mA, VCE ${Vce.toFixed(2)} V.`; note('ok', `${label} is fully ON: ${(Ic * 1000).toFixed(0)} mA flows from collector to emitter (VCE ${Vce.toFixed(2)} V).`, d.id); }
+      else {
+        R.status = 'warn'; R.msg = `Partly ON: ${(Ic * 1000).toFixed(0)} mA, VCE ${Vce.toFixed(1)} V.`;
+        note('warn', `${label} is not saturated: the base current (${(Ib * 1000).toFixed(1)} mA, × a gain of about 100) only allows ${(Ic * 1000).toFixed(0)} mA, so the load gets less and the transistor drops ${Vce.toFixed(1)} V (it heats up: ${(Vce * Ic * 1000).toFixed(0)} mW). Use a smaller base resistor: about one tenth of the load current as base current.`, d.id);
+      }
+      // an inductive load (motor or relay coil) between the supply and the collector needs a flyback diode across it
+      if (powered) {
+        const cn = find(T(d, 'C'));
+        for (const l of parts) if (l.type === 'motor' || l.type === 'relay') {
+          const t1 = find(T(l, l.type === 'motor' ? 'M1' : 'DCP')), t2 = find(T(l, l.type === 'motor' ? 'M2' : 'DCN'));
+          if (t1 !== cn && t2 !== cn) continue;
+          const other = t1 === cn ? t2 : t1;
+          const prot = parts.some(p => p.type === 'diode' && !burnt.has(p.id) && find(T(p, 'A')) === cn && find(T(p, 'K')) === other);
+          if (!prot) note('warn', `${label} switches an inductive load (${nameOf(l)}) without a flyback diode. When the current stops, the coil makes a voltage spike far above the supply that can destroy the transistor. Put a diode across the load: cathode (band) to the supply side, anode to the transistor side.`, d.id);
+        }
       }
     } else if (d.type === 'lcd1602' || d.type === 'oled') {
       const lcd = d.type === 'lcd1602', vs = s.Vs ?? 0, sda = gpioOn(d, 'SDA'), scl = gpioOn(d, 'SCL'), kind = id => usedPins.get(id) || {}, addr = lcd ? '0x27' : '0x3C';
@@ -759,6 +808,7 @@ export function evaluate(model) {
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
       hcsr04: d => [item(d, 'VCC', ['5v'], name['5v'], 'The HC-SR04 is made for 5 V'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'TRIG', ['gpio'], sig), (pi || e32 ? echoDivider(d) : item(d, 'ECHO', ['gpio'], pi || e32 ? 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider' : u3 ? 'a digital pin (for example D8)' : 'D8 (a 5 V-tolerant pin)', pi || e32 ? 'Its 5 V echo would damage the pin directly' : u3 ? '' : 'Not D3 or A0–A5: they are 3.3 V only', (k, id) => !pi && !e32 ? !k.v3 : true))],
+      npn: d => [item(d, 'E', ['gnd'], name.gnd + ' (low-side switch: the emitter goes to GND)'), item(d, 'B', ['gpio'], sig + ' (through a base resistor)', 'A transistor needs a resistor in the base line')],
       lcd1602: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VCC', ['5v'], name['5v'] + ' (the LCD is made for 5 V)'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : u3 ? 'A4 (or SDA), the I²C data' : e32 ? 'GPIO21, the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda'), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : u3 ? 'A5 (or SCL), the I²C clock' : e32 ? 'GPIO22, the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl')],
       oled: d => [item(d, 'GND', ['gnd'], name.gnd), item(d, 'VCC', ['3v3', '5v'], name['3v3'] + ' (or 5 V: check your module)'), item(d, 'SCL', ['gpio'], pi ? 'GPIO3 (pin 5), the I²C clock' : u3 ? 'A5 (or SCL), the I²C clock' : e32 ? 'GPIO22, the I²C clock' : 'D21 (or A5), the I²C clock', '', k => k.i2c === 'scl'), item(d, 'SDA', ['gpio'], pi ? 'GPIO2 (pin 3), the I²C data' : u3 ? 'A4 (or SDA), the I²C data' : e32 ? 'GPIO21, the I²C data' : 'D20 (or A4), the I²C data', '', k => k.i2c === 'sda')],
       neopixel: d => [item(d, 'VCC', ['5v', '3v3'], name['5v'] + ' (the pixels are made for about 5 V)', 'Connect GND first'), item(d, 'DIN', ['gpio'], sig + (pi ? ' (GPIO18 in the Adafruit example)' : '')), item(d, 'GND', ['gnd'], name.gnd)],
@@ -780,7 +830,7 @@ export function evaluate(model) {
 }
 
 export function nameOf(d) {
-  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
+  const nm = { thermo: 'Modulino Thermo', pixels: 'Modulino Pixels', l293d: 'L293D driver', motor: 'DC motor', relay: 'Relay module', battery: 'Battery pack (4 × AA)', lamp: 'Lamp 6 V', sht31: 'SHT31-D', diode: 'Diode 1N4007', npn: 'Transistor PN2222A', lcd1602: 'LCD 16x2', oled: 'OLED display', neopixel: 'NeoPixel strip', joystick: 'Joystick module', encoder: 'Rotary encoder', dht: 'DHT sensor', rgbled: 'RGB LED', pir: 'PIR sensor', hcsr04: 'HC-SR04', servo: 'Servo SG90', resistor: 'Resistor', led: 'LED', button: 'Push button', pot: 'Potentiometer', buzzer: 'Buzzer', ldr: 'Light sensor', tmp36: 'TMP36', wire: 'Wire', fwire: 'Wire' }[d.type] || d.type;
   const extra = d.type === 'resistor' ? ` ${fmtOhms(d.ohms)}` : d.type === 'led' ? ` (${d.color || 'red'})` : '';
   return `${nm}${extra} ${String(d.id).toUpperCase()}`;
 }

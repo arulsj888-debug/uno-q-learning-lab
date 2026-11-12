@@ -175,6 +175,21 @@ for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3']
 }
 r = rgbOK('uno3', u3, '✖ LCD powered from 3.3 V'); ok(r.parts.lcd1.status === 'warn' && !r.parts.lcd1.show, 'UNO R3: LCD on 3.3 V is flagged and shows no text');
 r = rgbOK('uno3', u3, '✖ OLED with SDA'); ok(r.parts.oled1.status === 'warn' && !r.parts.oled1.show, 'UNO R3: OLED with SDA and SCL swapped stays dark');
+// ---- NPN transistor (PN2222A) low-side switch and the 1N4007 diode
+for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3'], ['esp32', findPinE32, 'ESP32']]) {
+  const pin = kind === 'esp32' ? 'G16' : 'D5';
+  r = rgbOK(kind, info, '✔ Transistor switches'); ok(r.parts.q1.status === 'ok' && r.parts.lamp1.level > 0.5 && r.parts.q1.Ic > 0.25, name + ': transistor with a base resistor switches the 6 V lamp fully on (' + (r.parts.q1.Ic * 1000).toFixed(0) + ' mA)');
+  r = rgbOK(kind, info, '✖ Transistor without'); ok(r.newDamage.has(pin) || r.pins[pin].status === 'warn', name + ': base wired straight to a pin damages it or overloads it (warning)');
+}
+r = rgbOK('uno3', u3, '✖ Base resistor too large'); ok(r.parts.q1.status !== 'ok' && r.parts.lamp1.level < 0.2, 'UNO R3: 100 kΩ base resistor leaves the lamp dark');
+r = rgbOK('uno3', u3, '✖ Emitter and collector swapped'); ok(r.parts.q1.status === 'off' && r.notes.some(n => /pin order/.test(n.text)), 'UNO R3: swapped emitter and collector stays off and says to check the pin order');
+r = rgbOK('uno3', u3, '✔ Diode'); ok(r.parts.d1.msg.startsWith('Conducting') && r.parts.led1.status === 'ok', 'UNO R3: diode conducts forward and the LED lights');
+{ const x = EXAMPLES('uno3').find(e => e.title.startsWith('✔ Diode')); const parts = x.parts.map(p => (p.id === 'd1' ? { ...p, a: 'b14', k: 'b10' } : p)); r = evaluate({ boardKind: 'uno3', pinInfo: u3, parts, pinCfg: {}, powered: true, env, t: 0 }); ok(r.parts.d1.msg.startsWith('Blocking') && r.parts.led1.status !== 'ok', 'UNO R3: diode turned round blocks the current'); }
+{ const x = EXAMPLES('uno3').find(e => e.title.startsWith('✔ Transistor switches'));
+  const noD = x.parts.concat([{ id: 'mot1', type: 'motor' }, { id: 'ld9', type: 'lead', from: 'bat1.POS', to: 'mot1.M1', color: 'red', lift: 14 }, { id: 'ld10', type: 'lead', from: 'mot1.M2', to: 'c12', color: 'orange', lift: 14 }]);
+  r = evaluate({ boardKind: 'uno3', pinInfo: u3, parts: noD, pinCfg: x.pins, powered: true, env, t: 0 }); ok(r.notes.some(n => /flyback diode/.test(n.text)), 'UNO R3: transistor switching a motor without a flyback diode is warned');
+  const withD = noD.concat([{ id: 'd1', type: 'diode', a: 'a12', k: 'a16' }, { id: 'ld11', type: 'lead', from: 'mot1.M1', to: 'a16', color: 'red', lift: 14 }]);
+  r = evaluate({ boardKind: 'uno3', pinInfo: u3, parts: withD, pinCfg: x.pins, powered: true, env, t: 0 }); ok(!r.notes.some(n => /flyback diode/.test(n.text)), 'UNO R3: a diode across the motor (anode on the collector side) removes the warning'); }
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

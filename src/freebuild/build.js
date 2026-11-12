@@ -9,13 +9,13 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const ROWS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 const RAILS = ['top+', 'top-', 'bot-', 'bot+'];
 const OHMS = [10, 100, 220, 330, 470, 1000, 2200, 4700, 10000, 47000, 100000, 1000000];
-const PREFIX = { lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
+const PREFIX = { diode: 'd', npn: 'q', lcd1602: 'lcd', oled: 'oled', neopixel: 'neo', joystick: 'joy', encoder: 'enc', dht: 'dht', rgbled: 'rgb', thermo: 'th', pixels: 'pix', qwiic: 'cab', l293d: 'u', motor: 'mot', relay: 'rel', battery: 'bat', lamp: 'lamp', sht31: 'sen', hcsr04: 'us', pir: 'pir', servo: 'sv', resistor: 'r', led: 'led', button: 'sw', pot: 'pot', buzzer: 'bz', ldr: 'ldr', tmp36: 'tmp', wire: 'w', fwire: 'w' };
 const WIRE_COLORS = ['red', 'black', 'yellow', 'blue', 'green', 'orange', 'white'];
 const WIRE_HEX = { red: '#d8261e', black: '#1b1b1b', yellow: '#f2c21b', blue: '#2369d6', green: '#23a046', orange: '#f07a16', white: '#eeeeee' };
 const TERMS = { lcd1602: ['GND', 'VCC', 'SDA', 'SCL'], oled: ['GND', 'VCC', 'SCL', 'SDA'], neopixel: ['VCC', 'DIN', 'GND'], pir: ['VCC', 'OUT', 'GND'], relay: ['DCP', 'DCN', 'IN', 'NO', 'COM', 'NC'], battery: ['POS', 'NEG'], lamp: ['L1', 'L2'], motor: ['M1', 'M2'], thermo: ['QA', 'QB'], pixels: ['QA', 'QB'] };
 const DESK_SLOT_PI = { lcd1602: [125, 17], oled: [125, 17], neopixel: [110, 42] };
 const DESK_SLOT = { lcd1602: [20, 70], oled: [125, 70], neopixel: [70, 105], relay: [150, -20], battery: [150, 45], lamp: [205, 10], motor: [205, 78], thermo: [60, 118], pixels: [125, 118] };
-const MOVABLE = new Set(['resistor', 'led', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
+const MOVABLE = new Set(['resistor', 'led', 'diode', 'npn', 'rgbled', 'dht', 'joystick', 'encoder', 'buzzer', 'ldr', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d']);
 const LUX = { dark: 0.01, dim: 10, room: 300, torch: 2000 };
 
 export class FreeBuild {
@@ -233,12 +233,13 @@ export class FreeBuild {
       if (fp) { if (fp.refs.every(r => this.free(r))) { def = { ...fp.def }; if (type === 'tmp36' && old) def.flip = old.flip; } }
       else if (this.firstOk(type, ref)) {
         const cands = this.second(type, ref), p = this.byRef.get(ref);
-        const pref = { resistor: [4, -4, 5, -5, 3, -3], led: [1, -1], ldr: [1, -1], buzzer: [3, -3] }[type] || [];
+        const pref = { diode: [4, -4, 5, -5, 3, -3], resistor: [4, -4, 5, -5, 3, -3], led: [1, -1], ldr: [1, -1], buzzer: [3, -3] }[type] || [];
         let b = null; for (const dc of pref) { const r = p.row + (p.col + dc); if (cands.includes(r)) { b = r; break; } }
-        if (!b && type === 'resistor' && cands.length) b = cands[0];
+        if (!b && (type === 'resistor' || type === 'diode') && cands.length) b = cands[0];
         if (b) {
           if (type === 'resistor') def = { type, a: ref, b, ohms: old ? old.ohms : this.opts.ohms };
           else if (type === 'led') { const c = old ? old.color : this.opts.color; def = { type, anode: ref, cathode: b, color: c, hex: LED_TYPES[c].hex }; }
+          else if (type === 'diode') def = { type, a: ref, k: b };
           else if (type === 'ldr') def = { type, a: ref, b };
           else if (type === 'buzzer') def = { type, plus: ref, minus: b };
         }
@@ -292,6 +293,7 @@ export class FreeBuild {
     if (type === 'dht') { if (col > 27) return null; return { def: { type, row, col, model: this.opts.dht }, refs: [at(row, col), at(row, col + 1), at(row, col + 2), at(row, col + 3)] }; }
     if (type === 'rgbled') { if (col > 27) return null; return { def: { type, row, col, ca: this.opts.rgbCA }, refs: [at(row, col), at(row, col + 1), at(row, col + 2), at(row, col + 3)] }; }
     if (type === 'servo') { if (col > 28) return null; return { def: { type, row, col }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
+    if (type === 'npn') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     if (type === 'tmp36') { if (col > 28) return null; return { def: { type, row, col, flip: this.opts.flip }, refs: [at(row, col), at(row, col + 1), at(row, col + 2)] }; }
     return null;
   }
@@ -304,7 +306,7 @@ export class FreeBuild {
       if (type === 'wire') { if (!this.wireOk(f, p)) continue; out.push(p.ref); continue; }
       if (p.kind !== 'hole') continue;
       const dx = Math.abs(p.pos.x - f.pos.x), dz = Math.abs(p.pos.z - f.pos.z), dist = Math.hypot(dx, dz);
-      if (type === 'resistor') { if (dist >= 7.4 && dist <= 26) out.push(p.ref); }
+      if (type === 'resistor' || type === 'diode') { if (dist >= 7.4 && dist <= 26) out.push(p.ref); }
       else if (type === 'led' || type === 'ldr') { if (p.row === f.row && Math.abs(p.col - f.col) === 1) out.push(p.ref); }
       else if (type === 'buzzer') { if (p.row === f.row && Math.abs(p.col - f.col) === 3) out.push(p.ref); }
     }
@@ -340,7 +342,7 @@ export class FreeBuild {
   }
   click(ref) {
     const T = this.tool; if (!T) return; this.occ = this.occupied();
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder'].includes(T.type)) {
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn'].includes(T.type)) {
       const fp = this.footprint(T.type, ref);
       if (!fp) return this.toast('That part does not fit there (it needs more holes to the right).');
       if (fp.refs.some(r => !this.free(r))) return this.toast('One of the holes is already used.');
@@ -356,6 +358,7 @@ export class FreeBuild {
     const a = T.first; let def;
     if (T.type === 'resistor') def = { type: 'resistor', a, b: ref, ohms: this.opts.ohms };
     else if (T.type === 'led') def = { type: 'led', anode: a, cathode: ref, color: this.opts.color, hex: LED_TYPES[this.opts.color].hex };
+    else if (T.type === 'diode') def = { type: 'diode', a, k: ref };
     else if (T.type === 'ldr') def = { type: 'ldr', a, b: ref };
     else if (T.type === 'buzzer') def = { type: 'buzzer', plus: a, minus: ref };
     else if (T.type === 'wire') def = this.wireDef(a, ref);
@@ -421,13 +424,13 @@ export class FreeBuild {
   }
   hoverOk(ref) {
     const T = this.tool; this.occ = this.occupied();
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder'].includes(T.type)) { const fp = this.footprint(T.type, ref); return !!fp && fp.refs.every(r => this.free(r)); }
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn'].includes(T.type)) { const fp = this.footprint(T.type, ref); return !!fp && fp.refs.every(r => this.free(r)); }
     if (T.step === 0) return this.firstOk(T.type, ref) && this.second(T.type, ref).length > 0;
     return this.second(T.type, T.first).includes(ref);
   }
   previewFoot(ref) {
     const T = this.tool; if (!T) return;
-    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder'].includes(T.type)) { const fp = ref && this.footprint(T.type, ref); this.occ = this.occupied(); if (fp) this.setMarks(fp.refs.filter(r => this.free(r)), fp.refs.filter(r => !this.free(r))); else this.cand.count = 0; }
+    if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn'].includes(T.type)) { const fp = ref && this.footprint(T.type, ref); this.occ = this.occupied(); if (fp) this.setMarks(fp.refs.filter(r => this.free(r)), fp.refs.filter(r => !this.free(r))); else this.cand.count = 0; }
   }
   pointName(q) {
     if (q.kind === 'hole') return `Hole ${q.ref} (column ${q.col}, row ${q.row})`;
@@ -505,9 +508,9 @@ export class FreeBuild {
     const T = this.tool, h = $('#fb-hint'); let t;
     if (!T) t = this.probeOn ? 'Voltmeter: click any hole or board pin to measure the voltage there.' : 'Drag a part from the left onto the breadboard (or click it, then click holes). Drag from a board pin to a hole to make a wire. Drag a placed part to move it. Hold a push button to press it; drag a knob to turn it.';
     else if (T.type === 'wire') t = T.step ? 'Click the other end of the wire (green = free).' : 'Click where the wire starts: a board pin, a breadboard hole or a power rail.';
-    else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder'].includes(T.type)) t = { joystick: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: GND, VCC, VRx, VRy, SW. The module lies over the breadboard towards you.', encoder: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: CLK, DT, SW, +, GND.', dht: 'Click a hole for the VCC pin: the 4 pins go in columns n … n+3 of one row: VCC, DATA, (not connected), GND. The grille faces you. DATA needs a pull-up resistor to VCC.', rgbled: 'Click the hole for the red leg: the 4 legs go in columns n … n+3 of one row: red, common (the longest leg), green, blue. Each colour needs its own resistor.', l293d: 'Click a hole: the 16-pin chip straddles the middle gap over 8 columns (n … n+7). Pin 1 is at the left of the row nearest you (row f); the notch marks the pin-1 end.', sht31: 'Click a hole in row f to j for the VIN pin: the breakout has 7 pins in columns n … n+6: VIN, GND, SCL, SDA, ADDR, RST, ALRT. The board lies over the middle of the breadboard.', hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
+    else if (['button', 'pot', 'tmp36', 'hcsr04', 'servo', 'sht31', 'l293d', 'rgbled', 'dht', 'joystick', 'encoder', 'npn'].includes(T.type)) t = { npn: 'Click a hole for the EMITTER leg: the three legs go in columns n, n+1, n+2 of one row: emitter, base, collector (flat side toward you). Tick “turn round” to swap emitter and collector.', joystick: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: GND, VCC, VRx, VRy, SW. The module lies over the breadboard towards you.', encoder: 'Click a hole in row f to j for the first pin: the 5 pins go in columns n … n+4 of one row: CLK, DT, SW, +, GND.', dht: 'Click a hole for the VCC pin: the 4 pins go in columns n … n+3 of one row: VCC, DATA, (not connected), GND. The grille faces you. DATA needs a pull-up resistor to VCC.', rgbled: 'Click the hole for the red leg: the 4 legs go in columns n … n+3 of one row: red, common (the longest leg), green, blue. Each colour needs its own resistor.', l293d: 'Click a hole: the 16-pin chip straddles the middle gap over 8 columns (n … n+7). Pin 1 is at the left of the row nearest you (row f); the notch marks the pin-1 end.', sht31: 'Click a hole in row f to j for the VIN pin: the breakout has 7 pins in columns n … n+6: VIN, GND, SCL, SDA, ADDR, RST, ALRT. The board lies over the middle of the breadboard.', hcsr04: 'Click the hole for the VCC leg (leftmost): the 4 legs go in columns n to n+3 of one row: VCC, TRIG, ECHO, GND. The sensor faces forward.', servo: 'Click the hole for the first pin: the servo plug has 3 pins in columns n, n+1, n+2: brown GND, red 5 V (middle), orange signal.', button: 'Click a hole in row e or f: the button straddles the middle gap (its legs go in columns n and n+2).', pot: 'Click the hole for the left leg: the knob uses 3 holes in a row (columns n, n+2, n+4).', tmp36: 'Click the hole for the left leg: 3 holes in a row. Flat face toward you, legs down: +VS, VOUT, GND from left to right.' }[T.type];
     else if (T.type === 'qwiic') t = T.step ? 'Click the other Qwiic socket (green).' : 'Click a Qwiic socket: the one on the board (left edge) or one of a module. The cable fits only one way.';
-    else t = T.step ? { led: 'Click the neighbouring hole for the SHORT leg (cathode, −). The first hole is the long leg (anode, +).', buzzer: 'Click the hole 3 columns away for the − leg. The first hole is +.', resistor: 'Click the hole for the other leg (a resistor has no polarity).', ldr: 'Click the neighbouring hole for the other leg.' }[T.type] : { led: 'Click the hole for the LONG leg (anode, +).', buzzer: 'Click the hole for the + leg.', resistor: 'Click the hole for one leg.', ldr: 'Click the hole for one leg.' }[T.type];
+    else t = T.step ? { diode: 'Click the hole for the CATHODE (the end with the silver band). The first hole is the anode.', led: 'Click the neighbouring hole for the SHORT leg (cathode, −). The first hole is the long leg (anode, +).', buzzer: 'Click the hole 3 columns away for the − leg. The first hole is +.', resistor: 'Click the hole for the other leg (a resistor has no polarity).', ldr: 'Click the neighbouring hole for the other leg.' }[T.type] : { diode: 'Click the hole for the ANODE (the end without the band).', led: 'Click the hole for the LONG leg (anode, +).', buzzer: 'Click the hole for the + leg.', resistor: 'Click the hole for one leg.', ldr: 'Click the hole for one leg.' }[T.type];
     if (h) h.textContent = t;
     if (this.active) $('#legend').textContent = t;
   }
@@ -593,6 +596,8 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('button')}" data-tool="button">Push button</button></div>
       <div class="fb-row"><button class="fb-btn${on('pot')}" data-tool="pot">Potentiometer 10 kΩ${this.isPi ? ' (no ADC on Pi)' : ''}</button></div>
       <div class="fb-row"><button class="fb-btn${on('buzzer')}" data-tool="buzzer">Passive buzzer</button></div>
+      <div class="fb-row"><button class="fb-btn${on('diode')}" data-tool="diode">Diode 1N4007</button></div>
+      <div class="fb-row"><button class="fb-btn${on('npn')}" data-tool="npn">Transistor NPN (PN2222A)</button></div>
       <div class="fb-row"><button class="fb-btn${on('ldr')}" data-tool="ldr">Light sensor (LDR)</button></div>
       <div class="fb-row"><button class="fb-btn${on('tmp36')}" data-tool="tmp36">TMP36 temperature${this.isPi ? ' (no ADC on Pi)' : ''}</button><label class="fb-chk"><input type="checkbox" data-opt="flip"${this.opts.flip ? ' checked' : ''}> turn round</label></div>
       <h3>Modules</h3>
