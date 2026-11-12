@@ -71,6 +71,7 @@ const VIEWS = {
   dispp: { t: new THREE.Vector3(55, 0, -40), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 330 },
   farpi: { t: new THREE.Vector3(100, 0, -30), d: new THREE.Vector3(-0.1, 0.92, 0.4), dist: 520 },
   qwq: { t: new THREE.Vector3(50, 0, 95), d: new THREE.Vector3(-0.1, 0.92, 0.38), dist: 420 },
+  scanv: { t: new THREE.Vector3(40, 0, 95), d: new THREE.Vector3(-0.1, 0.92, 0.4), dist: 430 },
   bbwide: { t: new THREE.Vector3(0, 2, 68), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 150 },
   bigq: { t: new THREE.Vector3(30, 0, 36), d: new THREE.Vector3(-0.2, 0.85, 0.5), dist: 330 },
   bigpi: { t: new THREE.Vector3(24, 0, -46), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 340 },
@@ -2021,6 +2022,7 @@ class App {
       ble: ev => { if (ev.stage === 'adv') this.bl.adv = !!ev.val; else if (ev.stage === 'val') this.bl.val = ev.val; this.bleRender(); },
       neo: ev => this.neoOp(ev),
       lcd: ev => this.lcdOp(ev),
+      i2cProbe: a => (a === this.lcdAddr && this.i2cDispOk('lcd')) || (a === this.oledAddr && this.i2cDispOk('oled')),
       oled: ev => this.oledOp(ev),
       dht: () => {
         const L = this.lesson, pin = L && L.io ? Object.keys(L.io).find(p => L.io[p].kind === 'dht') : null, io = pin && this.ioFor(pin);

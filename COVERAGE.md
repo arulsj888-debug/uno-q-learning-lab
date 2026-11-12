@@ -70,7 +70,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 |---|---|---|---|---|---|
 | USB serial / Serial Monitor | DONE | DONE (terminal) | DONE | DONE | |
 | I2C (one device) | DONE | DONE | DONE | build only | |
-| I2C scanner, two devices on one bus | TODO | TODO | TODO | TODO | |
+| I2C scanner, two devices on one bus | TODO | TODO | DONE (lesson 28: LCD 0x27 + OLED 0x3C; second device on the repeated SDA/SCL sockets) | TODO (needs the breadboard to share one socket) | scanner reads rt.i2cProbe |
 | SPI (concept + one device) | TODO | TODO | TODO | TODO | |
 | UART between two boards | TODO | TODO | TODO | TODO | 3.3 V / 5 V level shifting |
 | Wi-Fi scan / connect / web server | partly (dashboard) | DONE (web) | n/a | DONE | |

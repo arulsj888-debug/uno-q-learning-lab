@@ -59,6 +59,7 @@ export class Sim {
       deepSleep: async (ms) => { for (const k of Object.keys(pins)) if (pins[k] && pins[k].mode === 'OUTPUT') H.pin(k, 0); for (const k of Object.keys(pins)) delete pins[k]; if (H.sleep) H.sleep(true, ms); await rt.delay(ms); if (H.sleep) H.sleep(false, ms); },
       ble: (stage, val) => { if (H.ble) H.ble({ stage, val }); },
       neo: (op, a, b, c, d) => (H.neo ? H.neo({ op, a, b, c, d }) : undefined),
+      i2cProbe: (addr) => (H.i2cProbe ? !!H.i2cProbe(addr) : false),   // Wire.endTransmission() == 0 for this address
       lcd: (op, a, b) => (H.lcd ? H.lcd({ op, a, b }) : undefined),
       oled: (op, a, b) => (H.oled ? H.oled({ op, a, b }) : false),
       dhtRead: () => (H.dht ? H.dht() : { ok: false }),
@@ -871,6 +872,28 @@ export const PROGRAMS = {
       await rt.at(27); last = button;
       await rt.yield();
     }
+  },
+
+  async u3_i2cscan(rt) {
+    await rt.at(2); await rt.at(4);
+    await rt.at(5); await rt.at(6); rt.serialBegin(9600);
+    await rt.at(7); rt.println('Scanning...');
+    await rt.at(8); let found = 0;
+    for (let a = 1; a < 127; a++) {
+      await rt.at(9); await rt.at(10);
+      await rt.at(11); const ok = rt.i2cProbe(a);
+      await rt.at(12);
+      if (ok) {
+        await rt.at(13); rt.print('Device found at 0x');
+        await rt.at(14); rt.println(a.toString(16).toUpperCase());
+        await rt.at(15); found++;
+      }
+    }
+    await rt.at(18); rt.print('Done: ');
+    await rt.at(19); rt.print(found);
+    await rt.at(20); rt.println(' device(s)');
+    await rt.at(23);
+    for (;;) await rt.delay(1000);
   },
 
   async thermo(rt) {

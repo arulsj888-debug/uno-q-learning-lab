@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1313,5 +1313,53 @@ export const U3_LESSONS_2 = [
       { q: 'What does the variable previousMillis store?', a: ['The pin of the LED', 'The time of the last LED change', 'The button reading', 'The interval'], c: 1, why: 'It lets the sketch compute how long ago the last change was.' },
     ],
     sources: [SRC.millis, SRC.bwd, SRC.ds],
+  },
+
+  // ================================================================== 28
+  {
+    id: 'u28', num: 28, module: 12, title: 'I²C scanner: two devices, one bus', level: 'Intermediate', time: '20 min',
+    goal: 'Put two I²C devices on the same two wires and find their addresses with a scanner sketch.',
+    hardware: ['Arduino UNO R3', 'LCD 16×2 with I²C backpack', 'OLED 128×64 (SSD1306, I²C)', '8 × female jumper wires'],
+    code: U3_SCAN, file: 'I2CScanner.ino', program: 'u3_i2cscan', fast: true,
+    circuit: SCAN_PARTS, io: { A4: { kind: 'lcd', scl: 'A5', item: 'lcd1', needs: SCAN_IDS }, SDA: { kind: 'oled', scl: 'SCL', item: 'oled1', needs: SCAN_IDS } },
+    explain: {
+      2: '<b>Wire.h</b> is the I²C library of the Arduino core.',
+      5: '<b>Wire.begin()</b> starts the UNO R3 as the I²C <b>controller</b> on pins A4 (SDA) and A5 (SCL).',
+      6: 'Serial output on.',
+      7: 'A first message.',
+      8: 'A counter for the devices found.',
+      9: 'Try every 7-bit address from 1 to 126.',
+      10: 'Begin a transmission to this address.',
+      11: '<b>endTransmission()</b> sends it and returns <b>0 if a device answered</b> (acknowledged), another number if not.',
+      12: 'Answered: there is a device here.',
+      13: 'Print the address in hexadecimal…',
+      14: '…with <b>HEX</b>: for example 27 or 3C.',
+      15: 'Count it.',
+      18: 'The scan is done.',
+      19: 'How many devices answered.',
+      20: 'The unit.',
+      23: '<b>loop()</b> stays empty: the scan runs once.',
+    },
+    steps: [
+      { title: 'Many devices, two wires', view: 'scanv', have: [], power: false,
+        body: `<p>I²C uses just <b>two wires</b>, SDA (data) and SCL (clock). Many devices can share them, because <b>each device has its own address</b>. If you do not know the address of a device (or the display stays blank), a <b>scanner</b> sketch asks every address and prints the ones that answer.</p>` },
+      { title: 'Two devices on one bus', view: 'scanv', have: SCAN_IDS, power: false,
+        body: `<p>The <b>LCD backpack</b> (PCF8574) usually answers at <b>0x27</b> (0x3F on some boards) and the <b>OLED</b> (SSD1306) at <b>0x3C</b> (0x3D on some). Different addresses: no conflict. Two devices with the <b>same</b> address on one bus would collide.</p>` },
+      { title: 'Wire it', view: 'scanv', have: SCAN_IDS, power: false, pins: ['A4', 'A5', 'SDA', 'SCL', '5V', '3V3', 'GND2', 'GND1'],
+        body: `<ul><li>LCD: <b>GND → GND</b>, <b>VCC → 5V</b>, <b>SDA → A4</b>, <b>SCL → A5</b></li><li>OLED: <b>GND → GND</b>, <b>VCC → 3V3</b>, <b>SDA → SDA</b>, <b>SCL → SCL</b> (the two sockets next to AREF)</li></ul>
+        <p>On the UNO R3 the <b>SDA and SCL sockets next to AREF are the same signals as A4 and A5</b> (the same pins repeated), so both devices share one bus.</p>` },
+      { title: 'The code', view: 'scanv', have: SCAN_IDS, showCode: true, power: true,
+        body: `<p>Click lines <b>10 and 11</b>: the whole trick. A device that answers returns 0.</p>` },
+      { title: 'Run the scanner', view: 'scanv', have: SCAN_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The Serial Monitor lists <b>0x27</b> and <b>0x3C</b> and ends with <b>Done: 2 device(s)</b>. Now you know the address to put into your display sketch.</p>` },
+      { title: 'Summary', view: 'scanv', have: SCAN_IDS, power: true,
+        body: `<ul><li>Devices on one I²C bus are told apart by their <b>7-bit address</b>.</li><li><code>Wire.endTransmission()</code> returns 0 when a device answers.</li><li>If a device is missing from the list: check power, SDA/SCL (not swapped), and the address jumpers.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How many wires does an I²C bus use for data and clock?', a: ['One', 'Two', 'Four', 'Eight'], c: 1, why: 'SDA and SCL.' },
+      { q: 'How does a scanner find a device?', a: ['It reads a label', 'It tries each address and sees which one answers', 'It measures current', 'It restarts the board'], c: 1, why: 'endTransmission() returns 0 when a device acknowledges.' },
+      { q: 'Two devices have the same address. What happens?', a: ['Nothing', 'They collide on the bus', 'The faster one wins always', 'Wire.h fixes it'], c: 1, why: 'Each device on a bus needs its own address.' },
+    ],
+    sources: [SRC.wirelib, SRC.wire, SRC.ds],
   },
 ];

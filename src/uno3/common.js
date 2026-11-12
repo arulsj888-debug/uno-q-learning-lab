@@ -35,6 +35,7 @@ export const SRC = {
   d1n4007: { t: 'Vishay 1N4001 to 1N4007 datasheet (average forward current 1 A; forward voltage 1.1 V at 1 A; up to 1000 V reverse for the 1N4007; the band marks the cathode)', u: 'https://www.vishay.com/docs/88503/1n4001.pdf' },
   millis: { t: 'Arduino reference: millis() (milliseconds since the program started)', u: 'https://docs.arduino.cc/language-reference/en/functions/time/millis/' },
   bwd: { t: 'Arduino example: Blink Without Delay', u: 'https://docs.arduino.cc/built-in-examples/digital/BlinkWithoutDelay/' },
+  wirelib: { t: 'Arduino reference: Wire library (beginTransmission / endTransmission)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -259,3 +260,18 @@ export const D_PARTS = [
   { id: 'w4', type: 'wire', from: 'b18', to: 'b29', color: 'black', lift: 12 },
 ];
 export const D_IDS = D_PARTS.map(d => d.id);
+
+// ---- Lesson 28: LCD backpack and OLED on the same I2C bus (LCD on A4/A5, OLED on the repeated SDA/SCL sockets), both on the desk
+export const SCAN_PARTS = [
+  { id: 'lcd1', type: 'lcd1602', x: -30, z: 138 },
+  { id: 'w90', type: 'fwire', from: 'lcd1.GND', to: 'GND2', color: 'black', lift: 24 },
+  { id: 'w91', type: 'fwire', from: 'lcd1.VCC', to: '5V', color: 'red', lift: 30 },
+  { id: 'w92', type: 'fwire', from: 'lcd1.SDA', to: 'A4', color: 'blue', lift: 36 },
+  { id: 'w93', type: 'fwire', from: 'lcd1.SCL', to: 'A5', color: 'yellow', lift: 42 },
+  { id: 'oled1', type: 'oled', x: 100, z: 138 },
+  { id: 'w95', type: 'fwire', from: 'oled1.GND', to: 'GND1', color: 'black', lift: 48 },
+  { id: 'w96', type: 'fwire', from: 'oled1.VCC', to: '3V3', color: 'orange', lift: 54 },
+  { id: 'w97', type: 'fwire', from: 'oled1.SCL', to: 'SCL', color: 'green', lift: 60 },
+  { id: 'w98', type: 'fwire', from: 'oled1.SDA', to: 'SDA', color: 'white', lift: 66 },
+];
+export const SCAN_IDS = SCAN_PARTS.map(d => d.id);

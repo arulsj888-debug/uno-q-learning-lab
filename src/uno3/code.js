@@ -581,3 +581,29 @@ void loop() {
   }
   lastButton = button;
 }`;
+
+// Lesson 28 — I2C scanner: two devices on one bus
+export const U3_SCAN = `// I2C scanner: ask every address from 1 to 126 and print the ones that answer
+#include <Wire.h>
+
+void setup() {
+  Wire.begin();
+  Serial.begin(9600);
+  Serial.println("Scanning...");
+  int found = 0;
+  for (byte address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    byte error = Wire.endTransmission();   // 0 = a device answered
+    if (error == 0) {
+      Serial.print("Device found at 0x");
+      Serial.println(address, HEX);
+      found++;
+    }
+  }
+  Serial.print("Done: ");
+  Serial.print(found);
+  Serial.println(" device(s)");
+}
+
+void loop() {
+}`;
