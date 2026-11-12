@@ -737,6 +737,48 @@ export class MPU6050Module {
   }
 }
 
+// ---------------------------------------------------------------- 28BYJ-48 stepper motor (28 mm can, gearbox) with its ULN2003 driver board (4 LEDs, IN1..IN4 header, power - and +)
+export class StepperULN2003 {
+  constructor() {
+    const g = this.group = new THREE.Group(); this.hw = 'stepper';
+    const edge = new THREE.MeshStandardMaterial({ color: 0x1b2f52, roughness: 0.7 }), mask = new THREE.MeshStandardMaterial({ color: 0x2a6bd1, roughness: 0.45 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(40, 1.4, 32), [edge, edge, mask, mask, edge, edge]); pcb.position.set(-22, 2.6, 6); g.add(pcb);
+    const names = ['IN1', 'IN2', 'IN3', 'IN4', 'GND', 'VCC'], PX = 20;
+    const tex = canvasTex(40 * PX, 32 * PX, (c, w, h) => {
+      c.clearRect(0, 0, w, h); c.strokeStyle = 'rgba(245,245,240,0.8)'; c.lineWidth = 3; c.strokeRect(6, 6, w - 12, h - 12);
+      silk(c, 'ULN2003', 20 * PX, 4 * PX, 20, 'rgba(243,243,238,0.9)', 'center', 600);
+      names.forEach((n, i) => silk(c, n, (20 + (i - 2.5) * 2.54) * PX, 26.2 * PX, 12, '#f3f3ee', 'center', 600));
+      ['A', 'B', 'C', 'D'].forEach((n, i) => silk(c, n, (10 + i * 6) * PX, 19.5 * PX, 14, '#f3f3ee', 'center', 600));
+    });
+    const lab = new THREE.Mesh(new THREE.PlaneGeometry(40, 32), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })); lab.rotation.x = -Math.PI / 2; lab.position.set(-22, 3.32, 6); g.add(lab);
+    const chip = new THREE.Mesh(new RoundedBoxGeometry(18, 2.6, 6.5, 1, 0.3), new THREE.MeshStandardMaterial({ color: 0x151517, roughness: 0.5 })); chip.position.set(-22, 4.4, 5); g.add(chip);
+    this.leds = [0, 1, 2, 3].map(i => { const m = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.2, 1.6), new THREE.MeshStandardMaterial({ color: 0x5a2a1a, emissive: 0x000000, roughness: 0.4 })); m.position.set(-22 + (i - 1.5) * 6, 3.9, 12); g.add(m); return m; });
+    const y0 = 4.3, pinZ = 18.5; this.pinZ = pinZ; this.pinTop = y0 + 8.2; this.pinX = {};
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(6 * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(-22, y0, pinZ); g.add(strip);
+    names.forEach((n, i) => { const x = -22 + (i - 2.5) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, y0 + 4.2, pinZ); g.add(p); });
+    // the motor: 28 mm silver can, 19 mm high, with the gearbox boss and a flatted output shaft that turns
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 19, 48), new THREE.MeshStandardMaterial({ color: 0xc3c7cc, metalness: 0.85, roughness: 0.4 })); can.position.set(18, 11.5, 6); g.add(can);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(9.2, 9.2, 1.6, 36), new THREE.MeshStandardMaterial({ color: 0xb6babf, metalness: 0.8, roughness: 0.4 })); cap.position.set(18, 21.8, 6); g.add(cap);
+    for (const s of [-1, 1]) { const ear = new THREE.Mesh(new THREE.BoxGeometry(7, 0.8, 4), new THREE.MeshStandardMaterial({ color: 0xc3c7cc, metalness: 0.85, roughness: 0.4 })); ear.position.set(18 + s * 17.5, 21.1, 6); g.add(ear); }
+    this.shaft = new THREE.Group(); this.shaft.position.set(18 + 0, 22.6, 6 - 0); g.add(this.shaft);
+    const boss = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 4, 24), new THREE.MeshStandardMaterial({ color: 0xe6e8ec, metalness: 0.8, roughness: 0.35 })); boss.position.y = 2; this.shaft.add(boss);
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.5, 1.1), new THREE.MeshStandardMaterial({ color: 0xc8231b, roughness: 0.5 })); mark.position.set(2.6, 4.2, 0); this.shaft.add(mark);
+    // the cable to the driver (five wires: blue, pink, yellow, orange, red)
+    const cableCols = [0x2a62d6, 0xe58fb2, 0xe8c618, 0xe26a12, 0xc8231b];
+    cableCols.forEach((c, i) => { const path = new THREE.CatmullRomCurve3([new THREE.Vector3(6, 9, 6), new THREE.Vector3(-2, 4.2, 7 + i * 0.6), new THREE.Vector3(-8, 4.2, 18.5)]); g.add(new THREE.Mesh(new THREE.TubeGeometry(path, 20, 0.35, 6, false), new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 }))); });
+    tagHW(g, 'stepper'); this.setState([0, 0, 0, 0], 0, false);
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    return { pos: this.group.localToWorld(new THREE.Vector3(this.pinX[name], this.pinTop, this.pinZ)), dir: new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion())) };
+  }
+  /** lv = 4 coil levels (0/1), angleDeg = output shaft angle, powered = supply present */
+  setState(lv, angleDeg, powered) {
+    this.leds.forEach((m, i) => { const on = powered && lv[i]; m.material.color.setHex(on ? 0xff7a2a : 0x5a2a1a); m.material.emissive.setRGB(on ? 1.2 : 0, on ? 0.25 : 0, 0); });
+    this.shaft.rotation.y = -angleDeg * Math.PI / 180;
+  }
+}
+
 // ---------------------------------------------------------------- 38 kHz IR receiver (TSOP382-type, minicast 5.0 x 6.95 x 4.8 mm), dome toward you, legs OUT GND VS
 export class IRReceiver {
   constructor() {
@@ -2089,6 +2131,18 @@ export const HW_INFO = {
       'The X and Y arrows printed on the board show the sensor axes.',
     ],
     src: 'MPU-6000/MPU-6050 Register Map and Descriptions (InvenSense, rev 4.0)',
+  },
+  stepper: {
+    name: '28BYJ-48 stepper motor with ULN2003 driver', tag: 'A motor that turns in exact steps',
+    summary: 'A stepper motor turns a fixed small angle each time its four coils are energised in the next pattern. The ULN2003 board lets four weak pins drive the coils (the pins only switch the driver; the 5 V supply feeds the motor). The four LEDs on the board show which coils are on.',
+    points: [
+      'Vendor datasheets for the 5 V version: 4 phases, nominal gear ratio 1/64, stride angle 5.625°/64: about 2048 full steps per turn of the output shaft (4096 in half-step mode). The true gear ratio is about 63.68:1, so 2048 is a rounding.',
+      'It is slow and strong for its size: tutorials commonly use about 10 to 15 revolutions per minute. Faster, and the motor skips steps.',
+      'Coil resistance is quoted differently by different sellers (22 Ω and 50 Ω appear): read the sheet of your own motor.',
+      'With the Arduino Stepper library this motor needs the pins given in the order IN1, IN3, IN2, IN4.',
+      'Power the driver board from the 5 V pin and share GND with the board.',
+    ],
+    src: 'Vendor datasheet copies of the 28BYJ-48 (no single manufacturer datasheet found); Arduino Stepper library',
   },
   irrx: {
     name: 'IR receiver, 38 kHz (TSOP382-type)', tag: 'Receives infrared remote controls',

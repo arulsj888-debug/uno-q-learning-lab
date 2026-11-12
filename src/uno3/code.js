@@ -691,3 +691,25 @@ void loop() {
   Serial.println(" rad/s");
   delay(500);
 }`;
+
+// Lesson 32 — 28BYJ-48 stepper motor with ULN2003 driver and the Stepper library
+export const U3_STEP = `#include <Stepper.h>
+
+const int stepsPerRevolution = 2048;   // 28BYJ-48 with its gearbox (nominal value)
+
+// The 28BYJ-48 needs the pins in the order IN1, IN3, IN2, IN4
+Stepper myStepper(stepsPerRevolution, 8, 10, 9, 11);
+
+void setup() {
+  myStepper.setSpeed(10);              // 10 revolutions per minute
+  Serial.begin(9600);
+}
+
+void loop() {
+  Serial.println("clockwise");
+  myStepper.step(stepsPerRevolution);   // one full turn
+  delay(500);
+  Serial.println("counter-clockwise");
+  myStepper.step(-stepsPerRevolution);  // and back
+  delay(500);
+}`;

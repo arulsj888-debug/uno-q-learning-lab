@@ -23,7 +23,7 @@ let PINS = UQ_PINS, PI = false, U3 = false, E32 = false, SUP = '3V3';    // SUP 
 PINS.add('QWIIC');                                         // the UNO Q Qwiic connector (I2C4 / Wire1)
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
-const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2|QA|QB|SDA|SCL|DIN)$/;          // pin of an off-board module, e.g. pir1.OUT
+const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2|QA|QB|SDA|SCL|DIN|IN1|IN2|IN3|IN4)$/;          // pin of an off-board module, e.g. pir1.OUT
 const isMod = r => MOD.test(r);
 const isWire = d => d.type === 'wire' || d.type === 'fwire' || d.type === 'lead' || d.type === 'qwiic';
 const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
@@ -85,7 +85,7 @@ for (const L of list) {
     const ends = isWire(d) ? [d.from, d.to] : Object.values(legs(d));
     for (const e of ends) {
       if (isHole(e)) { const [, , c] = HOLE.exec(e); if (+c < 1 || +c > 30) bad(L, `${d.id}: hole ${e} out of range`); (used[e] ??= []).push(d.id); }
-      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo', 'pixels', 'lcd1602', 'oled', 'neopixel', 'mpu6050'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
+      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo', 'pixels', 'lcd1602', 'oled', 'neopixel', 'mpu6050', 'stepper'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
       else if (!PINS.has(e)) bad(L, `${d.id}: unknown header pin ${e}`);
     }
   }
@@ -186,6 +186,12 @@ for (const L of list) {
       if (!r) bad(L, `${pin}: no resistor between the pin and the ${leg} leg of ${id}`);
       if (!N.same(id + '.C', G)) bad(L, `${pin}: common leg of ${id} is not on GND (common cathode)`);
       if (N.same(P, id + '.' + leg)) bad(L, `${pin}: the ${leg} leg is connected to the pin without a resistor`);
+    }
+    if (io.kind === 'stepper') {
+      const id = io.item;
+      if (!N.same(id + '.IN' + io.idx, P)) bad(L, `${pin}: stepper IN${io.idx} not on ${pin}`);
+      if (!N.same(id + '.GND', G)) bad(L, `stepper: GND not on GND`);
+      if (!N.same(id + '.VCC', 'PIN:' + (U3 ? '5V' : 'VIN'))) bad(L, `stepper: VCC not on ${U3 ? '5V' : 'VIN'}`);
     }
     if (io.kind === 'mpu') {
       const id = io.item, sda = pin, scl = io.scl;

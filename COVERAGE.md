@@ -60,7 +60,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 |---|---|---|---|---|---|
 | Servo SG90 | DONE | TODO | DONE | build only | |
 | DC motor + L293D, relay | DONE | build only | DONE | n/a (5 V handling TODO) | |
-| Stepper 28BYJ-48 + ULN2003 | TODO | TODO | TODO | TODO | |
+| Stepper 28BYJ-48 + ULN2003 | TODO | TODO | DONE (lesson 32, lesson only) | DONE (lesson 32, lesson only) | facts from vendor datasheet copies (2048 steps nominal, true ratio ~63.68:1, coil resistance 22 or 50 ohm disagree); Stepper library pin order IN1,IN3,IN2,IN4; Build part TODO |
 | Stepper A4988 / DRV8825 driver | TODO | TODO | TODO | TODO | |
 | Solenoid / pump / fan with MOSFET | TODO | TODO | TODO | TODO | |
 | SD card (SPI) | TODO | n/a | TODO | TODO | |

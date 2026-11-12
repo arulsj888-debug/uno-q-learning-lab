@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -46,6 +46,8 @@ const SRC = {
   mpureg: { t: 'MPU-6000/MPU-6050 Register Map and Descriptions (InvenSense): sleep mode at power-up, WHO_AM_I 0x68, 16384 LSB/g, 131 LSB/(deg/s)', u: 'https://cdn.sparkfun.com/datasheets/Sensors/Accelerometers/RM-MPU-6000A.pdf' },
   adampu: { t: 'Adafruit MPU6050 library (Adafruit_MPU6050, Adafruit_Sensor)', u: 'https://github.com/adafruit/Adafruit_MPU6050' },
   isrdoc: { t: 'Arduino reference: attachInterrupt()', u: 'https://docs.arduino.cc/language-reference/en/functions/external-interrupts/attachInterrupt/' },
+  uln: { t: 'Vendor datasheet copy: 28BYJ-48 5 V stepper, 1/64 gear, 5.625 deg / 64 stride angle, 4 phases', u: 'https://cdn.shopify.com/s/files/1/0015/7571/4865/files/datasheet_28BYJ-48.pdf' },
+  steplib: { t: 'Arduino reference: Stepper library (setSpeed, step)', u: 'https://docs.arduino.cc/libraries/stepper/' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -120,6 +122,16 @@ const OLED_PARTS_E = dispE('oled', 'oled1', '3V3', ['GND', 'VCC', 'SCL', 'SDA'],
 const OLED_IDS_E = OLED_PARTS_E.map(d => d.id);
 const MPU_PARTS_E = dispE('mpu6050', 'mpu1', '3V3', ['VCC', 'GND', 'SCL', 'SDA'], 7);
 const MPU_IDS_E = MPU_PARTS_E.map(d => d.id);
+const STEP_PARTS_E = [
+  { id: 'stp1', type: 'stepper', x: 20, z: 138 },
+  { id: 'w90', type: 'fwire', from: 'stp1.IN1', to: 'G16', color: 'blue', lift: 36 },
+  { id: 'w91', type: 'fwire', from: 'stp1.IN2', to: 'G17', color: 'green', lift: 40 },
+  { id: 'w92', type: 'fwire', from: 'stp1.IN3', to: 'G18', color: 'yellow', lift: 44 },
+  { id: 'w93', type: 'fwire', from: 'stp1.IN4', to: 'G19', color: 'orange', lift: 48 },
+  { id: 'w94', type: 'fwire', from: 'stp1.GND', to: 'GND2', color: 'black', lift: 24 },
+  { id: 'w95', type: 'fwire', from: 'stp1.VCC', to: 'VIN', color: 'red', lift: 30 },
+];
+const STEP_IDS_E = STEP_PARTS_E.map(d => d.id);
 // NeoPixel strip on the desk: leads to breadboard holes a10..a12, board pins (VIN, GPIO16, GND) to b10..b12
 const NEO_PARTS_E = [
   { id: 'neo1', type: 'neopixel', x: 35, z: 140 },
@@ -193,7 +205,7 @@ const D_IDS_E = D_PARTS_E.map(d => d.id);
 const TOUCH_PARTS = [...LED_CIRCUIT, { id: 'w8', type: 'fwire', from: 'G4', to: 'a30', color: 'green', lift: 30 }];
 const TOUCH_IDS = TOUCH_PARTS.map(d => d.id);
 
-export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays', 10: 'Module 10 — Switching loads', 11: 'Module 11 — Timing' };
+export const E32_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Wi-Fi', 4: 'Module 4 — Touch', 5: 'Module 5 — Saving power', 6: 'Module 6 — Bluetooth', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays', 10: 'Module 10 — Switching loads', 11: 'Module 11 — Timing', 12: 'Module 12 — Stepper motors' };
 export const E32_COMING = [];
 
 export const E32_LESSONS = [
@@ -1718,5 +1730,45 @@ export const E32_LESSONS = [
       { q: 'What should an ISR do?', a: ['Print long messages', 'Wait with delay()', 'Be very short, e.g. set a flag', 'Connect to Wi-Fi'], c: 2, why: 'Long work blocks everything else.' },
     ],
     sources: [SRC.isrdoc, SRC.ds],
+  },
+
+  // ================================================================== 32
+  {
+    id: 'e32', num: 32, module: 12, title: 'Stepper motor: turn exactly one revolution', level: 'Intermediate', time: '25 min',
+    goal: 'Drive a 28BYJ-48 stepper motor through a ULN2003 board with the Stepper library: one turn each way.',
+    hardware: ['ESP32 DevKit V1', '28BYJ-48 stepper motor (5 V) with its ULN2003 driver board', '6 × female–male jumper wires'],
+    code: E32_STEP, file: 'StepperTurn.ino', program: 'e_step', fast: true, widgets: ['stepper'],
+    circuit: STEP_PARTS_E, io: { G16: { kind: 'stepper', idx: 1, item: 'stp1', needs: STEP_IDS_E }, G17: { kind: 'stepper', idx: 2, item: 'stp1', needs: STEP_IDS_E }, G18: { kind: 'stepper', idx: 3, item: 'stp1', needs: STEP_IDS_E }, G19: { kind: 'stepper', idx: 4, item: 'stp1', needs: STEP_IDS_E } },
+    explain: {
+      1: 'The <b>Stepper</b> library comes with the Arduino IDE.',
+      3: 'Steps for one turn of the output shaft: about <b>2048</b> for this motor (nominal gear 1/64; the true ratio is a little different).',
+      6: 'Create the stepper with the four pins <b>in the order IN1, IN3, IN2, IN4</b> (this motor’s coils are wired that way).',
+      9: '<b>setSpeed(10)</b>: 10 revolutions per minute. This sets the delay between steps; it does not move the motor.',
+      10: 'Serial output on.',
+      14: 'Say which way we go.',
+      15: '<b>step(2048)</b> moves that many steps (positive = one direction) and waits until done: it is <b>blocking</b>.',
+      16: 'Pause half a second.',
+      17: 'Say the other way.',
+      18: 'A <b>negative</b> number turns the other way.',
+    },
+    steps: [
+      { title: 'A motor that counts', view: 'scanv', have: [], power: false,
+        body: `<p>An ordinary DC motor just spins. A <b>stepper motor</b> moves in small <b>exact steps</b>: you energise its coils in a repeating pattern and each new pattern turns the shaft a fixed small angle. Count the steps and you know the position, with no sensor.</p>` },
+      { title: 'The 28BYJ-48 and its driver', view: 'scanv', have: ['stp1'], power: false,
+        body: `<p>The popular <b>28BYJ-48</b> (5 V) has a gearbox: about <b>2048 steps</b> per turn of the output shaft (vendor sheets: 1/64 gear, 5.625°/64 per step). Pins cannot power the coils, so the <b>ULN2003 board</b> switches them: four pins IN1 to IN4 in, the motor cable out. Four <b>LEDs</b> show which coils are on. <b>Click it</b> in the 3D view.</p><p class="warn">Seller sheets disagree on coil resistance (22 Ω or 50 Ω): read the sheet of your own motor.</p>` },
+      { title: 'Wire it', view: 'scanv', have: STEP_IDS_E, power: false, pins: ['G16', 'G17', 'G18', 'G19', 'VIN', 'GND2'],
+        body: `<ul><li><b>IN1 → GPIO16</b>, <b>IN2 → GPIO17</b>, <b>IN3 → GPIO18</b>, <b>IN4 → GPIO19</b></li><li><b>VCC → VIN</b> (5 V), <b>GND → GND</b></li></ul><p>The motor plugs into the white socket of the driver board (already connected here).</p>` },
+      { title: 'The code', view: 'scanv', have: STEP_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>6</b>, <b>9</b> and <b>15</b>. Note the pin order <code>IN1, IN3, IN2, IN4</code> in the constructor.</p>` },
+      { title: 'Run it', view: 'scanv', have: STEP_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>The four LEDs on the driver chase as the coil patterns change, and the shaft (red mark) turns one revolution clockwise, pauses, then one back. At 10 rpm one turn takes about 6 seconds. The panel counts the steps and the angle.</p><p class="sim">Simulated motor: the speed is approximate in the browser.</p>` },
+      { title: 'Summary', view: 'scanv', have: STEP_IDS_E, power: true,
+        body: `<ul><li>Stepper: exact steps by energising coils in a pattern; the ULN2003 board does the switching.</li><li><code>Stepper s(steps, IN1, IN3, IN2, IN4); s.setSpeed(rpm); s.step(n);</code></li><li><code>step()</code> blocks; negative = other direction; about 10 to 15 rpm is typical for this motor.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How many steps for one output revolution of a 28BYJ-48 (nominal)?', a: ['32', '200', '2048', '10000'], c: 2, why: 'About 2048 full steps with the 1/64 gearbox.' },
+      { q: 'Why use a ULN2003 board?', a: ['To make the motor faster', 'A pin cannot supply the coil current', 'To store the position', 'To cool the motor'], c: 1, why: 'It switches the coil current for the pins.' },
+      { q: 'What does step(-2048) do?', a: ['Nothing', 'Turns one revolution the other way', 'Stops the motor', 'Sets the speed'], c: 1, why: 'A negative count reverses the direction.' },
+    ],
+    sources: [SRC.uln, SRC.steplib, ],
   },
 ];

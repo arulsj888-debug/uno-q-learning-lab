@@ -859,6 +859,7 @@ class App {
     if (w.includes('pikeys')) h += `<div class="io-block"><div class="io-title">Keys — click to play <span class="io-note">(GPIO17)</span></div><div class="pkeys">${[['C4', 60], ['D4', 62], ['E4', 64], ['F4', 65], ['G4', 67], ['A4', 69], ['B4', 71]].map(([n, m]) => `<button class="pkey" data-hz="${(440 * Math.pow(2, (m - 69) / 12)).toFixed(3)}" data-n="${n}">${n}</button>`).join('')}</div><div id="pk-note" class="io-note"></div></div>`;
     if (w.includes('piweb')) h += `<div class="io-block pirstat tight"><div><span>Phone browser</span><b id="w-ph">—</b></div><div class="arrow">→</div><div><span>${IS_E32 ? 'WebServer on the ESP32' : 'Flask on the Pi'}</span><b id="w-fl">—</b></div><div class="arrow">→</div><div><span>LED on ${IS_E32 ? 'GPIO16' : 'GPIO17'}</span><b id="w-led">—</b></div></div><div id="w-note" class="io-note"></div>`;
     if (w.includes('wifiscan')) h += `<div class="io-block"><div class="io-title">Signal of “HomeNet” <span class="io-note">(simulated)</span></div><input id="wf-rssi" type="range" min="-90" max="-30" step="1" value="${this.wf.rssi}"><div id="wf-val" class="io-val"></div><div class="io-note">RSSI = received signal strength in dBm. The closer to 0, the stronger the signal. The other networks are made up for this demo.</div></div>`;
+    if (w.includes('stepper')) { this.stp = { lv: [0, 0, 0, 0], steps: 0 }; h += `<div class="io-block"><div class="io-title">Stepper motor <span class="io-note">(simulated)</span></div><div id="stp-out" class="io-val">Steps: 0 · angle 0°</div><div id="stp-note" class="io-note"></div></div>`; }
     if (w.includes('mpusens')) { this.mp = { pitch: 0, roll: 0, rate: 0 }; h += `<div class="io-block"><div class="io-title">Tilt the board <span class="io-note">(simulated)</span></div><div class="throw"><label>Pitch</label><input id="mp-p" type="range" min="-90" max="90" step="1" value="0"><b id="mp-pv">0°</b></div><div class="throw"><label>Roll</label><input id="mp-r" type="range" min="-90" max="90" step="1" value="0"><b id="mp-rv">0°</b></div><div class="throw"><label>Rotation</label><input id="mp-w" type="range" min="-250" max="250" step="5" value="0"><b id="mp-wv">0 °/s</b></div></div>`; }
     if (w.includes('irremote')) { this.irq = []; h += `<div class="io-block"><div class="io-title">Simulated IR remote <span class="io-note">(NEC, address 0x00)</span></div><div class="io-tools"><button id="ir-45" class="hold small">⏻ Power 0x45</button><button id="ir-0c" class="hold small">1 · 0x0C</button><button id="ir-18" class="hold small">2 · 0x18</button><button id="ir-5e" class="hold small">3 · 0x5E</button></div><div id="ir-note" class="io-note"></div></div>`; }
     if (w.includes('ntpserver')) { this.wf.ntp = true; this.wf.ntpT0 = 0; h += `<div class="io-block"><div class="io-title">Time server <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="ntp-btn" class="hold small">🕒 pool.ntp.org: reachable</button></div></div>`; }
@@ -1604,8 +1605,18 @@ class App {
     set('#ir-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>, then press a button of the remote.' : '');
     if (!run) this.irq = [];
   }
+  stpTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('stepper') || !this.stp) return;
+    const run = this.sim.running, S = this.stp, o = this.bench.get('stp1'), pw = this.board.powered;
+    if (!run) { S.lv = [0, 0, 0, 0]; }
+    const ang = S.steps * 360 / 2048;
+    if (o && o.setState) o.setState(S.lv, ang, pw && run);
+    const set = (id, h) => { const e = $(id); if (e && e.innerHTML !== h) e.innerHTML = h; };
+    set('#stp-out', `Steps: <b>${S.steps}</b> · angle <b>${(((ang % 360) + 360) % 360).toFixed(1)}°</b> · coils ${S.lv.join('')}`);
+    set('#stp-note', !pw ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>.' : '');
+  }
   displayTick() {
-    this.qTick(); this.mTick(); this.irTick();
+    this.qTick(); this.mTick(); this.irTick(); this.stpTick();
     const L = this.lesson; if (!L) return;
     if (!this.sim.running && this.neoSt) this.neoSt.shown = null;
     if (L.io && Object.values(L.io).some(x => x.kind === 'neo')) {
@@ -2047,6 +2058,7 @@ class App {
       i2cProbe: a => (a === this.lcdAddr && this.i2cDispOk('lcd')) || (a === this.oledAddr && this.i2cDispOk('oled')) || (a === 0x68 && this.i2cDispOk('mpu')),
       oled: ev => this.oledOp(ev),
       mpu: () => { const L = this.lesson, io = Object.values((L && L.io) || {}).find(x => x.kind === 'mpu'); if (!(io && this.wired(io) && this.board.powered)) return { ax: 0, ay: 0, az: 0, gz: 0 }; const g = 9.80665, p = this.mp.pitch * Math.PI / 180, r = this.mp.roll * Math.PI / 180, n = () => (Math.random() - 0.5) * 0.04; return { ax: -g * Math.sin(p) + n(), ay: g * Math.sin(r) * Math.cos(p) + n(), az: g * Math.cos(r) * Math.cos(p) + n(), gz: this.mp.rate * Math.PI / 180 }; },
+      stepTick: dir => { const L = this.lesson, io = Object.values((L && L.io) || {}).find(x => x.kind === 'stepper'); if (this.stp && io && this.wired(io) && this.board.powered) this.stp.steps += dir; },
       ir: () => (this.irq && this.irq.length ? this.irq.shift() : null),
       ds18: () => {
         const L = this.lesson, pin = L && L.io ? Object.keys(L.io).find(p => L.io[p].kind === 'ds18b20') : null, io = pin && this.ioFor(pin);
@@ -2104,7 +2116,7 @@ class App {
   ledFor(pin) { const io = this.ioFor(pin); return io && io.kind === 'led' ? { io, led: this.bench.get(io.item) } : null; }
 
   onDigital(pin, level) {
-    { const qo = this.ioFor(pin); if (qo && (qo.kind === 'npn' || qo.kind === 'mosfet')) this.qPin = level ? 1 : 0; }
+    { const qo = this.ioFor(pin); if (qo && (qo.kind === 'npn' || qo.kind === 'mosfet')) this.qPin = level ? 1 : 0; if (qo && qo.kind === 'stepper' && this.stp) this.stp.lv[qo.idx - 1] = level ? 1 : 0; }
     { const rg = this.ioFor(pin); if (rg && rg.kind === 'rgb') this.rgbSet(rg, level ? 1 : 0); }
     if (IS_E32 && pin === 'G2') { this.br.led = !!level; if (this.board.powered) this.board.setLed('blue', !!level); }   // the blue LED is on GPIO2 (active high)
     if (IS_U3 && pin === 'LED_BUILTIN') {        // the yellow L LED on pin 13 is active-high

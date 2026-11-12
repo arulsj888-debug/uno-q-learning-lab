@@ -42,6 +42,8 @@ export const SRC = {
   irremote: { t: 'Arduino-IRremote library (version 4.x) by Armin Joachimsmeyer and contributors', u: 'https://github.com/Arduino-IRremote/Arduino-IRremote' },
   mpureg: { t: 'MPU-6000/MPU-6050 Register Map and Descriptions (InvenSense): sleep mode at power-up, WHO_AM_I 0x68, 16384 LSB/g, 131 LSB/(deg/s)', u: 'https://cdn.sparkfun.com/datasheets/Sensors/Accelerometers/RM-MPU-6000A.pdf' },
   adampu: { t: 'Adafruit MPU6050 library (Adafruit_MPU6050, Adafruit_Sensor)', u: 'https://github.com/adafruit/Adafruit_MPU6050' },
+  uln: { t: 'Vendor datasheet copy: 28BYJ-48 5 V stepper, 1/64 gear, 5.625 deg / 64 stride angle, 4 phases', u: 'https://cdn.shopify.com/s/files/1/0015/7571/4865/files/datasheet_28BYJ-48.pdf' },
+  steplib: { t: 'Arduino reference: Stepper library (setSpeed, step)', u: 'https://docs.arduino.cc/libraries/stepper/' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -311,3 +313,15 @@ export const MPU_PARTS = [
   { id: 'w93', type: 'fwire', from: 'mpu1.SCL', to: 'A5', color: 'yellow', lift: 42 },
 ];
 export const MPU_IDS = MPU_PARTS.map(d => d.id);
+
+// ---- Lesson 32: 28BYJ-48 + ULN2003 on the desk, IN1..IN4 on pins 8..11, power from 5V and GND
+export const STEP_PARTS = [
+  { id: 'stp1', type: 'stepper', x: 20, z: 138 },
+  { id: 'w90', type: 'fwire', from: 'stp1.IN1', to: 'D8', color: 'blue', lift: 36 },
+  { id: 'w91', type: 'fwire', from: 'stp1.IN2', to: 'D9', color: 'green', lift: 40 },
+  { id: 'w92', type: 'fwire', from: 'stp1.IN3', to: 'D10', color: 'yellow', lift: 44 },
+  { id: 'w93', type: 'fwire', from: 'stp1.IN4', to: 'D11', color: 'orange', lift: 48 },
+  { id: 'w94', type: 'fwire', from: 'stp1.GND', to: 'GND2', color: 'black', lift: 24 },
+  { id: 'w95', type: 'fwire', from: 'stp1.VCC', to: '5V', color: 'red', lift: 30 },
+];
+export const STEP_IDS = STEP_PARTS.map(d => d.id);

@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1505,5 +1505,45 @@ export const U3_LESSONS_2 = [
       { q: 'mpu.begin() returns false. What is the most likely cause?', a: ['The LED is off', 'The chip does not answer: wiring or power', 'The baud rate', 'The delay is too long'], c: 1, why: 'No I²C answer: check power and the SDA/SCL wires.' },
     ],
     sources: [SRC.mpureg, SRC.adampu, SRC.wire],
+  },
+
+  // ================================================================== 32
+  {
+    id: 'u32', num: 32, module: 13, title: 'Stepper motor: turn exactly one revolution', level: 'Intermediate', time: '25 min',
+    goal: 'Drive a 28BYJ-48 stepper motor through a ULN2003 board with the Stepper library: one turn each way.',
+    hardware: ['Arduino UNO R3', '28BYJ-48 stepper motor (5 V) with its ULN2003 driver board', '6 × female jumper wires'],
+    code: U3_STEP, file: 'StepperTurn.ino', program: 'u3_step', fast: true, widgets: ['stepper'],
+    circuit: STEP_PARTS, io: { D8: { kind: 'stepper', idx: 1, item: 'stp1', needs: STEP_IDS }, D9: { kind: 'stepper', idx: 2, item: 'stp1', needs: STEP_IDS }, D10: { kind: 'stepper', idx: 3, item: 'stp1', needs: STEP_IDS }, D11: { kind: 'stepper', idx: 4, item: 'stp1', needs: STEP_IDS } },
+    explain: {
+      1: 'The <b>Stepper</b> library comes with the Arduino IDE.',
+      3: 'Steps for one turn of the output shaft: about <b>2048</b> for this motor (nominal gear 1/64; the true ratio is a little different).',
+      6: 'Create the stepper with the four pins <b>in the order IN1, IN3, IN2, IN4</b> (this motor’s coils are wired that way).',
+      9: '<b>setSpeed(10)</b>: 10 revolutions per minute. This sets the delay between steps; it does not move the motor.',
+      10: 'Serial output on.',
+      14: 'Say which way we go.',
+      15: '<b>step(2048)</b> moves that many steps (positive = one direction) and waits until done: it is <b>blocking</b>.',
+      16: 'Pause half a second.',
+      17: 'Say the other way.',
+      18: 'A <b>negative</b> number turns the other way.',
+    },
+    steps: [
+      { title: 'A motor that counts', view: 'scanv', have: [], power: false,
+        body: `<p>An ordinary DC motor just spins. A <b>stepper motor</b> moves in small <b>exact steps</b>: you energise its coils in a repeating pattern and each new pattern turns the shaft a fixed small angle. Count the steps and you know the position, with no sensor.</p>` },
+      { title: 'The 28BYJ-48 and its driver', view: 'scanv', have: ['stp1'], power: false,
+        body: `<p>The popular <b>28BYJ-48</b> (5 V) has a gearbox: about <b>2048 steps</b> per turn of the output shaft (vendor sheets: 1/64 gear, 5.625°/64 per step). Pins cannot power the coils, so the <b>ULN2003 board</b> switches them: four pins IN1 to IN4 in, the motor cable out. Four <b>LEDs</b> show which coils are on. <b>Click it</b> in the 3D view.</p><p class="warn">Seller sheets disagree on coil resistance (22 Ω or 50 Ω): read the sheet of your own motor.</p>` },
+      { title: 'Wire it', view: 'scanv', have: STEP_IDS, power: false, pins: ['D8', 'D9', 'D10', 'D11', '5V', 'GND2'],
+        body: `<ul><li><b>IN1 → 8</b>, <b>IN2 → 9</b>, <b>IN3 → 10</b>, <b>IN4 → 11</b></li><li><b>VCC → 5V</b> (5 V), <b>GND → GND</b></li></ul><p>The motor plugs into the white socket of the driver board (already connected here).</p>` },
+      { title: 'The code', view: 'scanv', have: STEP_IDS, showCode: true, power: true, body: `<p>Click lines <b>6</b>, <b>9</b> and <b>15</b>. Note the pin order <code>IN1, IN3, IN2, IN4</code> in the constructor.</p>` },
+      { title: 'Run it', view: 'scanv', have: STEP_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The four LEDs on the driver chase as the coil patterns change, and the shaft (red mark) turns one revolution clockwise, pauses, then one back. At 10 rpm one turn takes about 6 seconds. The panel counts the steps and the angle.</p><p class="sim">Simulated motor: the speed is approximate in the browser.</p>` },
+      { title: 'Summary', view: 'scanv', have: STEP_IDS, power: true,
+        body: `<ul><li>Stepper: exact steps by energising coils in a pattern; the ULN2003 board does the switching.</li><li><code>Stepper s(steps, IN1, IN3, IN2, IN4); s.setSpeed(rpm); s.step(n);</code></li><li><code>step()</code> blocks; negative = other direction; about 10 to 15 rpm is typical for this motor.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How many steps for one output revolution of a 28BYJ-48 (nominal)?', a: ['32', '200', '2048', '10000'], c: 2, why: 'About 2048 full steps with the 1/64 gearbox.' },
+      { q: 'Why use a ULN2003 board?', a: ['To make the motor faster', 'A pin cannot supply the coil current', 'To store the position', 'To cool the motor'], c: 1, why: 'It switches the coil current for the pins.' },
+      { q: 'What does step(-2048) do?', a: ['Nothing', 'Turns one revolution the other way', 'Stops the motor', 'Sets the speed'], c: 1, why: 'A negative count reverses the direction.' },
+    ],
+    sources: [SRC.uln, SRC.steplib, ],
   },
 ];

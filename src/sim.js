@@ -72,6 +72,7 @@ export class Sim {
       oled: (op, a, b) => (H.oled ? H.oled({ op, a, b }) : false),
       irDecode: () => (H.ir ? H.ir() : null),   // IrReceiver.decode(): the command of a received code, or null
       mpuRead: () => (H.mpu ? H.mpu() : { ax: 0, ay: 0, az: 0, gz: 0 }),
+      stepTick: (dir) => { if (H.stepTick) H.stepTick(dir); },
       dsRead: () => (H.ds18 ? H.ds18() : { ok: false }),
       dhtRead: () => (H.dht ? H.dht() : { ok: false }),
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
@@ -1126,6 +1127,44 @@ export const PROGRAMS = {
         await rt.at(24); await rt.delay(1000);
       }
     } finally { alive = false; }
+  },
+
+  async u3_step(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(6);
+    for (const p of ['D8', 'D9', 'D10', 'D11']) rt.pinMode(p, 'OUTPUT');
+    await rt.at(9); const rpm = 10; const ms = 60000 / (2048 * rpm);
+    await rt.at(10); rt.serialBegin(9600);
+    const SEQ = [[1, 0, 1, 0], [0, 1, 1, 0], [0, 1, 0, 1], [1, 0, 0, 1]];   // coil pattern of the Stepper library (pins 1..4 in constructor order)
+    let k = 0;
+    const turn = async (n) => { const dir = n > 0 ? 1 : -1, tot = Math.abs(n), t0 = performance.now(); let done = 0; while (done < tot) { const target = Math.min(tot, Math.floor((performance.now() - t0) / ms) + 1); while (done < target) { k = (k + (dir > 0 ? 1 : 3)) % 4; rt.stepTick(dir); done++; } const p = SEQ[k]; rt.digitalWrite(['D8', 'D9', 'D10', 'D11'][0], p[0]); rt.digitalWrite(['D8', 'D9', 'D10', 'D11'][2], p[1]); rt.digitalWrite(['D8', 'D9', 'D10', 'D11'][1], p[2]); rt.digitalWrite(['D8', 'D9', 'D10', 'D11'][3], p[3]); await rt.delay(8); } };
+    for (;;) {
+      await rt.at(13);
+      await rt.at(14); rt.println('clockwise');
+      await rt.at(15); await turn(2048);
+      await rt.at(16); await rt.delay(500);
+      await rt.at(17); rt.println('counter-clockwise');
+      await rt.at(18); await turn(-2048);
+      await rt.at(19); await rt.delay(500);
+    }
+  },
+
+  async e_step(rt) {
+    await rt.at(1); await rt.at(3); await rt.at(6);
+    for (const p of ['G16', 'G17', 'G18', 'G19']) rt.pinMode(p, 'OUTPUT');
+    await rt.at(9); const rpm = 10; const ms = 60000 / (2048 * rpm);
+    await rt.at(10); rt.serialBegin(115200);
+    const SEQ = [[1, 0, 1, 0], [0, 1, 1, 0], [0, 1, 0, 1], [1, 0, 0, 1]];   // coil pattern of the Stepper library (pins 1..4 in constructor order)
+    let k = 0;
+    const turn = async (n) => { const dir = n > 0 ? 1 : -1, tot = Math.abs(n), t0 = performance.now(); let done = 0; while (done < tot) { const target = Math.min(tot, Math.floor((performance.now() - t0) / ms) + 1); while (done < target) { k = (k + (dir > 0 ? 1 : 3)) % 4; rt.stepTick(dir); done++; } const p = SEQ[k]; rt.digitalWrite(['G16', 'G17', 'G18', 'G19'][0], p[0]); rt.digitalWrite(['G16', 'G17', 'G18', 'G19'][2], p[1]); rt.digitalWrite(['G16', 'G17', 'G18', 'G19'][1], p[2]); rt.digitalWrite(['G16', 'G17', 'G18', 'G19'][3], p[3]); await rt.delay(8); } };
+    for (;;) {
+      await rt.at(13);
+      await rt.at(14); rt.println('clockwise');
+      await rt.at(15); await turn(2048);
+      await rt.at(16); await rt.delay(500);
+      await rt.at(17); rt.println('counter-clockwise');
+      await rt.at(18); await turn(-2048);
+      await rt.at(19); await rt.delay(500);
+    }
   },
 
   async thermo(rt) {
