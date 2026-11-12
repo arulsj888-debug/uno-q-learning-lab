@@ -2133,6 +2133,16 @@ export const HW_INFO = {
     ],
     src: 'Vendor manuals and listings of the capacitive soil moisture sensor v1.2 (no manufacturer datasheet found): values are typical and differ between units',
   },
+  snd: {
+    name: 'Microphone sound sensor module (analog output)', tag: 'Detects loud sounds',
+    summary: 'A small electret microphone with an amplifier. The analog output AO sits near the middle of the supply when it is quiet and swings up and down with the sound. Many boards (KY-038 / LM393 style) also have a comparator and a potentiometer that gives a digital output when the sound passes a level.',
+    points: [
+      'Pin names and order differ between makers (for example AO, GND, VCC, DO): read the printing on your own board. This lesson uses the analog output only.',
+      'The quiet level and the swing are not standard: measure the quiet level in setup() and react to the difference from it.',
+      'The sensor reacts to loudness (sound pressure) in a rough way: it is good for “was there a loud sound”, not for measuring decibels.',
+    ],
+    src: 'Vendor listings of microphone sound sensor modules (no manufacturer datasheet): values are typical',
+  },
   bmp280: {
     name: 'BMP280 pressure and temperature sensor (breakout)', tag: 'Measures air pressure',
     summary: 'A small sensor that measures air pressure (300 to 1100 hPa) and temperature (−40 to +85 °C) and sends them over I²C. Pressure falls with height, so it can also give an estimate of altitude.',

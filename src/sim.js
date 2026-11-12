@@ -1238,6 +1238,46 @@ export const PROGRAMS = {
     }
   },
 
+  async u3_snd(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5);
+    await rt.at(8); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(9); rt.serialBegin(9600);
+    await rt.at(10); await rt.delay(300); const quiet = rt.analogRead('A0');
+    let ledOn = 0;
+    for (;;) {
+      await rt.at(13);
+      await rt.at(14); const level = Math.abs(rt.analogRead('A0') - quiet);
+      await rt.at(15);
+      if (level > 40) {
+        await rt.at(16); ledOn = ledOn ? 0 : 1;
+        await rt.at(17); rt.digitalWrite('D5', ledOn);
+        await rt.at(18); rt.println('Clap detected');
+        await rt.at(19); await rt.delay(300);
+      }
+      await rt.yield();
+    }
+  },
+
+  async e_snd(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5);
+    await rt.at(8); rt.pinMode('G16', 'OUTPUT');
+    await rt.at(9); rt.serialBegin(115200);
+    await rt.at(10); await rt.delay(300); const quiet = rt.analogRead('G34');
+    let ledOn = 0;
+    for (;;) {
+      await rt.at(13);
+      await rt.at(14); const level = Math.abs(rt.analogRead('G34') - quiet);
+      await rt.at(15);
+      if (level > 160) {
+        await rt.at(16); ledOn = ledOn ? 0 : 1;
+        await rt.at(17); rt.digitalWrite('G16', ledOn);
+        await rt.at(18); rt.println('Clap detected');
+        await rt.at(19); await rt.delay(300);
+      }
+      await rt.yield();
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

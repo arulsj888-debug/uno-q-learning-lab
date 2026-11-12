@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP, U3_SOIL } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP, U3_SOIL, U3_SND } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS, SOIL_PARTS, SOIL_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS, SOIL_PARTS, SOIL_IDS, SND_PARTS, SND_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1623,5 +1623,44 @@ export const U3_LESSONS_2 = [
       { q: 'What does constrain(x, 0, 100) do?', a: ['Keeps x between 0 and 100', 'Multiplies x', 'Makes x an integer', 'Prints x'], c: 0, why: 'It clamps the value into the range.' },
     ],
     sources: [SRC.soilsrc, SRC.ds],
+  },
+
+  // ================================================================== 35
+  {
+    id: 'u35', num: 35, module: 7, title: 'Sound sensor: a clap switch', level: 'Beginner', time: '20 min',
+    goal: 'Read a microphone module, find the quiet level, and toggle an LED when a loud sound (a clap) arrives.',
+    hardware: ['Arduino UNO R3', 'The LED circuit of Lesson 4', 'Microphone sound sensor module (analog output)', 'Jumper wires'],
+    code: U3_SND, file: 'ClapSwitch.ino', program: 'u3_snd', fast: true, widgets: ['clapsens'],
+    circuit: [...LED_CIRCUIT, ...SND_PARTS], io: { D5: IO_LED, A0: { kind: 'mic', item: 'snd1', needs: SND_IDS } },
+    explain: {
+      1: 'The analog input where AO is connected.',
+      2: 'The LED from Lesson 4.',
+      3: 'How far the reading must move away from the quiet level to count as a clap. Tune it for your sensor.',
+      4: 'The quiet-room reading, found in setup().',
+      10: 'Read the sensor once in a quiet room. A microphone module sits near the <b>middle</b> of its range when quiet.',
+      14: 'How far is the reading from the quiet level? <b>abs()</b> makes it positive: sound swings up and down.',
+      15: 'Louder than the threshold: a clap.',
+      16: 'Toggle the LED state…',
+      17: '…and write it to the LED.',
+      19: 'Wait 300 ms so the echo of one clap is not counted twice.',
+    },
+    steps: [
+      { title: 'Listening with a microphone module', view: 'scanv', have: [], power: false,
+        body: `<p>A sound sensor module has a small <b>microphone</b> and an amplifier. Its analog output <b>AO</b> sits near the <b>middle</b> of the supply voltage when it is quiet and swings up and down with the sound. A clap makes a big swing.</p>` },
+      { title: 'The module', view: 'scanv', have: ['snd1'], power: false,
+        body: `<p><b>Click it</b> in the 3D view. Pin names and order differ between makers (AO, GND, VCC here): read the printing on your own board. Many boards also have a digital output with a potentiometer; this lesson uses the analog output.</p><p class="warn">There is no standard datasheet for these modules: the quiet level and swing are typical, not exact.</p>` },
+      { title: 'Wire it', view: 'scanv', have: [...LED_IDS, ...SND_IDS], power: false, pins: ['A0', '5V', 'GND1'], body: `<ul><li><b>AO → A0</b>, <b>VCC → 5V</b>, <b>GND → GND</b> (the LED is wired as in Lesson 4, on pin 5)</li></ul>` },
+      { title: 'The code', view: 'scanv', have: [...LED_IDS, ...SND_IDS], showCode: true, power: true, body: `<p>Click lines <b>10</b>, <b>14</b> and <b>15</b>.</p>` },
+      { title: 'Run it and clap', view: 'scanv', have: [...LED_IDS, ...SND_IDS], showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>, then press <b>“Clap”</b> in the panel. Each clap toggles the LED and prints <code>Clap detected</code>. A quiet sound does nothing.</p><p class="sim">Simulated sound: quiet is about half of the supply, a clap swings the reading by a large amount.</p>` },
+      { title: 'Summary', view: 'scanv', have: [...LED_IDS, ...SND_IDS], power: true,
+        body: `<ul><li>Microphone module: AO near mid-supply when quiet, swings with sound.</li><li>Measure the quiet level, react to the <b>difference</b> (<code>abs()</code>).</li><li>A short <code>delay()</code> after a clap avoids counting the echo.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Why compare with the quiet level instead of a fixed number?', a: ['Modules differ: the quiet reading is not the same on every board', 'To save memory', 'Because analogRead cannot be compared', 'It is faster'], c: 0, why: 'The quiet level varies between modules.' },
+      { q: 'Why abs() on the difference?', a: ['Sound swings above and below the quiet level', 'To print it', 'To save power', 'To make it integer'], c: 0, why: 'The signal goes both up and down.' },
+      { q: 'What is the delay(300) for?', a: ['To ignore the echo of the clap', 'To warm up the sensor', 'To save power', 'To read Serial'], c: 0, why: 'Otherwise one clap could toggle the LED several times.' },
+    ],
+    sources: [SRC.sndsrc, SRC.ds],
   },
 ];

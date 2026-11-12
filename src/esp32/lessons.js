@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -51,6 +51,7 @@ const SRC = {
   bmpds: { t: 'Bosch BMP280 datasheet: 300-1100 hPa, -40..+85 C, supply 1.71-3.6 V, chip ID 0x58, address 0x76 (SDO to GND) or 0x77 (SDO to VDDIO)', u: 'https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf' },
   adabmp: { t: 'Adafruit BMP280 library (Adafruit_BMP280)', u: 'https://github.com/adafruit/Adafruit_BMP280_Library' },
   soilsrc: { t: 'Vendor manuals for the capacitive soil moisture sensor v1.2: 3.3-5.5 V, analog AOUT, wetter = lower voltage, calibrate dry and wet', u: 'https://www.atomic14.com/esp32/sensors/capacitive-soil/' },
+  sndsrc: { t: 'Arduino reference: analogRead(). The sound module itself has no standard datasheet: its values are typical', u: 'https://docs.arduino.cc/language-reference/en/functions/analog-io/analogRead/' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -131,6 +132,10 @@ const SOIL_PARTS_E = [{ id: 'soil1', type: 'soil', x: 20, z: 138 },
   ...['VCC', 'GND', 'AOUT'].map((n, i) => ({ id: 'm7' + i, type: 'fwire', from: 'soil1.' + n, to: 'a' + (10 + i), color: { VCC: 'red', GND: 'black', AOUT: 'yellow' }[n], lift: 16 + i * 2 })),
   ...['VCC', 'GND', 'AOUT'].map((n, i) => ({ id: 'w7' + i, type: 'fwire', from: { VCC: '3V3', GND: 'GND2', AOUT: 'G34' }[n], to: 'b' + (10 + i), color: { VCC: 'red', GND: 'black', AOUT: 'yellow' }[n], lift: 22 + i * 3 }))];
 const SOIL_IDS_E = SOIL_PARTS_E.map(d => d.id);
+const SND_PARTS_E = [{ id: 'snd1', type: 'snd', x: 20, z: 138 },
+  ...['AO', 'GND', 'VCC'].map((n, i) => ({ id: 'm8' + i, type: 'fwire', from: 'snd1.' + n, to: 'a' + (20 + i), color: { VCC: 'red', GND: 'black', AO: 'yellow' }[n], lift: 16 + i * 2 })),
+  ...['AO', 'GND', 'VCC'].map((n, i) => ({ id: 'w8' + i, type: 'fwire', from: { VCC: '3V3', GND: 'GND1', AO: 'G34' }[n], to: 'b' + (20 + i), color: { VCC: 'red', GND: 'black', AO: 'yellow' }[n], lift: 22 + i * 3 }))];
+const SND_IDS_E = SND_PARTS_E.map(d => d.id);
 const STEP_PARTS_E = [
   { id: 'stp1', type: 'stepper', x: 20, z: 138 },
   { id: 'w90', type: 'fwire', from: 'stp1.IN1', to: 'G16', color: 'blue', lift: 36 },
@@ -1857,5 +1862,44 @@ export const E32_LESSONS = [
       { q: 'What does constrain(x, 0, 100) do?', a: ['Keeps x between 0 and 100', 'Multiplies x', 'Makes x an integer', 'Prints x'], c: 0, why: 'It clamps the value into the range.' },
     ],
     sources: [SRC.soilsrc, SRC.ds],
+  },
+
+  // ================================================================== 35
+  {
+    id: 'e35', num: 35, module: 7, title: 'Sound sensor: a clap switch', level: 'Beginner', time: '20 min',
+    goal: 'Read a microphone module, find the quiet level, and toggle an LED when a loud sound (a clap) arrives.',
+    hardware: ['ESP32 DevKit V1', 'The LED circuit of Lesson 4', 'Microphone sound sensor module (analog output)', 'Jumper wires'],
+    code: E32_SND, file: 'ClapSwitch.ino', program: 'e_snd', fast: true, widgets: ['clapsens'],
+    circuit: [...LED_CIRCUIT, ...SND_PARTS_E], io: { G16: IO_LED, G34: { kind: 'mic', item: 'snd1', needs: SND_IDS_E } },
+    explain: {
+      1: 'The analog input where AO is connected.',
+      2: 'The LED from Lesson 4.',
+      3: 'How far the reading must move away from the quiet level to count as a clap. Tune it for your sensor.',
+      4: 'The quiet-room reading, found in setup().',
+      10: 'Read the sensor once in a quiet room. A microphone module sits near the <b>middle</b> of its range when quiet.',
+      14: 'How far is the reading from the quiet level? <b>abs()</b> makes it positive: sound swings up and down.',
+      15: 'Louder than the threshold: a clap.',
+      16: 'Toggle the LED state…',
+      17: '…and write it to the LED.',
+      19: 'Wait 300 ms so the echo of one clap is not counted twice.',
+    },
+    steps: [
+      { title: 'Listening with a microphone module', view: 'scanv', have: [], power: false,
+        body: `<p>A sound sensor module has a small <b>microphone</b> and an amplifier. Its analog output <b>AO</b> sits near the <b>middle</b> of the supply voltage when it is quiet and swings up and down with the sound. A clap makes a big swing.</p>` },
+      { title: 'The module', view: 'scanv', have: ['snd1'], power: false,
+        body: `<p><b>Click it</b> in the 3D view. Pin names and order differ between makers (AO, GND, VCC here): read the printing on your own board. Many boards also have a digital output with a potentiometer; this lesson uses the analog output.</p><p class="warn">There is no standard datasheet for these modules: the quiet level and swing are typical, not exact.</p>` },
+      { title: 'Wire it', view: 'scanv', have: [...LED_IDS, ...SND_IDS_E], power: false, pins: ['G34', '3V3', 'GND1'], body: `<ul><li>Module pins to breadboard row a (AO a20, GND a21, VCC a22); board wires in row b: <b>GPIO34 → b20</b>, <b>GND → b21</b>, <b>3V3 → b22</b> (the LED is wired as in Lesson 4, on GPIO16)</li></ul>` },
+      { title: 'The code', view: 'scanv', have: [...LED_IDS, ...SND_IDS_E], showCode: true, power: true, body: `<p>Click lines <b>10</b>, <b>14</b> and <b>15</b>.</p>` },
+      { title: 'Run it and clap', view: 'scanv', have: [...LED_IDS, ...SND_IDS_E], showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>, then press <b>“Clap”</b> in the panel. Each clap toggles the LED and prints <code>Clap detected</code>. A quiet sound does nothing.</p><p class="sim">Simulated sound: quiet is about half of the supply, a clap swings the reading by a large amount.</p>` },
+      { title: 'Summary', view: 'scanv', have: [...LED_IDS, ...SND_IDS_E], power: true,
+        body: `<ul><li>Microphone module: AO near mid-supply when quiet, swings with sound.</li><li>Measure the quiet level, react to the <b>difference</b> (<code>abs()</code>).</li><li>A short <code>delay()</code> after a clap avoids counting the echo.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Why compare with the quiet level instead of a fixed number?', a: ['Modules differ: the quiet reading is not the same on every board', 'To save memory', 'Because analogRead cannot be compared', 'It is faster'], c: 0, why: 'The quiet level varies between modules.' },
+      { q: 'Why abs() on the difference?', a: ['Sound swings above and below the quiet level', 'To print it', 'To save power', 'To make it integer'], c: 0, why: 'The signal goes both up and down.' },
+      { q: 'What is the delay(300) for?', a: ['To ignore the echo of the clap', 'To warm up the sensor', 'To save power', 'To read Serial'], c: 0, why: 'Otherwise one clap could toggle the LED several times.' },
+    ],
+    sources: [SRC.sndsrc, SRC.ds],
   },
 ];

@@ -758,3 +758,26 @@ void loop() {
   Serial.println(" %");
   delay(1000);
 }`;
+
+// Lesson 35 — clap switch with an analog sound sensor
+export const U3_SND = `const int micPin = A0;      // AO of the sound sensor
+const int ledPin = 5;       // LED from Lesson 4
+const int threshold = 40;   // how far from the quiet level counts as a clap
+int quiet = 0;
+bool ledOn = false;
+
+void setup() {
+  pinMode(ledPin, OUTPUT);
+  Serial.begin(9600);
+  quiet = analogRead(micPin);   // the level in a quiet room
+}
+
+void loop() {
+  int level = abs(analogRead(micPin) - quiet);
+  if (level > threshold) {      // a loud sound
+    ledOn = !ledOn;
+    digitalWrite(ledPin, ledOn);
+    Serial.println("Clap detected");
+    delay(300);                  // ignore the echo
+  }
+}`;
