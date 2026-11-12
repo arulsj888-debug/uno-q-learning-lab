@@ -1602,7 +1602,7 @@ class App {
       const b = $('#neo-shift'); if (b) { b.disabled = this.sim.running; b.textContent = `Level shifter: ${this.neoShift ? 'present' : 'absent'}`; b.classList.toggle('on', this.neoShift); }
       const n = $('#neo-note'); if (n) { const h = !pw ? 'USB is not plugged in — the board has no power.' : !this.sim.running ? 'Press <b>▶ Run</b>. Stop the sketch to change the level shifter.' : bad ? 'The data signal is 3.3 V but the 5 V pixels need at least 3.5 V (70 %): they show wrong colours or flicker.' : 'The data signal reaches the pixels at the level they need.'; if (n.innerHTML !== h) n.innerHTML = h; }
     } const w = L.widgets || [], run = this.sim.running, pw = this.board.powered;
-    if (!run) { this.lcdSt.ready = false; this.lcdSt.bl = false; this.oledSt.shown = null; }
+    if (!run) { if (this.lcdSt) { this.lcdSt.ready = false; this.lcdSt.bl = false; } if (this.oledSt) this.oledSt.shown = null; }
     const set = (id, h) => { const e = $(id); if (e && e.innerHTML !== h) e.innerHTML = h; };
     if (w.includes('lcdaddr')) {
       const S = this.lcdSt, okAddr = this.lcdAddr === 0x27, o = this.bench.get('lcd1');
