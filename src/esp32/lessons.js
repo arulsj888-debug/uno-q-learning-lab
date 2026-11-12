@@ -1956,7 +1956,7 @@ export const E32_LESSONS = [
     id: 'e37', num: 37, module: 7, title: 'Project: a weather station (BMP280 + OLED)', level: 'Intermediate', time: '30 min',
     goal: 'Put two I²C devices on one bus: read temperature and pressure from a BMP280 and show them on an OLED display.',
     hardware: ['ESP32 DevKit V1', 'BMP280 breakout', 'SSD1306 OLED 128×64 (I²C)', 'Breadboard', '12 × female–male jumper wires'],
-    code: E32_WX, file: 'WeatherStation.ino', program: 'e_wx', fast: true, widgets: ['bmpsens'],
+    code: E32_WX, file: 'WeatherStation.ino', program: 'e_wx', fast: true, widgets: ['bmpsens', 'oledaddr'],
     circuit: WX_PARTS_E, io: { G21: { kind: 'oled', scl: 'G22', item: 'oled1', needs: WX_IDS_E }, BMP: { kind: 'bmp', sda: 'G21', scl: 'G22', item: 'bmp1', needs: WX_IDS_E } },
     explain: {
       1: '<b>Wire.h</b>: the I²C library, shared by both devices.',
@@ -1979,7 +1979,7 @@ export const E32_LESSONS = [
       { title: 'Wire it', view: 'scanv', have: WX_IDS_E, power: false, pins: ['3V3', 'GND2', 'G21', 'G22'],
         body: `<p>Both modules connect to the <b>same four breadboard columns</b> (10 to 13): VCC, GND, SCL, SDA. The ESP32 connects to those columns once: <b>3V3 → b10</b>, <b>GND → b11</b>, <b>GPIO22 → b12</b> (SCL), <b>GPIO21 → b13</b> (SDA).</p><p class="warn">Check the pin order printed on your own modules: it differs between makers. Both modules here run from 3.3 V.</p>` },
       { title: 'The code', view: 'scanv', have: WX_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>11</b> and <b>12</b> (two devices, two addresses) and <b>22</b>.</p>` },
-      { title: 'Run it and change the weather', view: 'scanv', have: WX_IDS_E, showCode: true, power: true, action: 'run',
+      { title: 'Run it and change the weather', view: 'wxv', have: WX_IDS_E, showCode: true, power: true, action: 'run',
         body: `<p>The OLED shows the temperature and the pressure. Move the <b>temperature</b> and <b>pressure</b> sliders and watch the screen follow once a second.</p><p class="sim">Simulated sensor and display.</p>` },
       { title: 'Summary', view: 'scanv', have: WX_IDS_E, power: true,
         body: `<ul><li>Project = sensor + display on one I²C bus: devices need different addresses.</li><li>Read, clear, print, <code>display()</code>, repeat.</li><li>Ideas to extend: add the DS18B20, log values, publish over MQTT (Lesson 26).</li></ul>` },

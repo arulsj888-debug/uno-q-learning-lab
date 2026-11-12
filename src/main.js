@@ -71,6 +71,7 @@ const VIEWS = {
   dispp: { t: new THREE.Vector3(55, 0, -40), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 330 },
   farpi: { t: new THREE.Vector3(100, 0, -30), d: new THREE.Vector3(-0.1, 0.92, 0.4), dist: 520 },
   qwq: { t: new THREE.Vector3(50, 0, 95), d: new THREE.Vector3(-0.1, 0.92, 0.38), dist: 420 },
+  wxv: { t: new THREE.Vector3(60, 0, 125), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 260 },
   scanv: { t: new THREE.Vector3(40, 0, 95), d: new THREE.Vector3(-0.1, 0.92, 0.4), dist: 430 },
   bbwide: { t: new THREE.Vector3(0, 2, 68), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 150 },
   bigq: { t: new THREE.Vector3(30, 0, 36), d: new THREE.Vector3(-0.2, 0.85, 0.5), dist: 330 },
