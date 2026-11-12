@@ -730,8 +730,13 @@ export class MPU6050Module {
     const y0 = 4.3, pinZ = 6.2; this.pinZ = pinZ; this.pinTop = y0 + 8.2; this.pinX = {};
     const strip = new THREE.Mesh(new RoundedBoxGeometry(nn * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0, pinZ); g.add(strip);
     names.forEach((n, i) => { const x = (i - (nn - 1) / 2) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, y0 + 4.2, pinZ); g.add(p); });
+    // the board can tilt about the header line (drag it in the 3D view); the header and the wires stay where they are
+    const T = this.tilt = new THREE.Group(); T.position.set(0, 3.0, pinZ); g.add(T);
+    for (const m of [pcb, lab, chip, reg]) { if (!m) continue; g.remove(m); m.position.sub(T.position); T.add(m); }
     tagHW(g, tag);
   }
+  /** pitch, roll in degrees (the tilt is limited to +-40 degrees for the picture) */
+  setTilt(pitch, roll) { const c = v => Math.max(-40, Math.min(40, v)) * Math.PI / 180; this.tilt.rotation.x = -c(pitch); this.tilt.rotation.z = c(roll); }
   pin(name) {
     this.group.updateMatrixWorld(true);
     return { pos: this.group.localToWorld(new THREE.Vector3(this.pinX[name], this.pinTop, this.pinZ)), dir: new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion())) };

@@ -91,8 +91,30 @@ export class FreeBuild {
     // press the push button / turn the knob directly in the 3D view
     stage.addEventListener('pointerdown', e => {
       if (!this.active || e.button !== 0 || this.tool) return;
-      const hit = this.partAt(e); if (!hit) return;
+      // a joystick stick or an encoder knob is controlled directly, even when a wire is drawn in front of it
+      const ctl = this.parts.find(p => { if ((p.type !== 'joystick' && p.type !== 'encoder') || !this.app.bench.items[p.id]) return false; const o = this.app.bench.items[p.id].obj, t = p.type === 'joystick' ? o.stick : o.knob; if (!t) return false; const v = app.viewer; v.setPointer(e); v.raycaster.setFromCamera(v.pointer, v.camera); return v.raycaster.intersectObject(t, true).length > 0; });
+      const hit = ctl ? ctl.id : this.partAt(e); if (!hit) return;
       const d = this.parts.find(p => p.id === hit);
+      if (d && (d.type === 'joystick' || d.type === 'encoder') && this.app.bench.items[d.id]) {
+        const o = this.app.bench.items[d.id].obj, target = d.type === 'joystick' ? o.stick : o.knob;
+        if (target) {
+          const v = app.viewer; v.setPointer(e); v.raycaster.setFromCamera(v.pointer, v.camera);
+          if (v.raycaster.intersectObject(target, true).length) {
+            e.stopPropagation(); app.viewer.controls.enabled = false;
+            const x0 = e.clientX, y0 = e.clientY; let moved = false, last = e.clientX; this.env.pressed[d.id] = true; this.dirty = true;
+            const c = new THREE.Vector3(); if (d.type === 'joystick') target.getWorldPosition(c); const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(c.y + 6)), p = new THREE.Vector3();
+            const mv = ev => {
+              if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 5) { moved = true; this.env.pressed[d.id] = false; }
+              if (!moved) return; this.dirty = true;
+              if (d.type === 'joystick') { v.setPointer(ev); v.raycaster.setFromCamera(v.pointer, v.camera); if (v.raycaster.ray.intersectPlane(plane, p)) { this.env.joy[d.id] = { x: Math.min(1, Math.max(0, 0.5 + (p.x - c.x) / 14)), y: Math.min(1, Math.max(0, 0.5 + (p.z - c.z) / 14)) }; this.syncControls && this.syncControls(); } }
+              else { while (ev.clientX - last > 14) { this.env.enc[d.id] = (this.env.enc[d.id] ?? 0) + 1; last += 14; } while (last - ev.clientX > 14) { this.env.enc[d.id] = (this.env.enc[d.id] ?? 0) - 1; last -= 14; } }
+            };
+            const up = () => { this.env.pressed[d.id] = false; if (d.type === 'joystick') this.env.joy[d.id] = { x: 0.5, y: 0.5 }; this.dirty = true; this.syncControls && this.syncControls(); app.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };   // the stick springs back
+            window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+            return;
+          }
+        }
+      }
       if (d && d.type === 'button') {
         e.stopPropagation(); app.viewer.controls.enabled = false; this.env.pressed[d.id] = true; this.dirty = true;
         const up = () => { this.env.pressed[d.id] = false; this.dirty = true; app.viewer.controls.enabled = true; window.removeEventListener('pointerup', up); };

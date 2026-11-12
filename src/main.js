@@ -914,7 +914,7 @@ class App {
     if ($('#cl-btn')) { $('#cl-btn').onclick = () => { if (this.sim.running) this.cl.until = performance.now() + 120; }; }
     if ($('#sm-w')) { $('#sm-w').oninput = e => { this.sm.wet = +e.target.value; $('#sm-wv').textContent = this.sm.wet + ' % wet'; }; }
     if ($('#bp-t')) { const upd = () => { $('#bp-tv').textContent = this.bp.t + ' °C'; $('#bp-pv').textContent = this.bp.p + ' hPa'; }; $('#bp-t').oninput = e => { this.bp.t = +e.target.value; upd(); }; $('#bp-p').oninput = e => { this.bp.p = +e.target.value; upd(); }; }
-    if ($('#mp-p')) { const upd = () => { $('#mp-pv').textContent = this.mp.pitch + '°'; $('#mp-rv').textContent = this.mp.roll + '°'; $('#mp-wv').textContent = this.mp.rate + ' °/s'; }; $('#mp-p').oninput = e => { this.mp.pitch = +e.target.value; upd(); }; $('#mp-r').oninput = e => { this.mp.roll = +e.target.value; upd(); }; $('#mp-w').oninput = e => { this.mp.rate = +e.target.value; upd(); }; }
+    if ($('#mp-p')) { const upd = () => { $('#mp-pv').textContent = this.mp.pitch + '°'; $('#mp-rv').textContent = this.mp.roll + '°'; $('#mp-wv').textContent = this.mp.rate + ' °/s'; }; $('#mp-p').oninput = e => { this.mp.pitch = +e.target.value; upd(); this.mpShow(); }; $('#mp-r').oninput = e => { this.mp.roll = +e.target.value; upd(); this.mpShow(); }; $('#mp-w').oninput = e => { this.mp.rate = +e.target.value; upd(); }; }
     if ($('#ir-45')) { for (const [id, cmd] of [['#ir-45', 0x45], ['#ir-0c', 0x0C], ['#ir-18', 0x18], ['#ir-5e', 0x5E]]) $(id).onclick = () => { if (!this.sim.running) return; const io = Object.values((this.lesson && this.lesson.io) || {}).find(x => x.kind === 'irrx'); if (!(io && this.wired(io) && this.board.powered)) return; this.irq.push(cmd); const r = this.bench.get('ir1'); if (r && r.setActive) { r.setActive(true); setTimeout(() => r.setActive(false), 250); } }; }
     if ($('#ntp-btn')) { $('#ntp-btn').onclick = () => { if (!this.sim.running) this.wf.ntp = !this.wf.ntp; }; }
     if ($('#mq-up')) { $('#mq-up').onclick = () => { if (!this.sim.running) this.mq.up = !this.mq.up; }; const send = p => () => { const M = this.mq; if (!this.sim.running || !M.conn) return; M.log.push('home/led = ' + p); if (M.subs.has('home/led')) M.inbox.push({ topic: 'home/led', payload: p }); }; $('#mq-on').onclick = send('ON'); $('#mq-off').onclick = send('OFF'); }
@@ -1555,6 +1555,7 @@ class App {
     set('#bl-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !run ? 'The sketch is not running: the phone cannot find the ESP32. Press <b>▶ Run</b>.' : !B.adv ? 'Starting Bluetooth…' : !B.conn ? 'The ESP32 is advertising. Tap <b>Connect</b> on the phone.' : 'Tap <b>Write “1”</b> / <b>Write “0”</b> on the phone.', 'io-note');
   }
   // ---- lessons 16 / 17 / 19 / 20: joystick and rotary encoder
+  mpShow() { const set = (id, v, t) => { const e = $(id); if (e) { e.value = v; } const l = $(t.l); if (l) l.textContent = t.v; }; set('#mp-p', this.mp.pitch, { l: '#mp-pv', v: this.mp.pitch + '°' }); set('#mp-r', this.mp.roll, { l: '#mp-rv', v: this.mp.roll + '°' }); const o = this.bench.get('mpu1'); if (o && o.setTilt) o.setTilt(this.mp.pitch, this.mp.roll); }
   joyShow() { const o = this.bench.get('joy1'); if (o && o.setStick) o.setStick(this.joyPos.x, this.joyPos.y, this.joySw); }
   encShow() { const o = this.bench.get('enc1'); if (o && o.setPhase) o.setPhase(this.encPh, this.encSw); }
   encTurn(dir) { let n = 4; const step = () => { this.encPh += dir; this.encShow(); if (--n > 0) setTimeout(step, 25); }; step(); }
@@ -1974,7 +1975,13 @@ class App {
     const stage = $('#stage');
     stage.addEventListener('pointerdown', e => {
       if (e.button !== 0 || this.mode !== 'lessons') return;
-      const hit = this.viewer.pick(e);
+      let hit = this.viewer.pick(e);
+      // the stick of a joystick and the knob of an encoder win over wires drawn in front of them
+      for (const [bid, prop, hid] of [['joy1', 'stick', 'joystick'], ['enc1', 'knob', 'encoder']]) {
+        const o = this.bench.get(bid); if (!o || !o[prop]) continue;
+        this.viewer.setPointer(e); this.viewer.raycaster.setFromCamera(this.viewer.pointer, this.viewer.camera);
+        const hh = this.viewer.raycaster.intersectObject(o[prop], true); if (hh.length) { hit = { id: hid, object: hh[0].object, point: hh[0].point }; break; }
+      }
       if (!hit) return;
       if (hit.id === 'pushbutton') {
         e.stopPropagation(); this.viewer.controls.enabled = false; this.pressButton(true);
@@ -1996,6 +2003,64 @@ class App {
         e.stopPropagation(); this.viewer.controls.enabled = false;
         let x0 = e.clientX, f0 = this.knobValue();
         const mv = ev => this.setKnob(f0 + (ev.clientX - x0) / 220);
+        const up = () => { this.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      } else if (hit.id === 'joystick') {
+        const o = this.bench.get('joy1'); if (!o || !o.stick) return; { let q = hit.object, on = false; while (q) { if (q === o.stick) on = true; q = q.parent; } if (!on) return; }
+        e.stopPropagation(); this.viewer.controls.enabled = false;
+        const x0 = e.clientX, y0 = e.clientY; let moved = false; this.joySw = true; this.joyShow();
+        const c = new THREE.Vector3(); o.stick.getWorldPosition(c); const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(c.y + 6)), p = new THREE.Vector3();
+        const mv = ev => {
+          if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 5) { moved = true; this.joySw = false; }
+          if (!moved) return;
+          this.viewer.setPointer(ev); this.viewer.raycaster.setFromCamera(this.viewer.pointer, this.viewer.camera);
+          if (this.viewer.raycaster.ray.intersectPlane(plane, p)) { this.joyPos.x = Math.min(1, Math.max(0, 0.5 + (p.x - c.x) / 14)); this.joyPos.y = Math.min(1, Math.max(0, 0.5 + (p.z - c.z) / 14)); this.joyShow(); const jx = $('#jx'), jy = $('#jy'); if (jx) jx.value = Math.round(this.joyPos.x * 100); if (jy) jy.value = Math.round(this.joyPos.y * 100); }
+        };
+        const up = () => { this.joySw = false; this.joyPos.x = 0.5; this.joyPos.y = 0.5; this.joyShow(); const jx = $('#jx'), jy = $('#jy'); if (jx) jx.value = 50; if (jy) jy.value = 50; this.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };   // the stick springs back to the centre
+        window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      } else if (hit.id === 'encoder') {
+        const o = this.bench.get('enc1'); if (!o || !o.knob) return; { let q = hit.object, on = false; while (q) { if (q === o.knob) on = true; q = q.parent; } if (!on) return; }
+        e.stopPropagation(); this.viewer.controls.enabled = false;
+        let last = e.clientX, moved = false; this.encSw = true; this.encShow();
+        const mv = ev => { if (!moved && Math.abs(ev.clientX - e.clientX) > 5) { moved = true; this.encSw = false; this.encShow(); } if (!moved) return; while (ev.clientX - last > 14) { this.encTurn(1); last += 14; } while (last - ev.clientX > 14) { this.encTurn(-1); last -= 14; } };
+        const up = () => { this.encSw = false; this.encShow(); this.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      } else if (hit.id === 'keypad' && this.kp) {
+        const o = this.bench.get('kp1'); if (!o || !o.keyPos) return;
+        e.stopPropagation(); this.viewer.controls.enabled = false;
+        const lp = o.group.worldToLocal(hit.point.clone()); let best = null, bd = 7;
+        for (const [k, [x, z]] of Object.entries(o.keyPos)) { const d = Math.hypot(lp.x - x, lp.z - z); if (d < bd) { bd = d; best = k; } }
+        if (best && this.sim.running) { this.kp.q.push(best); this.kp.cur = best; this.kp.until = performance.now() + 250; }
+        const up = () => { this.viewer.controls.enabled = true; window.removeEventListener('pointerup', up); }; window.addEventListener('pointerup', up);
+      } else if (hit.id === 'snd' && this.cl) {
+        e.stopPropagation(); if (this.sim.running) this.cl.until = performance.now() + 120;
+      } else if (hit.id === 'soil' && this.sm) {
+        e.stopPropagation(); this.viewer.controls.enabled = false;
+        const y0 = e.clientY, w0 = this.sm.wet;
+        const mv = ev => { this.sm.wet = Math.min(100, Math.max(0, Math.round(w0 + (y0 - ev.clientY) / 2))); const sl = $('#sm-w'); if (sl) sl.value = this.sm.wet; const lb = $('#sm-wv'); if (lb) lb.textContent = this.sm.wet + ' % wet'; };   // drag up = wetter
+        const up = () => { this.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      } else if (hit.id === 'ldr' && this.sliderToLux && $('#lux')) {
+        e.stopPropagation(); this.viewer.controls.enabled = false;
+        const y0 = e.clientY, v0 = this.luxToSlider(this.lux);   // drag up = brighter
+        const mv = ev => this.setLux(this.sliderToLux(Math.min(1000, Math.max(0, v0 + (y0 - ev.clientY) * 4))));
+        const up = () => { this.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      } else if ((hit.id === 'dht' || hit.id === 'ds18b20' || hit.id === 'bmp280') && ($('#th-t') || $('#bp-t'))) {
+        e.stopPropagation(); this.viewer.controls.enabled = false;
+        const y0 = e.clientY, bp = !!$('#bp-t') && hit.id === 'bmp280', t0 = bp ? this.bp.t : this.th.t;   // drag up = warmer
+        const mv = ev => { const t = Math.round((t0 + (y0 - ev.clientY) / 4) * 2) / 2; if (bp) { this.bp.t = Math.min(60, Math.max(-20, t)); const sl = $('#bp-t'); if (sl) { sl.value = this.bp.t; sl.dispatchEvent(new Event('input')); } } else { this.setThermo({ t }); const sl = $('#th-t'); if (sl) sl.value = this.th.t; } };
+        const up = () => { this.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+        window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+      } else if (hit.id === 'pir' && $('#pir-wave')) {
+        e.stopPropagation(); this.pirWave();
+      } else if (hit.id === 'irrx' && this.irq) {
+        e.stopPropagation(); if (this.sim.running) { this.irq.push(0x45); const r = this.bench.get('ir1'); if (r && r.setActive) { r.setActive(true); setTimeout(() => r.setActive(false), 250); } }
+      } else if (hit.id === 'mpu6050' && this.mp) {
+        const o = this.bench.get('mpu1'); if (!o) return;
+        e.stopPropagation(); this.viewer.controls.enabled = false;
+        const x0 = e.clientX, y0 = e.clientY, p0 = this.mp.pitch, r0 = this.mp.roll;
+        const mv = ev => { this.mp.roll = Math.round(Math.min(90, Math.max(-90, r0 + (ev.clientX - x0) * 0.6))); this.mp.pitch = Math.round(Math.min(90, Math.max(-90, p0 + (ev.clientY - y0) * 0.6))); this.mpShow(); };
         const up = () => { this.viewer.controls.enabled = true; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
         window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
       }
