@@ -726,3 +726,30 @@ void loop() {
   Serial.println(" rad/s");
   delay(500);
 }`;
+
+// Lesson 31 — external interrupt on the button pin
+export const E32_ISR = `const int buttonPin = 17;
+const int ledPin = 16;
+volatile bool pressed = false;   // shared with the interrupt: volatile
+bool ledOn = false;
+
+void IRAM_ATTR onPress() {       // the interrupt service routine: keep it tiny
+  pressed = true;
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  pinMode(buttonPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(buttonPin), onPress, FALLING);
+}
+
+void loop() {
+  if (pressed) {
+    pressed = false;
+    ledOn = !ledOn;
+    digitalWrite(ledPin, ledOn);
+    Serial.println("Interrupt: button pressed");
+  }
+  delay(1000);                   // a slow loop: the press is still not missed
+}`;

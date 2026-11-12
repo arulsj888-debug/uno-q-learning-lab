@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -45,6 +45,7 @@ const SRC = {
   irremote: { t: 'Arduino-IRremote library (version 4.x) by Armin Joachimsmeyer and contributors', u: 'https://github.com/Arduino-IRremote/Arduino-IRremote' },
   mpureg: { t: 'MPU-6000/MPU-6050 Register Map and Descriptions (InvenSense): sleep mode at power-up, WHO_AM_I 0x68, 16384 LSB/g, 131 LSB/(deg/s)', u: 'https://cdn.sparkfun.com/datasheets/Sensors/Accelerometers/RM-MPU-6000A.pdf' },
   adampu: { t: 'Adafruit MPU6050 library (Adafruit_MPU6050, Adafruit_Sensor)', u: 'https://github.com/adafruit/Adafruit_MPU6050' },
+  isrdoc: { t: 'Arduino reference: attachInterrupt()', u: 'https://docs.arduino.cc/language-reference/en/functions/external-interrupts/attachInterrupt/' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -1673,5 +1674,49 @@ export const E32_LESSONS = [
       { q: 'mpu.begin() returns false. What is the most likely cause?', a: ['The LED is off', 'The chip does not answer: wiring or power', 'The baud rate', 'The delay is too long'], c: 1, why: 'No I²C answer: check power and the SDA/SCL wires.' },
     ],
     sources: [SRC.mpureg, SRC.adampu, SRC.wire],
+  },
+
+  // ================================================================== 31
+  {
+    id: 'e31', num: 31, module: 11, title: 'Interrupts: never miss a button press', level: 'Intermediate', time: '20 min',
+    goal: 'Use attachInterrupt() so a button press is caught even while the loop is busy waiting.',
+    hardware: ['ESP32 DevKit V1', 'LED circuit and push button from Lesson 5', 'Breadboard and jumper wires'],
+    code: E32_ISR, file: 'Interrupt.ino', program: 'e_isr', fast: true, widgets: ['button'],
+    circuit: [...LED_CIRCUIT, ...BUTTON_PARTS], io: { G16: IO_LED, G17: { kind: 'button', item: 'btn1', needs: BUTTON_IDS } },
+    explain: {
+      1: 'The button on GPIO17 (to GND, internal pull-up).',
+      2: 'The LED on GPIO16.',
+      3: '<b>volatile</b>: the flag is changed inside the interrupt, so the compiler must always read it from memory.',
+      4: 'The stored LED state.',
+      6: 'The <b>interrupt service routine (ISR)</b>: it runs by itself the instant the pin changes, interrupting loop().',
+      7: 'Only set a flag: an ISR must be very short.',
+      11: 'Serial output on.',
+      13: 'The button pin uses the internal pull-up: pressed reads LOW.',
+      14: '<b>attachInterrupt(pin, function, FALLING)</b>: call onPress when the pin falls from HIGH to LOW, that is when the button is pressed.',
+      17: 'loop() only has to look at the flag.',
+      18: 'Was there a press since we last looked?',
+      19: 'Clear the flag.',
+      20: 'Toggle the LED state…',
+      21: '…and write it.',
+      22: 'Report it.',
+      24: 'A one-second delay: without the interrupt a short press during it would be missed.',
+    },
+    steps: [
+      { title: 'The problem with polling', view: 'bench', have: [], power: false,
+        body: `<p>If the loop spends a second in <code>delay(1000)</code> and only then reads the button, a short press in between is <b>missed</b>. An <b>interrupt</b> makes the chip stop what it is doing the instant the pin changes and run a small function, then carry on.</p>` },
+      { title: 'Use the button lesson circuit', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], power: false, pins: ['G16', 'G17'],
+        body: `<p>LED on <b>GPIO16</b>, button on <b>GPIO17</b>: wired as in Lesson 5. Nothing new to wire. On most ESP32 pins an interrupt can be attached; on an <b>Arduino UNO R3</b> only pins <b>2 and 3</b> can (so the button would have to move there).</p>` },
+      { title: 'The code', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], showCode: true, power: true, body: `<p>Click lines <b>6</b>, <b>7</b> and <b>14</b>.</p>` },
+      { title: 'Run it and press quickly', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], showCode: true, power: true, action: 'run',
+        body: `<p>Press the button briefly (Hold to press, then let go). Even though <code>loop()</code> waits a full second, the press is remembered: the LED toggles and the Serial Monitor reports it within a second. With plain polling a quick tap would be lost.</p><p class="sim">The simulator checks the pin about 100 times per second to imitate the hardware interrupt.</p>` },
+      { title: 'Summary', view: 'bench', have: [...LED_IDS, ...BUTTON_IDS], power: true,
+        body: `<ul><li><code>attachInterrupt(digitalPinToInterrupt(pin), isr, FALLING)</code></li><li>Keep the ISR tiny: set a <code>volatile</code> flag and handle it in <code>loop()</code>.</li><li>UNO R3: interrupts only on pins 2 and 3.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does an interrupt do?', a: ['Restarts the board', 'Runs a function the instant the pin changes', 'Slows the loop', 'Turns off Wi-Fi'], c: 1, why: 'It pauses loop() and runs the service routine.' },
+      { q: 'Why is the flag declared volatile?', a: ['To save memory', 'It is changed inside the interrupt, so it must be re-read every time', 'To make it faster', 'It is a constant'], c: 1, why: 'The compiler must not cache it.' },
+      { q: 'What should an ISR do?', a: ['Print long messages', 'Wait with delay()', 'Be very short, e.g. set a flag', 'Connect to Wi-Fi'], c: 2, why: 'Long work blocks everything else.' },
+    ],
+    sources: [SRC.isrdoc, SRC.ds],
   },
 ];

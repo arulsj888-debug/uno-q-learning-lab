@@ -83,7 +83,8 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | LoRa (SX1276), nRF24L01, Zigbee | TODO | TODO | TODO | TODO | external modules, SPI |
 | Ethernet | n/a (not verified) | built in | n/a (shield) | n/a | |
 | millis() without delay | TODO | TODO | DONE (lesson 27) | DONE (lesson 24) | shows the button noticed at once while the LED blinks; Arduino docs as sources (50-day overflow figure not verified, not stated) |
-| Interrupts, timers, EEPROM / preferences | TODO | TODO | TODO | TODO | core programming lessons |
+| Interrupts (attachInterrupt) | TODO | TODO | UNO R3 needs the button on pin 2/3 (TODO) | DONE (lesson 31) | simulator polls the pin every 10 ms to imitate the ISR |
+| Timers, EEPROM / preferences | TODO | TODO | TODO | TODO | |
 
 ## F. Projects (after the parts exist)
 Weather station (DHT + OLED + MQTT), security alarm (PIR + buzzer + keypad), plant watering (soil + relay/pump), smart door

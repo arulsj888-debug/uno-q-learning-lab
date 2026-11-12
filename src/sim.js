@@ -1106,6 +1106,28 @@ export const PROGRAMS = {
     }
   },
 
+  async e_isr(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(11); rt.serialBegin(115200);
+    await rt.at(12); rt.pinMode('G16', 'OUTPUT');
+    await rt.at(13); rt.pinMode('G17', 'INPUT_PULLUP');
+    await rt.at(14);
+    let pressed = false, ledOn = 0, last = 1, alive = true;
+    (async () => { try { while (alive) { const v = rt.digitalRead('G17'); if (v === 0 && last === 1) { await rt.at(6); pressed = true; await rt.at(7); } last = v; await rt.delay(10); } } catch (e) {} })();
+    try {
+      for (;;) {
+        await rt.at(17); await rt.at(18);
+        if (pressed) {
+          await rt.at(19); pressed = false;
+          await rt.at(20); ledOn = ledOn ? 0 : 1;
+          await rt.at(21); rt.digitalWrite('G16', ledOn);
+          await rt.at(22); rt.println('Interrupt: button pressed');
+        }
+        await rt.at(24); await rt.delay(1000);
+      }
+    } finally { alive = false; }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);
