@@ -10,7 +10,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 |---|---|---|---|---|---|
 | Resistor, LED, push button | DONE | DONE | DONE | DONE | |
 | Potentiometer, buzzer (passive) | DONE | DONE (pot n/a: no ADC) | DONE | DONE | |
-| Active buzzer | TODO | TODO | TODO | TODO | |
+| Active buzzer | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | no single manufacturer datasheet found (TMB12A05 listings disagree on range, current, pitch): values labelled typical; 3.3 V pins sag to about 2.5 V so a 5 V buzzer warns |
 | Diode 1N4007 (forward / blocking, flyback) | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 26) | DONE (Build + lesson 23) | 1.1 V at 1 A model; 1 A limit |
 | Capacitor (decoupling, RC charging) | TODO | TODO | TODO | TODO | needs a time-dependent solver |
 | NPN transistor PN2222A low-side switch (TO-92 E B C) | Build DONE, lesson TODO | Build DONE, lesson TODO | DONE (Build + lesson 24) | DONE (Build + lesson 21) | base resistor, saturation, pin order, flyback-diode warning; max 600 mA |

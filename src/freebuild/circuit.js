@@ -319,7 +319,7 @@ export function evaluate(model) {
       else if (d.type === 'ldr') { const r = LDR_OHMS(env.lux), a = nodeOf(d.a), b = nodeOf(d.b); elems.push({ t: 'R', a, b, g: 1 / r }); pe[d.id] = { a, b, r }; }
       else if (d.type === 'button') { const down = !!(env.pressed || {})[d.id]; if (down) elems.push({ t: 'R', a: nid(T(d, 'e1')), b: nid(T(d, 'f1')), g: 20 }); pe[d.id] = { down }; }
       else if (d.type === 'pot') { const f = (env.pot || {})[d.id] ?? 0.5, r1 = Math.max(1, f * 10000), r2 = Math.max(1, (1 - f) * 10000); const A = nid(T(d, 'A')), W = nid(T(d, 'W')), B = nid(T(d, 'B')); elems.push({ t: 'R', a: A, b: W, g: 1 / r1 }, { t: 'R', a: W, b: B, g: 1 / r2 }); pe[d.id] = { W }; }
-      else if (d.type === 'buzzer') pe[d.id] = { a: nodeOf(d.plus), b: nodeOf(d.minus) };
+      else if (d.type === 'buzzer') { pe[d.id] = { a: nodeOf(d.plus), b: nodeOf(d.minus) }; if (d.active && !dead) elems.push({ t: 'R', a: nid(T(d, 'plus')), b: nid(T(d, 'minus')), g: 1 / 167, load: true }); }   // active buzzer: about 30 mA at 5 V (listings give 25 to 30 mA, models differ)
       else if (d.type === 'pir' || d.type === 'hcsr04' || d.type === 'servo') {
         const vn = nid(T(d, d.type === 'servo' ? 'V' : 'VCC')), gn = nid(T(d, 'GND'));
         const load = { pir: 100000, hcsr04: 330, servo: 100 }[d.type];
@@ -638,6 +638,18 @@ export function evaluate(model) {
       else if (P > 0.25) { R.status = 'warn'; note('warn', `${label} gets very hot: ${(P * 1000).toFixed(0)} mW is more than its 0.25 W rating.`, d.id); }
       else R.msg = powered ? `${((s.I ?? 0) * 1000).toFixed(2)} mA, ${(s.V ?? 0).toFixed(2)} V across it, ${((s.P ?? 0) * 1000).toFixed(1)} mW.` : '';
       if (dn && !burnt.has(d.id)) { if (R.status === 'ok') R.status = 'warn'; note('warn', `${label}: one leg is not connected to anything, so it does nothing.`, d.id); }
+    } else if (d.type === 'buzzer' && d.active) {
+      const dn = dangling(d, 'plus') ? '+' : dangling(d, 'minus') ? '−' : null, Vp = s.V ?? 0, mA = Math.max(0, Vp) / 167 * 1000;
+      R.active = true; R.loud = 0;
+      if (!powered) R.status = 'off';
+      else if (dn) { R.status = 'off'; R.msg = `Silent: its ${dn} leg is not connected.`; note('bad', `${label} is silent: its ${dn} leg is not connected to anything.`, d.id); }
+      else if (Vp < -0.5) { R.status = 'off'; R.msg = 'Connected backwards: silent.'; note('warn', `${label} is silent: its + and − legs are the wrong way round. An active buzzer has a polarity: the leg marked + goes toward the pin or the supply.`, d.id); }
+      else if (Vp >= 3.0) {
+        R.loud = 1; R.msg = `Beeping by itself: ${Vp.toFixed(1)} V across it, about ${mA.toFixed(0)} mA.`;
+        note('ok', `${label} beeps: it has its own oscillator, so a steady voltage is enough (no tone needed).`, d.id);
+        if (mA > 20 && boardKind === 'uno3') note('warn', `${label} draws about ${mA.toFixed(0)} mA from the pin. The ATmega328P recommends 20 mA per pin (40 mA absolute maximum). For a longer run, switch the buzzer with a transistor.`, d.id);
+      } else if (Vp > 0.5) { R.status = 'warn'; R.msg = `Only ${Vp.toFixed(1)} V: too low.`; note('warn', `${label} gets only ${Vp.toFixed(1)} V. The common 5 V active buzzer (TMB12A05 listings: 3 to 7 V) needs at least about 3 V: check the datasheet of your part.`, d.id); }
+      else { R.status = 'off'; R.msg = 'Silent: no voltage across it.'; note('info', `${label} is silent: there is no voltage across it. Set the pin it is wired to to Output HIGH.`, d.id); }
     } else if (d.type === 'buzzer') {
       const dn = dangling(d, 'plus') ? '+' : dangling(d, 'minus') ? '−' : null, swing = (s.Vmax ?? 0) - (s.Vmin ?? 0), Vp = s.V ?? 0;
       R.loud = Math.min(1, swing / 3.3);
@@ -844,7 +856,7 @@ export function evaluate(model) {
     };
     const SPEC = {
       led: d => [item(d, 'anode', ['gpio', '3v3', '5v'], pi ? 'a GPIO pin (through a resistor)' : 'a pin (through a resistor)'), item(d, 'cathode', ['gnd'], name.gnd)],
-      buzzer: d => [item(d, 'plus', ['gpio'], sig), item(d, 'minus', ['gnd'], name.gnd)],
+      buzzer: d => d.active ? [item(d, 'plus', ['gpio', '3v3', '5v'], sig + ' (or a supply pin)', 'The + leg is marked on the buzzer'), item(d, 'minus', ['gnd'], name.gnd)] : [item(d, 'plus', ['gpio'], sig), item(d, 'minus', ['gnd'], name.gnd)],
       pot: d => [item(d, 'A', ['3v3'], name['3v3'], 'The end legs are the supply; the middle leg is the output'), item(d, 'B', ['gnd'], name.gnd), item(d, 'W', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs, so it can only read HIGH or LOW' : '', (k) => pi || k.analog)],
       tmp36: d => [item(d, 'VS', ['3v3', '5v'], name['3v3']), item(d, 'GND', ['gnd'], name.gnd), item(d, 'OUT', ['gpio'], adcTxt, pi ? 'The Raspberry Pi has no analog inputs' : '', (k) => pi || k.analog)],
       hcsr04: d => [item(d, 'VCC', ['5v'], name['5v'], 'The HC-SR04 is made for 5 V'), item(d, 'GND', ['gnd'], name.gnd), item(d, 'TRIG', ['gpio'], sig), (pi || e32 ? echoDivider(d) : item(d, 'ECHO', ['gpio'], pi || e32 ? 'a GPIO pin through a 1 kΩ + 2.2 kΩ voltage divider' : u3 ? 'a digital pin (for example D8)' : 'D8 (a 5 V-tolerant pin)', pi || e32 ? 'Its 5 V echo would damage the pin directly' : u3 ? '' : 'Not D3 or A0–A5: they are 3.3 V only', (k, id) => !pi && !e32 ? !k.v3 : true))],

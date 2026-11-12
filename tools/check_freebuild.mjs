@@ -97,7 +97,7 @@ r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: '
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'pix1', type: 'pixels' }, Q('c2', 'th1.QB', 'pix1.QA')] })); ok(r.parts.th1.status === 'off' && r.parts.pix1.status === 'off', 'modules without a cable to the board are off');
 r = evaluate(base({ parts: [{ id: 'th1', type: 'thermo' }, { id: 'th2', type: 'thermo' }, Q('c1', 'QWIIC', 'th1.QA'), Q('c2', 'th1.QB', 'th2.QA')] })); ok(r.parts.th1.status === 'warn', 'two Thermos clash');
 // ---- Arduino UNO R3 (5 V logic)
-const u3 = id => ({ D4: { id: 'D4' }, D6: { id: 'D6', pwm: true }, D7: { id: 'D7' }, D9: { id: 'D9', pwm: true }, A1: { id: 'A1' }, D5: { id: 'D5', pwm: true }, D13: { id: 'D13' }, D2: { id: 'D2' }, A0: { id: 'A0' }, A4: { id: 'A4' }, A5: { id: 'A5' }, SDA: { id: 'SDA' }, '5V': { id: '5V', kind: 'pwr' }, '3V3': { id: '3V3', kind: 'pwr' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
+const u3 = id => ({ D8: { id: 'D8' }, D4: { id: 'D4' }, D6: { id: 'D6', pwm: true }, D7: { id: 'D7' }, D9: { id: 'D9', pwm: true }, A1: { id: 'A1' }, D5: { id: 'D5', pwm: true }, D13: { id: 'D13' }, D2: { id: 'D2' }, A0: { id: 'A0' }, A4: { id: 'A4' }, A5: { id: 'A5' }, SDA: { id: 'SDA' }, '5V': { id: '5V', kind: 'pwr' }, '3V3': { id: '3V3', kind: 'pwr' }, GND2: { id: 'GND2', kind: 'gnd' } }[id]);
 const b3 = o => ({ boardKind: 'uno3', pinInfo: u3, parts: [], pinCfg: {}, powered: true, env, t: 0, ...o });
 r = evaluate(b3({ parts: [W('w1', 'D5', 'a10'), res('r1', 'b10', 'b14', 220), led('l1', 'c14', 'c15'), W('w2', 'GND2', 'd15')], pinCfg: { D5: { mode: 'out1' } } }));
 ok(r.parts.l1.status === 'ok' && r.parts.l1.I > 0.010 && r.parts.l1.I < 0.016 && r.pins.D5.V > 4.3, 'UNO R3: 5 V pin + 220 ohm + LED gives about 12 mA');
@@ -204,6 +204,14 @@ r = rgbOK('unoq', uno, '⚠ MOSFET switches a motor'); ok(r.parts.q1.status === 
   const set = (pin, mode) => evaluate({ boardKind: 'uno3', pinInfo: u3, parts: x.parts, pinCfg: { D5: { mode } }, powered: true, env, t: 0 });
   r = set('D5', 'out0'); ok(r.parts.lamp1.level < 0.2 && r.parts.q1.status === 'off', 'UNO R3: pin LOW switches the MOSFET and the lamp off');
   r = set('D5', 'in'); ok(r.parts.q1.status === 'warn', 'UNO R3: gate pin set to input is warned'); }
+// ---- active buzzer
+for (const [kind, info, name] of [['unoq', uno, 'UNO Q'], ['uno3', u3, 'UNO R3'], ['esp32', findPinE32, 'ESP32']]) {
+  if (kind === 'uno3') { r = rgbOK(kind, info, '✔ Active buzzer'); ok(r.parts.bz1.loud > 0.5 && r.parts.bz1.status === 'ok', name + ': active buzzer beeps on a steady HIGH (' + r.parts.bz1.msg + ')'); }
+  else { r = rgbOK(kind, info, '⚠ Active buzzer'); ok(r.parts.bz1.loud === 0 && r.parts.bz1.status === 'warn' && r.notes.some(n => /needs at least about 3 V/.test(n.text)), name + ': active buzzer on a 3.3 V pin gets too little voltage and warns (' + r.parts.bz1.msg + ')'); }
+  r = rgbOK(kind, info, '✖ Active buzzer'); ok(r.parts.bz1.loud === 0 && r.notes.some(n => /wrong way round/.test(n.text)), name + ': active buzzer connected backwards stays silent and says why');
+  if (kind !== 'esp32') { r = rgbOK(kind, info, '✖ Buzzer that stays silent'); ok(r.parts.bz1.loud === 0, name + ': (control) passive buzzer on a steady HIGH stays silent'); }
+}
+r = rgbOK('uno3', u3, '✔ Active buzzer'); ok(r.notes.some(n => /20 mA per pin/.test(n.text)), 'UNO R3: active buzzer draw above 20 mA per pin is mentioned');
 ok(resistorBands(220).join() === 'red,red,brown,gold' && resistorBands(10000).join() === 'brown,black,orange,gold' && resistorBands(4700).join() === 'yellow,violet,red,gold', 'resistor bands');
 console.log(fail ? `${fail} FAILED` : 'all free-build checks passed');
 process.exit(fail ? 1 : 0);

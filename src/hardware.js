@@ -756,22 +756,23 @@ export class Potentiometer {
 
 // ---------------------------------------------------------------- passive piezo buzzer (12 mm, legs 7.62 mm apart)
 export class PiezoBuzzer {
-  constructor() {
+  constructor(active = false) {
     const g = this.group = new THREE.Group();
     const top = canvasTex(256, 256, (c, w, h) => {
       c.fillStyle = '#18181a'; c.fillRect(0, 0, w, h); noise(c, w, h, 6);
-      c.fillStyle = '#050505'; c.beginPath(); c.arc(w / 2, h / 2, 22, 0, Math.PI * 2); c.fill();
+      if (active) { c.fillStyle = '#d9d6c4'; c.beginPath(); c.arc(w / 2, h / 2, 74, 0, Math.PI * 2); c.fill(); noise(c, w, h, 4); c.fillStyle = '#2a2a2a'; c.font = '700 26px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('BUZZER', w * 0.5, h * 0.5); }
+      else { c.fillStyle = '#050505'; c.beginPath(); c.arc(w / 2, h / 2, 22, 0, Math.PI * 2); c.fill(); }
       // Cylinder top-cap UVs: canvas x follows local z, canvas y follows local −x.
       // The + leg is at local x = −3.81 mm (r = 6 mm) -> canvas y = (0.5 + 3.81 / 12) · h
       c.fillStyle = '#e8e8e2'; c.font = '700 54px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('+', w * 0.5, h * (0.5 + 3.81 / 12));
     });
     const side = new THREE.MeshPhysicalMaterial({ color: 0x18181a, roughness: 0.45, clearcoat: 0.25 });
-    const body = this.body = new THREE.Mesh(new THREE.CylinderGeometry(6.0, 6.0, 8.0, 48), [side, new THREE.MeshStandardMaterial({ map: top, roughness: 0.5 }), side]);
-    body.position.y = 4.0 + 0.3; g.add(body);
+    const body = this.body = new THREE.Mesh(new THREE.CylinderGeometry(6.0, 6.0, active ? 9.5 : 8.0, 48), [side, new THREE.MeshStandardMaterial({ map: top, roughness: 0.5 }), side]);
+    body.position.y = (active ? 4.75 : 4.0) + 0.3; g.add(body);
     for (const [x, len] of [[-3.81, 3.6], [3.81, 3.0]]) {
       const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, len + 0.3, 8), M.tin); leg.position.set(x, 0.3 - (len + 0.3) / 2 + 0.3, 0); g.add(leg);
     }
-    tagHW(g, 'buzzer');
+    tagHW(g, active ? 'abuzzer' : 'buzzer');
   }
   vibrate(on) { this.body.scale.setScalar(on ? 1 + 0.012 * Math.sin(performance.now() / 6) : 1); }
 }
@@ -1993,6 +1994,17 @@ export const HW_INFO = {
       'The + leg is marked on the top; in this circuit it faces the resistor and the pin.',
     ],
     src: 'General electronics practice',
+  },
+  abuzzer: {
+    name: 'Active buzzer (built-in oscillator)', tag: 'Sound',
+    summary: 'An active buzzer has its own oscillator inside: apply a steady DC voltage and it beeps at a fixed pitch. No tone signal is needed (a passive buzzer needs one).',
+    points: [
+      'It has a polarity: the leg marked + goes toward the pin or the supply, the other to GND.',
+      'Typical 5 V type (TMB12A05 listings): supply 3 to 7 V, about 25 to 30 mA, fixed tone about 2.3 to 2.7 kHz. Values differ between makers: read the datasheet of your part.',
+      'About 30 mA is more than the 20 mA recommended per pin on an Arduino UNO R3: for long use switch it with a transistor.',
+      'A passive buzzer looks similar but has no oscillator: it only clicks on a steady voltage.',
+    ],
+    src: 'Distributor listings of the TMB12A05 (Electrokit, Thingbits, LCSC): no single manufacturer datasheet found, so values are labelled typical',
   },
   resistor10k: {
     name: '10 kΩ resistor', tag: 'Colour code brown-black-orange-gold',

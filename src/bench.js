@@ -111,7 +111,7 @@ export class Bench {
       case 'encoder': obj = new EncoderModule(); break;
       case 'button': obj = new PushButton(); break;
       case 'pot': obj = new Potentiometer(); break;
-      case 'buzzer': obj = new PiezoBuzzer(); break;
+      case 'buzzer': obj = new PiezoBuzzer(!!d.active); break;
       case 'wire': obj = new JumperWire(this.point(d.from), this.point(d.to), d.color, { id: 'jumper', lift: d.lift ?? 10, depthA: 5, depthB: 5 }); break;
       default: throw new Error('unknown part ' + d.type);
     }

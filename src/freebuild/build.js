@@ -25,7 +25,7 @@ export class FreeBuild {
     this.parts = []; this.pinCfg = {}; this.burnt = new Set(); this.damaged = new Set(); this.burnWhy = {};
     this.env = { disp1: 'Hello, world!', disp2: 'Free build', joy: {}, enc: {}, lux: 300, tempC: 25, pressed: {}, pot: {}, motion: false, dist: 40, hum: 45 }; this.pi = { sd: true, touched: false, hdmi: false, kbd: false, mouse: false, cam: 'none', flip: false }; this.piWarn = ''; this.servoNow = {}; this.modPts = []; this.relayOn = {}; this.motorTarget = {};
     this.seq = {}; this.undoStack = []; this.tool = null; this.selected = null; this.probe = null; this.probeOn = false;
-    this.opts = { dht: 'dht11', rgbCA: false, ohms: 220, color: 'red', wire: 'auto', flip: false };
+    this.opts = { bzActive: false, dht: 'dht11', rgbCA: false, ohms: 220, color: 'red', wire: 'auto', flip: false };
     this.result = null; this.tripMsg = null; this.lastRun = 0; this.lastHtml = {}; this.soundHz = 0;
     this.key = 'fb:' + this.boardKind;
     this.t0 = performance.now();
@@ -241,7 +241,7 @@ export class FreeBuild {
           else if (type === 'led') { const c = old ? old.color : this.opts.color; def = { type, anode: ref, cathode: b, color: c, hex: LED_TYPES[c].hex }; }
           else if (type === 'diode') def = { type, a: ref, k: b };
           else if (type === 'ldr') def = { type, a: ref, b };
-          else if (type === 'buzzer') def = { type, plus: ref, minus: b };
+          else if (type === 'buzzer') def = { type, plus: ref, minus: b, ...(((old && old.active) || (!old && this.opts.bzActive)) ? { active: true } : {}) };
         }
       }
     } finally { this.parts = keep; this.occ = this.occupied(); }
@@ -361,7 +361,7 @@ export class FreeBuild {
     else if (T.type === 'led') def = { type: 'led', anode: a, cathode: ref, color: this.opts.color, hex: LED_TYPES[this.opts.color].hex };
     else if (T.type === 'diode') def = { type: 'diode', a, k: ref };
     else if (T.type === 'ldr') def = { type: 'ldr', a, b: ref };
-    else if (T.type === 'buzzer') def = { type: 'buzzer', plus: a, minus: ref };
+    else if (T.type === 'buzzer') def = { type: 'buzzer', plus: a, minus: ref, ...(this.opts.bzActive ? { active: true } : {}) };
     else if (T.type === 'wire') def = this.wireDef(a, ref);
     else if (T.type === 'qwiic') def = { type: 'qwiic', from: a, to: ref, lift: 4 };
     def.id = this.nextId(def.type);
@@ -478,7 +478,7 @@ export class FreeBuild {
     this.result = res; this.apply(res); this.updateProbe(); this.liveText(res);
   }
   apply(res) {
-    const b = this.app.bench; let buzz = null;
+    const b = this.app.bench; let buzz = null, abz = false;
     for (const d of this.parts) {
       const it = b.items[d.id], R = res.parts[d.id]; if (!it) continue;
       if (d.type === 'led') it.obj.set(!!R && R.level > 0.02 && !this.burnt.has(d.id), R ? Math.max(0.15, R.level) : 0);
@@ -495,12 +495,12 @@ export class FreeBuild {
       else if (d.type === 'lamp') it.obj.set(!!R && R.level > 0.05 && !this.burnt.has(d.id));
       else if (d.type === 'relay') this.relayOn[d.id] = !!(R && R.on);
       else if (d.type === 'servo') { const tgt = R && R.angle !== undefined ? R.angle : (this.servoNow[d.id] ?? 90), cur = this.servoNow[d.id] ?? 90; const nx = cur + Math.max(-9, Math.min(9, tgt - cur)); this.servoNow[d.id] = nx; it.obj.setAngle(nx); }
-      else if (d.type === 'buzzer') { const on = !!R && R.loud > 0.05; it.obj.vibrate(on); if (on) buzz = true; }
+      else if (d.type === 'buzzer') { const on = !!R && R.loud > 0.05; it.obj.vibrate(on); if (on) { if (d.active) abz = true; else buzz = true; } }
     }
     if (this.isU3) { const o = res.pins.D13, c = this.pinCfg.D13 || {}; this.app.board.setLed('l', this.powered() && !this.damaged.has('D13') && ['out1', 'blink', 'pwm', 'tone', 'servo', 'pulse'].includes(c.mode) && (c.mode !== 'blink' || Math.floor((performance.now() - this.t0) / 500) % 2 === 0)); }
     // sound: the passive buzzer follows the pin that is in tone mode
     const tonePin = Object.entries(this.pinCfg).find(([id, c]) => c.mode === 'tone' && !this.damaged.has(id));
-    const hz = buzz && tonePin && this.powered() ? Math.round(tonePin[1].freq || 440) : 0;
+    const hz = !this.powered() ? 0 : abz ? 2500 : buzz && tonePin ? Math.round(tonePin[1].freq || 440) : 0;   // an active buzzer has a fixed pitch (listings give 2.3 to 2.7 kHz)
     if (hz !== this.soundHz) { this.soundHz = hz; if (hz) this.app.playTone(hz); else this.app.stopSound(); }
   }
 
@@ -596,7 +596,7 @@ export class FreeBuild {
       <div class="fb-row"><button class="fb-btn${on('rgbled')}" data-tool="rgbled">RGB LED</button><select data-opt="rgbCA"><option value="0"${this.opts.rgbCA ? '' : ' selected'}>common cathode</option><option value="1"${this.opts.rgbCA ? ' selected' : ''}>common anode</option></select></div>
       <div class="fb-row"><button class="fb-btn${on('button')}" data-tool="button">Push button</button></div>
       <div class="fb-row"><button class="fb-btn${on('pot')}" data-tool="pot">Potentiometer 10 kΩ${this.isPi ? ' (no ADC on Pi)' : ''}</button></div>
-      <div class="fb-row"><button class="fb-btn${on('buzzer')}" data-tool="buzzer">Passive buzzer</button></div>
+      <div class="fb-row"><button class="fb-btn${on('buzzer')}" data-tool="buzzer">Buzzer</button><select data-opt="bzActive"><option value="0"${this.opts.bzActive ? '' : ' selected'}>passive</option><option value="1"${this.opts.bzActive ? ' selected' : ''}>active</option></select></div>
       <div class="fb-row"><button class="fb-btn${on('diode')}" data-tool="diode">Diode 1N4007</button></div>
       <div class="fb-row"><button class="fb-btn${on('npn')}" data-tool="npn">Transistor NPN (PN2222A)</button></div>
       <div class="fb-row"><button class="fb-btn${on('mosfet')}" data-tool="mosfet">MOSFET N-channel (IRLZ44N)</button></div>
@@ -667,7 +667,7 @@ export class FreeBuild {
     if (t.dataset.picam !== undefined) { this.piToggle('cam', t.value); return; }
     if (t.dataset.piflip !== undefined) { this.piToggle('flip', t.checked); return; }
     const o = t.dataset.opt; if (!o) return;
-    this.opts[o] = o === 'ohms' ? +t.value : o === 'flip' ? t.checked : o === 'rgbCA' ? t.value === '1' : t.value;
+    this.opts[o] = o === 'ohms' ? +t.value : o === 'flip' ? t.checked : o === 'rgbCA' || o === 'bzActive' ? t.value === '1' : t.value;
   }
   loadExample(i) {
     const ex = EXAMPLES(this.boardKind)[i]; this.cancel();
