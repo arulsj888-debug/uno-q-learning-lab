@@ -1442,6 +1442,43 @@ export const PROGRAMS = {
     }
   },
 
+  async e_home(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(8); await rt.at(9); await rt.at(10);
+    await rt.at(24); rt.serialBegin(115200);
+    await rt.at(25); rt.pinMode('G16', 'OUTPUT');
+    await rt.at(26);
+    if (!rt.i2cProbe(0x76)) { await rt.at(27); rt.println('BMP280 not found'); for (;;) await rt.delay(1000); }
+    await rt.at(30); rt.wifiBegin();
+    while (rt.wifiStatus() !== 'connected') { await rt.at(31); await rt.delay(500); }
+    await rt.at(31);
+    await rt.at(32); await rt.at(33);
+    let lastSend = 0;
+    for (;;) {
+      await rt.at(37);
+      if (!rt.mqttConnected()) {
+        await rt.at(38);
+        if (await rt.mqttConnect()) { await rt.at(39); rt.mqttSubscribe('home/led'); await rt.at(40); rt.println('MQTT connected'); }
+        else { await rt.at(42); await rt.delay(2000); await rt.at(43); continue; }
+      }
+      await rt.at(46);
+      const m = rt.mqttPoll();
+      if (m) {
+        await rt.at(16); await rt.at(19); rt.digitalWrite('G16', m.payload === 'ON' ? 1 : 0);
+        await rt.at(20); rt.mqttPublish('home/led/state', m.payload === 'ON' ? 'ON' : 'OFF');
+      }
+      await rt.at(47);
+      if (rt.millis() - lastSend > 3000) {
+        await rt.at(48); lastSend = rt.millis();
+        await rt.at(49); const t = rt.bmpRead().t;
+        await rt.at(50); rt.mqttPublish('home/temperature', t.toFixed(1));
+        await rt.at(51); rt.println('Temperature sent');
+        await rt.at(52);
+        if (t > 28.0) { await rt.at(53); rt.mqttPublish('home/alert', 'too warm'); await rt.at(54); rt.println('Alert sent'); }
+      }
+      await rt.yield();
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

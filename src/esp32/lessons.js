@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT, E32_WX, E32_KEYPAD, E32_LOCK, E32_LOG } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT, E32_WX, E32_KEYPAD, E32_LOCK, E32_LOG, E32_HOME } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -158,6 +158,11 @@ const LOCK_PARTS_E = [...KP_PARTS_E,
   { id: 'w98', type: 'fwire', from: 'G16', to: 'a19', color: 'orange', lift: 24 },
   { id: 'w99', type: 'fwire', from: 'GND2', to: 'a26', color: 'black', lift: 18 }];
 const LOCK_IDS_E = LOCK_PARTS_E.map(d => d.id);
+const HA_NAMES = ['VCC', 'GND', 'SCL', 'SDA'];
+const HA_PARTS_E = [{ id: 'bmp1', type: 'bmp280', x: 20, z: 138 },
+  ...HA_NAMES.map((n, i) => ({ id: 'hm' + i, type: 'fwire', from: 'bmp1.' + n, to: 'a' + (20 + i), color: { VCC: 'red', GND: 'black', SDA: 'blue', SCL: 'yellow' }[n], lift: 16 + i * 2 })),
+  ...HA_NAMES.map((n, i) => ({ id: 'hw' + i, type: 'fwire', from: { VCC: '3V3', GND: 'GND1', SDA: 'G21', SCL: 'G22' }[n], to: 'b' + (20 + i), color: { VCC: 'red', GND: 'black', SDA: 'blue', SCL: 'yellow' }[n], lift: 22 + i * 3 }))];
+const HA_IDS_E = [...LED_IDS, ...HA_PARTS_E.map(d => d.id)];
 const STEP_PARTS_E = [
   { id: 'stp1', type: 'stepper', x: 20, z: 138 },
   { id: 'w90', type: 'fwire', from: 'stp1.IN1', to: 'G16', color: 'blue', lift: 36 },
@@ -2130,5 +2135,49 @@ export const E32_LESSONS = [
       { q: 'What is a CSV file?', a: ['Text lines with values separated by commas', 'A picture', 'A program', 'A Wi-Fi setting'], c: 0, why: 'Comma-separated values: opens in any spreadsheet.' },
     ],
     sources: [SRC.littlefs, SRC.bmpds],
+  },
+
+  // ================================================================== 41
+  {
+    id: 'e41', num: 41, module: 3, title: 'Project: a smart home node (MQTT lamp + temperature)', level: 'Intermediate', time: '35 min',
+    goal: 'Make one ESP32 a small smart-home device: switch a lamp by MQTT command, report its state, publish the temperature and raise an alert by a rule.',
+    hardware: ['ESP32 DevKit V1', 'LED circuit of Lesson 4 (the lamp)', 'BMP280 breakout', 'Your Wi-Fi name and password', 'An MQTT broker (simulated here)'],
+    code: E32_HOME, file: 'SmartHome.ino', program: 'e_home', fast: true, widgets: ['wifirouter', 'mqttbroker', 'bmpsens'],
+    circuit: [...LED_CIRCUIT, ...HA_PARTS_E], io: { G16: IO_LED, BMP: { kind: 'bmp', sda: 'G21', scl: 'G22', item: 'bmp1', needs: HA_IDS_E } },
+    explain: {
+      2: 'The MQTT library (Lesson 26).',
+      4: 'The BMP280 library (Lesson 33): the temperature sensor.',
+      8: 'The broker address: made up for this lesson.',
+      9: 'The lamp: the LED from Lesson 4.',
+      16: 'The callback runs when a command arrives on a topic we subscribed to.',
+      19: '“ON” switches the lamp on, anything else off.',
+      20: 'Report the new state on a <b>state topic</b>, so a dashboard can show the real lamp state, not just the command sent.',
+      26: 'Start the sensor first: without it there is nothing to report.',
+      39: 'Listen to the lamp command topic.',
+      47: 'Every 3 seconds, without blocking (millis(), Lesson 27).',
+      49: 'Read the temperature.',
+      50: 'Publish it as text with one decimal.',
+      52: 'A <b>rule</b> on the device: above 28 °C…',
+      53: '…publish an alert. Rules on the device keep working even if the dashboard is closed.',
+    },
+    steps: [
+      { title: 'Command, state, telemetry, rule', view: 'bench', have: [], power: false,
+        body: `<p>A smart-home device usually does four things: it receives <b>commands</b> (lamp on/off), reports its <b>state</b> (the lamp really is on), sends <b>telemetry</b> (the temperature) and applies <b>rules</b> (alert when too warm). MQTT topics for each: <code>home/led</code> (command), <code>home/led/state</code>, <code>home/temperature</code>, <code>home/alert</code>.</p>` },
+      { title: 'Wire it', view: 'bench', have: HA_IDS_E, power: false, pins: ['G16', 'G21', 'G22', '3V3', 'GND1'],
+        body: `<ul><li>The lamp: the LED on <b>GPIO16</b>, as in Lesson 4.</li><li>The BMP280 on breadboard columns 20 to 23: <b>3V3 → b20</b>, <b>GND → b21</b>, <b>GPIO22 (SCL) → b22</b>, <b>GPIO21 (SDA) → b23</b> (module pins VCC, GND, SCL, SDA in row a).</li></ul><p class="warn">Check the pin order printed on your BMP280 board.</p>` },
+      { title: 'The code', view: 'bench', have: HA_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>16</b> (commands), <b>50</b> (telemetry) and <b>52</b> (the rule).</p>` },
+      { title: 'Run it: command and report', view: 'bench', have: HA_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>After the Wi-Fi and the broker connect, press <b>“Send ON”</b> in the panel: the lamp lights and the broker log shows the state <code>home/led/state = ON</code>. The temperature is published every 3 seconds.</p><p class="sim">The broker and the phone are simulated; the broker address is made up.</p>` },
+      { title: 'Run it: the rule', view: 'bench', have: HA_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Move the <b>temperature</b> slider above <b>28 °C</b>: the next report is followed by <code>home/alert = too warm</code> in the broker log.</p>` },
+      { title: 'Summary', view: 'bench', have: HA_IDS_E, power: true,
+        body: `<ul><li>Command topic in, state topic out: report what really happened.</li><li>Telemetry on a timer with <code>millis()</code>.</li><li>Rules on the device keep working without a dashboard.</li><li>Missing here: security (passwords, encryption), reconnection of Wi-Fi, and a real broker.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Why publish a state topic after a command?', a: ['So others see what the lamp really did', 'To slow the loop', 'To save power', 'Brokers require it'], c: 0, why: 'The state confirms the result of the command.' },
+      { q: 'Where does the alert rule run?', a: ['On the ESP32 itself', 'Only in the broker', 'Only on the phone', 'Nowhere'], c: 0, why: 'The sketch compares the temperature and publishes the alert.' },
+      { q: 'Which topic carries the command to switch the lamp?', a: ['home/led', 'home/temperature', 'home/alert', 'home/led/state'], c: 0, why: 'The sketch subscribes to home/led.' },
+    ],
+    sources: [SRC.pubsub, SRC.mqtt, SRC.bmpds],
   },
 ];

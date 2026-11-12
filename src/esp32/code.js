@@ -1016,3 +1016,62 @@ void loop() {
   }
   delay(2000);
 }`;
+
+// Lesson 41 (project) — smart home node: MQTT lamp control, temperature reports and a rule
+export const E32_HOME = `#include <WiFi.h>
+#include <PubSubClient.h>
+#include <Wire.h>
+#include <Adafruit_BMP280.h>
+
+const char *ssid = "HomeNet";
+const char *password = "MyPassword";
+const char *mqttServer = "broker.example.com";   // a made-up address for this lesson
+const int ledPin = 16;
+unsigned long lastSend = 0;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+Adafruit_BMP280 bmp;
+
+void callback(char *topic, byte *payload, unsigned int length) {
+  String message;
+  for (unsigned int i = 0; i < length; i++) message += (char)payload[i];
+  digitalWrite(ledPin, message == "ON" ? HIGH : LOW);       // the lamp follows the command
+  client.publish("home/led/state", message == "ON" ? "ON" : "OFF");   // report what we did
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  if (!bmp.begin(0x76)) {
+    Serial.println("BMP280 not found");
+    for (;;);
+  }
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) delay(500);
+  client.setServer(mqttServer, 1883);
+  client.setCallback(callback);
+}
+
+void loop() {
+  if (!client.connected()) {
+    if (client.connect("esp32-home")) {
+      client.subscribe("home/led");
+      Serial.println("MQTT connected");
+    } else {
+      delay(2000);
+      return;
+    }
+  }
+  client.loop();
+  if (millis() - lastSend > 3000) {
+    lastSend = millis();
+    float t = bmp.readTemperature();
+    client.publish("home/temperature", String(t, 1).c_str());
+    Serial.println("Temperature sent");
+    if (t > 28.0) {
+      client.publish("home/alert", "too warm");               // a rule that runs on the device
+      Serial.println("Alert sent");
+    }
+  }
+}`;
