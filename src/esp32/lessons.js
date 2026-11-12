@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT, E32_WX, E32_KEYPAD, E32_LOCK } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP, E32_SOIL, E32_SND, E32_PLANT, E32_WX, E32_KEYPAD, E32_LOCK, E32_LOG } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -53,6 +53,7 @@ const SRC = {
   soilsrc: { t: 'Vendor manuals for the capacitive soil moisture sensor v1.2: 3.3-5.5 V, analog AOUT, wetter = lower voltage, calibrate dry and wet', u: 'https://www.atomic14.com/esp32/sensors/capacitive-soil/' },
   sndsrc: { t: 'Arduino reference: analogRead(). The sound module itself has no standard datasheet: its values are typical', u: 'https://docs.arduino.cc/language-reference/en/functions/analog-io/analogRead/' },
   keypadlib: { t: 'Keypad library (Mark Stanley, Alexander Brevig): makeKeymap, getKey', u: 'https://github.com/Chris--A/Keypad' },
+  littlefs: { t: 'Arduino-ESP32 LittleFS library (open with FILE_READ / FILE_WRITE / FILE_APPEND)', u: 'https://github.com/espressif/arduino-esp32/tree/master/libraries/LittleFS' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -2083,5 +2084,51 @@ export const E32_LESSONS = [
       { q: 'What does tone(pin, 300, 600) do?', a: ['Plays 300 Hz for 600 ms', 'Plays 600 Hz for 300 ms', 'Turns the pin on', 'Reads the pin'], c: 0, why: 'tone(pin, frequency, duration).' },
     ],
     sources: [SRC.keypadlib, ],
+  },
+
+  // ================================================================== 40
+  {
+    id: 'e40', num: 40, module: 7, title: 'Project: a data logger (CSV file in flash)', level: 'Intermediate', time: '30 min',
+    goal: 'Store sensor readings in a file on the ESP32’s own flash memory (LittleFS) and read the file back.',
+    hardware: ['ESP32 DevKit V1', 'BMP280 breakout (wired as in Lesson 33)', 'Jumper wires'],
+    code: E32_LOG, file: 'DataLogger.ino', program: 'e_log', fast: true, widgets: ['bmpsens', 'fsview'],
+    circuit: BMP_PARTS_E, io: { G21: { kind: 'bmp', sda: 'G21', scl: 'G22', item: 'bmp1', needs: BMP_IDS_E } },
+    explain: {
+      1: '<b>LittleFS</b>: a small file system that lives in the ESP32’s flash memory, like a tiny disk.',
+      6: 'The name of the file. A <b>CSV</b> file (comma-separated values) opens in any spreadsheet.',
+      7: 'Counts the lines written.',
+      11: '<b>LittleFS.begin(true)</b> mounts the file system; <b>true</b> formats it if it is empty or damaged.',
+      12: 'Stop if there is no file system.',
+      15: 'Start the BMP280 sensor (Lesson 33).',
+      19: '<b>FILE_WRITE</b> opens the file and <b>empties</b> it: a fresh start at every boot.',
+      20: 'The first line: the column names.',
+      21: '<b>close()</b> finishes the write. Unclosed files can lose data.',
+      25: '<b>FILE_APPEND</b> opens the file and adds to the <b>end</b>.',
+      26: 'The time since the start in seconds. A board without a real-time clock only knows its running time.',
+      28: 'The temperature with two decimals…',
+      30: '…and the pressure in hPa, one decimal. <b>println</b> ends the line.',
+      31: 'Close the file after each line.',
+      35: 'After five lines, read the whole file back.',
+      36: '<b>FILE_READ</b> opens it for reading.',
+      37: '<b>available()</b> is true while there are bytes left.',
+      38: 'Send each byte to the Serial Monitor.',
+    },
+    steps: [
+      { title: 'Remember the readings', view: 'wxv', have: [], power: false,
+        body: `<p>A sensor shows a value for a moment; a <b>data logger</b> keeps them. The ESP32 has a few megabytes of <b>flash memory</b>, and part of it can hold files through <b>LittleFS</b>. The data stays when the power is off.</p><p class="warn">Flash memory wears out after many rewrites: do not write every few milliseconds for years. One line every few seconds or minutes is fine for experiments.</p>` },
+      { title: 'The circuit', view: 'wxv', have: BMP_IDS_E, power: false, pins: ['3V3', 'GND2', 'G21', 'G22'],
+        body: `<p>The BMP280 is wired exactly as in Lesson 33: <b>3V3, GND, SDA → GPIO21, SCL → GPIO22</b>. Nothing else is needed: the “storage” is inside the ESP32.</p>` },
+      { title: 'The code', view: 'wxv', have: BMP_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>19</b> (new file), <b>25</b> (append) and <b>31</b> (close).</p>` },
+      { title: 'Run it: log five lines', view: 'wxv', have: BMP_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Every 2 seconds one line is added to <code>/log.csv</code> (see the file in the panel). Change the <b>temperature</b> and <b>pressure</b> sliders between lines. After the fifth line the sketch reads the file back to the Serial Monitor.</p><p class="sim">The file system and the readings are simulated; the time column is the simulated running time.</p>` },
+      { title: 'Summary', view: 'wxv', have: BMP_IDS_E, power: true,
+        body: `<ul><li>LittleFS gives the ESP32 a small file system in flash.</li><li><code>FILE_WRITE</code> starts a new file, <code>FILE_APPEND</code> adds lines, <code>close()</code> saves.</li><li>CSV: one line per reading, values separated by commas.</li><li>No clock chip: log the running time, or add an RTC (not covered yet).</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does FILE_WRITE do to an existing file?', a: ['Empties it and starts again', 'Adds to the end', 'Deletes the board', 'Nothing'], c: 0, why: 'FILE_WRITE starts a new, empty file; FILE_APPEND adds to the end.' },
+      { q: 'Why close() the file?', a: ['So the data is really saved', 'To make the board faster', 'To free Wi-Fi', 'It is not needed'], c: 0, why: 'Unclosed files can lose data.' },
+      { q: 'What is a CSV file?', a: ['Text lines with values separated by commas', 'A picture', 'A program', 'A Wi-Fi setting'], c: 0, why: 'Comma-separated values: opens in any spreadsheet.' },
+    ],
+    sources: [SRC.littlefs, SRC.bmpds],
   },
 ];

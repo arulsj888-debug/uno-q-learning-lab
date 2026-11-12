@@ -971,3 +971,48 @@ void loop() {
     }
   }
 }`;
+
+// Lesson 40 (project) — data logger: BMP280 readings written to a CSV file in the ESP32 flash (LittleFS)
+export const E32_LOG = `#include <LittleFS.h>
+#include <Wire.h>
+#include <Adafruit_BMP280.h>
+
+Adafruit_BMP280 bmp;
+const char *path = "/log.csv";
+int count = 0;
+
+void setup() {
+  Serial.begin(115200);
+  if (!LittleFS.begin(true)) {            // true = format the flash area if mounting fails
+    Serial.println("LittleFS mount failed");
+    for (;;);
+  }
+  if (!bmp.begin(0x76)) {
+    Serial.println("BMP280 not found");
+    for (;;);
+  }
+  File f = LittleFS.open(path, FILE_WRITE);   // FILE_WRITE starts a new, empty file
+  f.println("seconds,temp_c,pressure_hpa");
+  f.close();
+}
+
+void loop() {
+  File f = LittleFS.open(path, FILE_APPEND);  // FILE_APPEND adds to the end
+  f.print(millis() / 1000);
+  f.print(",");
+  f.print(bmp.readTemperature(), 2);
+  f.print(",");
+  f.println(bmp.readPressure() / 100.0, 1);
+  f.close();                                  // close so the data is really saved
+  count++;
+  Serial.print("Logged line ");
+  Serial.println(count);
+  if (count == 5) {                           // after five lines, read the file back
+    File r = LittleFS.open(path, FILE_READ);
+    while (r.available()) {
+      Serial.write(r.read());
+    }
+    r.close();
+  }
+  delay(2000);
+}`;

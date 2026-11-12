@@ -861,6 +861,7 @@ class App {
     if (w.includes('pikeys')) h += `<div class="io-block"><div class="io-title">Keys — click to play <span class="io-note">(GPIO17)</span></div><div class="pkeys">${[['C4', 60], ['D4', 62], ['E4', 64], ['F4', 65], ['G4', 67], ['A4', 69], ['B4', 71]].map(([n, m]) => `<button class="pkey" data-hz="${(440 * Math.pow(2, (m - 69) / 12)).toFixed(3)}" data-n="${n}">${n}</button>`).join('')}</div><div id="pk-note" class="io-note"></div></div>`;
     if (w.includes('piweb')) h += `<div class="io-block pirstat tight"><div><span>Phone browser</span><b id="w-ph">—</b></div><div class="arrow">→</div><div><span>${IS_E32 ? 'WebServer on the ESP32' : 'Flask on the Pi'}</span><b id="w-fl">—</b></div><div class="arrow">→</div><div><span>LED on ${IS_E32 ? 'GPIO16' : 'GPIO17'}</span><b id="w-led">—</b></div></div><div id="w-note" class="io-note"></div>`;
     if (w.includes('wifiscan')) h += `<div class="io-block"><div class="io-title">Signal of “HomeNet” <span class="io-note">(simulated)</span></div><input id="wf-rssi" type="range" min="-90" max="-30" step="1" value="${this.wf.rssi}"><div id="wf-val" class="io-val"></div><div class="io-note">RSSI = received signal strength in dBm. The closer to 0, the stronger the signal. The other networks are made up for this demo.</div></div>`;
+    if (w.includes('fsview')) { this.fsd = { '/log.csv': '' }; h += `<div class="io-block"><div class="io-title">Flash file system <span class="io-note">(LittleFS, simulated)</span></div><pre id="fs-view" class="io-val" style="white-space:pre;margin:0">(no file yet)</pre></div>`; }
     if (w.includes('keypad')) { this.kp = { q: [], cur: '', until: 0 }; h += `<div class="io-block"><div class="io-title">Keypad <span class="io-note">(simulated)</span></div><div class="kp-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">${['1','2','3','A','4','5','6','B','7','8','9','C','*','0','#','D'].map(k => `<button class="hold small kp-key" data-k="${k}">${k}</button>`).join('')}</div><div id="kp-note" class="io-note"></div></div>`; }
     if (w.includes('clapsens')) { this.cl = { until: 0 }; h += `<div class="io-block"><div class="io-title">The room <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="cl-btn" class="hold small">👏 Clap</button></div><div id="cl-note" class="io-note"></div></div>`; }
     if (w.includes('soilsens')) { this.sm = { wet: 0 }; h += `<div class="io-block"><div class="io-title">The soil <span class="io-note">(simulated)</span></div><div class="throw"><label>Moisture</label><input id="sm-w" type="range" min="0" max="100" step="1" value="0"><b id="sm-wv">dry</b></div><div id="sm-v" class="io-val"></div></div>`; }
@@ -1615,6 +1616,11 @@ class App {
     set('#ir-note', !this.board.powered ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>, then press a button of the remote.' : '');
     if (!run) this.irq = [];
   }
+  fsTick() {
+    const L = this.lesson; if (!L || !(L.widgets || []).includes('fsview') || !this.fsd) return;
+    const e = $('#fs-view'), txt = this.fsd['/log.csv'];
+    if (e) { const h = this.sim.running || txt ? `/log.csv  (${(txt || '').length} bytes)\n` + (txt || '') : '(no file yet)'; if (e.textContent !== h) e.textContent = h; }
+  }
   kpTick() {
     const L = this.lesson; if (!L || !(L.widgets || []).includes('keypad') || !this.kp) return;
     const run = this.sim.running, o = this.bench.get('kp1'), K = this.kp, act = run && performance.now() < K.until;
@@ -1634,7 +1640,7 @@ class App {
     set('#stp-note', !pw ? 'USB is not plugged in — the board has no power.' : !run ? 'Press <b>▶ Run</b>.' : '');
   }
   displayTick() {
-    this.qTick(); this.mTick(); this.irTick(); this.stpTick(); this.kpTick();
+    this.qTick(); this.mTick(); this.irTick(); this.stpTick(); this.kpTick(); this.fsTick();
     const L = this.lesson; if (!L) return;
     if (!this.sim.running && this.neoSt) this.neoSt.shown = null;
     if (L.io && Object.values(L.io).some(x => x.kind === 'neo')) {
@@ -2080,6 +2086,7 @@ class App {
       mpu: () => { const L = this.lesson, io = Object.values((L && L.io) || {}).find(x => x.kind === 'mpu'); if (!(io && this.wired(io) && this.board.powered)) return { ax: 0, ay: 0, az: 0, gz: 0 }; const g = 9.80665, p = this.mp.pitch * Math.PI / 180, r = this.mp.roll * Math.PI / 180, n = () => (Math.random() - 0.5) * 0.04; return { ax: -g * Math.sin(p) + n(), ay: g * Math.sin(r) * Math.cos(p) + n(), az: g * Math.cos(r) * Math.cos(p) + n(), gz: this.mp.rate * Math.PI / 180 }; },
       stepTick: dir => { const L = this.lesson, io = Object.values((L && L.io) || {}).find(x => x.kind === 'stepper'); if (this.stp && io && this.wired(io) && this.board.powered) this.stp.steps += dir; },
       bmp: () => { const L = this.lesson, io = Object.values((L && L.io) || {}).find(x => x.kind === 'bmp'); if (!(io && this.wired(io) && this.board.powered)) return { t: 0, p: 0 }; return { t: Math.round(this.bp.t * 100) / 100, p: Math.round(this.bp.p * 100) / 100 }; },
+      fs: (op, p, t) => { const F = this.fsd || (this.fsd = {}); if (op === 'write') F[p] = t; else if (op === 'append') F[p] = (F[p] || '') + t; else return F[p] || ''; },
       keypad: () => (this.kp && this.kp.q.length ? this.kp.q.shift() : null),
       ir: () => (this.irq && this.irq.length ? this.irq.shift() : null),
       ds18: () => {

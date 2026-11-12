@@ -75,6 +75,9 @@ export class Sim {
       stepTick: (dir) => { if (H.stepTick) H.stepTick(dir); },
       bmpRead: () => (H.bmp ? H.bmp() : { t: 0, p: 0 }),
       keypadKey: () => (H.keypad ? H.keypad() : null),
+      fsWrite: (p, t) => { if (H.fs) H.fs('write', p, t); },
+      fsAppend: (p, t) => { if (H.fs) H.fs('append', p, t); },
+      fsRead: (p) => (H.fs ? H.fs('read', p) : ''),
       dsRead: () => (H.ds18 ? H.ds18() : { ok: false }),
       dhtRead: () => (H.dht ? H.dht() : { ok: false }),
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
@@ -1409,6 +1412,33 @@ export const PROGRAMS = {
         }
       }
       await rt.yield();
+    }
+  },
+
+  async e_log(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(5); await rt.at(6); await rt.at(7);
+    await rt.at(10); rt.serialBegin(115200);
+    await rt.at(11); await rt.at(12);
+    await rt.at(15);
+    if (!rt.i2cProbe(0x76)) { await rt.at(16); rt.println('BMP280 not found'); for (;;) await rt.delay(1000); }
+    await rt.at(19); rt.fsWrite('/log.csv', '');
+    await rt.at(20); rt.fsAppend('/log.csv', 'seconds,temp_c,pressure_hpa\n');
+    await rt.at(21);
+    let count = 0;
+    for (;;) {
+      await rt.at(24);
+      await rt.at(25);
+      await rt.at(26); const m = rt.bmpRead(); const sec = Math.floor(rt.millis() / 1000);
+      await rt.at(28); await rt.at(30); rt.fsAppend('/log.csv', sec + ',' + m.t.toFixed(2) + ',' + m.p.toFixed(1) + '\n');
+      await rt.at(31); count++;
+      await rt.at(32); await rt.at(33); rt.print('Logged line '); await rt.at(34); rt.println(count);
+      await rt.at(35);
+      if (count === 5) {
+        await rt.at(36); const txt = rt.fsRead('/log.csv');
+        await rt.at(37); await rt.at(38); for (const line of txt.split('\n')) if (line) rt.println(line);
+        await rt.at(40);
+      }
+      await rt.at(42); await rt.delay(2000);
     }
   },
 
