@@ -709,17 +709,18 @@ export class SlideSwitch {
 
 // ---------------------------------------------------------------- MPU6050 breakout (GY-521 style): small blue board, the QFN chip with X/Y axis marks, 8-pin header VCC GND SCL SDA XDA XCL AD0 INT
 export class MPU6050Module {
-  constructor() {
-    const g = this.group = new THREE.Group(); this.hw = 'mpu6050';
+  constructor(title = 'GY-521', names = ['VCC', 'GND', 'SCL', 'SDA', 'XDA', 'XCL', 'AD0', 'INT'], tag = 'mpu6050') {
+    const g = this.group = new THREE.Group(); this.hw = tag;
     const edge = new THREE.MeshStandardMaterial({ color: 0x14264a, roughness: 0.7 }), mask = new THREE.MeshStandardMaterial({ color: 0x1d4fb8, roughness: 0.45 });
     const pcb = new THREE.Mesh(new THREE.BoxGeometry(21, 1.4, 16), [edge, edge, mask, mask, edge, edge]); pcb.position.set(0, 2.6, 0); g.add(pcb);
-    const names = ['VCC', 'GND', 'SCL', 'SDA', 'XDA', 'XCL', 'AD0', 'INT'], PX = 30;
+    const PX = 30, nn = names.length;
     const tex = canvasTex(21 * PX, 16 * PX, (c, w, h) => {
       c.clearRect(0, 0, w, h); c.strokeStyle = 'rgba(245,245,240,0.8)'; c.lineWidth = 3; c.strokeRect(6, 6, w - 12, h - 12);
-      names.forEach((n, i) => silk(c, n, (10.5 + (i - 3.5) * 2.54) * PX, 12.6 * PX, 12, '#f3f3ee', 'center', 600));
-      silk(c, 'GY-521', 6.2 * PX, 2.2 * PX, 15, 'rgba(243,243,238,0.9)', 'center', 600);
+      names.forEach((n, i) => silk(c, n, (10.5 + (i - (nn - 1) / 2) * 2.54) * PX, 12.6 * PX, 12, '#f3f3ee', 'center', 600));
+      silk(c, title, 6.2 * PX, 2.2 * PX, 15, 'rgba(243,243,238,0.9)', 'center', 600);
       // axis marks printed next to the chip
       c.strokeStyle = '#f3f3ee'; c.fillStyle = '#f3f3ee'; c.lineWidth = 3;
+      if (tag !== 'mpu6050') return;
       c.beginPath(); c.moveTo(14 * PX, 8 * PX); c.lineTo(18 * PX, 8 * PX); c.stroke(); silk(c, 'X', 18.8 * PX, 8 * PX, 14, '#f3f3ee', 'center', 700);
       c.beginPath(); c.moveTo(14 * PX, 8 * PX); c.lineTo(14 * PX, 4 * PX); c.stroke(); silk(c, 'Y', 14 * PX, 3.2 * PX, 14, '#f3f3ee', 'center', 700);
     });
@@ -727,9 +728,9 @@ export class MPU6050Module {
     const chip = new THREE.Mesh(new RoundedBoxGeometry(4, 0.9, 4, 1, 0.15), new THREE.MeshStandardMaterial({ color: 0x151517, roughness: 0.5 })); chip.position.set(-2, 3.5, -1.2); g.add(chip);
     const reg = new THREE.Mesh(new RoundedBoxGeometry(2.6, 1, 1.6, 1, 0.1), new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.5 })); reg.position.set(-7, 3.5, -3.5); g.add(reg);
     const y0 = 4.3, pinZ = 6.2; this.pinZ = pinZ; this.pinTop = y0 + 8.2; this.pinX = {};
-    const strip = new THREE.Mesh(new RoundedBoxGeometry(8 * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0, pinZ); g.add(strip);
-    names.forEach((n, i) => { const x = (i - 3.5) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, y0 + 4.2, pinZ); g.add(p); });
-    tagHW(g, 'mpu6050');
+    const strip = new THREE.Mesh(new RoundedBoxGeometry(nn * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0, pinZ); g.add(strip);
+    names.forEach((n, i) => { const x = (i - (nn - 1) / 2) * 2.54; this.pinX[n] = x; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, y0 + 4.2, pinZ); g.add(p); });
+    tagHW(g, tag);
   }
   pin(name) {
     this.group.updateMatrixWorld(true);
@@ -2120,6 +2121,17 @@ export const HW_INFO = {
     summary: 'Three legs: the middle leg (COM, common) is connected to one outer leg or to the other, depending on the slider position.',
     points: ['Left leg A, middle COM, right leg B (the app labels them in this order).', 'Used to select a mode or to switch a supply.'],
     src: 'General electronics practice',
+  },
+  bmp280: {
+    name: 'BMP280 pressure and temperature sensor (breakout)', tag: 'Measures air pressure',
+    summary: 'A small sensor that measures air pressure (300 to 1100 hPa) and temperature (−40 to +85 °C) and sends them over I²C. Pressure falls with height, so it can also give an estimate of altitude.',
+    points: [
+      'Bosch datasheet: the chip ID register (0xD0) reads 0x58. The I²C address is 0x76 when SDO is connected to GND and 0x77 when SDO is connected to VDDIO. SDO must not be left floating.',
+      'The bare chip is a 1.8 V part: supply 1.71 V to 3.6 V. Hobby breakouts usually add a regulator and level shifting, but the safe choice is 3.3 V: check your board.',
+      'Some boards sold as “BMP280” are really a BME280 (which adds humidity): check the chip ID or the marking.',
+      'Typical sea-level pressure is about 1013 hPa.',
+    ],
+    src: 'Bosch BMP280 datasheet (BST-BMP280-DS001)',
   },
   mpu6050: {
     name: 'MPU6050 accelerometer + gyroscope (GY-521 style breakout)', tag: 'Measures tilt, movement and rotation',

@@ -775,3 +775,27 @@ void loop() {
   myStepper.step(-stepsPerRevolution);  // and back
   delay(500);
 }`;
+
+// Lesson 33 — BMP280 pressure and temperature sensor with Adafruit_BMP280
+export const E32_BMP = `#include <Wire.h>
+#include <Adafruit_BMP280.h>
+
+Adafruit_BMP280 bmp;   // connected over I2C
+
+void setup() {
+  Serial.begin(115200);
+  if (!bmp.begin(0x76)) {   // 0x76 when SDO is on GND (0x77 when SDO is on VDDIO)
+    Serial.println("BMP280 not found!");
+    while (1) delay(10);
+  }
+}
+
+void loop() {
+  Serial.print("Temperature = ");
+  Serial.print(bmp.readTemperature());
+  Serial.println(" *C");
+  Serial.print("Pressure = ");
+  Serial.print(bmp.readPressure() / 100.0);   // Pascal to hPa
+  Serial.println(" hPa");
+  delay(1000);
+}`;

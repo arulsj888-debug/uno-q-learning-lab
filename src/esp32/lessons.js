@@ -1,6 +1,6 @@
 // Lessons for the ESP32 DevKit V1 (DOIT-style board). Facts come from the Espressif ESP32 datasheet v5.3 (DS), the ESP32-WROOM-32
 // datasheet v3.8 (MOD), the Arduino-ESP32 documentation (AE), Random Nerd Tutorials (RNT) and espboards.dev (EB). Code: ./code.js.
-import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP } from './code.js';
+import { E32_BLINK, E32_EXT_LED, E32_BUTTON, E32_POT, E32_FADE, E32_SCAN, E32_CONNECT, E32_WEB, E32_TOUCH, E32_SLEEP, E32_BLE, E32_RGB, E32_DHT, E32_JOY, E32_ENC, E32_LCD, E32_OLED, E32_NEO, E32_QSW, E32_MOSW, E32_DIODE, E32_MILLIS, E32_HTTP, E32_MQTT, E32_NTP, E32_DS18, E32_IR, E32_MPU, E32_ISR, E32_STEP, E32_BMP } from './code.js';
 
 const SRC = {
   ds: { t: 'Espressif ESP32 Series Datasheet v5.3', u: 'https://documentation.espressif.com/esp32_datasheet_en.pdf' },
@@ -48,6 +48,8 @@ const SRC = {
   isrdoc: { t: 'Arduino reference: attachInterrupt()', u: 'https://docs.arduino.cc/language-reference/en/functions/external-interrupts/attachInterrupt/' },
   uln: { t: 'Vendor datasheet copy: 28BYJ-48 5 V stepper, 1/64 gear, 5.625 deg / 64 stride angle, 4 phases', u: 'https://cdn.shopify.com/s/files/1/0015/7571/4865/files/datasheet_28BYJ-48.pdf' },
   steplib: { t: 'Arduino reference: Stepper library (setSpeed, step)', u: 'https://docs.arduino.cc/libraries/stepper/' },
+  bmpds: { t: 'Bosch BMP280 datasheet: 300-1100 hPa, -40..+85 C, supply 1.71-3.6 V, chip ID 0x58, address 0x76 (SDO to GND) or 0x77 (SDO to VDDIO)', u: 'https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf' },
+  adabmp: { t: 'Adafruit BMP280 library (Adafruit_BMP280)', u: 'https://github.com/adafruit/Adafruit_BMP280_Library' },
   pinmode: { t: 'Arduino reference: pinMode() — INPUT_PULLUP', u: 'https://docs.arduino.cc/language-reference/en/functions/digital-io/pinMode/' },
 };
 
@@ -122,6 +124,8 @@ const OLED_PARTS_E = dispE('oled', 'oled1', '3V3', ['GND', 'VCC', 'SCL', 'SDA'],
 const OLED_IDS_E = OLED_PARTS_E.map(d => d.id);
 const MPU_PARTS_E = dispE('mpu6050', 'mpu1', '3V3', ['VCC', 'GND', 'SCL', 'SDA'], 7);
 const MPU_IDS_E = MPU_PARTS_E.map(d => d.id);
+const BMP_PARTS_E = dispE('bmp280', 'bmp1', '3V3', ['VCC', 'GND', 'SCL', 'SDA'], 7);
+const BMP_IDS_E = BMP_PARTS_E.map(d => d.id);
 const STEP_PARTS_E = [
   { id: 'stp1', type: 'stepper', x: 20, z: 138 },
   { id: 'w90', type: 'fwire', from: 'stp1.IN1', to: 'G16', color: 'blue', lift: 36 },
@@ -1770,5 +1774,43 @@ export const E32_LESSONS = [
       { q: 'What does step(-2048) do?', a: ['Nothing', 'Turns one revolution the other way', 'Stops the motor', 'Sets the speed'], c: 1, why: 'A negative count reverses the direction.' },
     ],
     sources: [SRC.uln, SRC.steplib, ],
+  },
+
+  // ================================================================== 33
+  {
+    id: 'e33', num: 33, module: 7, title: 'BMP280: air pressure and temperature', level: 'Intermediate', time: '20 min',
+    goal: 'Read pressure and temperature from a BMP280 over I²C and learn what address and supply it needs.',
+    hardware: ['ESP32 DevKit V1', 'BMP280 breakout (4-pin I²C version)', '8 × female–male jumper wires'],
+    code: E32_BMP, file: 'BMP280_read.ino', program: 'e_bmp', fast: true, widgets: ['bmpsens'],
+    circuit: BMP_PARTS_E, io: { G21: { kind: 'bmp', scl: 'G22', item: 'bmp1', needs: BMP_IDS_E } },
+    explain: {
+      1: '<b>Wire.h</b>: the I²C library.',
+      2: 'The <b>Adafruit BMP280</b> library (install it from the Library Manager).',
+      4: 'The sensor object, using I²C.',
+      7: 'Serial output on.',
+      8: '<b>bmp.begin(0x76)</b> starts the sensor at address <b>0x76</b> (SDO on GND). If your board has SDO on VDDIO the address is 0x77. Returns false if nothing answers.',
+      9: 'No answer: check power, SDA/SCL and the address.',
+      16: '<b>readTemperature()</b> returns °C.',
+      19: '<b>readPressure()</b> returns the pressure in <b>Pascal</b>…',
+      20: '…divided by 100 it is in <b>hPa</b> (hectopascal): about 1013 hPa at sea level.',
+    },
+    steps: [
+      { title: 'Pressure from a tiny chip', view: 'scanv', have: [], power: false,
+        body: `<p>Air has weight: the <b>pressure</b> is about <b>1013 hPa</b> at sea level and falls the higher you go (and with the weather). The <b>BMP280</b> measures it, plus the temperature, and reports both over I²C.</p>` },
+      { title: 'The BMP280 breakout', view: 'scanv', have: ['bmp1'], power: false,
+        body: `<p>Pins here: <b>VCC, GND, SCL, SDA</b>. <b>Click it</b> in the 3D view.</p><ul><li>Pressure range <b>300 to 1100 hPa</b>, temperature <b>−40 to +85 °C</b> (Bosch datasheet).</li><li>The chip itself runs from <b>1.71 V to 3.6 V</b>: power it from <b>3.3 V</b>. Many breakouts add a regulator, but check yours.</li><li>Address <b>0x76</b> (SDO to GND) or <b>0x77</b> (SDO to VDDIO).</li></ul><p class="warn">Boards sold as BMP280 are sometimes a BME280 (with humidity): the chip ID tells them apart (0x58 is a BMP280).</p>` },
+      { title: 'Wire it', view: 'scanv', have: BMP_IDS_E, power: false, pins: ['3V3', 'GND2', 'G21', 'G22'], body: `<ul><li>Module pins to breadboard row a (VCC a10, GND a11, SCL a12, SDA a13); board wires in row b: <b>3V3 → b10</b>, <b>GND → b11</b>, <b>GPIO22 → b12</b> (SCL), <b>GPIO21 → b13</b> (SDA)</li></ul>` },
+      { title: 'The code', view: 'scanv', have: BMP_IDS_E, showCode: true, power: true, body: `<p>Click lines <b>8</b>, <b>16</b> and <b>19</b>.</p>` },
+      { title: 'Run it and change the weather', view: 'scanv', have: BMP_IDS_E, showCode: true, power: true, action: 'run',
+        body: `<p>Every second the Serial Monitor prints temperature and pressure. Move the <b>temperature</b> and <b>pressure</b> sliders. Low pressure often means bad weather, high pressure fair weather.</p><p class="sim">Simulated values.</p>` },
+      { title: 'Summary', view: 'scanv', have: BMP_IDS_E, power: true,
+        body: `<ul><li>BMP280: pressure 300 to 1100 hPa and temperature, over I²C at 0x76 or 0x77; supply 1.71 V to 3.6 V.</li><li><code>readPressure()</code> is in Pascal: divide by 100 for hPa.</li><li>Not found? Check power, SDA/SCL and the address (the I²C scanner lesson helps).</li></ul>` },
+    ],
+    quiz: [
+      { q: 'About what pressure is normal at sea level?', a: ['10 hPa', '101 hPa', '1013 hPa', '10 130 hPa'], c: 2, why: 'About 1013 hPa.' },
+      { q: 'readPressure() returns 101300. In what unit is that?', a: ['hPa', 'Pascal', 'bar', 'mm'], c: 1, why: 'Pascal: divide by 100 for hPa.' },
+      { q: 'What does the SDO pin choose?', a: ['The I²C address (0x76 or 0x77)', 'The speed', 'The unit', 'The temperature range'], c: 0, why: 'SDO to GND gives 0x76, to VDDIO 0x77.' },
+    ],
+    sources: [SRC.bmpds, SRC.adabmp, SRC.wire],
   },
 ];

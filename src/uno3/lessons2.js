@@ -1,11 +1,11 @@
 // Lessons 9-16 of the Arduino UNO R3: sensors, motion and power, I²C.
 // Facts come from the UNO R3 datasheet A000066 (DS), the ATmega328P datasheet (ATM), the Arduino language reference and the
 // component datasheets listed in each lesson. Code listings: ./code.js (line numbers are checked by tools/check_code.mjs).
-import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP } from './code.js';
+import { U3_NIGHT, U3_TMP36, U3_ULTRASONIC, U3_PIR, U3_SERVO, U3_MOTOR, U3_RELAY, U3_SHT31, U3_RGB, U3_DHT, U3_JOY, U3_ENC, U3_LCD, U3_OLED, U3_NEO, U3_QSW, U3_MOSW, U3_DIODE, U3_MILLIS, U3_SCAN, U3_DS18, U3_IR, U3_MPU, U3_STEP, U3_BMP } from './code.js';
 import {
   SRC, LED_IDS, IO_LED, LED_CIRCUIT,
   LDR_PARTS, LDR_IDS, TMP_PARTS, TMP_IDS, US_PARTS, US_IDS, PIR_PARTS, PIR_IDS, SERVO_PARTS, SERVO_IDS,
-  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS,
+  MOTOR_PARTS, MOTOR_IDS, MOTOR_LOGIC, MOTOR_IO, RELAY_PARTS, RELAY_IDS, RELAY_IO, I2C_PARTS, I2C_IDS, RGB_PARTS, RGB_IDS, DHT_PARTS, DHT_IDS, JOY_PARTS, JOY_IDS, ENC_PARTS, ENC_IDS, LCD_PARTS, LCD_IDS, OLED_PARTS, OLED_IDS, NEO_PARTS, NEO_IDS, Q_PARTS, Q_IDS, M_PARTS, M_IDS, D_PARTS, D_IDS, BUTTON_PARTS, BUTTON_IDS, SCAN_PARTS, SCAN_IDS, DS_PARTS, DS_IDS, IR_PARTS, IR_IDS, MPU_PARTS, MPU_IDS, STEP_PARTS, STEP_IDS, BMP_PARTS, BMP_IDS,
 } from './common.js';
 
 export const U3_LESSONS_2 = [
@@ -1545,5 +1545,43 @@ export const U3_LESSONS_2 = [
       { q: 'What does step(-2048) do?', a: ['Nothing', 'Turns one revolution the other way', 'Stops the motor', 'Sets the speed'], c: 1, why: 'A negative count reverses the direction.' },
     ],
     sources: [SRC.uln, SRC.steplib, ],
+  },
+
+  // ================================================================== 33
+  {
+    id: 'u33', num: 33, module: 7, title: 'BMP280: air pressure and temperature', level: 'Intermediate', time: '20 min',
+    goal: 'Read pressure and temperature from a BMP280 over I²C and learn what address and supply it needs.',
+    hardware: ['Arduino UNO R3', 'BMP280 breakout (4-pin I²C version)', '4 × jumper wires'],
+    code: U3_BMP, file: 'BMP280_read.ino', program: 'u3_bmp', fast: true, widgets: ['bmpsens'],
+    circuit: BMP_PARTS, io: { A4: { kind: 'bmp', scl: 'A5', item: 'bmp1', needs: BMP_IDS } },
+    explain: {
+      1: '<b>Wire.h</b>: the I²C library.',
+      2: 'The <b>Adafruit BMP280</b> library (install it from the Library Manager).',
+      4: 'The sensor object, using I²C.',
+      7: 'Serial output on.',
+      8: '<b>bmp.begin(0x76)</b> starts the sensor at address <b>0x76</b> (SDO on GND). If your board has SDO on VDDIO the address is 0x77. Returns false if nothing answers.',
+      9: 'No answer: check power, SDA/SCL and the address.',
+      16: '<b>readTemperature()</b> returns °C.',
+      19: '<b>readPressure()</b> returns the pressure in <b>Pascal</b>…',
+      20: '…divided by 100 it is in <b>hPa</b> (hectopascal): about 1013 hPa at sea level.',
+    },
+    steps: [
+      { title: 'Pressure from a tiny chip', view: 'scanv', have: [], power: false,
+        body: `<p>Air has weight: the <b>pressure</b> is about <b>1013 hPa</b> at sea level and falls the higher you go (and with the weather). The <b>BMP280</b> measures it, plus the temperature, and reports both over I²C.</p>` },
+      { title: 'The BMP280 breakout', view: 'scanv', have: ['bmp1'], power: false,
+        body: `<p>Pins here: <b>VCC, GND, SCL, SDA</b>. <b>Click it</b> in the 3D view.</p><ul><li>Pressure range <b>300 to 1100 hPa</b>, temperature <b>−40 to +85 °C</b> (Bosch datasheet).</li><li>The chip itself runs from <b>1.71 V to 3.6 V</b>: power it from <b>3.3 V</b>. Many breakouts add a regulator, but check yours.</li><li>Address <b>0x76</b> (SDO to GND) or <b>0x77</b> (SDO to VDDIO).</li></ul><p class="warn">Boards sold as BMP280 are sometimes a BME280 (with humidity): the chip ID tells them apart (0x58 is a BMP280).</p>` },
+      { title: 'Wire it', view: 'scanv', have: BMP_IDS, power: false, pins: ['3V3', 'GND2', 'A4', 'A5'], body: `<ul><li><b>VCC → 3V3</b>, <b>GND → GND</b></li><li><b>SDA → A4</b>, <b>SCL → A5</b></li></ul>` },
+      { title: 'The code', view: 'scanv', have: BMP_IDS, showCode: true, power: true, body: `<p>Click lines <b>8</b>, <b>16</b> and <b>19</b>.</p>` },
+      { title: 'Run it and change the weather', view: 'scanv', have: BMP_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Every second the Serial Monitor prints temperature and pressure. Move the <b>temperature</b> and <b>pressure</b> sliders. Low pressure often means bad weather, high pressure fair weather.</p><p class="sim">Simulated values.</p>` },
+      { title: 'Summary', view: 'scanv', have: BMP_IDS, power: true,
+        body: `<ul><li>BMP280: pressure 300 to 1100 hPa and temperature, over I²C at 0x76 or 0x77; supply 1.71 V to 3.6 V.</li><li><code>readPressure()</code> is in Pascal: divide by 100 for hPa.</li><li>Not found? Check power, SDA/SCL and the address (the I²C scanner lesson helps).</li></ul>` },
+    ],
+    quiz: [
+      { q: 'About what pressure is normal at sea level?', a: ['10 hPa', '101 hPa', '1013 hPa', '10 130 hPa'], c: 2, why: 'About 1013 hPa.' },
+      { q: 'readPressure() returns 101300. In what unit is that?', a: ['hPa', 'Pascal', 'bar', 'mm'], c: 1, why: 'Pascal: divide by 100 for hPa.' },
+      { q: 'What does the SDO pin choose?', a: ['The I²C address (0x76 or 0x77)', 'The speed', 'The unit', 'The temperature range'], c: 0, why: 'SDO to GND gives 0x76, to VDDIO 0x77.' },
+    ],
+    sources: [SRC.bmpds, SRC.adabmp, SRC.wire],
   },
 ];

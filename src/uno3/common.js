@@ -44,6 +44,8 @@ export const SRC = {
   adampu: { t: 'Adafruit MPU6050 library (Adafruit_MPU6050, Adafruit_Sensor)', u: 'https://github.com/adafruit/Adafruit_MPU6050' },
   uln: { t: 'Vendor datasheet copy: 28BYJ-48 5 V stepper, 1/64 gear, 5.625 deg / 64 stride angle, 4 phases', u: 'https://cdn.shopify.com/s/files/1/0015/7571/4865/files/datasheet_28BYJ-48.pdf' },
   steplib: { t: 'Arduino reference: Stepper library (setSpeed, step)', u: 'https://docs.arduino.cc/libraries/stepper/' },
+  bmpds: { t: 'Bosch BMP280 datasheet: 300-1100 hPa, -40..+85 C, supply 1.71-3.6 V, chip ID 0x58, address 0x76 (SDO to GND) or 0x77 (SDO to VDDIO)', u: 'https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf' },
+  adabmp: { t: 'Adafruit BMP280 library (Adafruit_BMP280)', u: 'https://github.com/adafruit/Adafruit_BMP280_Library' },
   wire: { t: 'Arduino reference: Wire library (I²C)', u: 'https://docs.arduino.cc/language-reference/en/functions/communication/wire/' },
 };
 
@@ -325,3 +327,13 @@ export const STEP_PARTS = [
   { id: 'w95', type: 'fwire', from: 'stp1.VCC', to: '5V', color: 'red', lift: 30 },
 ];
 export const STEP_IDS = STEP_PARTS.map(d => d.id);
+
+// ---- Lesson 33: BMP280 breakout on the desk, four female jumpers to 3V3, GND, A4 (SDA), A5 (SCL)
+export const BMP_PARTS = [
+  { id: 'bmp1', type: 'bmp280', x: 20, z: 138 },
+  { id: 'w90', type: 'fwire', from: 'bmp1.GND', to: 'GND2', color: 'black', lift: 24 },
+  { id: 'w91', type: 'fwire', from: 'bmp1.VCC', to: '3V3', color: 'red', lift: 30 },
+  { id: 'w92', type: 'fwire', from: 'bmp1.SDA', to: 'A4', color: 'blue', lift: 36 },
+  { id: 'w93', type: 'fwire', from: 'bmp1.SCL', to: 'A5', color: 'yellow', lift: 42 },
+];
+export const BMP_IDS = BMP_PARTS.map(d => d.id);

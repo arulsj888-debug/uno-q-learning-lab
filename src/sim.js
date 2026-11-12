@@ -73,6 +73,7 @@ export class Sim {
       irDecode: () => (H.ir ? H.ir() : null),   // IrReceiver.decode(): the command of a received code, or null
       mpuRead: () => (H.mpu ? H.mpu() : { ax: 0, ay: 0, az: 0, gz: 0 }),
       stepTick: (dir) => { if (H.stepTick) H.stepTick(dir); },
+      bmpRead: () => (H.bmp ? H.bmp() : { t: 0, p: 0 }),
       dsRead: () => (H.ds18 ? H.ds18() : { ok: false }),
       dhtRead: () => (H.dht ? H.dht() : { ok: false }),
       touchRead: (pin) => Math.max(0, Math.round(H.touch ? H.touch(pin) : 0)),
@@ -1164,6 +1165,40 @@ export const PROGRAMS = {
       await rt.at(17); rt.println('counter-clockwise');
       await rt.at(18); await turn(-2048);
       await rt.at(19); await rt.delay(500);
+    }
+  },
+
+  async u3_bmp(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(4);
+    await rt.at(7); rt.serialBegin(9600);
+    await rt.at(8);
+    if (!rt.i2cProbe(0x76)) { await rt.at(9); rt.println('BMP280 not found!'); for (;;) await rt.delay(10); }
+    for (;;) {
+      await rt.at(14);
+      await rt.at(15); rt.print('Temperature = ');
+      await rt.at(16); const m = rt.bmpRead(); rt.print(m.t, 2);
+      await rt.at(17); rt.println(' *C');
+      await rt.at(18); rt.print('Pressure = ');
+      await rt.at(19); rt.print(m.p, 2);
+      await rt.at(20); rt.println(' hPa');
+      await rt.at(21); await rt.delay(1000);
+    }
+  },
+
+  async e_bmp(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(4);
+    await rt.at(7); rt.serialBegin(115200);
+    await rt.at(8);
+    if (!rt.i2cProbe(0x76)) { await rt.at(9); rt.println('BMP280 not found!'); for (;;) await rt.delay(10); }
+    for (;;) {
+      await rt.at(14);
+      await rt.at(15); rt.print('Temperature = ');
+      await rt.at(16); const m = rt.bmpRead(); rt.print(m.t, 2);
+      await rt.at(17); rt.println(' *C');
+      await rt.at(18); rt.print('Pressure = ');
+      await rt.at(19); rt.print(m.p, 2);
+      await rt.at(20); rt.println(' hPa');
+      await rt.at(21); await rt.delay(1000);
     }
   },
 
