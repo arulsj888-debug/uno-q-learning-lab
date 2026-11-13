@@ -1982,7 +1982,18 @@ class App {
         this.viewer.setPointer(e); this.viewer.raycaster.setFromCamera(this.viewer.pointer, this.viewer.camera);
         const hh = this.viewer.raycaster.intersectObject(o[prop], true); if (hh.length) { hit = { id: hid, object: hh[0].object, point: hh[0].point }; break; }
       }
+      // sensor and module boards win over wires drawn in front of them
+      if (!hit || !['joystick', 'encoder'].includes(hit.id)) for (const [bid, hid] of [['soil1', 'soil'], ['snd1', 'snd'], ['mpu1', 'mpu6050'], ['bmp1', 'bmp280'], ['kp1', 'keypad'], ['ir1', 'irrx'], ['ds1', 'ds18b20'], ['dht1', 'dht'], ['ldr1', 'ldr'], ['pir1', 'pir']]) {
+        const o = this.bench.get(bid); if (!o || !o.group) continue;
+        this.viewer.setPointer(e); this.viewer.raycaster.setFromCamera(this.viewer.pointer, this.viewer.camera);
+        const hh = this.viewer.raycaster.intersectObject(o.group, true); if (hh.length) { hit = { id: hid, object: hh[0].object, point: hh[0].point }; break; }
+      }
       if (!hit) return;
+      // a plain click on one of these parts still opens its information card (the handlers below stop the event)
+      if (['joystick', 'encoder', 'keypad', 'snd', 'soil', 'ldr', 'dht', 'ds18b20', 'bmp280', 'pir', 'irrx', 'mpu6050'].includes(hit.id)) {
+        const cx = e.clientX, cy = e.clientY, clickUp = ev => { window.removeEventListener('pointerup', clickUp, true); if (Math.hypot(ev.clientX - cx, ev.clientY - cy) < 5) this.viewer.onPick(hit, ev); };
+        window.addEventListener('pointerup', clickUp, true);
+      }
       if (hit.id === 'pushbutton') {
         e.stopPropagation(); this.viewer.controls.enabled = false; this.pressButton(true);
         const up = () => { this.pressButton(false); this.viewer.controls.enabled = true; window.removeEventListener('pointerup', up); };
