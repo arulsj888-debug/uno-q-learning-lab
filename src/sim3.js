@@ -201,7 +201,7 @@ export const PROGRAMS3 = {
     }
   },
 
-  async u3_gas(rt) {
+  async u3_gas(rt, opts = {}) {
     await rt.at(1); await rt.at(2); await rt.at(3);
     await rt.at(6); rt.pinMode('D2', 'INPUT');
     await rt.at(7); rt.serialBegin(9600);
@@ -212,7 +212,7 @@ export const PROGRAMS3 = {
       await rt.at(13); const level = rt.analogRead('A0');
       await rt.at(14); rt.print('level ');
       await rt.at(15); rt.print(level);
-      await rt.at(16); if (level > 450) rt.print('  GAS!');
+      await rt.at(16); if (level > (opts.thr || 450)) rt.print('  GAS!');
       await rt.at(17); rt.print('  DO=');
       await rt.at(18); rt.println(rt.digitalRead('D2'));
       await rt.at(19); await rt.delay(500);

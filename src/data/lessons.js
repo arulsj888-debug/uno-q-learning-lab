@@ -2283,3 +2283,7 @@ export const COMING_SOON = [];
 import { buildPorted, PORTED_MODULES } from './ported.js';
 LESSONS.push(...buildPorted(LESSONS.length + 1));
 Object.assign(MODULES, PORTED_MODULES);
+
+import { buildPorted2, PORTED2_MODULES } from './ported2.js';
+LESSONS.push(...buildPorted2(LESSONS.length + 1));
+Object.assign(MODULES, PORTED2_MODULES);

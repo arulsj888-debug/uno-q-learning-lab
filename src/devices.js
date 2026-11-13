@@ -84,7 +84,7 @@ class Swt extends Dev {
 const SEG_FONT = { '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg', '5': 'acdfg', '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg' };
 class Seg7 extends Dev {
   name = 'seg7'; lv = { a: 0, b: 0, c: 0, d: 0, e: 0, f: 0, g: 0, dp: 0 };
-  html() { return this.box('7-segment display', '<div id="sg-st" class="io-val">—</div>', 'A segment lights when its pin is HIGH (the common pin is at GND). Each segment has its own 220 Ω resistor.'); }
+  html() { return this.box('7-segment display', '<div id="sg-st" class="io-val">—</div>', 'A segment lights when its pin is HIGH (the common pin is at GND). Each segment has its own resistor.'); }
   reset() { for (const k in this.lv) this.lv[k] = 0; }
   halt() { this.reset(); }
   pin(pin, level) { const r = this.roleOf(pin); if (r && r in this.lv) this.lv[r] = level ? 1 : 0; }

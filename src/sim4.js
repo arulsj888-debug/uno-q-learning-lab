@@ -3,7 +3,7 @@
 import { PROGRAMS3 } from './sim3.js';
 
 const PIN_FNS = ['pinMode', 'digitalWrite', 'digitalRead', 'analogRead', 'analogWrite', 'attachInterrupt', 'detachInterrupt'];
-function remap(rt, map) {
+export function remap(rt, map) {
   return new Proxy(rt, { get(t, p) { return PIN_FNS.includes(p) ? (pin, ...a) => t[p](map[pin] || pin, ...a) : t[p]; } });
 }
 const E = { v: 3.3, adc: 4095 };

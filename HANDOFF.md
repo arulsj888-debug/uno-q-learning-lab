@@ -179,3 +179,7 @@ Description: <one short paragraph: what was done today and what comes next>
 - Files: `src/esp32/lessons4.js`, `src/esp32/code4.js` (listings derived from `code3.js` where the lines match; `CHECKS4` run by check_code), `src/sim4.js` (wrappers that remap R3 programs' pins + new programs), devices `btc`, `espnow`, `prefs` in `src/devices.js`; devices read `app.logicV` (3.3 V). Modules connect through the breadboard (module pin -> row a, board pin -> row b of the same column) because the ESP32 header has male pins.
 - Skipped on purpose: ESP32-CAM (other board), two-device I2C scanner (needs a shared socket), servo lesson, interrupts (ESP32 lesson 31 exists).
 - NOT verified: library and core-3.x calls (timerBegin/timerAlarm, ledcAttach, esp_now callback signature, BluetoothSerial, Preferences) from memory, not compiled; URLs not re-opened; ADC modelled linear (real ESP32 ADC is not).
+
+## UNO Q lessons 44-60 (17 lessons ported from UNO R3 40-59)
+- `src/data/ported2.js` builds them from `U3_LESSONS_3` with per-lesson fixes (3.3 V, 14-bit ADC, D20/D21 I2C, Serial1 on D0/D1 instead of SoftwareSerial, MQ-2 divider + DO on D8, HC-05 without divider, 100 ohm 7-segment resistors); programs `q3_*` in `src/sim5.js` wrap the R3 programs. Modules 14-17.
+- Not ported: interrupts, TimerOne, EEPROM (UNO Q equivalents not verified). Library support on the UNO Q Zephyr core is NOT verified for any of them; each lesson carries that warning.
