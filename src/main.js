@@ -49,6 +49,7 @@ const pinName = pin => { if (IS_E32) return /^G\d+$/.test(pin) ? 'GPIO' + pin.sl
 import { LOGO_ARRAY, SHADES_ARRAY, matrixCode } from './data/code.js';
 import { Sim, blinkCode, VREF } from './sim.js';
 import { Scope } from './scope.js';
+import { makeDevice } from './devices.js';
 
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -276,6 +277,7 @@ class App {
   async ensurePower() { if (!this.usbPlugged) await this.plug(true); }
 
   outputsOff() {
+    if (this.dvs) for (const d of this.dvs) d.halt();
     if (this.pw) { this.pw.up = false; this.pw.lit = false; delete this.pw.c; delete this.pw.rh; this.pwStage = 'idle'; this.pwRender && this.pwRender(); }
     this.uiq = [];
     this.phone = null;
@@ -357,6 +359,7 @@ class App {
     this.pirTick(Math.min(dt, 0.1));
     this.servoTick(Math.min(dt, 0.1));
     this.motorTick(Math.min(dt, 0.1));
+    if (this.dvs) for (const d of this.dvs) d.tick(Math.min(dt, 0.1));
     this.relayTick(Math.min(dt, 0.1));
     if (this.acc && this.acc.monitor.group.visible) this.acc.monitor.draw({ ...this.pios, mode: this.board.powered ? this.pios.mode : 'off' });
     this.pisensTick(); this.thermoTick(); this.bridgeTick(); this.bridge2Tick(); this.dashTick(); this.homeTick(); this.piwebTick(); this.pikeysTick(); this.wifiTick(); this.sleepTick(); this.bleTick(); this.ctlTick();
@@ -842,12 +845,13 @@ class App {
     if (w.includes('qbase')) h += `<div class="io-block"><div class="io-title">Base resistor <span class="io-note">(simulated)</span></div><div class="io-tools"><select id="q-r"><option value="220">220 Ω</option><option value="470">470 Ω</option><option value="1000">1 kΩ</option><option value="10000">10 kΩ</option><option value="100000">100 kΩ</option></select></div><div id="q-out" class="io-val"></div><div id="q-note" class="io-note"></div></div>`;
     if (w.includes('neolevel')) h += `<div class="io-block"><div class="io-title">Data line <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="neo-shift" class="hold small">Level shifter: absent</button></div><div id="neo-note" class="io-note"></div></div>`;
     if (w.includes('lcdaddr')) h += `<div class="io-block"><div class="io-title">LCD backpack <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="lcd-addr" class="hold small">Module address: 0x27</button></div><div id="lcd-note" class="io-note"></div></div>`;
+    this.dvs = []; for (const x of w) if (typeof x === 'string' && x.startsWith('dv:')) { const d = makeDevice(x.slice(3), this); if (d) { this.dvs.push(d); h += d.html(); } }
     if (w.includes('oledaddr')) h += `<div class="io-block"><div class="io-title">OLED module <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="oled-addr" class="hold small">Module address: 0x3C</button></div><div id="oled-note" class="io-note"></div></div>`;
     if (w.includes('joy')) h += `<div class="io-block"><div class="io-title">Joystick <span class="io-note">(simulated)</span></div><div class="throw"><label>X (left → right)</label><input id="jx" type="range" min="0" max="100" value="50"><b id="jx-v"></b></div><div class="throw"><label>Y (up ↔ down)</label><input id="jy" type="range" min="0" max="100" value="50"><b id="jy-v"></b></div><button id="jsw" class="hold">Hold to press the stick</button><div class="io-note">The sliders move the stick; pressing closes the switch under it.</div></div>`;
     if (w.includes('enc')) h += `<div class="io-block"><div class="io-title">Rotary encoder <span class="io-note">(simulated)</span></div><div class="io-tools"><button id="enc-l" class="small">◀ turn</button><button id="enc-r" class="small">turn ▶</button><button id="enc-sw" class="hold small">Hold to press the knob</button></div><div id="enc-st" class="io-val"></div><div class="io-note">One press = one click of the knob (four steps of the CLK / DT pattern).</div></div>`;
     if (w.includes('sleep')) h += `<div class="io-block pirstat tight"><div><span>ESP32</span><b id="sl-st">—</b></div><div class="arrow">→</div><div><span>Wake-up in</span><b id="sl-t">—</b></div><div class="arrow">→</div><div><span>LED on GPIO16</span><b id="sl-led">—</b></div></div><div class="io-note">In deep sleep only the RTC controller, RTC peripherals and RTC memory stay powered.</div>`;
     if (w.includes('touch')) h += `<div class="io-block"><div class="io-title">Touch pad: the wire on GPIO4 (T0)</div><button id="tch" class="hold">Touch the wire</button><div id="tch-state" class="io-val">Not touched</div><div class="io-note">touchRead() values are illustrative: your board and wire will give different numbers.</div></div>`;
-    if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on ${IS_PI ? 'GPIO2 (pin 3)' : IS_E32 ? 'GPIO17' : 'D4'}</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → D4 reads HIGH (pull-up)</div></div>`;
+    if (w.includes('button')) h += `<div class="io-block"><div class="io-title">Push button on ${IS_PI ? 'GPIO2 (pin 3)' : IS_E32 ? 'GPIO17' : IS_U3 ? this.btnPin() : 'D4'}</div><button id="hold" class="hold">Hold to press</button><div class="io-note">or click &amp; hold the button in the 3D view</div><div id="btn-state" class="io-val">Released → ${IS_U3 ? this.btnPin() : 'D4'} reads HIGH (pull-up)</div></div>`;
     if (w.includes('light')) h += `<div class="io-block"><div class="io-title">Light on the sensor <span class="io-note">(simulated)</span></div><input id="lux" type="range" min="0" max="1000" value="${Math.round(this.luxToSlider(this.lux))}"><div class="io-tools">${[['Dark', 0.01], ['Dim', 10], ['Room light', 300], ['Torch', 2000]].map(([t, v]) => `<button class="lvl" data-lux="${v}">${t}</button>`).join('')}</div><div id="lux-val" class="io-val"></div></div>`;
     if (w.includes('temp')) h += `<div class="io-block"><div class="io-title">Temperature around the TMP36 <span class="io-note">(simulated)</span></div><input id="tempc" type="range" min="-40" max="125" step="0.5" value="${this.tempC}"><div id="temp-val" class="io-val"></div></div>`;
     if (w.includes('distance')) h += `<div class="io-block"><div class="io-title">Obstacle in front of the sensor <span class="io-note">(simulated)</span></div><input id="dist" type="range" min="2" max="400" step="0.5" value="${this.distCm}"><div class="io-tools">${[5, 20, 40, 100, 250, 400].map(v => `<button class="lvl" data-dist="${v}">${v} cm</button>`).join('')}</div><div id="dist-val" class="io-val"></div><div class="io-note">or drag the obstacle in the 3D view</div></div><div class="io-block"><div class="io-title">Timing (HC-SR04 datasheet) · animation slowed down</div><canvas id="sonar-timing" width="560" height="112"></canvas></div>`;
@@ -904,6 +908,7 @@ class App {
     if (IS_E32) h = h.replace(/D4/g, 'GPIO17').replace(/D5/g, 'GPIO16').replace(/Pin D(\d+)/g, 'Pin GPIO$1').replace(/\(D(\d+)/g, '(GPIO$1').replace(/\bD(\d+)\b/g, 'GPIO$1');
     if (IS_U3) h = h.replace(/Pin D(\d+)/g, 'Pin $1').replace(/\(D(\d+)/g, '($1').replace(/\bD(\d+)\b/g, 'pin $1');
     io.innerHTML = h;
+    if (this.dvs) for (const d of this.dvs) d.bind();
     if ($('#tch')) { const t = $('#tch'), set = d => { this.touchDown = d; const s = $('#tch-state'); if (s) s.innerHTML = d ? '<b class="lo">Touched</b> → reading drops below the threshold' : 'Not touched'; }; set(false); t.addEventListener('pointerdown', e => { e.preventDefault(); set(true); }); t.addEventListener('pointerup', () => set(false)); t.addEventListener('pointerleave', () => set(false)); }
     if ($('#hold')) {
       const hold = $('#hold');
@@ -1303,12 +1308,14 @@ class App {
   }
 
   // ------------------------------------------------------------------ inputs
+  btnPin() { const L = this.lesson; if (IS_U3 && L && L.io) { const k = Object.keys(L.io).find(p => L.io[p].kind === 'button'); if (k) return 'pin ' + k.slice(1); } return BTN_PIN; }
   pressButton(down) {
     const b = this.bench.get('btn1') || (this.bench.tray || []).map(t => t.obj).find(o => o.setPressed);
     if (b && b.setPressed) b.setPressed(down);
     this.buttonDown = down;
+    if (this.dvs) for (const d of this.dvs) d.button(down);
     const s = $('#btn-state');
-    if (s) s.innerHTML = IS_PI ? (down ? '<b class="lo">Pressed</b> → GPIO2 connected to GND → LOW → is_pressed = True' : 'Released → GPIO2 reads HIGH (pull-up) → is_pressed = False') : down ? `<b class="lo">Pressed</b> → ${BTN_PIN} connected to GND → reads LOW` : `Released → ${BTN_PIN} reads HIGH (pull-up)`;
+    if (s) s.innerHTML = IS_PI ? (down ? '<b class="lo">Pressed</b> → GPIO2 connected to GND → LOW → is_pressed = True' : 'Released → GPIO2 reads HIGH (pull-up) → is_pressed = False') : down ? `<b class="lo">Pressed</b> → ${this.btnPin()} connected to GND → reads LOW` : `Released → ${this.btnPin()} reads HIGH (pull-up)`;
   }
   // ---- light sensor model: typical GL5528 (datasheet: 10–20 kΩ at 10 lux, γ = 0.6, dark ≥ 1 MΩ) — 15 kΩ at 10 lux
   ldrOhms(lux = this.lux) { return 15000 * Math.pow(Math.max(lux, 0.001) / 10, -0.6); }
@@ -2121,6 +2128,7 @@ class App {
       tone: (pin, f, ms) => this.onTone(pin, f, ms),
       noTone: pin => this.onNoTone(pin),
       read: (pin, mode) => {
+        if (this.dvs) for (const d of this.dvs) { const r = d.read(pin, mode); if (r !== undefined) return r; }
         const io = this.ioFor(pin);
         if (io && io.kind === 'enc' && this.wired(io)) { const ph = (this.encPh || 0) & 3; return io.role === 'clk' ? (ph === 1 || ph === 2 ? 0 : 1) : io.role === 'dt' ? (ph === 2 || ph === 3 ? 0 : 1) : (this.encSw ? 0 : 1); }
         if (io && io.kind === 'joysw' && this.wired(io)) return this.joySw ? 0 : 1;
@@ -2130,6 +2138,7 @@ class App {
         return Math.random() < 0.5 ? 0 : 1;      // an open input without pull-up floats
       },
       analog: pin => {
+        if (this.dvs) for (const d of this.dvs) { const r = d.analog(pin); if (r !== undefined) return r; }
         const io = this.ioFor(pin);
         if (io && io.kind === 'joyax' && this.wired(io)) return (this.joyPos ? this.joyPos[io.ax] : 0.5) * LOGIC_V;
         if (io && io.kind === 'pot' && this.wired(io)) return this.knobValue() * LOGIC_V;
@@ -2141,6 +2150,7 @@ class App {
       },
       matrix: vals => this.board.setMatrix(vals),
       servo: (pin, us, angle) => this.onServo(pin, us, angle),
+      dev: (name, op, ...a) => { const d = this.dvs && this.dvs.find(x => x.name === name); return d ? d.call(op, ...a) : undefined; },
       thermo: () => {
         const ok = this.thermoOk();
         if (!ok) return { found: false };
@@ -2223,6 +2233,7 @@ class App {
   ledFor(pin) { const io = this.ioFor(pin); return io && io.kind === 'led' ? { io, led: this.bench.get(io.item) } : null; }
 
   onDigital(pin, level) {
+    if (this.dvs) for (const d of this.dvs) d.pin(pin, level);
     { const qo = this.ioFor(pin); if (qo && (qo.kind === 'npn' || qo.kind === 'mosfet')) this.qPin = level ? 1 : 0; if (qo && qo.kind === 'stepper' && this.stp) this.stp.lv[qo.idx - 1] = level ? 1 : 0; }
     { const rg = this.ioFor(pin); if (rg && rg.kind === 'rgb') this.rgbSet(rg, level ? 1 : 0); }
     if (IS_E32 && pin === 'G2') { this.br.led = !!level; if (this.board.powered) this.board.setLed('blue', !!level); }   // the blue LED is on GPIO2 (active high)
@@ -2251,6 +2262,7 @@ class App {
   }
 
   onPwm(pin, duty, raw) {
+    if (this.dvs) for (const d of this.dvs) { if (d.pwm) d.pwm(pin, duty); }
     { const rg = this.ioFor(pin); if (rg && rg.kind === 'rgb') this.rgbSet(rg, duty); }
     { const mio = this.motorIo(); if (mio && pin === mio.en && this.mot) this.mot.en = duty; }
     const L = this.ledFor(pin);
@@ -2300,6 +2312,7 @@ class App {
       else if (key === 'shades') Object.assign(opts, { frame: SHADES_ARRAY, bits: 3 });
       else Object.assign(opts, { live: true, bits: this.editorExport().bits, getFrame: () => this.editorExport().arr, getBits: () => this.editorExport().bits });
     }
+    if (this.dvs) for (const d of this.dvs) d.reset();
     this.sim.run(L.program, opts);
   }
 

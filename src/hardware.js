@@ -2067,6 +2067,106 @@ export class SHT31Breakout {
   }
 }
 
+// ---------------------------------------------------------------- generic breakout boards (UNO R3 lessons 40-59): a coloured PCB with a pin header along the front edge
+// (and a second row along the back edge for the A4988 / nRF24L01), silkscreen pin names and a few recognisable parts on top.
+const BOX = (g, w, h, d, x, y, z, color, rough = 0.5, metal = 0) => { const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 1, Math.min(0.25, h / 3)), new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal })); m.position.set(x, y, z); g.add(m); return m; };
+const CYL = (g, r, h, x, y, z, color, rough = 0.5, metal = 0) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 32), new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal })); m.position.set(x, y, z); g.add(m); return m; };
+export const BREAKOUTS = {
+  mod_max7219: { title: 'MAX7219 8x8', names: ['VCC', 'GND', 'DIN', 'CS', 'CLK'], w: 36, d: 38, color: 0x1a7a3c, edge: 0x0f4a24, extras(g, o) {
+    BOX(g, 30, 7, 30, 0, 6.2, -2, 0x141416, 0.45);
+    o.leds = []; const pitch = 3.35;
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) { const m = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.5, 14), new THREE.MeshStandardMaterial({ color: 0x4a2222, emissive: 0x000000, roughness: 0.4 })); m.position.set((c - 3.5) * pitch, 9.8, (r - 3.5) * pitch - 2); g.add(m); o.leds.push(m); }
+    BOX(g, 9, 1.2, 6, 11, 3.6, 14, 0x15151a, 0.5); } },
+  mod_tft: { title: 'TFT 1.8 inch', names: ['GND', 'VCC', 'SCK', 'SDA', 'RES', 'DC', 'CS', 'BL'], w: 34, d: 56, color: 0xb11d1d, edge: 0x6e1010, extras(g, o) {
+    BOX(g, 30, 3.6, 40, 0, 4.4, -5.5, 0x0e0e10, 0.4);
+    o.cv = document.createElement('canvas'); o.cv.width = 128; o.cv.height = 160; o.tex = new THREE.CanvasTexture(o.cv); o.tex.colorSpace = THREE.SRGBColorSpace; o.tex.magFilter = THREE.NearestFilter;
+    const c = o.cv.getContext('2d'); c.fillStyle = '#050505'; c.fillRect(0, 0, 128, 160);
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(27.6, 34.5), new THREE.MeshBasicMaterial({ map: o.tex })); scr.rotation.x = -Math.PI / 2; scr.position.set(0, 6.3, -5.5); g.add(scr); } },
+  mod_mq2: { title: 'MQ-2', names: ['VCC', 'GND', 'DO', 'AO'], w: 34, d: 24, color: 0x1d4fb8, edge: 0x14264a, extras(g) {
+    CYL(g, 8.4, 9, -4.5, 7.6, -1.5, 0xb8bcc2, 0.35, 0.8); CYL(g, 7.2, 0.5, -4.5, 12.3, -1.5, 0x6a6e74, 0.5, 0.6);
+    BOX(g, 7, 7, 5, 11.5, 5.6, -5, 0x1f6fd0, 0.4); BOX(g, 5, 1, 4, 11.5, 4, 2.5, 0x15151a, 0.5); } },
+  mod_flame: { title: 'FLAME', names: ['AO', 'GND', 'VCC', 'DO'], w: 34, d: 18, color: 0x1d4fb8, edge: 0x14264a, extras(g) {
+    const m = CYL(g, 2.5, 6.5, -9, 6.7, -1.5, 0x15151a, 0.35); m.scale.set(1, 1, 0.7);
+    BOX(g, 7, 7, 5, 6, 5.6, -3.5, 0x1f6fd0, 0.4); BOX(g, 5, 1, 4, 12, 4, 2, 0x15151a, 0.5); } },
+  mod_rfid: { title: 'RC522', names: ['3V3', 'RST', 'GND', 'IRQ', 'MISO', 'MOSI', 'SCK', 'SDA'], w: 60, d: 39, color: 0x1d4fb8, edge: 0x14264a, extras(g) {
+    const ant = canvasTex(512, 320, (c, w, h) => { c.clearRect(0, 0, w, h); c.strokeStyle = '#c9a44c'; c.lineWidth = 7; for (let i = 0; i < 4; i++) c.strokeRect(80 + i * 22, 30 + i * 22, w - 160 - i * 44, h - 120 - i * 44); });
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(40, 25), new THREE.MeshStandardMaterial({ map: ant, transparent: true, roughness: 0.5 })); p.rotation.x = -Math.PI / 2; p.position.set(2, 3.45, -4.5); g.add(p);
+    BOX(g, 5.5, 1, 5.5, -21, 3.7, 4, 0x151517, 0.5); BOX(g, 3, 1.4, 3, 14, 3.9, 8, 0xb9bcc2, 0.4, 0.8); } },
+  mod_gps: { title: 'NEO-6M GPS', names: ['VCC', 'RX', 'TX', 'GND'], w: 36, d: 28, color: 0x1d4fb8, edge: 0x14264a, extras(g) {
+    BOX(g, 22, 5, 22, -5, 6, -1.5, 0xd9d2b8, 0.55); BOX(g, 19, 0.5, 19, -5, 8.7, -1.5, 0xc2b99a, 0.7);
+    BOX(g, 6, 1, 6, 11, 3.7, -5, 0x151517, 0.5); CYL(g, 2.6, 2, 12, 3.9, 4, 0x9c8f4a, 0.4, 0.7); } },
+  mod_rtc: { title: 'DS3231', names: ['32K', 'SQW', 'SCL', 'SDA', 'VCC', 'GND'], w: 38, d: 22, color: 0x1d4fb8, edge: 0x14264a, extras(g) {
+    CYL(g, 10, 3.2, 6.5, 5, -1, 0xc4c7cc, 0.3, 0.85); CYL(g, 9.2, 0.4, 6.5, 6.7, -1, 0xaeb2b8, 0.4, 0.8);
+    BOX(g, 10, 2, 7.5, -12, 4, -3, 0x151517, 0.5); BOX(g, 5, 1.2, 4, -12, 3.7, 5, 0x15151a, 0.5); } },
+  mod_sd: { title: 'microSD', names: ['GND', 'VCC', 'MISO', 'MOSI', 'SCK', 'CS'], w: 42, d: 26, color: 0x1d4fb8, edge: 0x14264a, extras(g) {
+    BOX(g, 15, 2.2, 14, -12, 4.3, -3.5, 0xc4c7cc, 0.3, 0.85); BOX(g, 9, 1.4, 14, -3, 3.9, -3.5, 0x2a2a2e, 0.5); BOX(g, 5.5, 1, 5.5, 11, 3.7, 0, 0x151517, 0.5); BOX(g, 5.5, 1, 5.5, 18, 3.7, 0, 0x151517, 0.5); } },
+  mod_a4988: { title: 'A4988', names: ['ENABLE', 'MS1', 'MS2', 'MS3', 'RESET', 'SLEEP', 'STEP', 'DIR'], back: ['VMOT', 'GND2', '2B', '2A', '1A', '1B', 'VDD', 'GND'], w: 22, d: 17, color: 0xc41e1e, edge: 0x7a1010, extras(g) {
+    BOX(g, 8, 1.8, 8, 0, 4, 0, 0xa8acb2, 0.35, 0.8); BOX(g, 4.5, 4, 4.5, -7, 5, -1.8, 0x1f6fd0, 0.4); CYL(g, 2.2, 4, 7, 5, -2.2, 0x15151a, 0.5); } },
+  mod_hc05: { title: 'HC-05', names: ['STATE', 'RXD', 'TXD', 'GND', 'VCC', 'EN'], w: 38, d: 18, color: 0x1d4fb8, edge: 0x14264a, extras(g) {
+    BOX(g, 28, 2.6, 13, 4, 4.5, -1.2, 0xb8bcc2, 0.3, 0.85); BOX(g, 3, 1.2, 3, -14, 3.7, -3, 0xd7a31f, 0.5); } },
+  mod_nrf24: { title: 'nRF24L01+', names: ['GND', 'CE', 'SCK', 'MISO'], back: ['VCC', 'CSN', 'MOSI', 'IRQ'], w: 30, d: 16, color: 0x1d4fb8, edge: 0x14264a, extras(g) {
+    BOX(g, 5, 1, 5, -3, 3.7, 0, 0x151517, 0.5); BOX(g, 12, 0.5, 1.2, 9, 3.45, -3, 0xc9a44c, 0.4, 0.7); BOX(g, 3, 1, 3, 1, 3.7, -5, 0xb8bcc2, 0.4, 0.8); } },
+  mod_peer: { title: 'ARDUINO (BOARD B)', names: ['RX', 'TX', 'GND'], w: 54, d: 26, color: 0x00797f, edge: 0x004f54, extras(g) {
+    BOX(g, 12, 6, 11, -22, 6, -3, 0xc4c7cc, 0.3, 0.85); BOX(g, 9, 1.2, 9, 2, 3.8, -2, 0x151517, 0.5); BOX(g, 5, 1, 5, 14, 3.7, 0, 0xb8bcc2, 0.4, 0.8); } },
+};
+export class BreakoutBoard {
+  constructor(model) {
+    const cfg = BREAKOUTS[model]; this.model = model; this.cfg = cfg;
+    const g = this.group = new THREE.Group(); this.hw = model;
+    const { w, d } = cfg;
+    const edge = new THREE.MeshStandardMaterial({ color: cfg.edge, roughness: 0.7 }), mask = new THREE.MeshStandardMaterial({ color: cfg.color, roughness: 0.45 });
+    const pcb = new THREE.Mesh(new THREE.BoxGeometry(w, 1.4, d), [edge, edge, mask, mask, edge, edge]); pcb.position.set(0, 2.6, 0); g.add(pcb);
+    const PX = 16, nn = cfg.names.length, zf = d / 2 - 1.8, zb = -d / 2 + 1.8;
+    const tex = canvasTex(w * PX, d * PX, (c, tw, th) => {
+      c.clearRect(0, 0, tw, th); c.strokeStyle = 'rgba(245,245,240,0.8)'; c.lineWidth = 2; c.strokeRect(5, 5, tw - 10, th - 10);
+      silk(c, cfg.title, tw / 2, th * 0.5, Math.min(28, Math.max(15, tw / cfg.title.length / 1.4)), 'rgba(243,243,238,0.9)', 'center', 600);
+      cfg.names.forEach((n, i) => silk(c, n, (w / 2 + (i - (nn - 1) / 2) * 2.54) * PX, (zf + d / 2 - 3.1) * PX, 10, '#f3f3ee', 'center', 600));
+      if (cfg.back) cfg.back.forEach((n, i) => silk(c, n, (w / 2 + (i - (cfg.back.length - 1) / 2) * 2.54) * PX, (zb + d / 2 + 3.1) * PX, 10, '#f3f3ee', 'center', 600));
+    });
+    const lab = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5 })); lab.rotation.x = -Math.PI / 2; lab.position.set(0, 3.32, 0); g.add(lab);
+    if (cfg.extras) cfg.extras(g, this);
+    const y0 = 4.3; this.pinX = {}; this.pinZ = {}; this.pinTop = y0 + 8.2;
+    const row = (names, z) => {
+      const strip = new THREE.Mesh(new RoundedBoxGeometry(names.length * 2.54, 2.5, 2.5, 1, 0.15), M.blackPlastic); strip.position.set(0, y0, z); g.add(strip);
+      names.forEach((n, i) => { const x = (i - (names.length - 1) / 2) * 2.54; this.pinX[n] = x; this.pinZ[n] = z; const p = new THREE.Mesh(new THREE.BoxGeometry(0.64, 11, 0.64), M.gold); p.position.set(x, y0 + 4.2, z); g.add(p); });
+    };
+    row(cfg.names, zf); if (cfg.back) row(cfg.back, zb);
+    tagHW(g, model);
+  }
+  pin(name) {
+    this.group.updateMatrixWorld(true);
+    return { pos: this.group.localToWorld(new THREE.Vector3(this.pinX[name], this.pinTop, this.pinZ[name])), dir: new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion())) };
+  }
+  /** 8x8 matrix module: 64 brightness values 0..1 (row-major, column 0 on the left) */
+  setMatrix(lv) { if (!this.leds) return; this.leds.forEach((m, i) => { const k = lv ? Math.max(0, Math.min(1, lv[i] || 0)) : 0; m.material.color.setRGB(0.29 + 0.65 * k, 0.13 - 0.05 * k, 0.13 - 0.07 * k); m.material.emissive.setRGB(1.5 * k, 0.04 * k, 0.02 * k); }); }
+  /** TFT module: copy a 128x160 canvas onto the screen (null = dark) */
+  setScreen(cv) { if (!this.cv) return; const c = this.cv.getContext('2d'); if (cv) c.drawImage(cv, 0, 0); else { c.fillStyle = '#050505'; c.fillRect(0, 0, 128, 160); } this.tex.needsUpdate = true; }
+}
+
+// NEMA 17 bipolar stepper motor (42.3 mm square flange, 22 mm pilot, 5 mm shaft): the shaft turns with setAngle(degrees)
+export class Nema17 {
+  constructor() {
+    const g = this.group = new THREE.Group(); this.hw = 'nema17';
+    const steel = new THREE.MeshStandardMaterial({ color: 0x2b2d31, roughness: 0.55, metalness: 0.5 }), alu = new THREE.MeshStandardMaterial({ color: 0xb9bcc2, roughness: 0.35, metalness: 0.85 });
+    const H = 40, S = 42.3;
+    const body = new THREE.Mesh(new RoundedBoxGeometry(S, H, S, 2, 1.2), steel); body.position.y = H / 2 + 3; g.add(body);
+    for (const y of [3 + 5, 3 + H - 5]) { const c = new THREE.Mesh(new RoundedBoxGeometry(S + 0.6, 10, S + 0.6, 2, 1), alu); c.position.y = y; g.add(c); }   // front and rear end caps
+    const boss = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 2, 40), alu); boss.position.y = 3 + H + 1; g.add(boss);
+    const rot = this.rot = new THREE.Group(); rot.position.y = 3 + H; g.add(rot);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 24, 28), M.steel); shaft.position.y = 12; rot.add(shaft);
+    const flat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 18, 5.2), new THREE.MeshStandardMaterial({ color: 0x8e9196, metalness: 0.9, roughness: 0.3 })); flat.position.set(2.2, 15, 0); rot.add(flat);
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(14, 1.6, 3), new THREE.MeshStandardMaterial({ color: 0xe8541c, roughness: 0.5 })); mark.position.set(5, 21, 0); rot.add(mark);   // an arm so the angle can be seen
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const h = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, 0.6, 16), new THREE.MeshStandardMaterial({ color: 0x0a0a0b })); h.position.set(sx * 15.5, 3 + H + 0.3, sz * 15.5); g.add(h); }
+    // four-wire cable, ending in a connector at the back
+    const conn = new THREE.Mesh(new RoundedBoxGeometry(10.5, 6, 5, 1, 0.4), new THREE.MeshStandardMaterial({ color: 0xe8e4d6, roughness: 0.6 })); conn.position.set(0, 3 + 12, S / 2 + 6); g.add(conn);
+    this.pins = {}; [['A1', -3.81], ['A2', -1.27], ['B1', 1.27], ['B2', 3.81]].forEach(([n, x]) => { this.pins[n] = new THREE.Vector3(x, 3 + 16, S / 2 + 6); const p = new THREE.Mesh(new THREE.BoxGeometry(0.6, 6, 0.6), M.gold); p.position.set(x, 3 + 17, S / 2 + 6); g.add(p); });
+    tagHW(g, 'nema17');
+  }
+  pin(name) { this.group.updateMatrixWorld(true); return { pos: this.group.localToWorld(this.pins[name].clone()), dir: new THREE.Vector3(0, 1, 0).applyQuaternion(this.group.getWorldQuaternion(new THREE.Quaternion())) }; }
+  setAngle(deg) { this.rot.rotation.y = -deg * Math.PI / 180; }
+  spin() { /* a stepper has no free spinning: the angle is set by setAngle() */ }
+}
+
 export const HW_INFO = {
   usbcable: {
     name: 'USB-C® cable', tag: 'Power + data',
@@ -2569,5 +2669,157 @@ export const HW_INFO = {
     src: 'General electronics practice',
   },
 };
+
+// information cards of the breakout boards of UNO R3 lessons 40-59 (facts from the datasheets named in `src`; seller-listing values are marked as such)
+Object.assign(HW_INFO, {
+  mod_max7219: {
+    name: 'MAX7219 8×8 LED matrix module', tag: 'Sixty-four LEDs from three wires',
+    summary: 'A MAX7219 chip switches 64 LEDs on and off by itself. The Arduino only sends a short serial message when the picture changes: DIN carries the bits, CLK clocks them in and CS (also called LOAD) tells the chip the message is complete.',
+    points: [
+      'Datasheet: supply 4.0 to 5.5 V, serial clock up to 10 MHz, one message is 16 bits: 4 unused bits, 4 address bits, 8 data bits, most significant bit first. The chip takes the message when CS goes from LOW to HIGH.',
+      'After power-up all registers are reset, the display is blank and the chip is in shutdown mode: you must write the shutdown register to turn the display on.',
+      'The eight rows are the registers 1 to 8 (digit registers); each data bit is one LED of the row. Other registers: decode mode (9), intensity (10), scan limit (11), shutdown (12), display test (15).',
+      'The pin order printed on your module may differ: this one shows VCC, GND, DIN, CS, CLK. Which end of the matrix is “row 0” depends on how the module is built.',
+    ],
+    src: 'MAX7219/MAX7221 datasheet (Analog Devices); LedControl library by Eberhard Fahle',
+  },
+  mod_tft: {
+    name: '1.8 inch TFT display module (ST7735, 128×160)', tag: 'A small colour screen on an SPI bus',
+    summary: 'A colour LCD with an ST7735 controller. The Arduino sends commands and colour values over SPI; the controller keeps the picture in its own memory and the display stays lit without further work.',
+    points: [
+      'Resolution 128 × 160 pixels, 16-bit colour (RGB565: 5 bits red, 6 green, 5 blue), as used by the Adafruit ST7735 library.',
+      'Besides the SPI wires (SCK, SDA = MOSI) the module needs CS, DC (data or command) and RES (reset) pins and a backlight pin (BL).',
+      'The controller chip works at 3.3 V logic. Some modules have a regulator and level shifters, others do not: read the page of your module before you connect 5 V signals.',
+      'Pin names and order differ between makers; this drawing shows one common order (GND, VCC, SCK, SDA, RES, DC, CS, BL).',
+    ],
+    src: 'ST7735 controller datasheet (Sitronix); Adafruit ST7735 and GFX library guides',
+  },
+  mod_mq2: {
+    name: 'MQ-2 gas sensor module', tag: 'Smoke and combustible gas',
+    summary: 'A tin-oxide element, heated by a small coil, whose resistance drops when combustible gases or smoke are in the air. The module adds a load resistor, an analog output (AO) and a comparator with a trimmer (DO switches when the level passes the trimmer setting).',
+    points: [
+      'The heater needs 5 V and the sensor must warm up before the readings are stable (the maker’s datasheet states the heating and pre-heat conditions). The metal mesh gets hot.',
+      'The sensor reacts to LPG, propane, methane, hydrogen, alcohol and smoke, and it cannot tell them apart.',
+      'AO is a relative level. Without calibration against a known gas it is not a value in ppm, and this part is not a safety alarm.',
+      'On most modules a higher gas level gives a higher AO voltage; check yours, because it depends on how the module is wired.',
+    ],
+    src: 'MQ-2 datasheet (Hanwei Electronics); module listings',
+  },
+  mod_flame: {
+    name: 'Flame sensor module', tag: 'An infrared light detector with a comparator',
+    summary: 'An infrared photodiode that is most sensitive to the light of a flame, followed by a comparator (LM393) with a trimmer. DO switches when the infrared level passes the trimmer setting; AO gives the level itself.',
+    points: [
+      'Seller listings give a spectral range of about 760 to 1100 nm and a detection angle of about 60°; there is no manufacturer datasheet, so treat these as typical values.',
+      'Sunlight and many lamps also contain infrared light and can trigger it.',
+      'On most boards DO goes LOW when a flame is detected, but this depends on the board: check yours.',
+      'It does not measure temperature and it is not a fire alarm.',
+    ],
+    src: 'LM393 comparator datasheet; seller listings (no maker datasheet)',
+  },
+  mod_rfid: {
+    name: 'RC522 RFID reader (MFRC522)', tag: 'Reads contactless cards at 13.56 MHz',
+    summary: 'The NXP MFRC522 chip talks to MIFARE cards and tags (ISO/IEC 14443 A) with a printed antenna coil. The Arduino speaks to the chip over SPI and can read the card’s unique number (UID).',
+    points: [
+      'Datasheet: carrier frequency 13.56 MHz, supply 2.5 to 3.3 V: use the 3.3 V pin of the UNO, never 5 V.',
+      'SPI wires: SDA (this is the chip-select, SS), SCK, MOSI, MISO, plus RST. The IRQ pin is not used by the basic examples.',
+      'The reading distance is only a few centimetres.',
+      'A MIFARE Classic 1K card has a 4-byte UID; some cards have 7 or 10 bytes.',
+      'The chip’s logic is 3.3 V. Many tutorials connect the 5 V signals of the UNO directly; that is outside what the datasheet promises, and a level shifter is the safe choice.',
+    ],
+    src: 'MFRC522 datasheet (NXP); MFRC522 Arduino library (miguelbalboa)',
+  },
+  mod_gps: {
+    name: 'NEO-6M GPS module', tag: 'Position, speed and time from satellites',
+    summary: 'A u-blox NEO-6M receiver with a ceramic patch antenna. It sends text lines in the NMEA format over a serial (UART) connection, by default at 9600 baud, once per second.',
+    points: [
+      'u-blox NEO-6 data sheet: the default is NMEA at 9600 baud and a position update rate of 1 Hz (up to 5 Hz can be configured).',
+      'It needs a clear view of the sky. A first fix (cold start) takes tens of seconds or longer, and indoors it usually gets no fix at all.',
+      'Wiring is crossed: the module TX goes to an Arduino receive pin and the module RX to an Arduino transmit pin.',
+      'The chip is a 3.3 V part. The common boards add a regulator, and listings give a supply of about 3.3 to 5 V: check your board.',
+    ],
+    src: 'NEO-6 Data Sheet (u-blox); TinyGPS++ library',
+  },
+  mod_rtc: {
+    name: 'DS3231 real-time clock module', tag: 'A clock that keeps running without the Arduino',
+    summary: 'The DS3231 counts seconds, minutes, hours, date, month and year, and keeps counting from a coin cell when the Arduino is off. Its crystal is temperature-compensated.',
+    points: [
+      'Datasheet: accuracy ±2 ppm from 0 °C to +40 °C (about one minute per year). I²C address 0x68.',
+      'It also has a temperature sensor (resolution 0.25 °C) that you can read.',
+      'Many modules also carry a small EEPROM (AT24C32) at address 0x57.',
+      'Some boards have a charging circuit meant for a rechargeable cell. Check your board before you fit a non-rechargeable CR2032.',
+      'Address 0x68 is also the default address of the MPU6050, so the two cannot share one I²C bus without changing one address.',
+    ],
+    src: 'DS3231 datasheet (Analog Devices / Maxim); RTClib library (Adafruit)',
+  },
+  mod_sd: {
+    name: 'microSD card module (SPI)', tag: 'Files on a memory card',
+    summary: 'A card socket with the wiring for SPI. The Arduino SD library reads and writes ordinary files, so the card can be read on a computer afterwards.',
+    points: [
+      'The SD library supports FAT16 and FAT32 cards; file names use the old 8.3 format (for example LOG.CSV).',
+      'SPI pins of the UNO R3: MOSI 11, MISO 12, SCK 13. The chip-select pin is chosen in the sketch (the library examples use 4 for shields and 10 on the board itself).',
+      'A card works at 3.3 V. Modules with a regulator and level shifters accept the 5 V logic of the UNO; a bare socket does not.',
+      'Cards of 64 GB and more are formatted as exFAT by default and have to be reformatted to FAT32 for this library.',
+    ],
+    src: 'Arduino SD library reference; SD Association simplified specification',
+  },
+  mod_a4988: {
+    name: 'A4988 stepper motor driver', tag: 'Two control pins move a big stepper motor',
+    summary: 'The A4988 supplies the coil currents of a bipolar stepper motor. Every pulse on STEP moves the motor one step (or one microstep) and DIR sets the direction, so the Arduino never handles the motor current.',
+    points: [
+      'Pololu A4988 carrier: motor supply (VMOT) 8 to 35 V, logic supply (VDD) 3 to 5.5 V, about 1 A per coil without a heat sink and up to about 2 A with good cooling.',
+      'MS1, MS2, MS3 choose full, half, quarter, eighth or sixteenth steps.',
+      'The current limit is set with the small trimmer: I = VREF ÷ (8 × R sense). The sense resistor value depends on the board version: read yours.',
+      'Put at least 47 µF across VMOT and GND, close to the board. Never connect or disconnect the motor while the supply is on: it can destroy the driver.',
+      'RESET and SLEEP must not float; Pololu suggests connecting them together. ENABLE is active LOW.',
+    ],
+    src: 'A4988 datasheet (Allegro); Pololu A4988 carrier product page',
+  },
+  mod_hc05: {
+    name: 'HC-05 Bluetooth serial module', tag: 'A wireless serial cable',
+    summary: 'A classic Bluetooth (2.0) module with the serial port profile. Bytes sent from the Arduino to the module appear in a terminal app on a phone or computer, and the other way round.',
+    points: [
+      'Typical settings: 9600 baud in data mode, AT-command mode usually at 38400 baud (this varies with the firmware), default pairing code usually 1234. Read the sheet of your own module.',
+      'The RXD pin of the module is a 3.3 V input. Reduce the 5 V from an Arduino TX pin with a divider such as 1 kΩ and 2 kΩ.',
+      'Android phones and computers can use the serial port profile; iPhones do not support it (use a BLE module there).',
+      'The module draws noticeably more current while it pairs and talks than an LED does; the Arduino 5 V pin supplies it well.',
+    ],
+    src: 'HC-05 module documentation (maker data sheet, firmware dependent)',
+  },
+  mod_nrf24: {
+    name: 'nRF24L01+ radio module', tag: 'A 2.4 GHz radio between two boards',
+    summary: 'A low-power radio chip that talks to other nRF24L01 modules over SPI. It is not WiFi and not Bluetooth: it can only exchange small packets with another nRF24 module.',
+    points: [
+      'Nordic datasheet: supply 1.9 to 3.6 V (use the 3.3 V pin: 5 V destroys it); the digital inputs are rated 5 V tolerant.',
+      'Data rates 250 kbit/s, 1 Mbit/s and 2 Mbit/s; the frequency is 2400 MHz + channel number (channels 0 to 125).',
+      'A 10 µF capacitor close to the module between VCC and GND is common advice for stable operation.',
+      'Both modules need the same channel, data rate and address (a 5-byte pipe address) to hear each other.',
+    ],
+    src: 'nRF24L01+ product specification (Nordic Semiconductor); RF24 library (TMRh20)',
+  },
+  mod_peer: {
+    name: 'Second Arduino (board B)', tag: 'The other end of the serial cable',
+    summary: 'A second Arduino board running its own sketch. The two boards exchange text over a serial (UART) connection with three wires: your TX to its RX, your RX to its TX, and a common GND.',
+    points: [
+      'This picture is a simplified drawing of a second board, not a model of a specific one.',
+      'Both boards must use the same baud rate, and both must share GND.',
+      'Two boards at 5 V logic (like two UNO R3) can be connected directly. A 3.3 V board needs a level shifter on its RX pin.',
+    ],
+    src: 'Arduino SoftwareSerial and Serial reference',
+  },
+});
+
+
+Object.assign(HW_INFO, {
+  nema17: {
+    name: 'NEMA 17 stepper motor', tag: 'Turns in exact steps of 1.8°',
+    summary: 'A bipolar stepper motor with two coils. A driver such as the A4988 energises the coils in a sequence, and every step turns the shaft by a fixed angle. NEMA 17 describes the 42.3 mm (1.67 inch) square flange.',
+    points: [
+      'The common NEMA 17 motors have 1.8° per step: 200 full steps per revolution. Current, voltage, resistance and torque differ from model to model: read the datasheet of yours.',
+      'Four wires belong to two coils (A and B). Find the pairs with a multimeter: two wires of one coil show a low resistance, wires of different coils show none.',
+      'The orange arm on the shaft in this picture only shows the angle; it is not part of a real motor.',
+    ],
+    src: 'NEMA ICS 16 flange size; general stepper motor practice (Pololu stepper motor guide)',
+  },
+});
 
 export { DESK_Y };

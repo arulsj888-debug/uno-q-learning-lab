@@ -23,7 +23,7 @@ let PINS = UQ_PINS, PI = false, U3 = false, E32 = false, SUP = '3V3';    // SUP 
 PINS.add('QWIIC');                                         // the UNO Q Qwiic connector (I2C4 / Wire1)
 const HOLE = /^([a-j])(\d{1,2})$/;
 const isHole = r => HOLE.test(r);
-const MOD = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2|QA|QB|SDA|SCL|DIN|IN1|IN2|IN3|IN4|AOUT|AO|R1|R2|R3|R4|C1|C2|C3|C4)$/;          // pin of an off-board module, e.g. pir1.OUT
+const MOD = /^(\w+)\.([A-Za-z0-9_]+)$/;          // pin of an off-board module, e.g. pir1.OUT
 const isMod = r => MOD.test(r);
 const isWire = d => d.type === 'wire' || d.type === 'fwire' || d.type === 'lead' || d.type === 'qwiic';
 const node = e => (isHole(e) ? colNet(e) : isMod(e) ? e : 'PIN:' + sigOf(e));
@@ -47,6 +47,9 @@ function legs(d) {
     case 'joystick': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.VCC']: `${d.row}${d.col + 1}`, [d.id + '.VRX']: `${d.row}${d.col + 2}`, [d.id + '.VRY']: `${d.row}${d.col + 3}`, [d.id + '.SW']: `${d.row}${d.col + 4}` };
     case 'encoder': return { [d.id + '.CLK']: `${d.row}${d.col}`, [d.id + '.DT']: `${d.row}${d.col + 1}`, [d.id + '.SW']: `${d.row}${d.col + 2}`, [d.id + '.VCC']: `${d.row}${d.col + 3}`, [d.id + '.GND']: `${d.row}${d.col + 4}` };
     case 'diode': return { [d.id + '.A']: d.a, [d.id + '.K']: d.k };
+    case 'cap': return { [d.id + '.+']: d.a, [d.id + '.-']: d.k };
+    case 'reed': case 'tilt': return { [d.id + '.1']: d.a, [d.id + '.2']: d.k };
+    case 'slidesw': return { [d.id + '.1']: `${d.row}${d.col}`, [d.id + '.C']: `${d.row}${d.col + 1}`, [d.id + '.2']: `${d.row}${d.col + 2}` };
     case 'ds18b20': return { [d.id + '.GND']: `${d.row}${d.col}`, [d.id + '.DQ']: `${d.row}${d.col + 1}`, [d.id + '.VDD']: `${d.row}${d.col + 2}` };
     case 'irrx': return { [d.id + '.OUT']: `${d.row}${d.col}`, [d.id + '.GND']: `${d.row}${d.col + 1}`, [d.id + '.VS']: `${d.row}${d.col + 2}` };
     case 'mosfet': return { [d.id + '.G']: `${d.row}${d.col}`, [d.id + '.D']: `${d.row}${d.col + 1}`, [d.id + '.S']: `${d.row}${d.col + 2}` };
@@ -85,7 +88,7 @@ for (const L of list) {
     const ends = isWire(d) ? [d.from, d.to] : Object.values(legs(d));
     for (const e of ends) {
       if (isHole(e)) { const [, , c] = HOLE.exec(e); if (+c < 1 || +c > 30) bad(L, `${d.id}: hole ${e} out of range`); (used[e] ??= []).push(d.id); }
-      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo', 'pixels', 'lcd1602', 'oled', 'neopixel', 'mpu6050', 'bmp280', 'soil', 'snd', 'keypad', 'stepper'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
+      else if (isMod(e)) { const [, pid] = MOD.exec(e); if (!byId[pid] || !['pir', 'battery', 'motor', 'relay', 'lamp', 'thermo', 'pixels', 'lcd1602', 'oled', 'neopixel', 'mpu6050', 'bmp280', 'soil', 'snd', 'keypad', 'stepper', 'sevenseg', 'mod', 'nema17'].includes(byId[pid].type)) bad(L, `${d.id}: unknown module pin ${e}`); }
       else if (!PINS.has(e)) bad(L, `${d.id}: unknown header pin ${e}`);
     }
   }
@@ -191,6 +194,10 @@ for (const L of list) {
       const id = io.item;
       io.rows.forEach((p2, i) => { if (!N.same(id + '.R' + (i + 1), 'PIN:' + p2)) bad(L, `keypad: R${i + 1} not on ${p2}`); });
       io.cols.forEach((p2, i) => { if (!N.same(id + '.C' + (i + 1), 'PIN:' + p2)) bad(L, `keypad: C${i + 1} not on ${p2}`); });
+    }
+    if (io.kind && io.kind.startsWith('dev:')) {      // simulated breakout modules (src/devices.js): the module pin must sit on the pin, the supply pins on the right nets
+      if (io.mp) { const ref = io.mp.includes('.') ? io.mp : io.item + '.' + io.mp; if (!N.same(ref, P)) bad(L, `${pin}: module pin ${ref} is not on ${pin}`); }
+      for (const [mpin, net] of io.pw || []) if (!N.same(mpin, 'PIN:' + net)) bad(L, `${mpin} is not on ${net}`);
     }
     if (io.kind === 'mic') {
       const id = io.item;

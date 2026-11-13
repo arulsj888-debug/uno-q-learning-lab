@@ -3,6 +3,7 @@
 import { U3_BLINK, U3_EXT_LED, U3_BUTTON, U3_POT, U3_FADE, U3_BUZZER } from './code.js';
 
 import { U3_LESSONS_2 } from './lessons2.js';
+import { U3_LESSONS_3, U3_MODULES_3 } from './lessons3.js';
 import { SRC, LED_CIRCUIT, LED_IDS, IO_LED, BUTTON_PARTS, BUTTON_IDS, POT_PARTS, POT_IDS, BUZZER_PARTS, BUZZER_IDS } from './common.js';
 
 export const U3_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs and PWM', 3: 'Module 3 — Sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion and power', 6: 'Module 6 — Digital sensors (I²C)', 7: 'Module 7 — Light and climate', 8: 'Module 8 — Controls', 9: 'Module 9 — Displays', 10: 'Module 10 — Switching loads', 11: 'Module 11 — Timing', 12: 'Module 12 — Buses', 13: 'Module 13 — Stepper motors' };
@@ -346,4 +347,5 @@ const U3_BASE = [
   },
 ];
 
-export const U3_LESSONS = [...U3_BASE, ...U3_LESSONS_2];
+export const U3_LESSONS = [...U3_BASE, ...U3_LESSONS_2, ...U3_LESSONS_3];
+Object.assign(U3_MODULES, U3_MODULES_3);

@@ -9,7 +9,7 @@
 //   { id:'t1', type:'tmp36', row:'e', col:18 }        legs +VS e18, VOUT e19, GND e20 (flat face toward +z)
 //   { id:'w1', type:'wire', from:'D5', to:'a10', color:'yellow' }
 import * as THREE from 'three';
-import { Resistor, LED5mm, RGBLED5mm, DHTSensor, NeoPixelStrip, Diode1N4007, TransistorPN2222A, MOSFETIRLZ44N, ElectrolyticCap, ReedSwitch, TiltSwitch, SlideSwitch, SevenSegModule, IRReceiver, MPU6050Module, StepperULN2003, KeypadModule, LCD1602Module, OLED128x64Module, JoystickModule, EncoderModule, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
+import { Resistor, LED5mm, RGBLED5mm, DHTSensor, NeoPixelStrip, Diode1N4007, TransistorPN2222A, MOSFETIRLZ44N, ElectrolyticCap, ReedSwitch, TiltSwitch, SlideSwitch, SevenSegModule, IRReceiver, MPU6050Module, BreakoutBoard, BREAKOUTS, Nema17, StepperULN2003, KeypadModule, LCD1602Module, OLED128x64Module, JoystickModule, EncoderModule, JumperWire, PushButton, Potentiometer, PiezoBuzzer, LDR, TMP36, HCSR04, PIRModule, FemaleJumper, ServoMotor, L293D, BatteryPack, HobbyMotor, LeadWire, RelayModule, MiniLamp, ModulinoThermo, ModulinoPixels, QwiicCable, SHT31Breakout, DESK_Y } from './hardware.js';
 
 import { resistorBands } from './freebuild/circuit.js';
 
@@ -29,7 +29,7 @@ export class Bench {
     const rl = /^r:(top[+-]|bot[+-]):(\d+)$/.exec(ref);
     if (rl) return this.bb.rail(rl[1], +rl[2]);
     if (ref === 'QWIIC') return this.board.qwiic.pos.clone();
-    const mp = /^(\w+)\.(VCC|OUT|GND|POS|NEG|M1|M2|DCP|DCN|IN|NO|COM|NC|L1|L2|QA|QB)$/.exec(ref);
+    const mp = /^(\w+)\.([A-Za-z0-9_]+)$/.exec(ref);
     if (mp && this.items[mp[1]]) return this.items[mp[1]].obj.pin(mp[2]).pos;
     const p = this.board.pins[ref];
     if (!p) throw new Error('unknown endpoint ' + ref);
@@ -92,6 +92,8 @@ export class Bench {
       case 'tilt': obj = new TiltSwitch(); break;
       case 'irrx': obj = new IRReceiver(); break;
       case 'mpu6050': obj = new MPU6050Module(); break;
+      case 'mod': obj = new BreakoutBoard(d.model); break;
+      case 'nema17': obj = new Nema17(); break;
       case 'soil': obj = new MPU6050Module('SOIL v1.2', ['VCC', 'GND', 'AOUT'], 'soil'); break;
       case 'snd': obj = new MPU6050Module('SOUND', ['AO', 'GND', 'VCC'], 'snd'); break;
       case 'keypad': obj = new KeypadModule(); break;
@@ -152,7 +154,7 @@ export class Bench {
       case 'dht': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       case 'rgbled': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       case 'l293d': return { pos: this.bb.hole('e', d.col).lerp(this.bb.hole('f', d.col + 7), 0.5), rotY: 0 };
-      case 'battery': case 'motor': case 'relay': case 'lamp': case 'neopixel': case 'lcd1602': case 'oled': case 'sevenseg': case 'mpu6050': case 'bmp280': case 'keypad': case 'snd': case 'soil': case 'stepper': case 'thermo': case 'pixels': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
+      case 'battery': case 'motor': case 'relay': case 'lamp': case 'neopixel': case 'lcd1602': case 'oled': case 'sevenseg': case 'mpu6050': case 'bmp280': case 'keypad': case 'snd': case 'soil': case 'stepper': case 'mod': case 'nema17': case 'thermo': case 'pixels': return { pos: new THREE.Vector3(d.x, DESK_Y, d.z), rotY: d.rotY || 0 };
       case 'hcsr04': return { pos: this.bb.hole(d.row, d.col + 1).lerp(this.bb.hole(d.row, d.col + 2), 0.5), rotY: 0 };
       default: return null;
     }

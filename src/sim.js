@@ -6,6 +6,7 @@
 //  - PWM frequency on the UNO Q is fixed at 500 Hz (UNO Q user manual)
 //  - tone() starts a square wave and returns immediately; noTone() stops it
 import { MATRIX_LINES } from './data/code.js';
+import { PROGRAMS3 } from './sim3.js';
 
 class Stop extends Error {}
 const frame = () => new Promise(r => requestAnimationFrame(() => r()));
@@ -20,6 +21,13 @@ export class Sim {
     this.token = null;
   }
   get running() { return !!this.token; }
+  /** a pin changed level (called by the app for buttons): runs the handler registered with attachInterrupt() */
+  edge(pin, level) {
+    const q = this.token && this.token.irqs && this.token.irqs[pin]; if (!q) return;
+    const was = q.last; q.last = level;
+    const fire = q.mode === 'CHANGE' ? level !== was : q.mode === 'RISING' ? level && !was : q.mode === 'FALLING' ? !level && was : !level;
+    if (fire) { try { q.fn(); } catch (e) { console.error(e); } }
+  }
 
   stop() {
     const t = this.token;
@@ -50,11 +58,16 @@ export class Sim {
         const id = setTimeout(() => { tok.timers.delete(id); tok.wake.delete(wake); res(); }, ms);
         tok.timers.add(id); tok.wake.add(wake);
       }),
+      dev: (name, op, ...a) => (H.dev ? H.dev(name, op, ...a) : undefined),   // simulated devices of UNO R3 lessons 40-59 (src/devices.js)
+      // attachInterrupt(): the app calls Sim.edge(pin, level) when the pin changes; the handler runs at once (like an ISR)
+      attachInterrupt: (pin, mode, fn) => { tok.irqs = tok.irqs || {}; tok.irqs[pin] = { mode, fn, last: 1 }; },
+      detachInterrupt: (pin) => { if (tok.irqs) delete tok.irqs[pin]; },
+      timerEvery: (ms, fn) => { const id = setInterval(() => { if (!tok.stopped) fn(); }, ms); tok.timers.add(id); },   // TimerOne style periodic interrupt
       millis: () => Math.floor(performance.now() - t0),   // milliseconds since the program started
       yield: () => rt.delay(8),   // simulator pacing: one pass of loop() takes about 8 ms here
       pinMode: (pin, mode) => { pins[pin] = { mode }; if (H.mode) H.mode(pin, mode); },
-      digitalWrite: (pin, level) => { if (!pins[pin] || pins[pin].mode !== 'OUTPUT') return; H.pin(pin, level); },
-      digitalRead: (pin) => H.read(pin, pins[pin] ? pins[pin].mode : 'INPUT'),
+      digitalWrite: (pin, level) => { if (!pins[pin] || pins[pin].mode !== 'OUTPUT') return; pins[pin].lv = level ? 1 : 0; H.pin(pin, level); },
+      digitalRead: (pin) => (pins[pin] && pins[pin].mode === 'OUTPUT' ? (pins[pin].lv ? 1 : 0) : H.read(pin, pins[pin] ? pins[pin].mode : 'INPUT')),   // an output pin reads back the level that was written
       // deep sleep: the CPU and digital pins are powered off (outputs go low), then the timer wakes the chip and the program restarts
       deepSleep: async (ms) => { for (const k of Object.keys(pins)) if (pins[k] && pins[k].mode === 'OUTPUT') H.pin(k, 0); for (const k of Object.keys(pins)) delete pins[k]; if (H.sleep) H.sleep(true, ms); await rt.delay(ms); if (H.sleep) H.sleep(false, ms); },
       ble: (stage, val) => { if (H.ble) H.ble({ stage, val }); },
@@ -2277,3 +2290,4 @@ export function blinkCode(base, ms) {
     return l;
   }).join('\n');
 }
+Object.assign(PROGRAMS, PROGRAMS3);

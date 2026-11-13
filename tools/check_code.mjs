@@ -3,6 +3,7 @@ import * as C from '../src/data/code.js';
 import * as PI from '../src/pi4/lessons.js';
 import * as U3 from '../src/uno3/code.js';
 import * as E32 from '../src/esp32/code.js';
+import { CODE3, CHECKS3 } from '../src/uno3/code3.js';
 const L = (code, n) => code.split('\n')[n - 1] || '';
 const checks = {
   BLINK: [C.BLINK, [[1, 'void setup'], [2, 'Serial.begin'], [4, 'pinMode(LED_BUILTIN'], [8, 'void loop'], [9, 'HIGH'], [10, 'delay(1000)'], [11, 'LOW'], [12, 'delay(1000)'], [14, 'Serial.println']]],
@@ -136,6 +137,7 @@ const checks = {
   U3_CAR: [U3.U3_CAR, [[2, 'enablePin ='], [3, 'in1Pin ='], [4, 'in2Pin ='], [5, 'trigPin ='], [6, 'echoPin ='], [9, 'pinMode(enablePin'], [10, 'pinMode(in1Pin'], [11, 'pinMode(in2Pin'], [12, 'pinMode(trigPin'], [13, 'pinMode(echoPin'], [14, 'Serial.begin'], [17, 'void loop'], [18, 'digitalWrite(trigPin, LOW)'], [19, 'delayMicroseconds(2)'], [20, 'digitalWrite(trigPin, HIGH)'], [21, 'delayMicroseconds(10)'], [23, 'pulseIn'], [24, 'float cm'], [26, 'cm > 0'], [27, 'analogWrite(enablePin, 0)'], [28, 'Obstacle: stop'], [30, 'in1Pin, HIGH'], [31, 'in2Pin, LOW'], [32, 'enablePin, 200'], [33, 'Clear: forward'], [35, 'delay(200)']]],
   BUZZER: [C.BUZZER, [[2, 'buzzerPin = D9'], [3, 'int notes[]'], [5, 'void setup'], [8, 'void loop'], [9, 'for (int i'], [10, 'tone(buzzerPin'], [11, 'delay(300)'], [13, 'noTone'], [14, 'delay(1000)']]],
 };
+for (const k of Object.keys(CODE3)) checks['U3_' + k.toUpperCase() + '_3'] = [CODE3[k], CHECKS3[k]];
 let bad = 0;
 for (const [name, [code, list]] of Object.entries(checks)) for (const [n, s] of list) {
   if (!L(code, n).includes(s)) { bad++; console.log(`MISMATCH ${name} line ${n}: expected "${s}" got "${L(code, n)}"`); }
