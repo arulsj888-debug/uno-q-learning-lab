@@ -11,10 +11,10 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Resistor, LED, push button | DONE | DONE | DONE | DONE | |
 | Potentiometer, buzzer (passive) | DONE | DONE (pot n/a: no ADC) | DONE | DONE | |
 | Active buzzer | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | no single manufacturer datasheet found (TMB12A05 listings disagree on range, current, pitch): values labelled typical; 3.3 V pins sag to about 2.5 V so a 5 V buzzer warns |
-| Diode 1N4007 (forward / blocking, flyback) | DONE (lesson 24, simulator only) | Build DONE, lesson TODO | DONE (Build + lesson 26) | DONE (Build + lesson 23) | 1.1 V at 1 A model; 1 A limit |
+| Diode 1N4007 (forward / blocking, flyback) | DONE (lesson 24, simulator only) | DONE (lesson 20, simulator only) | DONE (Build + lesson 26) | DONE (Build + lesson 23) | 1.1 V at 1 A model; 1 A limit |
 | Capacitor (electrolytic 10/100/470 uF: RC charging, polarity, inrush) | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | time-dependent solver (backward Euler, state in env.capV) plus an inrush solve for pin damage; ratings and sizes are typical values (16 V assumed); ceramic decoupling cap TODO |
-| NPN transistor PN2222A low-side switch (TO-92 E B C) | DONE (lesson 25, simulator only) | Build DONE, lesson TODO | DONE (Build + lesson 24) | DONE (Build + lesson 21) | base resistor, saturation, pin order, flyback-diode warning; max 600 mA |
-| MOSFET switch (IRLZ44N, TO-220 G D S) | DONE (lesson 26, simulator only; 3.3 V gate caveat) | Build DONE, lesson TODO | DONE (Build + lesson 25) | DONE (Build + lesson 22) | values from the Infineon datasheet (RDS(on) 35/25/22 mOhm at 4/5/10 V, VGS(th) 1.0-2.0 V, 47 A, +-16 V); no datasheet value at 3.3 V, so a 1 A load from a 3.3 V gate warns; body diode and flyback-diode warnings; 5 examples |
+| NPN transistor PN2222A low-side switch (TO-92 E B C) | DONE (lesson 25, simulator only) | DONE (lesson 21, simulator only) | DONE (Build + lesson 24) | DONE (Build + lesson 21) | base resistor, saturation, pin order, flyback-diode warning; max 600 mA |
+| MOSFET switch (IRLZ44N, TO-220 G D S) | DONE (lesson 26, simulator only; 3.3 V gate caveat) | DONE (lesson 22, simulator only; 3.3 V gate caveat) | DONE (Build + lesson 25) | DONE (Build + lesson 22) | values from the Infineon datasheet (RDS(on) 35/25/22 mOhm at 4/5/10 V, VGS(th) 1.0-2.0 V, 47 A, +-16 V); no datasheet value at 3.3 V, so a 1 A load from a 3.3 V gate warns; body diode and flyback-diode warnings; 5 examples |
 | Slide switch (SPDT), tilt switch, reed switch | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | Build DONE, lesson TODO | click the part in 3D to switch it (env.sw); generic parts, no part numbers or ratings claimed; toggle switch TODO |
 | Battery + breadboard power supply | partly (battery pack) | partly | partly | partly | |
 
@@ -38,8 +38,8 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | SHT31 (I2C) | DONE | DONE | DONE | build only | |
 | Modulino Thermo / Pixels (Qwiic) | DONE | n/a | n/a | n/a | UNO Q only |
 | DHT11 / DHT22 | DONE (lesson 33, simulator only; library reported to return NaN on UNO Q) | DONE (Build + lesson 15) | DONE (Build + lesson 18) | DONE (Build + lesson 15) | 4-pin sensor with external pull-up; specs from the Adafruit guide; Pi uses adafruit-circuitpython-dht |
-| DS18B20 (1-Wire) | DONE (lesson 34, simulator only) | Build DONE, lesson TODO | DONE (Build + lesson 29) | DONE (Build + lesson 28) | verified from the Dallas/Maxim datasheet (copy on a university mirror; the Analog Devices PDF was not reachable): TO-92 GND DQ VDD, 3.0-5.5 V, -55..+125 C, +-0.5 C from -10..+85 C, 9-12 bit, 750 ms max; pull-up about 5 kOhm (4.7 k usual); parasite power not modelled; Pi default 1-Wire pin GPIO4 |
-| BMP280 pressure (I2C) | DONE (lesson 35, simulator only) | TODO | DONE (lesson 33, lesson only) | DONE (lesson 33, lesson only) | verified from the Bosch datasheet: 300-1100 hPa, -40..+85 C, supply 1.71-3.6 V, chip ID 0x58, address 0x76 (SDO GND) / 0x77 (SDO VDDIO); Adafruit default address not re-checked (lesson passes 0x76 explicitly); BME280 / SPI TODO |
+| DS18B20 (1-Wire) | DONE (lesson 34, simulator only) | DONE (lesson 23, simulator only; Linux 1-Wire driver) | DONE (Build + lesson 29) | DONE (Build + lesson 28) | verified from the Dallas/Maxim datasheet (copy on a university mirror; the Analog Devices PDF was not reachable): TO-92 GND DQ VDD, 3.0-5.5 V, -55..+125 C, +-0.5 C from -10..+85 C, 9-12 bit, 750 ms max; pull-up about 5 kOhm (4.7 k usual); parasite power not modelled; Pi default 1-Wire pin GPIO4 |
+| BMP280 pressure (I2C) | DONE (lesson 35, simulator only) | DONE (lesson 24, simulator only) | DONE (lesson 33, lesson only) | DONE (lesson 33, lesson only) | verified from the Bosch datasheet: 300-1100 hPa, -40..+85 C, supply 1.71-3.6 V, chip ID 0x58, address 0x76 (SDO GND) / 0x77 (SDO VDDIO); Adafruit default address not re-checked (lesson passes 0x76 explicitly); BME280 / SPI TODO |
 | Soil moisture (capacitive, analog) | DONE (lesson 37, simulator only) | n/a (no ADC) | DONE (lesson 34, lesson only) | DONE (lesson 34, lesson only) | no manufacturer datasheet: vendor manuals say 3.3-5.5 V, wetter = lower voltage, example 2.5 V dry / 1.0 V wet (sources differ: calibration is the lesson); rain and water level TODO |
 | Gas MQ-2 / MQ-135 (analog + digital) | TODO | n/a | TODO | TODO | heater needs 5 V |
 | Sound sensor (analog microphone module) | DONE (lesson 38, simulator only) | n/a (no ADC) | DONE (lesson 35, lesson only) | DONE (lesson 35, lesson only) | no standard datasheet: quiet level near mid-supply is a typical, labelled assumption; pin order varies by maker; digital output / threshold pot not covered |
@@ -47,8 +47,8 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 | Rotary encoder KY-040 | DONE (lesson 29, simulator only) | DONE (Build + lesson 16) | DONE (Build + lesson 20) | DONE (Build + lesson 17) | module pull-ups described inconsistently by sources: the model relies on INPUT_PULLUP |
 | IR receiver (38 kHz, TSOP382-type) + remote | DONE (lesson 39, simulator only; library on UNO Q not verified) | Build DONE, lesson TODO | DONE (Build + lesson 30) | DONE (Build + lesson 29) | verified from the Vishay TSOP382/384 datasheet: pins OUT GND VS, 2.0-5.5 V, active-low output, 38 kHz variant; click the part to simulate a remote burst (steady LOW, not a real pulse train); IRremote/NEC decoding lesson TODO |
 | Flame, tilt, vibration, hall, line-follow IR | TODO | TODO | TODO | TODO | |
-| MPU6050 accelerometer / gyro (I2C) | DONE (lesson 36, simulator only) | TODO | DONE (lesson 31, lesson only) | DONE (lesson 30, lesson only) | InvenSense register map verified: sleep at power-up, WHO_AM_I 0x68, 16384 LSB/g, 131 LSB/(deg/s); I2C address 0x68/0x69 and GY-521 pin order from common knowledge (hedged in the text); Build part TODO |
-| Keypad 4x4 (matrix scan) | DONE (lesson 30, simulator only) | TODO | DONE (lesson 37, lesson only) | DONE (lesson 38, lesson only) | no datasheet: standard 1 2 3 A / 4 5 6 B / 7 8 9 C / * 0 # D layout and R1-R4 C1-C4 pin order are typical (the lesson warns to check yours); Keypad library API not re-checked; Build part TODO |
+| MPU6050 accelerometer / gyro (I2C) | DONE (lesson 36, simulator only) | DONE (lesson 25, simulator only) | DONE (lesson 31, lesson only) | DONE (lesson 30, lesson only) | InvenSense register map verified: sleep at power-up, WHO_AM_I 0x68, 16384 LSB/g, 131 LSB/(deg/s); I2C address 0x68/0x69 and GY-521 pin order from common knowledge (hedged in the text); Build part TODO |
+| Keypad 4x4 (matrix scan) | DONE (lesson 30, simulator only) | DONE (lesson 27, simulator only) | DONE (lesson 37, lesson only) | DONE (lesson 38, lesson only) | no datasheet: standard 1 2 3 A / 4 5 6 B / 7 8 9 C / * 0 # D layout and R1-R4 C1-C4 pin order are typical (the lesson warns to check yours); Keypad library API not re-checked; Build part TODO |
 | RFID RC522 (SPI) | TODO | TODO | TODO | TODO | 3.3 V part |
 | GPS (UART, NEO-6M) | TODO | TODO | TODO | TODO | |
 | DS3231 real-time clock (I2C) | TODO | TODO | TODO | TODO | |
@@ -60,7 +60,7 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 |---|---|---|---|---|---|
 | Servo SG90 | DONE | TODO | DONE | build only | |
 | DC motor + L293D, relay | DONE | build only | DONE | n/a (5 V handling TODO) | |
-| Stepper 28BYJ-48 + ULN2003 | DONE (lesson 41, simulator only) | TODO | DONE (lesson 32, lesson only) | DONE (lesson 32, lesson only) | facts from vendor datasheet copies (2048 steps nominal, true ratio ~63.68:1, coil resistance 22 or 50 ohm disagree); Stepper library pin order IN1,IN3,IN2,IN4; Build part TODO |
+| Stepper 28BYJ-48 + ULN2003 | DONE (lesson 41, simulator only) | DONE (lesson 28, simulator only) | DONE (lesson 32, lesson only) | DONE (lesson 32, lesson only) | facts from vendor datasheet copies (2048 steps nominal, true ratio ~63.68:1, coil resistance 22 or 50 ohm disagree); Stepper library pin order IN1,IN3,IN2,IN4; Build part TODO |
 | Stepper A4988 / DRV8825 driver | TODO | TODO | TODO | TODO | |
 | Solenoid / pump / fan with MOSFET | TODO | TODO | TODO | TODO | |
 | SD card (SPI) | TODO | n/a | TODO | TODO | |
@@ -70,20 +70,20 @@ Boards: UQ = UNO Q, PI = Raspberry Pi 4, R3 = UNO R3, E32 = ESP32 DevKit V1.
 |---|---|---|---|---|---|
 | USB serial / Serial Monitor | DONE | DONE (terminal) | DONE | DONE | |
 | I2C (one device) | DONE | DONE | DONE | build only | |
-| I2C scanner, two devices on one bus | TODO | TODO | DONE (lesson 28: LCD 0x27 + OLED 0x3C; second device on the repeated SDA/SCL sockets) | TODO (needs the breadboard to share one socket) | scanner reads rt.i2cProbe |
+| I2C scanner, two devices on one bus | TODO | DONE (lesson 26, simulator only) | DONE (lesson 28: LCD 0x27 + OLED 0x3C; second device on the repeated SDA/SCL sockets) | TODO (needs the breadboard to share one socket) | scanner reads rt.i2cProbe |
 | SPI (concept + one device) | TODO | TODO | TODO | TODO | |
 | UART between two boards | TODO | TODO | TODO | TODO | 3.3 V / 5 V level shifting |
 | Wi-Fi scan / connect / web server | partly (dashboard) | DONE (web) | n/a | DONE | |
-| HTTP client (fetch a web API, weather) | TODO | TODO | n/a | DONE (lesson 25: GET, status codes 200/404, failure; server is simulated and the address made up) | HTTPClient from the Arduino-ESP32 core; https needs a secure client (not covered) |
-| MQTT publish / subscribe | TODO | TODO | n/a | DONE (lesson 26: PubSubClient, publish home/temperature, subscribe home/led, LED switched by a message; broker and phone simulated) | dashboard TODO; PubSubClient API as in its documentation; made-up broker address |
+| HTTP client (fetch a web API, weather) | TODO | DONE (lesson 31, simulated server) | n/a | DONE (lesson 25: GET, status codes 200/404, failure; server is simulated and the address made up) | HTTPClient from the Arduino-ESP32 core; https needs a secure client (not covered) |
+| MQTT publish / subscribe | TODO | DONE (lesson 32, simulated broker) | n/a | DONE (lesson 26: PubSubClient, publish home/temperature, subscribe home/led, LED switched by a message; broker and phone simulated) | dashboard TODO; PubSubClient API as in its documentation; made-up broker address |
 | NTP time | n/a | n/a | n/a | DONE (lesson 27: configTime, getLocalTime, time zone offset; simulated time = your computer clock + 1 h) | OTA update TODO |
 | Bluetooth LE | n/a (not verified) | TODO | n/a | DONE | |
 | Bluetooth classic (HC-05 on R3/UQ, built in E32) | TODO | n/a | TODO | TODO | |
 | ESP-NOW (board to board, no router) | n/a | n/a | n/a | TODO | |
 | LoRa (SX1276), nRF24L01, Zigbee | TODO | TODO | TODO | TODO | external modules, SPI |
 | Ethernet | n/a (not verified) | built in | n/a (shield) | n/a | |
-| millis() without delay | DONE (lesson 40) | TODO | DONE (lesson 27) | DONE (lesson 24) | shows the button noticed at once while the LED blinks; Arduino docs as sources (50-day overflow figure not verified, not stated) |
-| Interrupts (attachInterrupt) | TODO | TODO | UNO R3 needs the button on pin 2/3 (TODO) | DONE (lesson 31) | simulator polls the pin every 10 ms to imitate the ISR |
+| millis() without delay | DONE (lesson 40) | DONE (lesson 30: monotonic) | DONE (lesson 27) | DONE (lesson 24) | shows the button noticed at once while the LED blinks; Arduino docs as sources (50-day overflow figure not verified, not stated) |
+| Interrupts (attachInterrupt) | TODO | DONE (lesson 29: events with when_pressed) | UNO R3 needs the button on pin 2/3 (TODO) | DONE (lesson 31) | simulator polls the pin every 10 ms to imitate the ISR |
 | Timers, EEPROM / preferences | TODO | TODO | TODO | TODO | |
 
 ## F. Projects (after the parts exist)

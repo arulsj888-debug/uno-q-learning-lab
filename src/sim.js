@@ -1580,6 +1580,179 @@ export const PROGRAMS = {
     }
   },
 
+  async pi_diode(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4); rt.pinMode('p11', 'OUTPUT');
+    for (;;) {
+      await rt.at(6);
+      await rt.at(7); rt.digitalWrite('p11', 1);
+      await rt.at(8); await rt.delay(1000);
+      await rt.at(9); rt.digitalWrite('p11', 0);
+      await rt.at(10); await rt.delay(1000);
+    }
+  },
+
+  async pi_qsw(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4); rt.pinMode('p11', 'OUTPUT');
+    for (;;) {
+      await rt.at(6);
+      await rt.at(7); rt.digitalWrite('p11', 1);
+      await rt.at(8); await rt.delay(1000);
+      await rt.at(9); rt.digitalWrite('p11', 0);
+      await rt.at(10); await rt.delay(1000);
+    }
+  },
+
+  async pi_mosw(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4); rt.pinMode('p11', 'OUTPUT');
+    for (;;) {
+      await rt.at(6);
+      await rt.at(7); rt.digitalWrite('p11', 1);
+      await rt.at(8); await rt.delay(1000);
+      await rt.at(9); rt.digitalWrite('p11', 0);
+      await rt.at(10); await rt.delay(1000);
+    }
+  },
+
+  async pi_ds18(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4); await rt.at(5);
+    if (!rt.dsRead().ok) { rt.println('StopIteration: no folder starting with 28- found (check the wiring and that 1-Wire is on)'); for (;;) await rt.delay(1000); }
+    for (;;) {
+      await rt.at(7);
+      await rt.at(8); const r = rt.dsRead();
+      await rt.at(9);
+      if (r.ok) { await rt.at(10); await rt.at(11); rt.println('Temperature: ' + r.t.toFixed(2) + ' C'); }
+      else { await rt.at(12); await rt.at(13); rt.println('Bad reading, trying again'); }
+      await rt.at(14); await rt.delay(1000);
+    }
+  },
+
+  async pi_bmp(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(5);
+    await rt.at(6);
+    if (!rt.i2cProbe(0x76)) { rt.println('ValueError: No I2C device at address: 0x76'); for (;;) await rt.delay(1000); }
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); const m = rt.bmpRead(); rt.println('Temperature = ' + m.t.toFixed(2) + ' C');
+      await rt.at(10); rt.println('Pressure = ' + m.p.toFixed(2) + ' hPa');
+      await rt.at(11); await rt.delay(1000);
+    }
+  },
+
+  async pi_mpu(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(5);
+    await rt.at(6);
+    if (!rt.i2cProbe(0x68)) { rt.println('ValueError: No I2C device at address: 0x68'); for (;;) await rt.delay(1000); }
+    for (;;) {
+      await rt.at(8);
+      await rt.at(9); const m = rt.mpuRead();
+      await rt.at(10); rt.println('Acceleration X: ' + m.ax.toFixed(2) + ', Y: ' + m.ay.toFixed(2) + ', Z: ' + m.az.toFixed(2) + ' m/s^2');
+      await rt.at(11); rt.println('Rotation Z: ' + m.gz.toFixed(2) + ' rad/s');
+      await rt.at(12); await rt.delay(500);
+    }
+  },
+
+  async pi_i2cscan(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(3); await rt.at(4); await rt.at(5);
+    await rt.at(6); const found = []; for (let a = 1; a < 127; a++) if (rt.i2cProbe(a)) found.push('0x' + a.toString(16));
+    await rt.at(7); await rt.at(8); rt.println('Devices found: [' + found.map(x => "'" + x + "'").join(', ') + ']');
+    for (;;) await rt.delay(1000);
+  },
+
+  async pi_keypad(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4); await rt.at(5); await rt.at(6);
+    for (;;) {
+      await rt.at(8);
+      const key = rt.keypadKey();
+      if (key) { await rt.at(9); await rt.at(10); await rt.at(11); await rt.at(12); await rt.at(13); rt.println('Key: ' + key); await rt.at(14); await rt.delay(300); await rt.at(15); }
+      await rt.at(16); await rt.delay(10);
+    }
+  },
+
+  async pi_step(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4); await rt.at(5);
+    const P = ['p29', 'p31', 'p33', 'p35']; for (const p of P) rt.pinMode(p, 'OUTPUT');
+    const SEQ = [[1, 1, 0, 0], [0, 1, 1, 0], [0, 0, 1, 1], [1, 0, 0, 1]]; let k = 0;
+    const turn = async (n) => { const dir = n > 0 ? 1 : -1, tot = Math.abs(n), ms = 3, t0 = performance.now(); let done = 0; while (done < tot) { const target = Math.min(tot, Math.floor((performance.now() - t0) / ms) + 1); while (done < target) { k = (k + (dir > 0 ? 1 : 3)) % 4; rt.stepTick(dir); done++; } const p = SEQ[k]; for (let i = 0; i < 4; i++) rt.digitalWrite(P[i], p[i]); await rt.delay(8); } };
+    for (;;) {
+      await rt.at(14);
+      await rt.at(15); await rt.at(7); await rt.at(9); await rt.at(11); await rt.at(12); await turn(2048);
+      await rt.at(16); await rt.delay(500);
+      await rt.at(17); await turn(-2048);
+      await rt.at(18); await rt.delay(500);
+    }
+  },
+
+  async pi_isr(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4); rt.pinMode('p11', 'OUTPUT'); await rt.at(5); rt.pinMode('p3', 'INPUT_PULLUP');
+    await rt.at(11); await rt.at(12);
+    let on = 0, last = 1, alive = true;
+    try {
+      for (;;) {
+        const v = rt.digitalRead('p3');
+        if (v === 0 && last === 1) { await rt.at(7); await rt.at(8); on = on ? 0 : 1; rt.digitalWrite('p11', on); await rt.at(9); rt.println('Button pressed'); await rt.at(12); }
+        last = v; await rt.delay(10);
+      }
+    } finally { alive = false; }
+  },
+
+  async pi_timing(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(4); rt.pinMode('p11', 'OUTPUT'); await rt.at(5); rt.pinMode('p3', 'INPUT_PULLUP');
+    await rt.at(6); let last = rt.millis() / 1000; await rt.at(7); let was = false, on = 0;
+    for (;;) {
+      await rt.at(9);
+      await rt.at(10); const now = rt.millis() / 1000;
+      await rt.at(11);
+      if (now - last >= 1) { await rt.at(12); last = now; await rt.at(13); on = on ? 0 : 1; rt.digitalWrite('p11', on); }
+      const pressed = rt.digitalRead('p3') === 0;
+      await rt.at(14);
+      if (pressed && !was) { await rt.at(15); rt.println('Button pressed: noticed at once'); }
+      await rt.at(16); was = pressed;
+      await rt.at(17); await rt.yield();
+    }
+  },
+
+  async pi_http(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(3); await rt.at(5);
+    await rt.at(6); const r = await rt.httpGet('http://api.example.com/temperature');
+    if (r.code > 0) {
+      await rt.at(7); rt.println('HTTP status: ' + r.code);
+      await rt.at(8);
+      if (r.code === 200) { await rt.at(9); rt.println(r.body); }
+    } else { await rt.at(10); await rt.at(11); rt.println('Request failed: (the exact message depends on the error)'); }
+    for (;;) await rt.delay(1000);
+  },
+
+  async pi_mqtt(rt) {
+    rt.serialBegin(9600);
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(5); rt.pinMode('p11', 'OUTPUT');
+    await rt.at(15); await rt.at(16); await rt.at(17);
+    if (!(await rt.mqttConnect())) { rt.println('ConnectionRefusedError: the broker did not answer'); for (;;) await rt.delay(1000); }
+    await rt.at(18); rt.mqttSubscribe('home/led');
+    await rt.at(19);
+    for (;;) {
+      await rt.at(21);
+      await rt.at(22); rt.mqttPublish('home/temperature', '21.5');
+      await rt.at(23); rt.println('Published home/temperature = 21.5');
+      for (let i = 0; i < 15; i++) {
+        const m = rt.mqttPoll();
+        if (m) { await rt.at(7); await rt.at(8); await rt.at(9); rt.println('Received on ' + m.topic + ' : ' + m.payload); await rt.at(10); if (m.payload === 'ON') { await rt.at(11); rt.digitalWrite('p11', 1); } else { await rt.at(12); await rt.at(13); rt.digitalWrite('p11', 0); } }
+        await rt.at(24); await rt.delay(200);
+      }
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

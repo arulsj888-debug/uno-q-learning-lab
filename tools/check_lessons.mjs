@@ -218,7 +218,7 @@ for (const L of list) {
       if (!N.same(id + '.VCC', 'PIN:' + (E32 ? 'VIN' : '5V'))) bad(L, `stepper: VCC not on ${E32 ? 'VIN' : '5V'}`);
     }
     if (io.kind === 'mpu') {
-      const id = io.item, sda = pin, scl = io.scl;
+      const id = io.item, sda = io.sda || pin, scl = io.scl;
       if (!N.same(id + '.SDA', 'PIN:' + sda)) bad(L, `mpu: SDA not on ${sda}`);
       if (!N.same(id + '.SCL', 'PIN:' + scl)) bad(L, `mpu: SCL not on ${scl}`);
       if (!N.same(id + '.GND', G)) bad(L, `mpu: GND not on GND`);

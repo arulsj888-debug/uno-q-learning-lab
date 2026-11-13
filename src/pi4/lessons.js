@@ -18,6 +18,20 @@ export const SRC_PI = {
   ssd1306py: { t: 'Adafruit CircuitPython SSD1306 library documentation', u: 'https://docs.circuitpython.org/projects/ssd1306/en/latest/' },
   neopy: { t: 'Adafruit: NeoPixels on Raspberry Pi (Python usage)', u: 'https://learn.adafruit.com/neopixels-on-raspberry-pi/python-usage' },
   neouber: { t: 'Adafruit NeoPixel Überguide: Powering NeoPixels', u: 'https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels' },
+  d1n4007: { t: 'Vishay 1N4001 to 1N4007 datasheet (1 A average forward current, 1.1 V at 1 A, band = cathode)', u: 'https://www.vishay.com/docs/88503/1n4001.pdf' },
+  pn2222: { t: 'onsemi PN2222 / PN2222A datasheet (TO-92: emitter, base, collector; 600 mA; VCE(sat) 0.3 V at 150 mA / 15 mA)', u: 'https://www.onsemi.com/pdf/datasheet/pn2222-d.pdf' },
+  irlz44n: { t: 'Infineon IRLZ44NPbF datasheet (TO-220: gate, drain, source; 55 V; RDS(on) 22 / 25 / 35 mohm at 10 / 5 / 4 V)', u: 'https://www.infineon.com/assets/row/public/documents/24/49/infineon-irlz44npbf-datasheet-en.pdf' },
+  gpiozeroout: { t: 'GPIO Zero documentation: output devices (LED, OutputDevice)', u: 'https://gpiozero.readthedocs.io/en/stable/api_output.html' },
+  ds18: { t: 'DS18B20 datasheet (Dallas Semiconductor / Maxim): TO-92 pinout GND, DQ, VDD; 3.0 V to 5.5 V; 750 ms conversion', u: 'https://www.analog.com/en/products/ds18b20.html' },
+  bmpds: { t: 'Bosch BMP280 datasheet: 300-1100 hPa, -40..+85 C, supply 1.71-3.6 V, chip ID 0x58, address 0x76 / 0x77', u: 'https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf' },
+  bmppy: { t: 'Adafruit CircuitPython BMP280 library documentation', u: 'https://docs.circuitpython.org/projects/bmp280/en/latest/' },
+  mpureg: { t: 'MPU-6000/MPU-6050 Register Map (InvenSense): sleep at power-up, WHO_AM_I 0x68, 16384 LSB/g', u: 'https://cdn.sparkfun.com/datasheets/Sensors/Accelerometers/RM-MPU-6000A.pdf' },
+  mpupy: { t: 'Adafruit CircuitPython MPU6050 library documentation', u: 'https://docs.circuitpython.org/projects/mpu6050/en/latest/' },
+  uln: { t: 'Vendor datasheet copy: 28BYJ-48 5 V stepper, 1/64 gear, 5.625 deg / 64 stride angle, 4 phases', u: 'https://cdn.shopify.com/s/files/1/0015/7571/4865/files/datasheet_28BYJ-48.pdf' },
+  requests: { t: 'Requests documentation: quickstart (get, status_code, text, timeout)', u: 'https://requests.readthedocs.io/en/latest/user/quickstart/' },
+  httpmdn: { t: 'MDN: HTTP response status codes', u: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Status' },
+  paho: { t: 'Eclipse Paho MQTT Python client documentation', u: 'https://eclipse.dev/paho/files/paho.mqtt.python/html/index.html' },
+  mqtt: { t: 'MQTT.org: what is MQTT (publish/subscribe, topics, broker)', u: 'https://mqtt.org/' },
   cfg: { t: 'Raspberry Pi documentation — Configuration: enable or disable I2C', u: 'https://www.raspberrypi.com/documentation/computers/configuration.html#i2c' },
   remote: { t: 'Raspberry Pi documentation — Remote access (find your IP address, SSH)', u: 'https://www.raspberrypi.com/documentation/computers/remote-access.html' },
   kernel: { t: 'Raspberry Pi documentation — Linux kernel (check your kernel)', u: 'https://www.raspberrypi.com/documentation/computers/linux_kernel.html' },
@@ -396,7 +410,256 @@ export const PI_NEO_PARTS = [
 ];
 const NEO_IDS = PI_NEO_PARTS.map(d => d.id);
 
-export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project', 7: 'Module 7 — Extra: sound', 8: 'Module 8 — Camera', 9: 'Module 9 — Light and climate', 10: 'Module 10 — Controls', 11: 'Module 11 — Displays' };
+
+// ---- lessons 20-33 (batch 2026-11-13): components, sensors, controls, patterns and network on the Raspberry Pi
+export const PI_DIODE = `from gpiozero import LED
+from time import sleep
+
+led = LED(17)   # one pin feeds both LED branches (resistor, diode, LED)
+
+while True:
+    led.on()    # 3.3 V: current flows through the diode in the forward direction
+    sleep(1)
+    led.off()   # 0 V: no current
+    sleep(1)`;
+export const PI_QSW = `from gpiozero import OutputDevice
+from time import sleep
+
+lamp = OutputDevice(17)   # drives the BASE of the transistor through a resistor
+
+while True:
+    lamp.on()    # base current flows: the lamp lights
+    sleep(1)
+    lamp.off()   # no base current: the lamp is off
+    sleep(1)`;
+export const PI_MOSW = `from gpiozero import OutputDevice
+from time import sleep
+
+lamp = OutputDevice(17)   # drives the GATE of the MOSFET through a 220 ohm resistor
+
+while True:
+    lamp.on()    # 3.3 V on the gate: the lamp lights
+    sleep(1)
+    lamp.off()   # 0 V on the gate: the lamp is off
+    sleep(1)`;
+export const PI_DS18 = `from pathlib import Path
+from time import sleep
+
+base = Path("/sys/bus/w1/devices")
+sensor = next(base.glob("28-*")) / "w1_slave"   # a DS18B20 appears as a folder starting with 28-
+
+while True:
+    lines = sensor.read_text().splitlines()
+    if lines[0].endswith("YES"):                 # the CRC check passed
+        millidegrees = int(lines[1].split("t=")[1])
+        print(f"Temperature: {millidegrees / 1000:.2f} C")
+    else:
+        print("Bad reading, trying again")
+    sleep(1)`;
+export const PI_BMP = `import time
+import board
+import adafruit_bmp280
+
+i2c = board.I2C()   # SDA = GPIO2 (pin 3), SCL = GPIO3 (pin 5)
+bmp = adafruit_bmp280.Adafruit_BMP280_I2C(i2c, address=0x76)
+
+while True:
+    print(f"Temperature = {bmp.temperature:.2f} C")
+    print(f"Pressure = {bmp.pressure:.2f} hPa")
+    time.sleep(1)`;
+export const PI_MPU = `import time
+import board
+import adafruit_mpu6050
+
+i2c = board.I2C()
+mpu = adafruit_mpu6050.MPU6050(i2c)   # address 0x68
+
+while True:
+    ax, ay, az = mpu.acceleration       # m/s^2
+    print(f"Acceleration X: {ax:.2f}, Y: {ay:.2f}, Z: {az:.2f} m/s^2")
+    print(f"Rotation Z: {mpu.gyro[2]:.2f} rad/s")
+    time.sleep(0.5)`;
+export const PI_SCAN = `import board
+
+i2c = board.I2C()
+while not i2c.try_lock():      # take control of the bus
+    pass
+devices = i2c.scan()           # the addresses that answered
+i2c.unlock()
+print("Devices found:", [hex(a) for a in devices])`;
+export const PI_KEYPAD = `from gpiozero import OutputDevice, Button
+from time import sleep
+
+keys = [["1", "2", "3", "A"], ["4", "5", "6", "B"], ["7", "8", "9", "C"], ["*", "0", "#", "D"]]
+rows = [OutputDevice(pin, initial_value=True) for pin in (5, 6, 13, 19)]   # driven LOW one at a time
+cols = [Button(pin, pull_up=True) for pin in (12, 16, 20, 21)]             # LOW = a key is pressed
+
+while True:
+    for r, row in enumerate(rows):
+        row.off()                              # activate this row
+        for c, col in enumerate(cols):
+            if col.is_pressed:
+                print("Key:", keys[r][c])
+                sleep(0.3)                     # simple debounce
+        row.on()
+    sleep(0.01)`;
+export const PI_STEP = `from gpiozero import OutputDevice
+from time import sleep
+
+coils = [OutputDevice(pin) for pin in (5, 6, 13, 19)]   # IN1, IN2, IN3, IN4
+sequence = [(1, 1, 0, 0), (0, 1, 1, 0), (0, 0, 1, 1), (1, 0, 0, 1)]   # two coils on at a time
+
+def step(count, delay=0.003):
+    for i in range(abs(count)):
+        pattern = sequence[i % 4] if count > 0 else sequence[3 - i % 4]
+        for coil, level in zip(coils, pattern):
+            coil.value = level
+        sleep(delay)                           # about 10 revolutions per minute
+
+while True:
+    step(2048)       # one revolution (nominal value)
+    sleep(0.5)
+    step(-2048)      # and back
+    sleep(0.5)`;
+export const PI_ISR = `from gpiozero import Button, LED
+from signal import pause
+
+led = LED(17)
+button = Button(2)
+
+def toggle():
+    led.toggle()
+    print("Button pressed")
+
+button.when_pressed = toggle   # gpiozero calls toggle() when the button goes down
+pause()                        # the program sleeps: no polling loop`;
+export const PI_TIMING = `from gpiozero import LED, Button
+from time import monotonic, sleep
+
+led = LED(17)
+button = Button(2)
+last_change = monotonic()
+was_pressed = False
+
+while True:
+    now = monotonic()                          # seconds since an arbitrary start
+    if now - last_change >= 1:
+        last_change = now
+        led.toggle()                           # blink once a second, without sleeping
+    if button.is_pressed and not was_pressed:
+        print("Button pressed: noticed at once")
+    was_pressed = button.is_pressed
+    sleep(0.01)`;
+export const PI_HTTP = `import requests
+
+url = "http://api.example.com/temperature"   # a made-up address for this lesson
+
+try:
+    response = requests.get(url, timeout=5)    # send a GET request
+    print("HTTP status:", response.status_code)
+    if response.status_code == 200:
+        print(response.text)
+except requests.exceptions.RequestException as error:
+    print("Request failed:", error)`;
+export const PI_MQTT = `import time
+import paho.mqtt.client as mqtt
+from gpiozero import LED
+
+led = LED(17)
+
+def on_message(client, userdata, message):    # runs for every message that arrives
+    text = message.payload.decode()
+    print("Received on", message.topic, ":", text)
+    if text == "ON":
+        led.on()
+    else:
+        led.off()
+
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)   # paho-mqtt 2.x
+client.on_message = on_message
+client.connect("broker.example.com", 1883)    # a made-up address for this lesson
+client.subscribe("home/led")
+client.loop_start()                            # network handling in a background thread
+
+while True:
+    client.publish("home/temperature", "21.5")
+    print("Published home/temperature = 21.5")
+    time.sleep(3)`;
+
+const piBat = (x, z) => [{ id: 'bat1', type: 'battery', x, z }, { id: 'lamp1', type: 'lamp', x: x + 40, z: z - 18 }];
+const piLamp = (rowEC, ohmsOrNull) => '';
+// diode: two identical branches (resistor, diode, LED) from one pin; the second diode is turned round
+export const PI_DIODE_PARTS = [
+  { id: 'w1', type: 'fwire', from: 'p11', to: 'a10', color: 'yellow', lift: 24 },
+  { id: 'r1', type: 'resistor', a: 'c10', b: 'c13', ohms: 100 },
+  { id: 'd1', type: 'diode', a: 'b13', k: 'b17' },
+  { id: 'led1', type: 'led', anode: 'c17', cathode: 'c18' },
+  { id: 'w2', type: 'fwire', from: 'p6', to: 'a18', color: 'black', lift: 30 },
+  { id: 'w3', type: 'wire', from: 'b10', to: 'b21', color: 'orange', lift: 12 },
+  { id: 'r2', type: 'resistor', a: 'c21', b: 'c24', ohms: 100 },
+  { id: 'd2', type: 'diode', a: 'b28', k: 'b24' },
+  { id: 'led2', type: 'led', anode: 'c28', cathode: 'c29' },
+  { id: 'w4', type: 'wire', from: 'b18', to: 'b29', color: 'black', lift: 12 },
+];
+const PDIO_IDS = PI_DIODE_PARTS.map(d => d.id);
+// NPN low-side switch for a 6 V lamp (battery and lamp on the desk)
+export const PI_Q_PARTS = [
+  { id: 'q1', type: 'npn', row: 'e', col: 10 },
+  { id: 'r1', type: 'resistor', a: 'a11', b: 'a15', ohms: 470 },
+  { id: 'w100', type: 'fwire', from: 'p11', to: 'b15', color: 'yellow', lift: 26 },
+  { id: 'w101', type: 'fwire', from: 'p6', to: 'b10', color: 'black', lift: 34 },
+  { id: 'bat1', type: 'battery', x: 125, z: -90 },
+  { id: 'lamp1', type: 'lamp', x: 165, z: -112 },
+  { id: 'l100', type: 'lead', from: 'bat1.POS', to: 'lamp1.L1', color: 'red', lift: 14 },
+  { id: 'l101', type: 'lead', from: 'lamp1.L2', to: 'c12', color: 'orange', lift: 18 },
+  { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c10', color: 'black', lift: 20 },
+];
+const PQ_IDS = PI_Q_PARTS.map(d => d.id);
+export const PI_M_PARTS = [
+  { id: 'q1', type: 'mosfet', row: 'e', col: 10 },
+  { id: 'r1', type: 'resistor', a: 'a5', b: 'a10', ohms: 220 },
+  { id: 'w100', type: 'fwire', from: 'p11', to: 'b5', color: 'yellow', lift: 26 },
+  { id: 'r2', type: 'resistor', a: 'd10', b: 'd12', ohms: 10000 },
+  { id: 'w102', type: 'fwire', from: 'p6', to: 'b12', color: 'black', lift: 34 },
+  { id: 'bat1', type: 'battery', x: 125, z: -90 },
+  { id: 'lamp1', type: 'lamp', x: 165, z: -112 },
+  { id: 'l100', type: 'lead', from: 'bat1.POS', to: 'lamp1.L1', color: 'red', lift: 14 },
+  { id: 'l101', type: 'lead', from: 'lamp1.L2', to: 'c11', color: 'orange', lift: 18 },
+  { id: 'l102', type: 'lead', from: 'bat1.NEG', to: 'c12', color: 'black', lift: 20 },
+];
+const PM_IDS = PI_M_PARTS.map(d => d.id);
+export const PI_DS_PARTS = [
+  { id: 'ds1', type: 'ds18b20', row: 'e', col: 10 },
+  { id: 'w70', type: 'fwire', from: 'p6', to: 'a10', color: 'black', lift: 28 },
+  { id: 'w71', type: 'fwire', from: 'p7', to: 'a11', color: 'yellow', lift: 36 },
+  { id: 'w72', type: 'fwire', from: 'p1', to: 'a12', color: 'red', lift: 22 },
+  { id: 'r70', type: 'resistor', a: 'c11', b: 'c14', ohms: 4700 },
+  { id: 'w73', type: 'wire', from: 'b12', to: 'b14', color: 'orange', lift: 12 },
+];
+const PDS_IDS = PI_DS_PARTS.map(d => d.id);
+export const PI_BMP_PARTS = piDisp('bmp280', 'bmp1', 'p1', ['VCC', 'GND', 'SCL', 'SDA'], 7);
+const PBMP_IDS = PI_BMP_PARTS.map(d => d.id);
+export const PI_MPU_PARTS = piDisp('mpu6050', 'mpu1', 'p1', ['VCC', 'GND', 'SCL', 'SDA'], 6);
+const PMPU_IDS = PI_MPU_PARTS.map(d => d.id);
+// two devices on one bus: both modules reach the same four breadboard columns (module wires in rows a and c)
+const PI_SC_NAMES = ['VCC', 'GND', 'SCL', 'SDA'];
+export const PI_SCAN_PARTS = [{ id: 'bmp1', type: 'bmp280', x: 125, z: -45 }, { id: 'mpu1', type: 'mpu6050', x: 60, z: -35 },
+  ...PI_SC_NAMES.map((n, i) => ({ id: 'm7' + i, type: 'fwire', from: 'bmp1.' + n, to: 'a' + (10 + i), color: { VCC: 'red', GND: 'black', SDA: 'blue', SCL: 'yellow' }[n], lift: 16 + i * 2 })),
+  ...PI_SC_NAMES.map((n, i) => ({ id: 'm6' + i, type: 'fwire', from: 'mpu1.' + n, to: 'c' + (10 + i), color: { VCC: 'orange', GND: 'black', SDA: 'white', SCL: 'green' }[n], lift: 40 + i * 2 })),
+  ...PI_SC_NAMES.map((n, i) => ({ id: 'w5' + i, type: 'fwire', from: { VCC: 'p1', GND: 'p6', SDA: 'p3', SCL: 'p5' }[n], to: 'b' + (10 + i), color: { VCC: 'red', GND: 'black', SDA: 'blue', SCL: 'yellow' }[n], lift: 26 + i * 4 }))];
+const PSC_IDS = PI_SCAN_PARTS.map(d => d.id);
+const PKP_PINS = ['p29', 'p31', 'p33', 'p35', 'p32', 'p36', 'p38', 'p40'], PKP_NAMES = ['R1', 'R2', 'R3', 'R4', 'C1', 'C2', 'C3', 'C4'], PKP_COL = ['blue', 'green', 'yellow', 'orange', 'white', 'red', 'black', 'violet'];
+export const PI_KP_PARTS = [{ id: 'kp1', type: 'keypad', x: 95, z: -20 },
+  ...PKP_NAMES.map((n, i) => ({ id: 'm4' + i, type: 'fwire', from: 'kp1.' + n, to: 'a' + (10 + i), color: PKP_COL[i], lift: 16 + i * 2 })),
+  ...PKP_NAMES.map((n, i) => ({ id: 'w4' + i, type: 'fwire', from: PKP_PINS[i], to: 'b' + (10 + i), color: PKP_COL[i], lift: 24 + i * 3 }))];
+const PKP_IDS = PI_KP_PARTS.map(d => d.id);
+const PST_NAMES = ['IN1', 'IN2', 'IN3', 'IN4', 'GND', 'VCC'], PST_PINS = ['p29', 'p31', 'p33', 'p35', 'p6', 'p2'];
+export const PI_STEP_PARTS = [{ id: 'stp1', type: 'stepper', x: 125, z: -45 },
+  ...PST_NAMES.map((n, i) => ({ id: 'ms' + i, type: 'fwire', from: 'stp1.' + n, to: 'a' + (10 + i), color: ['blue', 'green', 'yellow', 'orange', 'black', 'red'][i], lift: 16 + i * 2 })),
+  ...PST_NAMES.map((n, i) => ({ id: 'ws' + i, type: 'fwire', from: PST_PINS[i], to: 'b' + (10 + i), color: ['blue', 'green', 'yellow', 'orange', 'black', 'red'][i], lift: 24 + i * 3 }))];
+const PST_IDS = PI_STEP_PARTS.map(d => d.id);
+
+export const PI_MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — GPIO with Python', 3: 'Module 3 — Working on the Pi', 4: 'Module 4 — Sensors', 5: 'Module 5 — Web', 6: 'Module 6 — Final project', 7: 'Module 7 — Extra: sound', 8: 'Module 8 — Camera', 9: 'Module 9 — Light and climate', 10: 'Module 10 — Controls', 11: 'Module 11 — Displays', 12: 'Module 12 — Components that switch', 13: 'Module 13 — More sensors', 14: 'Module 14 — Controls and motion', 15: 'Module 15 — Programming patterns', 16: 'Module 16 — Network' };
 
 export const PI_LESSONS = [
   // ================================================================== P1
@@ -1533,6 +1796,462 @@ pause()</pre>
       { q: 'What does the Adafruit guide say about running the NeoPixel library?', a: ['It needs root access (sudo)', 'It needs no permissions', 'It only runs on Windows', 'It needs a monitor'], c: 0, why: 'Adafruit: running code for the NeoPixel library requires root access.' },
     ],
     sources: [SRC_PI.neopy, SRC_PI.neouber, SRC_PI.gpio],
+  },
+  // ================================================================== P20
+  {
+    id: 'p20', num: 20, module: 12, title: 'A diode: current flows one way', level: 'Intermediate', time: '25 min',
+    goal: 'See that a diode lets current through in one direction only, and read its band.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', '2 × diode 1N4007', '2 × 5 mm red LED', '2 × 100 Ω resistor', 'Breadboard and jumper wires'],
+    code: PI_DIODE, file: 'diode.py', program: 'pi_diode', fast: true,
+    circuit: PI_DIODE_PARTS, io: { p11: { kind: 'led', item: 'led1', diode: 'd1', rev: { r: 'r2', diode: 'd2', led: 'led2' }, needs: PDIO_IDS } },
+    explain: {
+      4: 'One pin (GPIO17, pin 11) feeds both branches through a resistor each.',
+      7: 'HIGH (3.3 V): in the first branch the current goes through the diode in its <b>forward</b> direction and the LED lights. In the second branch the diode is turned round and <b>blocks</b>.',
+      9: '0 V: no current anywhere.'
+    },
+    steps: [
+      { title: 'A one-way valve for current', view: 'pibb',
+        body: `<p>A <b>diode</b> lets current flow in <b>one direction only</b>. Its two legs are the <b>anode</b> (+) and the <b>cathode</b> (−, the end with the silver band).</p>` },
+      { title: 'The 1N4007', view: 'pibb', have: PDIO_IDS,
+        body: `<p>The <b>1N4007</b> is a common power diode. <b>Click it</b> in the 3D view.</p><ul><li>Average forward current <b>1 A</b>; forward voltage <b>1.1 V at 1 A</b> (Vishay datasheet).</li><li>It blocks up to <b>1000 V</b> in the reverse direction.</li></ul>` },
+      { title: 'Wire it', view: 'pibb', have: PDIO_IDS, power: false, pins: ['p11', 'p6'],
+        body: `<ul><li>Yellow: <b>pin 11 (GPIO17) → a10</b>; an orange link joins <b>b10 → b21</b> for the second branch</li><li>Black: <b>pin 6 (GND) → a18</b>, and a black link <b>b18 → b29</b> joins the two LED cathodes</li></ul><p>The resistors are 100 Ω: a GPIO pin gives 3.3 V.</p>` },
+      { title: 'The program', view: 'pibb', have: PDIO_IDS, showCode: true, power: true,
+        body: `<p>Just a blink on one pin. Click lines 7 and 9.</p>` },
+      { title: 'Run it', view: 'pibb', have: PDIO_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>When the pin is HIGH, only the <b>first LED</b> lights. The second one stays dark: its diode points the wrong way.</p>` },
+      { title: 'Summary', view: 'pibb', have: PDIO_IDS, power: true,
+        body: `<ul><li>Current flows from the <b>anode</b> to the <b>cathode</b> (the band).</li><li>A turned-round diode blocks.</li><li>1N4007: 1 A, 1.1 V at 1 A, 1000 V reverse.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Which end of a 1N4007 is the cathode?', a: ['The end without a mark', 'The end with the silver band', 'The longer leg', 'Either'], c: 1, why: 'The band marks the cathode.' },
+      { q: 'The diode is turned round in a series circuit. What happens?', a: ['It conducts more', 'It blocks the current', 'It burns', 'Nothing'], c: 1, why: 'A reverse-biased diode blocks.' }
+    ],
+    sources: [SRC_PI.d1n4007, SRC_PI.gpiozeroout, SRC_PI.ds],
+  },
+  // ================================================================== P21
+  {
+    id: 'p21', num: 21, module: 12, title: 'A transistor switches a lamp', level: 'Intermediate', time: '25 min',
+    goal: 'Let a small GPIO current switch a bigger load with an NPN transistor, and choose the base resistor.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'PN2222A NPN transistor (TO-92)', 'Resistor (470 Ω)', 'Battery holder 4 × AA (about 6 V) and a 6 V lamp', 'Breadboard and jumper wires'],
+    code: PI_QSW, file: 'transistor.py', program: 'pi_qsw', fast: true, widgets: ['qbase'], qdefault: 470,
+    circuit: PI_Q_PARTS, io: { p11: { kind: 'npn', item: 'q1', lamp: 'lamp1', needs: PQ_IDS } },
+    explain: {
+      4: 'GPIO17 (pin 11) is wired to the base resistor, which leads to the transistor’s <b>base</b>. The lamp is not connected to the pin.',
+      7: 'HIGH: a small current flows through the base resistor into the base. The transistor lets a much larger current flow from collector to emitter: <b>the lamp lights</b>.',
+      9: 'LOW: no base current, the transistor blocks, the lamp is off.'
+    },
+    steps: [
+      { title: 'Why a transistor?', view: 'pibb',
+        body: `<p>A 6 V lamp needs about <b>300 mA</b>. A Raspberry Pi GPIO pin can supply only a few milliamps safely (see the Pi documentation) and is <b>3.3 V only</b>, so it <b>cannot</b> drive the lamp directly. A <b>transistor</b> is a small electronic switch: a small current into its base lets a big current flow from the collector to the emitter.</p><p class="warn">Never connect a lamp, motor or relay coil straight to a GPIO pin.</p>` },
+      { title: 'The PN2222A', view: 'pibb', have: PQ_IDS,
+        body: `<p>With the <b>flat side facing you</b>, the pins from the left are <b>1 emitter, 2 base, 3 collector</b>. <b>Click it</b> in the 3D view.</p><ul><li>Continuous collector current <b>600 mA</b>; VCE(sat) 0.3 V at 150 mA / 15 mA (onsemi datasheet).</li></ul><p class="warn">Other versions have another pin order. Check the datasheet of your part.</p>` },
+      { title: 'Wire it', view: 'pibb', have: PQ_IDS, power: false, pins: ['p11', 'p6'],
+        body: `<ul><li>Yellow: <b>pin 11 → b15</b> (to the 470 Ω base resistor)</li><li>Black: <b>pin 6 (GND) → b10</b> (the emitter column)</li></ul><p>The lamp circuit is separate: battery + → lamp → <b>collector</b> (column 12); battery − → the <b>emitter column</b> (column 10), also joined to the Pi’s GND.</p>` },
+      { title: 'The program', view: 'pibb', have: PQ_IDS, showCode: true, power: true,
+        body: `<p>Just a blink. Click lines 7 and 9.</p>` },
+      { title: 'Run it and change the base resistor', view: 'pibb', have: PQ_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The lamp blinks. Choose another <b>base resistor</b> in the panel: with a small resistor the transistor is <b>saturated</b>; with <b>100 kΩ</b> only a trickle flows into the base.</p><p class="sim">Simplified model: collector current = about 100 × base current.</p>` },
+      { title: 'Summary', view: 'pibb', have: PQ_IDS, power: true,
+        body: `<ul><li>The pin drives the <b>base</b> through a resistor; the load goes between the supply and the <b>collector</b>; the <b>emitter</b> goes to GND.</li><li>All grounds joined.</li><li>Inductive loads need a flyback diode.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Why not connect the lamp directly to the pin?', a: ['The lamp is too bright', 'The lamp needs far more current than a pin can give', 'Pins are always LOW', 'Lamps need AC'], c: 1, why: 'A pin supplies only a few milliamps safely.' },
+      { q: 'The base resistor is 100 kΩ. What happens?', a: ['The lamp is brighter', 'Too little base current: the lamp stays dark or dim', 'The pin burns', 'Nothing changes'], c: 1, why: 'Collector current is only about 100 times the small base current.' }
+    ],
+    sources: [SRC_PI.pn2222, SRC_PI.gpiozeroout, SRC_PI.ds],
+  },
+  // ================================================================== P22
+  {
+    id: 'p22', num: 22, module: 12, title: 'A MOSFET switches a lamp', level: 'Intermediate', time: '25 min',
+    goal: 'Switch a bigger load with a logic-level MOSFET: the gate takes a voltage, not a current.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'IRLZ44N MOSFET (TO-220)', 'Resistors (220 Ω and 10 kΩ)', 'Battery holder 4 × AA (about 6 V) and a 6 V lamp', 'Breadboard and jumper wires'],
+    code: PI_MOSW, file: 'mosfet.py', program: 'pi_mosw', fast: true, widgets: ['mosload'],
+    circuit: PI_M_PARTS, io: { p11: { kind: 'mosfet', item: 'q1', lamp: 'lamp1', needs: PM_IDS } },
+    explain: {
+      4: 'GPIO17 drives the gate through a 220 Ω resistor. The lamp is not connected to the pin.',
+      7: 'HIGH: the gate gets 3.3 V. The MOSFET turns on and the lamp current flows from drain to source.',
+      9: 'LOW: the gate goes to 0 V (the 10 kΩ resistor also holds it there) and the lamp is off.'
+    },
+    steps: [
+      { title: 'A switch controlled by voltage', view: 'pibb',
+        body: `<p>A 6 V lamp needs about <b>300 mA</b>: a GPIO pin cannot drive it. A <b>MOSFET</b> is controlled by the <b>voltage on its gate</b>: the gate takes no steady current, so no base-current calculation is needed.</p><p class="warn">Never connect a lamp, motor or relay coil straight to a pin.</p>` },
+      { title: 'The IRLZ44N', view: 'pibb', have: PM_IDS,
+        body: `<p>With the <b>text facing you</b>, the pins from the left are <b>gate, drain, source</b>. <b>Click it</b> in the 3D view.</p><ul><li>Maximum <b>55 V</b> drain-source, <b>47 A</b> continuous; gate threshold <b>1.0 to 2.0 V</b>; gate ±16 V at most (Infineon datasheet).</li><li>On-resistance <b>35 mΩ at 4 V</b>, <b>25 mΩ at 5 V</b>, <b>22 mΩ at 10 V</b> on the gate.</li></ul><p class="warn">The datasheet gives no on-resistance below 4 V. The Pi pin gives only <b>3.3 V</b>: for a small lamp it works, for a big motor it is <b>not guaranteed</b>.</p>` },
+      { title: 'Wire it', view: 'pibb', have: PM_IDS, power: false, pins: ['p11', 'p6'],
+        body: `<ul><li>Yellow: <b>pin 11 → b5</b> (the 220 Ω gate resistor); the 10 kΩ resistor goes from the gate (<b>d10</b>) to <b>d12</b></li><li>Black: <b>pin 6 (GND) → b12</b> (the source column)</li></ul><p>Lamp circuit: battery + → lamp → <b>drain</b> (column 11); battery − → the <b>source column</b> (column 12), also joined to GND.</p>` },
+      { title: 'The program', view: 'pibb', have: PM_IDS, showCode: true, power: true,
+        body: `<p>Just a blink. Click lines 7 and 9.</p>` },
+      { title: 'Run it and choose the load', view: 'pibb', have: PM_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Choose a <b>lamp (about 300 mA)</b> or a <b>motor (about 1 A)</b> in the panel. With 3.3 V on the gate the motor option warns: the datasheet gives no value below 4 V.</p>` },
+      { title: 'Summary', view: 'pibb', have: PM_IDS, power: true,
+        body: `<ul><li>Gate = a <b>voltage</b> input. Source to GND, load between the supply and the <b>drain</b>.</li><li>Gate resistor (about 220 Ω) and a 10 kΩ pull-down.</li><li>3.3 V pins need care for big loads. A motor needs a flyback diode.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What controls a MOSFET?', a: ['A current into the gate', 'A voltage on the gate', 'Heat', 'Light'], c: 1, why: 'The gate takes no steady current: the voltage on it controls the channel.' },
+      { q: 'The datasheet gives the on-resistance for which gate voltages?', a: ['Only 3.3 V', '4 V, 5 V and 10 V', 'Only 1 V', 'All voltages'], c: 1, why: '35 mΩ at 4 V, 25 mΩ at 5 V, 22 mΩ at 10 V.' }
+    ],
+    sources: [SRC_PI.irlz44n, SRC_PI.gpiozeroout, SRC_PI.ds],
+  },
+  // ================================================================== P23
+  {
+    id: 'p23', num: 23, module: 13, title: 'DS18B20: a digital thermometer on one wire', level: 'Intermediate', time: '25 min',
+    goal: 'Wire a DS18B20 with its 4.7 kΩ pull-up and read it through the Linux 1-Wire driver.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'Breadboard', 'DS18B20 temperature sensor (TO-92)', '4.7 kΩ resistor', '3 × female–male jumper wires', '1 × jumper wire'],
+    code: PI_DS18, file: 'ds18b20.py', program: 'pi_ds18', fast: true, widgets: ['pisens', 'nohum'], sdaWire: 'w71', dht: true, wn: 'DQ',
+    circuit: PI_DS_PARTS, io: { p7: { kind: 'ds18b20', item: 'ds1', needs: PDS_IDS } },
+    explain: {
+      4: 'The Linux 1-Wire driver shows each 1-Wire device as a folder here.',
+      5: 'A DS18B20 appears as a folder starting with <b>28-</b>. This line fails (StopIteration) when no sensor is found: check the wiring and that 1-Wire is on.',
+      8: 'The file <b>w1_slave</b> holds two lines of text.',
+      9: 'The first line ends with <b>YES</b> when the CRC check passed.',
+      10: 'The second line ends with <b>t=</b> and the temperature in thousandths of a degree.',
+      11: 'Divide by 1000 for °C.',
+      13: 'A bad reading: just try again.',
+      14: 'One reading per second.'
+    },
+    steps: [
+      { title: 'The DS18B20', view: 'pibb', have: PDS_IDS,
+        body: `<p>A <b>digital</b> thermometer in a TO-92 case. With the <b>flat face toward you</b>, the legs from the left are <b>GND, DQ, VDD</b>. <b>Click it</b> in the 3D view.</p><ul><li>Supply <b>3.0 V to 5.5 V</b>; <b>−55 °C to +125 °C</b>, ±0.5 °C from −10 °C to +85 °C (datasheet).</li></ul>` },
+      { title: 'The pull-up resistor and the 1-Wire driver', view: 'pibb', have: PDS_IDS,
+        body: `<p>DQ is <b>open-drain</b>: a <b>4.7 kΩ pull-up</b> between DQ and VDD holds it high. On the Raspberry Pi the sensor goes on <b>GPIO4 (pin 7)</b>, the default 1-Wire pin. Switch <b>1-Wire on</b> (Control Centre → Interfaces, or <code>sudo raspi-config</code>, Lesson 9) and reboot.</p>` },
+      { title: 'Wire it', view: 'pibb', have: PDS_IDS, power: false, pins: ['p7', 'p6', 'p1'],
+        body: `<ul><li>Black: <b>pin 6 (GND) → a10</b></li><li>Yellow: <b>pin 7 (GPIO4) → a11</b> (DQ)</li><li>Red: <b>pin 1 (3V3) → a12</b> (VDD)</li></ul><p>The 4.7 kΩ resistor goes from <b>c11</b> to <b>c14</b>; a jumper links <b>b12 → b14</b>.</p>` },
+      { title: 'The program', view: 'pibb', have: PDS_IDS, showCode: true, power: true,
+        body: `<p>Click lines 5, 9 and 10.</p>` },
+      { title: 'Run it and change the temperature', view: 'pibb', have: PDS_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Once a second the Shell prints the temperature. <b>Move the temperature slider</b>: the values move in steps of 0.0625 °C at 12-bit resolution.</p><p class="sim">Simulated values.</p>` },
+      { title: 'What if the data wire is loose?', view: 'pibb', have: PDS_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Stop the program, press <b>“Unplug the DQ wire”</b> and run again: no folder starting with 28- exists and Python stops with a StopIteration error.</p>` },
+      { title: 'Summary', view: 'pibb', have: PDS_IDS, power: true,
+        body: `<ul><li>DS18B20: GND, DQ, VDD; DQ needs a <b>4.7 kΩ pull-up</b> to VDD.</li><li>On the Pi: 1-Wire on, GPIO4, folder <code>28-…</code>, file <code>w1_slave</code>, <code>t=</code> in thousandths of a degree.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What is the pull-up resistor for?', a: ['To cool the sensor', 'To hold the open-drain DQ line high', 'To measure the temperature', 'To limit the LED current'], c: 1, why: 'The sensor can only pull DQ low.' },
+      { q: 'The file says t=23125. What is the temperature?', a: ['23.125 °C', '231.25 °C', '2.3125 °C', '23125 °C'], c: 0, why: 'Thousandths of a degree.' }
+    ],
+    sources: [SRC_PI.ds18, SRC_PI.cfg, SRC_PI.ds],
+  },
+  // ================================================================== P24
+  {
+    id: 'p24', num: 24, module: 13, title: 'BMP280: air pressure and temperature', level: 'Intermediate', time: '25 min',
+    goal: 'Read pressure and temperature from a BMP280 over I²C with the Adafruit CircuitPython library.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'BMP280 breakout (4-pin I²C version)', '8 × female jumper wires'],
+    code: PI_BMP, file: 'bmp280.py', program: 'pi_bmp', fast: true, widgets: ['bmpsens'],
+    circuit: PI_BMP_PARTS, io: { p3: { kind: 'bmp', sda: 'p3', scl: 'p5', item: 'bmp1', needs: PBMP_IDS } },
+    explain: {
+      2: '<b>board</b> (Adafruit Blinka) knows the Pi’s pin names.',
+      3: 'The BMP280 driver.',
+      5: 'The I²C bus on GPIO2 (SDA, pin 3) and GPIO3 (SCL, pin 5).',
+      6: 'The sensor at address <b>0x76</b> (SDO on GND; 0x77 with SDO on VDDIO). If nothing answers, Python raises a ValueError.',
+      9: '°C.',
+      10: 'The pressure in <b>hPa</b>: about 1013 at sea level.'
+    },
+    steps: [
+      { title: 'Pressure from a tiny chip', view: 'dispp',
+        body: `<p>Air pressure is about <b>1013 hPa</b> at sea level and falls with height and bad weather. The <b>BMP280</b> measures it plus the temperature and reports both over I²C.</p>` },
+      { title: 'The BMP280 breakout', view: 'dispp', have: PBMP_IDS,
+        body: `<p>Pins: <b>VCC, GND, SCL, SDA</b>. <b>Click it</b>. Bosch datasheet: <b>300–1100 hPa</b>, <b>−40 to +85 °C</b>; the chip runs from <b>1.71 V to 3.6 V</b>, so use <b>3.3 V</b>; address <b>0x76</b> (SDO to GND) or <b>0x77</b> (SDO to VDDIO).</p><p class="warn">Boards sold as BMP280 are sometimes a BME280 (with humidity): the chip ID tells them apart (0x58 is a BMP280).</p>` },
+      { title: 'Turn I²C on, wire it', view: 'dispp', have: PBMP_IDS, power: false, pins: ['p1', 'p6', 'p5', 'p3'],
+        body: `<p>Turn I²C on first (Lesson 9). Breadboard rows <b>a10 – a13</b> and <b>b10 – b13</b>: <b>VCC → pin 1 (3V3)</b>, <b>GND → pin 6</b>, <b>SCL → pin 5</b>, <b>SDA → pin 3</b>.</p>` },
+      { title: 'Install the library', view: 'home',
+        body: `<p>In the Terminal (virtual environment, Lesson 8):</p><pre class="tree">pip3 install adafruit-circuitpython-bmp280</pre>` },
+      { title: 'The program', view: 'dispp', have: PBMP_IDS, showCode: true, power: true,
+        body: `<p>Click lines 6 and 10.</p>` },
+      { title: 'Run it and change the weather', view: 'dispp', have: PBMP_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Every second the Shell prints temperature and pressure. Move the <b>temperature</b> and <b>pressure</b> sliders.</p><p class="sim">Simulated values.</p>` },
+      { title: 'Summary', view: 'dispp', have: PBMP_IDS, power: true,
+        body: `<ul><li>BMP280: 300–1100 hPa, over I²C at 0x76 or 0x77; supply 1.71–3.6 V.</li><li><code>bmp.pressure</code> is already in hPa.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'About what pressure is normal at sea level?', a: ['10 hPa', '101 hPa', '1013 hPa', '10 130 hPa'], c: 2, why: 'About 1013 hPa.' },
+      { q: 'What does the SDO pin choose?', a: ['The I²C address (0x76 or 0x77)', 'The speed', 'The unit', 'The temperature range'], c: 0, why: 'SDO to GND gives 0x76, to VDDIO 0x77.' }
+    ],
+    sources: [SRC_PI.bmpds, SRC_PI.bmppy, SRC_PI.cfg],
+  },
+  // ================================================================== P25
+  {
+    id: 'p25', num: 25, module: 13, title: 'MPU6050: tilt and rotation', level: 'Intermediate', time: '25 min',
+    goal: 'Read acceleration and rotation from an MPU6050 over I²C, and see how gravity shows up in the numbers.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'MPU6050 breakout (GY-521 style)', '8 × female jumper wires'],
+    code: PI_MPU, file: 'mpu6050.py', program: 'pi_mpu', fast: true, widgets: ['mpusens'],
+    circuit: PI_MPU_PARTS, io: { p3: { kind: 'mpu', sda: 'p3', scl: 'p5', item: 'mpu1', needs: PMPU_IDS } },
+    explain: {
+      3: 'The Adafruit MPU6050 driver.',
+      6: 'The sensor at address <b>0x68</b> (it also wakes the chip from sleep).',
+      9: '<b>mpu.acceleration</b> is a tuple (x, y, z) in <b>m/s²</b>. Lying flat, Z reads about 9.8: that is gravity.',
+      11: '<b>mpu.gyro</b> is the rotation speed (x, y, z) in rad/s; index 2 is Z.'
+    },
+    steps: [
+      { title: 'Two sensors in one chip', view: 'dispp',
+        body: `<p>The <b>MPU6050</b> has a <b>3-axis accelerometer</b> and a <b>3-axis gyroscope</b>. The accelerometer measures acceleration <b>including gravity</b> (about 9.8 m/s² on Z when flat), so it tells you how the board is tilted; the gyroscope measures how fast it rotates.</p>` },
+      { title: 'The breakout and the address', view: 'dispp', have: PMPU_IDS,
+        body: `<p>Pins: <b>VCC, GND, SCL, SDA</b> (the header has more: XDA, XCL, AD0, INT). <b>Click it</b>. The chip wakes from sleep when the driver starts it; the I²C address is <b>0x68</b> (0x69 with AD0 high). Check the printing on your board for the pin order.</p>` },
+      { title: 'Wire it', view: 'dispp', have: PMPU_IDS, power: false, pins: ['p1', 'p6', 'p5', 'p3'],
+        body: `<p>I²C on (Lesson 9). <b>VCC → pin 1 (3V3)</b>, <b>GND → pin 6</b>, <b>SCL → pin 5</b>, <b>SDA → pin 3</b>.</p>` },
+      { title: 'Install the library', view: 'home',
+        body: `<pre class="tree">pip3 install adafruit-circuitpython-mpu6050</pre>` },
+      { title: 'The program', view: 'dispp', have: PMPU_IDS, showCode: true, power: true,
+        body: `<p>Click lines 9 and 11.</p>` },
+      { title: 'Run it and tilt the board', view: 'dispp', have: PMPU_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Move the <b>pitch</b> and <b>roll</b> sliders (or drag the board) and watch the gravity move from Z to X or Y. Set a <b>rotation</b> to see the gyro value.</p><p class="sim">Simulated board and readings.</p>` },
+      { title: 'Summary', view: 'dispp', have: PMPU_IDS, power: true,
+        body: `<ul><li>Accelerometer: acceleration including gravity; gyroscope: rotation speed.</li><li>Address 0x68; <code>mpu.acceleration</code>, <code>mpu.gyro</code>.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'The board lies flat and still. What does Z read?', a: ['0', 'About 9.8 m/s²', 'About 98 m/s²', 'It changes randomly'], c: 1, why: 'Gravity: about 9.8 m/s² (1 g).' },
+      { q: 'What does the gyroscope measure?', a: ['Temperature', 'How fast the board rotates', 'Magnetic field', 'Distance'], c: 1, why: 'Rotation speed around each axis.' }
+    ],
+    sources: [SRC_PI.mpureg, SRC_PI.mpupy, SRC_PI.cfg],
+  },
+  // ================================================================== P26
+  {
+    id: 'p26', num: 26, module: 13, title: 'I²C scanner: two devices, one bus', level: 'Intermediate', time: '25 min',
+    goal: 'Put two I²C devices on the same two wires and find their addresses.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'BMP280 breakout', 'MPU6050 breakout', '12 × female jumper wires'],
+    code: PI_SCAN, file: 'i2cscan.py', program: 'pi_i2cscan', fast: true,
+    circuit: PI_SCAN_PARTS, io: { p3: { kind: 'bmp', sda: 'p3', scl: 'p5', item: 'bmp1', needs: PSC_IDS }, MPU: { kind: 'mpu', sda: 'p3', scl: 'p5', item: 'mpu1', needs: PSC_IDS } },
+    explain: {
+      3: 'The I²C bus on GPIO2 / GPIO3.',
+      4: 'The bus is shared: <b>try_lock()</b> takes control (it returns False while another part of the program uses it).',
+      6: '<b>scan()</b> asks every address and returns the ones that <b>answered</b>.',
+      7: 'Give the bus back.',
+      8: 'Print the addresses in hexadecimal.'
+    },
+    steps: [
+      { title: 'Many devices, two wires', view: 'dispp',
+        body: `<p>I²C uses <b>two wires</b>, SDA and SCL. Many devices can share them, because <b>each device has its own address</b>. A scanner asks every address and lists the answers.</p>` },
+      { title: 'Two devices on one bus', view: 'dispp', have: PSC_IDS,
+        body: `<p>The <b>BMP280</b> answers at <b>0x76</b>, the <b>MPU6050</b> at <b>0x68</b>. Different addresses: no conflict. Two devices with the <b>same</b> address would collide.</p>` },
+      { title: 'Wire it', view: 'dispp', have: PSC_IDS, power: false, pins: ['p1', 'p6', 'p5', 'p3'],
+        body: `<p>Both modules go to the <b>same four breadboard columns</b> (10 to 13): VCC, GND, SCL, SDA. The Pi connects to those columns once: <b>pin 1 → b10</b>, <b>pin 6 → b11</b>, <b>pin 5 (SCL) → b12</b>, <b>pin 3 (SDA) → b13</b>.</p>` },
+      { title: 'The program', view: 'dispp', have: PSC_IDS, showCode: true, power: true,
+        body: `<p>Click lines 4 and 6.</p>` },
+      { title: 'Run the scanner', view: 'dispp', have: PSC_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The Shell prints <code>Devices found: ['0x68', '0x76']</code>. Now you know the addresses for your own programs.</p>` },
+      { title: 'Summary', view: 'dispp', have: PSC_IDS, power: true,
+        body: `<ul><li>Devices on one bus are told apart by their 7-bit address.</li><li>If one is missing: check power, SDA/SCL and the address jumpers.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How many wires does an I²C bus use for data and clock?', a: ['One', 'Two', 'Four', 'Eight'], c: 1, why: 'SDA and SCL.' },
+      { q: 'Two devices have the same address. What happens?', a: ['Nothing', 'They collide on the bus', 'The faster one wins always', 'Python fixes it'], c: 1, why: 'Each device needs its own address.' }
+    ],
+    sources: [SRC_PI.cfg, SRC_PI.bmpds, SRC_PI.mpureg],
+  },
+  // ================================================================== P27
+  {
+    id: 'p27', num: 27, module: 14, title: 'Keypad: sixteen keys on eight wires', level: 'Intermediate', time: '25 min',
+    goal: 'Scan a 4×4 matrix keypad with GPIO Zero and understand how a matrix scan finds the pressed key.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', '4×4 matrix keypad (8 pins)', '16 × female jumper wires'],
+    code: PI_KEYPAD, file: 'keypad.py', program: 'pi_keypad', fast: true, widgets: ['keypad'],
+    circuit: PI_KP_PARTS, io: { p29: { kind: 'keypad', rows: ['p29', 'p31', 'p33', 'p35'], cols: ['p32', 'p36', 'p38', 'p40'], item: 'kp1', needs: PKP_IDS } },
+    explain: {
+      4: 'The characters of the keys, laid out like the keypad.',
+      5: 'Four <b>row</b> wires as outputs (GPIO5, 6, 13, 19), all HIGH at the start.',
+      6: 'Four <b>column</b> wires as inputs with pull-ups (GPIO12, 16, 20, 21): LOW means a key connects it to the active row.',
+      10: 'Drive one row LOW.',
+      12: 'Is a column LOW? Then the key at this row and column is pressed.',
+      13: 'Print it.',
+      14: 'A simple debounce: wait before looking again.',
+      15: 'Release the row and go to the next one.'
+    },
+    steps: [
+      { title: 'Sixteen keys, eight wires', view: 'pikey',
+        body: `<p>A <b>matrix</b> uses <b>4 row wires and 4 column wires</b>: a key sits where a row crosses a column and connects them. 4 + 4 = 8 wires for 16 keys.</p>` },
+      { title: 'How a scan finds the key', view: 'pikey', have: PKP_IDS,
+        body: `<p>The program sets the <b>rows</b> as outputs, one after another, and reads the <b>columns</b>. When row 2 is driven LOW and column 3 reads LOW, the key at row 2, column 3 is pressed: <b>6</b>. <b>Click the keypad</b>.</p><p class="warn">The pin order differs between makers: check the printing on yours.</p>` },
+      { title: 'Wire it', view: 'pikey', have: PKP_IDS, power: false, pins: ['p29', 'p31', 'p33', 'p35', 'p32', 'p36', 'p38', 'p40'],
+        body: `<p>Keypad pins R1 to R4, C1 to C4 go to breadboard row a (columns 10 to 17); the Pi connects in row b: rows → <b>pins 29, 31, 33, 35</b> (GPIO5, 6, 13, 19), columns → <b>pins 32, 36, 38, 40</b> (GPIO12, 16, 20, 21).</p>` },
+      { title: 'The program', view: 'pikey', have: PKP_IDS, showCode: true, power: true,
+        body: `<p>Click lines 10, 12 and 13.</p>` },
+      { title: 'Run it and press keys', view: 'pikey', have: PKP_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Press keys on the keypad in the panel (or click the 3D keys). The Shell prints each key and the panel shows which <b>row and column</b> got connected.</p><p class="sim">Simulated keypad.</p>` },
+      { title: 'Summary', view: 'pikey', have: PKP_IDS, power: true,
+        body: `<ul><li>Rows × columns wires for rows × columns keys.</li><li>Drive one row, read the columns; the crossing is the key.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How many wires does a 4×4 matrix keypad use?', a: ['4', '8', '16', '32'], c: 1, why: '4 rows + 4 columns.' },
+      { q: 'What does pressing a key do?', a: ['Connects its row to its column', 'Sends a Wi-Fi packet', 'Powers the keypad', 'Resets the Pi'], c: 0, why: 'The key is a switch between a row and a column.' }
+    ],
+    sources: [SRC_PI.gpiozeroin, SRC_PI.gpiozeroout, SRC_PI.gpio],
+  },
+  // ================================================================== P28
+  {
+    id: 'p28', num: 28, module: 14, title: 'Stepper motor: turn exactly one revolution', level: 'Intermediate', time: '25 min',
+    goal: 'Drive a 28BYJ-48 stepper motor through a ULN2003 board with four GPIO pins: one turn each way.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', '28BYJ-48 stepper motor (5 V) with its ULN2003 driver board', '12 × female–male jumper wires'],
+    code: PI_STEP, file: 'stepper.py', program: 'pi_step', fast: true, widgets: ['stepper'],
+    circuit: PI_STEP_PARTS, io: { p29: { kind: 'stepper', idx: 1, item: 'stp1', needs: PST_IDS }, p31: { kind: 'stepper', idx: 2, item: 'stp1', needs: PST_IDS }, p33: { kind: 'stepper', idx: 3, item: 'stp1', needs: PST_IDS }, p35: { kind: 'stepper', idx: 4, item: 'stp1', needs: PST_IDS } },
+    explain: {
+      4: 'Four output pins, one per coil input IN1 to IN4 (GPIO5, 6, 13, 19).',
+      5: 'The coil patterns, <b>two coils on at a time</b>: each new pattern turns the shaft one small step.',
+      7: 'One function does the stepping. A negative count turns the other way.',
+      9: 'Pick the next pattern (or the previous one when going backwards).',
+      11: 'Switch the four coils.',
+      12: 'The delay between steps sets the speed: 3 ms is about 10 revolutions per minute.',
+      15: 'About <b>2048 steps</b> per turn of the output shaft (vendor sheets: 1/64 gear, 5.625°/64 per step; the true ratio is a little different).'
+    },
+    steps: [
+      { title: 'A motor that counts', view: 'dispp',
+        body: `<p>A <b>stepper motor</b> moves in small <b>exact steps</b>: you energise its coils in a repeating pattern and each new pattern turns the shaft a fixed small angle. Count the steps and you know the position.</p>` },
+      { title: 'The 28BYJ-48 and its driver', view: 'dispp', have: PST_IDS,
+        body: `<p>Vendor sheets: <b>5 V</b>, nominal gear <b>1/64</b>, about <b>2048 steps</b> per turn. A GPIO pin cannot power the coils, so the <b>ULN2003 board</b> switches them; four LEDs show which coils are on. <b>Click it</b>.</p><p class="warn">Seller sheets disagree on coil resistance (22 Ω or 50 Ω): read the sheet of your own motor.</p>` },
+      { title: 'Wire it', view: 'dispp', have: PST_IDS, power: false, pins: ['p29', 'p31', 'p33', 'p35', 'p6', 'p2'],
+        body: `<p>Driver pins IN1 to IN4, GND, VCC to breadboard row a (columns 10 to 15); the Pi connects in row b: <b>pins 29, 31, 33, 35</b> (IN1 to IN4), <b>pin 6</b> (GND), <b>pin 2 (5V)</b> (VCC).</p>` },
+      { title: 'The program', view: 'dispp', have: PST_IDS, showCode: true, power: true,
+        body: `<p>Click lines 5, 9 and 15.</p>` },
+      { title: 'Run it', view: 'dispp', have: PST_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The four LEDs chase and the shaft (red mark) turns one revolution, pauses, then one back. At about 10 rpm a turn takes about 6 seconds.</p><p class="sim">Simulated motor.</p>` },
+      { title: 'Summary', view: 'dispp', have: PST_IDS, power: true,
+        body: `<ul><li>Stepper: exact steps by energising coils in a pattern; the ULN2003 board does the switching.</li><li>Negative count = other direction; about 10–15 rpm is typical for this motor.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'How many steps for one output revolution of a 28BYJ-48 (nominal)?', a: ['32', '200', '2048', '10000'], c: 2, why: 'About 2048 full steps with the 1/64 gearbox.' },
+      { q: 'Why use a ULN2003 board?', a: ['To make the motor faster', 'A pin cannot supply the coil current', 'To store the position', 'To cool the motor'], c: 1, why: 'It switches the coil current for the pins.' }
+    ],
+    sources: [SRC_PI.uln, SRC_PI.gpiozeroout, SRC_PI.gpio],
+  },
+  // ================================================================== P29
+  {
+    id: 'p29', num: 29, module: 15, title: 'Events: never miss a button press', level: 'Intermediate', time: '25 min',
+    goal: 'Use button.when_pressed so a press is handled the moment it happens, without a polling loop.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'The LED and button circuit of Lesson 5', 'Breadboard and jumper wires'],
+    code: PI_ISR, file: 'event.py', program: 'pi_isr', fast: true, widgets: ['button'],
+    circuit: PI_BTN_PARTS, io: { p11: IO_LED, p3: { kind: 'button', item: 'btn1', needs: BTN_IDS } },
+    explain: {
+      4: 'The LED on GPIO17 (Lesson 4).',
+      5: 'The button on GPIO2, with its internal pull-up (Lesson 5).',
+      7: 'The <b>handler</b>: a normal function.',
+      8: 'Switch the LED on or off.',
+      11: '<b>when_pressed</b>: GPIO Zero calls <code>toggle()</code> by itself when the button goes down, from a background thread.',
+      12: 'The main program just waits. No loop checks the button: the press cannot be missed.'
+    },
+    steps: [
+      { title: 'Polling or events?', view: 'pibb',
+        body: `<p>A loop that reads the button with <code>sleep(1)</code> in between can <b>miss a short press</b>. With an <b>event</b>, the library watches the pin and calls your function the moment the button goes down.</p>` },
+      { title: 'Use the button lesson circuit', view: 'pibb', have: BTN_IDS, power: false, pins: ['p11', 'p3'],
+        body: `<p>LED on <b>GPIO17 (pin 11)</b>, button on <b>GPIO2 (pin 3)</b> to GND: exactly as in Lessons 4 and 5. Nothing new to wire.</p>` },
+      { title: 'The program', view: 'pibb', have: BTN_IDS, showCode: true, power: true,
+        body: `<p>Click lines 7 and 11.</p>` },
+      { title: 'Run it and tap the button', view: 'pibb', have: BTN_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Tap the button (Hold to press, then let go). The LED toggles and the Shell reports it immediately.</p><p class="sim">The simulator checks the pin about 100 times per second to imitate the event.</p>` },
+      { title: 'Summary', view: 'pibb', have: BTN_IDS, power: true,
+        body: `<ul><li><code>button.when_pressed = function</code> calls your function on every press.</li><li>Keep handlers short; the main program can just <code>pause()</code>.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does when_pressed do?', a: ['Calls your function when the button goes down', 'Waits for a press', 'Turns the LED on', 'Resets the Pi'], c: 0, why: 'GPIO Zero calls the function by itself.' },
+      { q: 'What does pause() do?', a: ['Keeps the program alive while events happen', 'Stops the Pi', 'Waits one second', 'Reads the button'], c: 0, why: 'It lets the main thread sleep while callbacks run.' }
+    ],
+    sources: [SRC_PI.gpiozeroin, SRC_PI.gpio],
+  },
+  // ================================================================== P30
+  {
+    id: 'p30', num: 30, module: 15, title: 'Blink without sleeping: monotonic()', level: 'Intermediate', time: '25 min',
+    goal: 'Keep a program responsive: do two things at once by checking the clock instead of sleeping for a second.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'The LED and button circuit of Lesson 5', 'Breadboard and jumper wires'],
+    code: PI_TIMING, file: 'timing.py', program: 'pi_timing', fast: true, widgets: ['button'],
+    circuit: PI_BTN_PARTS, io: { p11: IO_LED, p3: { kind: 'button', item: 'btn1', needs: BTN_IDS } },
+    explain: {
+      6: '<b>monotonic()</b> returns seconds since an arbitrary start: it never goes backwards and does not stop the program.',
+      7: 'The previous button state, to notice the moment it changes.',
+      11: 'Has one second passed since the last change? If not, <b>skip the block and carry on</b>.',
+      13: 'Toggle the LED.',
+      14: 'Pressed now and not before: the button was <b>just pressed</b>.',
+      17: 'A tiny pause so the loop does not use all of the processor.'
+    },
+    steps: [
+      { title: 'The problem with sleep(1)', view: 'pibb',
+        body: `<p>During <code>sleep(1)</code> the program does <b>nothing else</b>: a button pressed in that time is not noticed. To blink an LED <b>and</b> watch a button, never wait long: look at the clock instead.</p>` },
+      { title: 'The idea: look at the clock', view: 'pibb',
+        body: `<p>Keep the time of the last change and ask in every pass: <b>has 1 second passed?</b> If yes, toggle the LED; if not, carry on and read the button.</p>` },
+      { title: 'Use the button lesson circuit', view: 'pibb', have: BTN_IDS, power: false, pins: ['p11', 'p3'],
+        body: `<p>LED on pin 11, button on pin 3, as before.</p>` },
+      { title: 'The program', view: 'pibb', have: BTN_IDS, showCode: true, power: true,
+        body: `<p>Click lines 10 and 11.</p>` },
+      { title: 'Run it and press the button', view: 'pibb', have: BTN_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>The LED blinks every second. <b>Hold the button</b>: the Shell shows the message <b>at once</b>, even in the middle of a blink interval.</p>` },
+      { title: 'Summary', view: 'pibb', have: BTN_IDS, power: true,
+        body: `<ul><li><code>sleep()</code> blocks everything; <code>monotonic()</code> does not.</li><li>Pattern: <code>if now - last &gt;= interval: last = now; …</code></li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does monotonic() return?', a: ['Seconds since an arbitrary start, never backwards', 'The time of day', 'The LED state', 'The pin number'], c: 0, why: 'A clock that only counts up.' },
+      { q: 'Why is sleep(1) a problem when you also read a button?', a: ['It uses too much power', 'The program does nothing else during the sleep', 'It only works once', 'It needs a pull-up'], c: 1, why: 'The program cannot read the button while it waits.' }
+    ],
+    sources: [SRC_PI.gpiozeroin, SRC_PI.gpio],
+  },
+  // ================================================================== P31
+  {
+    id: 'p31', num: 31, module: 16, title: 'HTTP client: ask a web server (GET)', level: 'Intermediate', time: '25 min',
+    goal: 'Send an HTTP GET request with the requests library, read the status code and the answer, and handle errors.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'An Internet connection (Wi-Fi or Ethernet)'],
+    code: PI_HTTP, file: 'http_get.py', program: 'pi_http', fast: true, widgets: ['httpserver'],
+    circuit: [], io: {},
+    explain: {
+      1: 'The <b>requests</b> library (install: <code>pip3 install requests</code>).',
+      3: 'The address to ask. Made up for this lesson: use a real address on a real Pi.',
+      5: 'Network calls can fail, so wrap them in <b>try / except</b>.',
+      6: '<b>requests.get(url, timeout=5)</b> sends the request and waits for the answer, at most 5 seconds.',
+      7: 'The <b>HTTP status code</b>: 200 = OK, 404 = not found.',
+      8: '200 means success: the server sent data.',
+      9: 'The body of the answer as text.',
+      10: 'The request itself failed (no connection, time-out…).',
+      11: 'Print the reason.'
+    },
+    steps: [
+      { title: 'The Pi is a web client', view: 'home',
+        body: `<p>In the web-page lesson the Pi <b>answered</b> requests. Now it <b>asks</b>, like a browser: it sends a <b>GET request</b> and gets a <b>status code</b> and a <b>body</b>.</p>` },
+      { title: 'Status codes and the body', view: 'home',
+        body: `<ul><li><b>200 OK</b>: success, the body has the data.</li><li><b>404 Not Found</b>: the server is there but has nothing at that address.</li><li>An <b>exception</b>: the request itself failed, there was no answer at all.</li></ul><p class="sim">In this simulation the server and its answer are made up.</p>` },
+      { title: 'The program', view: 'home', showCode: true, power: true,
+        body: `<p>Click lines 6 and 8.</p>` },
+      { title: 'Run it: the server answers, 404, down', view: 'home', showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>. With <b>“Server: answers 200”</b> you see <code>HTTP status: 200</code> and the data. Press <b>■ Stop</b>, click the server button to choose <b>404</b> or <b>down</b> and run again.</p>` },
+      { title: 'Summary', view: 'home', power: true,
+        body: `<ul><li><code>requests.get(url, timeout=5)</code>; <code>response.status_code</code>; <code>response.text</code>.</li><li>Always catch <code>RequestException</code> and use a time-out.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'What does response.status_code hold?', a: ['The HTTP status code such as 200', 'The body', 'The IP address', 'The Wi-Fi name'], c: 0, why: '200 = OK, 404 = not found.' },
+      { q: 'Why use a time-out?', a: ['So the program does not wait forever if the server is down', 'To make it faster', 'To save power', 'It is required by Python'], c: 0, why: 'Without it a dead connection can block the program.' }
+    ],
+    sources: [SRC_PI.requests, SRC_PI.httpmdn],
+  },
+  // ================================================================== P32
+  {
+    id: 'p32', num: 32, module: 16, title: 'MQTT: publish a value and listen to a topic', level: 'Intermediate', time: '25 min',
+    goal: 'Use a broker: publish a temperature to a topic, subscribe to another topic, and switch the LED from a message.',
+    hardware: ['Raspberry Pi 4 (set up, Lesson 2)', 'The LED circuit of Lesson 4', 'An MQTT broker (simulated here)'],
+    code: PI_MQTT, file: 'mqtt_demo.py', program: 'pi_mqtt', fast: true, widgets: ['mqttbroker'],
+    circuit: PI_LED_PARTS, io: { p11: IO_LED },
+    explain: {
+      2: 'The <b>paho-mqtt</b> client library (<code>pip3 install paho-mqtt</code>).',
+      7: 'The <b>callback</b>: paho calls it for every message that arrives on a topic we subscribed to.',
+      8: 'The payload arrives as bytes: decode it to text.',
+      9: 'Show where it came from and what it said.',
+      10: '“ON” switches the LED on, anything else off.',
+      15: 'Create the client. paho-mqtt 2.x needs the callback API version as the first argument.',
+      16: 'Tell the client which function handles incoming messages.',
+      17: '<b>connect(host, port)</b>: where the broker is. <b>1883</b> is the standard MQTT port (8883 for the encrypted one). Made up for the lesson.',
+      18: '<b>subscribe(topic)</b>: ask the broker to send us everything published on <b>home/led</b>.',
+      19: 'Handle the network in a background thread.',
+      22: '<b>publish(topic, payload)</b> sends a value to <b>home/temperature</b>. Everyone subscribed to it receives it.'
+    },
+    steps: [
+      { title: 'Publish and subscribe', view: 'pibb',
+        body: `<p><b>MQTT</b> is a light messaging protocol for the Internet of Things. Devices talk to a <b>broker</b>: a device <b>publishes</b> a message to a <b>topic</b> (like <code>home/temperature</code>); every device that <b>subscribed</b> to that topic receives it.</p>` },
+      { title: 'The LED circuit', view: 'pibb', have: LED_IDS, power: false, pins: ['p11'],
+        body: `<p>The LED circuit of Lesson 4 (LED with a resistor on <b>GPIO17</b>). The LED follows the messages on <code>home/led</code>.</p>` },
+      { title: 'The program', view: 'pibb', have: LED_IDS, showCode: true, power: true,
+        body: `<p>Click lines 7, 18 and 22.</p>` },
+      { title: 'Run it: publish and listen', view: 'pibb', have: LED_IDS, showCode: true, power: true, action: 'run',
+        body: `<p>Press <b>▶ Run</b>. The Pi publishes the temperature every 3 seconds (see the broker log). Press <b>“Send ON”</b> (the phone app): the Pi prints <code>Received on home/led : ON</code> and the LED lights.</p><p class="sim">The broker and the phone are simulated; the broker address is made up.</p>` },
+      { title: 'Summary', view: 'pibb', have: LED_IDS, power: true,
+        body: `<ul><li>Devices talk through a <b>broker</b>: <b>publish</b> to a topic, <b>subscribe</b> to receive.</li><li>paho-mqtt: <code>connect</code>, <code>subscribe</code>, <code>on_message</code>, <code>loop_start</code>, <code>publish</code>.</li></ul>` },
+    ],
+    quiz: [
+      { q: 'Who receives a message published to a topic?', a: ['Every client subscribed to that topic', 'Only the sender', 'Nobody', 'Only the broker owner'], c: 0, why: 'The broker forwards it to all subscribers.' },
+      { q: 'What is the standard MQTT port without encryption?', a: ['80', '1883', '443', '22'], c: 1, why: '1883 (8883 is the encrypted one).' }
+    ],
+    sources: [SRC_PI.paho, SRC_PI.mqtt, SRC_PI.gpiozeroout],
   },
 ];
 
