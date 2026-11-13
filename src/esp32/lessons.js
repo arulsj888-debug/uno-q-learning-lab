@@ -2185,3 +2185,6 @@ export const E32_LESSONS = [
 import { E32_LESSONS_4, E32_MODULES_4 } from './lessons4.js';
 E32_LESSONS.push(...E32_LESSONS_4);
 Object.assign(E32_MODULES, E32_MODULES_4);
+
+import { addExtra } from '../extra/index.js';
+addExtra('e32', E32_LESSONS, E32_MODULES);

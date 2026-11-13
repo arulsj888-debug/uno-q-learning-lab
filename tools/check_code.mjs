@@ -5,6 +5,8 @@ import * as U3 from '../src/uno3/code.js';
 import * as E32 from '../src/esp32/code.js';
 import { CODE3, CHECKS3 } from '../src/uno3/code3.js';
 import { CODE4, CHECKS4 } from '../src/esp32/code4.js';
+import { CODE5, CHECKS5 } from '../src/pi4/code5.js';
+import { EXTRA } from '../src/extra/index.js';
 const L = (code, n) => code.split('\n')[n - 1] || '';
 const checks = {
   BLINK: [C.BLINK, [[1, 'void setup'], [2, 'Serial.begin'], [4, 'pinMode(LED_BUILTIN'], [8, 'void loop'], [9, 'HIGH'], [10, 'delay(1000)'], [11, 'LOW'], [12, 'delay(1000)'], [14, 'Serial.println']]],
@@ -140,6 +142,8 @@ const checks = {
 };
 for (const k of Object.keys(CODE3)) checks['U3_' + k.toUpperCase() + '_3'] = [CODE3[k], CHECKS3[k]];
 for (const k of Object.keys(CODE4)) checks['E32_' + k.toUpperCase() + '_4'] = [CODE4[k], CHECKS4[k]];
+for (const k of Object.keys(CODE5)) checks['PI_' + k.toUpperCase() + '_5'] = [CODE5[k], CHECKS5[k]];
+for (const k of Object.keys(EXTRA.code)) checks['X_' + k] = [EXTRA.code[k], EXTRA.checks[k]];
 let bad = 0;
 for (const [name, [code, list]] of Object.entries(checks)) for (const [n, s] of list) {
   if (!L(code, n).includes(s)) { bad++; console.log(`MISMATCH ${name} line ${n}: expected "${s}" got "${L(code, n)}"`); }

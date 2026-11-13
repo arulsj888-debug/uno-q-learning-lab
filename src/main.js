@@ -50,6 +50,7 @@ import { LOGO_ARRAY, SHADES_ARRAY, matrixCode } from './data/code.js';
 import { Sim, blinkCode, VREF } from './sim.js';
 import { Scope } from './scope.js';
 import { makeDevice } from './devices.js';
+import './extra/ui.js';
 
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));

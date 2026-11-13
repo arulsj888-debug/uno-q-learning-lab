@@ -168,7 +168,7 @@ class Flame extends Dev {
   volts() { return 4.7 - 4.2 * Math.pow(this.lvl / 100, 0.7); }
   analog(pin) { if (this.roleOf(pin) !== 'ao' || !this.on()) return undefined; const io = this.app.ioFor(pin); return this.volts() * (io.vs || 5) / 5 + (Math.random() - 0.5) * 0.01; }   // io.vs: supply of the module (the output follows it)
   read(pin) { return this.roleOf(pin) === 'do' && this.on() ? (this.lvl > this.thr ? 0 : 1) : undefined; }
-  tick() { this.set('#fl-st', this.stateNote() || `AO = <b>${this.volts().toFixed(2)} V</b> · DO = <b>${this.lvl > this.thr ? 'LOW (flame detected)' : 'HIGH (no flame)'}</b>`); }
+  tick() { const hasAo = this.ios().some(x => x.role === 'ao'); this.set('#fl-st', this.stateNote() || `${hasAo ? `AO = <b>${this.volts().toFixed(2)} V</b> · ` : ''}DO = <b>${this.lvl > this.thr ? 'LOW (flame detected)' : 'HIGH (no flame)'}</b>`); }
 }
 
 // ------------------------------------------------------------------------------------------------ RFID reader (MFRC522)
@@ -425,4 +425,6 @@ class Prefs extends Dev {
 }
 
 const REG = { btc: BTC, espnow: EspNow, prefs: Prefs, abuz: ABuz, rc: RC, swt: Swt, seg7: Seg7, max7219: Max7219, tft: TFT, gas: Gas, flame: Flame, rfid: RFID, gps: GPS, rtc: RTC, a4988: A4988, sd: SD, peer: Peer, hc05: HC05, nrf: NRF, irq: IRQ, eeprom: EEPROM, fan: Fan };
+export const DEVICE_REG = REG;   // extra devices can be added from src/extra/*.js: DEVICE_REG.name = Class
+export { Dev };
 export function makeDevice(name, app) { const C = REG[name]; return C ? new C(app) : null; }

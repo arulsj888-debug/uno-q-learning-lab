@@ -2287,3 +2287,6 @@ Object.assign(MODULES, PORTED_MODULES);
 import { buildPorted2, PORTED2_MODULES } from './ported2.js';
 LESSONS.push(...buildPorted2(LESSONS.length + 1));
 Object.assign(MODULES, PORTED2_MODULES);
+
+import { addExtra } from '../extra/index.js';
+addExtra('uq', LESSONS, MODULES);

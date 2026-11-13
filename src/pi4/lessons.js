@@ -2256,3 +2256,10 @@ pause()</pre>
 ];
 
 export const PI_COMING = [];
+
+import { PI_LESSONS_5, PI_MODULES_5 } from './lessons5.js';
+PI_LESSONS.push(...PI_LESSONS_5);
+Object.assign(PI_MODULES, PI_MODULES_5);
+
+import { addExtra } from '../extra/index.js';
+addExtra('pi', PI_LESSONS, PI_MODULES);

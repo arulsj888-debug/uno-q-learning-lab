@@ -349,3 +349,6 @@ const U3_BASE = [
 
 export const U3_LESSONS = [...U3_BASE, ...U3_LESSONS_2, ...U3_LESSONS_3];
 Object.assign(U3_MODULES, U3_MODULES_3);
+
+import { addExtra } from '../extra/index.js';
+addExtra('u3', U3_LESSONS, U3_MODULES);

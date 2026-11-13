@@ -183,3 +183,9 @@ Description: <one short paragraph: what was done today and what comes next>
 ## UNO Q lessons 44-60 (17 lessons ported from UNO R3 40-59)
 - `src/data/ported2.js` builds them from `U3_LESSONS_3` with per-lesson fixes (3.3 V, 14-bit ADC, D20/D21 I2C, Serial1 on D0/D1 instead of SoftwareSerial, MQ-2 divider + DO on D8, HC-05 without divider, 100 ohm 7-segment resistors); programs `q3_*` in `src/sim5.js` wrap the R3 programs. Modules 14-17.
 - Not ported: interrupts, TimerOne, EEPROM (UNO Q equivalents not verified). Library support on the UNO Q Zephyr core is NOT verified for any of them; each lesson carries that warning.
+
+## Pi lessons 33-46 and the agent batch (lessons added through src/extra)
+- Pi 33-46: buzzer, switches, 7-segment, MAX7219, TFT, RFID, GPS, RTC, A4988, fan, flame, UART, threading.Timer, settings file (`src/pi4/lessons5.js`, `code5.js`, `src/sim6.js`). Python library calls NOT run on a real Pi.
+- Five agents each added lessons through slot files `src/extra/{a..e}.js` (+ `*_ui.js` for 3D models, info cards and devices; `ui.js` imports them; `index.js` numbers the lessons per board): a = vibration / Hall / line-follow (all boards), b = solenoid + e-paper, c = LoRa + Zigbee/XBee, d = Pi servo / IR / BLE + I2C scanner (ESP32, UNO Q) + ESP32-CAM concept, e = projects (motion alarm, smart door, pump plant watering, two-motor car; R3 + UNO Q, ESP32 plant only).
+- Fixed after the smoke test: UNO Q scanner used female jumpers from board pins (UNO Q header is female: use male `wire`). Flame panel no longer shows AO when no analog pin is wired (Pi).
+- Open: IR receiver supply in the older R3/ESP32 IR lessons says 2.0-5.5 V; the agent's sources say about 2.5-5.5 V (check the Vishay TSOP38238 datasheet). 3D positions of many new modules are guesses (Pi servo bx 80 / bz -58, ESP32-CAM, FTDI). Nothing compiled; no URLs re-opened.

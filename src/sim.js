@@ -9,6 +9,8 @@ import { MATRIX_LINES } from './data/code.js';
 import { PROGRAMS3 } from './sim3.js';
 import { PROGRAMS4 } from './sim4.js';
 import { PROGRAMS5 } from './sim5.js';
+import { PROGRAMS6 } from './sim6.js';
+import { EXTRA } from './extra/index.js';
 
 class Stop extends Error {}
 const frame = () => new Promise(r => requestAnimationFrame(() => r()));
@@ -2292,4 +2294,4 @@ export function blinkCode(base, ms) {
     return l;
   }).join('\n');
 }
-Object.assign(PROGRAMS, PROGRAMS3, PROGRAMS4, PROGRAMS5);
+Object.assign(PROGRAMS, PROGRAMS3, PROGRAMS4, PROGRAMS5, PROGRAMS6, EXTRA.programs);
