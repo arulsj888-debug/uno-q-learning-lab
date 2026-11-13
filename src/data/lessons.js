@@ -2278,3 +2278,8 @@ export const LESSONS = [
 export const MODULES = { 1: 'Module 1 — Getting started', 2: 'Module 2 — Inputs & outputs', 3: 'Module 3 — Light & sound', 4: 'Module 4 — Sensors', 5: 'Module 5 — Motion', 6: 'Module 6 — I²C & Qwiic', 7: 'Module 7 — Linux side & Bridge', 8: 'Module 8 — Final project' };
 
 export const COMING_SOON = [];
+
+// UNO Q versions of the lessons first written for the UNO R3 (see ported.js)
+import { buildPorted, PORTED_MODULES } from './ported.js';
+LESSONS.push(...buildPorted(LESSONS.length + 1));
+Object.assign(MODULES, PORTED_MODULES);

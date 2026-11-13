@@ -1503,6 +1503,83 @@ export const PROGRAMS = {
     }
   },
 
+  async q_joy(rt) {
+    await rt.at(2); await rt.at(3); await rt.at(4);
+    await rt.at(6);
+    await rt.at(7); rt.serialBegin(9600); rt.analogReadResolution(14);
+    await rt.at(8); rt.pinMode('D2', 'INPUT_PULLUP');
+    for (;;) {
+      await rt.at(11);
+      await rt.at(12); const x = rt.analogRead('A0');
+      await rt.at(13); const y = rt.analogRead('A1');
+      await rt.at(14); const pressed = rt.digitalRead('D2') === 0;
+      await rt.at(15); rt.print('X: ');
+      await rt.at(16); rt.print(x);
+      await rt.at(17); rt.print('  Y: ');
+      await rt.at(18); rt.print(y);
+      await rt.at(19); rt.print('  Button: ');
+      await rt.at(20); rt.println(pressed ? 'pressed' : 'released');
+      await rt.at(21); await rt.delay(200);
+    }
+  },
+
+  async q_soil(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3);
+    await rt.at(6); rt.serialBegin(9600); rt.analogReadResolution(14);
+    const dryV = 12412, wetV = 4965;
+    for (;;) {
+      await rt.at(9);
+      await rt.at(10); const raw = rt.analogRead('A0');
+      await rt.at(11); let pct = rt.map(raw, dryV, wetV, 0, 100);
+      await rt.at(12); pct = Math.min(100, Math.max(0, pct));
+      await rt.at(13); rt.print('raw ');
+      await rt.at(14); rt.print(raw);
+      await rt.at(15); rt.print('  moisture ');
+      await rt.at(16); rt.print(pct);
+      await rt.at(17); rt.println(' %');
+      await rt.at(18); await rt.delay(1000);
+    }
+  },
+
+  async q_snd(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5);
+    await rt.at(8); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(9); rt.serialBegin(9600); rt.analogReadResolution(14);
+    await rt.at(10); await rt.delay(300); const quiet = rt.analogRead('A0');
+    let ledOn = 0;
+    for (;;) {
+      await rt.at(13);
+      await rt.at(14); const level = Math.abs(rt.analogRead('A0') - quiet);
+      await rt.at(15);
+      if (level > 640) {
+        await rt.at(16); ledOn = ledOn ? 0 : 1;
+        await rt.at(17); rt.digitalWrite('D5', ledOn);
+        await rt.at(18); rt.println('Clap detected');
+        await rt.at(19); await rt.delay(300);
+      }
+      await rt.yield();
+    }
+  },
+
+  async q_plant(rt) {
+    await rt.at(1); await rt.at(2); await rt.at(3); await rt.at(4); await rt.at(5);
+    await rt.at(8); rt.pinMode('D5', 'OUTPUT');
+    await rt.at(9); rt.serialBegin(9600); rt.analogReadResolution(14);
+    let pumpOn = false;
+    for (;;) {
+      await rt.at(12);
+      await rt.at(13); const raw = rt.analogRead('A0');
+      await rt.at(14); const pct = Math.min(100, Math.max(0, rt.map(raw, 12412, 4965, 0, 100)));
+      await rt.at(15); if (pct < 30) pumpOn = true;
+      await rt.at(16); if (pct > 60) pumpOn = false;
+      await rt.at(17); rt.digitalWrite('D5', pumpOn ? 1 : 0);
+      await rt.at(18); rt.print('moisture ');
+      await rt.at(19); rt.print(pct);
+      await rt.at(20); rt.println(pumpOn ? ' %  pump ON' : ' %  pump off');
+      await rt.at(21); await rt.delay(1000);
+    }
+  },
+
   async thermo(rt) {
     await rt.at(1); await rt.at(3);
     await rt.at(6); rt.serialBegin(9600);

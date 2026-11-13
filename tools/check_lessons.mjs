@@ -165,7 +165,7 @@ for (const L of list) {
       if (!N.same(id + '.SDA', 'PIN:' + sda)) bad(L, `${io.kind}: SDA not on ${sda}`);
       if (!N.same(id + '.SCL', 'PIN:' + scl)) bad(L, `${io.kind}: SCL not on ${scl}`);
       if (!N.same(id + '.GND', G)) bad(L, `${io.kind}: GND not on GND`);
-      const v = lcd ? ((U3 || PI) ? 'PIN:5V' : 'PIN:VIN') : (PI ? 'PIN:3V3' : 'PIN:3V3');
+      const v = lcd ? (E32 ? 'PIN:VIN' : 'PIN:5V') : (PI ? 'PIN:3V3' : 'PIN:3V3');
       if (!N.same(id + '.VCC', v)) bad(L, `${io.kind}: VCC not on ${v.slice(4)}${lcd ? ' (the LCD backpack is made for 5 V)' : ''}`);
     }
     if (io.kind === 'joyax') {
@@ -215,7 +215,7 @@ for (const L of list) {
       const id = io.item;
       if (!N.same(id + '.IN' + io.idx, P)) bad(L, `${pin}: stepper IN${io.idx} not on ${pin}`);
       if (!N.same(id + '.GND', G)) bad(L, `stepper: GND not on GND`);
-      if (!N.same(id + '.VCC', 'PIN:' + (U3 ? '5V' : 'VIN'))) bad(L, `stepper: VCC not on ${U3 ? '5V' : 'VIN'}`);
+      if (!N.same(id + '.VCC', 'PIN:' + (E32 ? 'VIN' : '5V'))) bad(L, `stepper: VCC not on ${E32 ? 'VIN' : '5V'}`);
     }
     if (io.kind === 'mpu') {
       const id = io.item, sda = pin, scl = io.scl;
