@@ -7,6 +7,7 @@
 //  - tone() starts a square wave and returns immediately; noTone() stops it
 import { MATRIX_LINES } from './data/code.js';
 import { PROGRAMS3 } from './sim3.js';
+import { PROGRAMS4 } from './sim4.js';
 
 class Stop extends Error {}
 const frame = () => new Promise(r => requestAnimationFrame(() => r()));
@@ -2290,4 +2291,4 @@ export function blinkCode(base, ms) {
     return l;
   }).join('\n');
 }
-Object.assign(PROGRAMS, PROGRAMS3);
+Object.assign(PROGRAMS, PROGRAMS3, PROGRAMS4);

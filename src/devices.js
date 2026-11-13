@@ -40,19 +40,21 @@ class ABuz extends Dev {
 // ------------------------------------------------------------------------------------------------ RC charging circuit
 class RC extends Dev {
   name = 'rc'; V = 0; target = 0; t = 0; hist = [];
+  get VS() { return this.app.logicV || 5; }
   tau() { const io = this.ios()[0]; return io ? io.r * io.c : 1; }
   step() { const now = performance.now(), dt = Math.min(0.5, (now - this.t) / 1000); this.t = now; const k = 1 - Math.exp(-dt / this.tau()); this.V += (this.target - this.V) * k; }
   html() { return this.box('Capacitor voltage', '<canvas id="rc-cv" width="300" height="130" style="width:100%;background:#0d1117;border-radius:6px"></canvas><div id="rc-st" class="io-val">—</div>', 'Charge and discharge follow V = V<sub>final</sub> + (V<sub>start</sub> − V<sub>final</sub>) · e<sup>−t/RC</sup>. This picture uses the ideal R and C: a real capacitor has a tolerance (often −20 % / +20 % for electrolytics).'); }
   reset() { this.V = 0; this.target = 0; this.t = performance.now(); this.hist = []; }
-  pin(pin, level) { if (this.roleOf(pin) !== 'drive') return; this.step(); this.target = level ? 5 : 0; }
-  analog(pin) { if (this.roleOf(pin) !== 'cap' || !this.on()) return undefined; this.step(); return clamp(this.V + (Math.random() - 0.5) * 0.004, 0, 5); }
+  pin(pin, level) { if (this.roleOf(pin) !== 'drive') return; this.step(); this.target = level ? this.VS : 0; }
+  analog(pin) { if (this.roleOf(pin) !== 'cap' || !this.on()) return undefined; this.step(); return clamp(this.V + (Math.random() - 0.5) * 0.004, 0, this.VS); }
   tick() {
+    const VS = this.VS, VM = Math.ceil(VS);
     if (!this.running()) { this.t = performance.now(); } else { this.step(); const last = this.hist[this.hist.length - 1], t = this.app.sim.token ? (performance.now() - (this.app.runStart || 0)) / 1000 : 0; if (!last || t - last[0] > 0.05) this.hist.push([t, this.V]); if (this.hist.length > 400) this.hist.shift(); }
     const cv = $('#rc-cv'); if (!cv) return; const c = cv.getContext('2d'), W = cv.width, H = cv.height; c.clearRect(0, 0, W, H);
-    c.strokeStyle = '#2a3340'; c.lineWidth = 1; for (let i = 0; i <= 5; i++) { const y = H - 14 - i * (H - 24) / 5; c.beginPath(); c.moveTo(28, y); c.lineTo(W - 4, y); c.stroke(); c.fillStyle = '#8b98a8'; c.font = '10px sans-serif'; c.fillText(i + ' V', 2, y + 3); }
+    c.strokeStyle = '#2a3340'; c.lineWidth = 1; for (let i = 0; i <= VM; i++) { const y = H - 14 - i * (H - 24) / VM; c.beginPath(); c.moveTo(28, y); c.lineTo(W - 4, y); c.stroke(); c.fillStyle = '#8b98a8'; c.font = '10px sans-serif'; c.fillText(i + ' V', 2, y + 3); }
     const tau = this.tau(), span = 8 * tau; c.strokeStyle = '#3b6ea8'; c.setLineDash([3, 3]); for (let k = 1; k <= 5; k++) { const x = 28 + (k * tau / span) * (W - 32); c.beginPath(); c.moveTo(x, 6); c.lineTo(x, H - 14); c.stroke(); c.fillStyle = '#6f93bd'; c.fillText(k + 'τ', x - 5, H - 3); } c.setLineDash([]);
-    if (this.hist.length > 1) { c.strokeStyle = '#ffb454'; c.lineWidth = 2; c.beginPath(); this.hist.forEach(([t, v], i) => { const x = 28 + clamp(t / span, 0, 1) * (W - 32), y = H - 14 - v / 5 * (H - 24); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.stroke(); }
-    this.set('#rc-st', this.stateNote() || `Voltage <b>${this.V.toFixed(2)} V</b> (${(this.V / 5 * 100).toFixed(0)} % of 5 V) · pin is <b>${this.target ? 'HIGH: charging' : 'LOW: discharging'}</b> · τ = R·C = <b>${(this.tau()).toFixed(2)} s</b>`);
+    if (this.hist.length > 1) { c.strokeStyle = '#ffb454'; c.lineWidth = 2; c.beginPath(); this.hist.forEach(([t, v], i) => { const x = 28 + clamp(t / span, 0, 1) * (W - 32), y = H - 14 - v / VM * (H - 24); i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.stroke(); }
+    this.set('#rc-st', this.stateNote() || `Voltage <b>${this.V.toFixed(2)} V</b> (${(this.V / VS * 100).toFixed(0)} % of ${VS} V) · pin is <b>${this.target ? 'HIGH: charging' : 'LOW: discharging'}</b> · τ = R·C = <b>${(this.tau()).toFixed(2)} s</b>`);
   }
 }
 
@@ -75,7 +77,7 @@ class Swt extends Dev {
     if (role === 'slide') return this.st.slide ? 1 : 0;          // right = 5 V, left = GND
     return this.st[role] ? 0 : 1;                                 // closed to GND, the pull-up gives 1 when open
   }
-  tick() { this.set('#sw-st', this.stateNote() || `Slide → pin = <b>${this.st.slide ? 'HIGH (5 V)' : 'LOW (GND)'}</b> · reed: contacts <b>${this.st.reed ? 'closed → LOW' : 'open → HIGH (pull-up)'}</b> · tilt: contacts <b>${this.st.tilt ? 'closed → LOW' : 'open → HIGH (pull-up)'}</b>`); }
+  tick() { this.set('#sw-st', this.stateNote() || `Slide → pin = <b>${this.st.slide ? 'HIGH (' + (this.app.logicV || 5) + ' V)' : 'LOW (GND)'}</b> · reed: contacts <b>${this.st.reed ? 'closed → LOW' : 'open → HIGH (pull-up)'}</b> · tilt: contacts <b>${this.st.tilt ? 'closed → LOW' : 'open → HIGH (pull-up)'}</b>`); }
 }
 
 // ------------------------------------------------------------------------------------------------ 7-segment display (common cathode)
@@ -155,7 +157,7 @@ class Gas extends Dev {
   html() { return this.box('The air around the sensor', `<div class="throw"><label>Smoke / gas</label><input id="gs-l" type="range" min="0" max="100" step="1" value="0"><b id="gs-lv">clean air</b></div><div class="throw"><label>Trimmer (DO threshold)</label><input id="gs-t" type="range" min="5" max="95" step="1" value="${this.thr}"><b id="gs-tv"></b></div><div id="gs-st" class="io-val">—</div>`, 'Typical values for an MQ-2 module: about 0.4 V in clean air and up to about 4 V in a lot of smoke. Your sensor needs its own calibration, and a few minutes of warm-up.'); }
   bind() { const u = () => { $('#gs-lv').textContent = this.lvl ? this.lvl + ' %' : 'clean air'; $('#gs-tv').textContent = (this.volts(this.thr)).toFixed(2) + ' V'; }; $('#gs-l').oninput = e => { this.lvl = +e.target.value; u(); }; $('#gs-t').oninput = e => { this.thr = +e.target.value; u(); }; u(); }
   volts(l = this.lvl) { return 0.4 + 3.6 * Math.pow(l / 100, 0.8); }
-  analog(pin) { return this.roleOf(pin) === 'ao' && this.on() ? this.volts() + (Math.random() - 0.5) * 0.01 : undefined; }
+  analog(pin) { if (this.roleOf(pin) !== 'ao' || !this.on()) return undefined; const io = this.app.ioFor(pin); return this.volts() * (io.div || 1) + (Math.random() - 0.5) * 0.01; }   // io.div: voltage divider between AO and the pin
   read(pin) { return this.roleOf(pin) === 'do' && this.on() ? (this.lvl > this.thr ? 0 : 1) : undefined; }   // this module: DO is LOW above the trimmer level
   tick() { this.set('#gs-st', this.stateNote() || `AO = <b>${this.volts().toFixed(2)} V</b> · DO = <b>${this.lvl > this.thr ? 'LOW (level above the trimmer setting)' : 'HIGH'}</b>`); }
 }
@@ -164,7 +166,7 @@ class Flame extends Dev {
   html() { return this.box('The flame', `<div class="throw"><label>Infrared from the flame</label><input id="fl-l" type="range" min="0" max="100" step="1" value="0"><b id="fl-lv">no flame</b></div><div class="throw"><label>Trimmer (DO threshold)</label><input id="fl-t" type="range" min="5" max="95" step="1" value="${this.thr}"><b id="fl-tv"></b></div><div id="fl-st" class="io-val">—</div>`, 'Typical behaviour: AO falls as more infrared light reaches the photodiode and DO goes LOW above the trimmer level. Sunlight and lamps also contain infrared.'); }
   bind() { const u = () => { $('#fl-lv').textContent = this.lvl ? this.lvl + ' %' : 'no flame'; $('#fl-tv').textContent = this.thr + ' %'; }; $('#fl-l').oninput = e => { this.lvl = +e.target.value; u(); }; $('#fl-t').oninput = e => { this.thr = +e.target.value; u(); }; u(); }
   volts() { return 4.7 - 4.2 * Math.pow(this.lvl / 100, 0.7); }
-  analog(pin) { return this.roleOf(pin) === 'ao' && this.on() ? this.volts() + (Math.random() - 0.5) * 0.01 : undefined; }
+  analog(pin) { if (this.roleOf(pin) !== 'ao' || !this.on()) return undefined; const io = this.app.ioFor(pin); return this.volts() * (io.vs || 5) / 5 + (Math.random() - 0.5) * 0.01; }   // io.vs: supply of the module (the output follows it)
   read(pin) { return this.roleOf(pin) === 'do' && this.on() ? (this.lvl > this.thr ? 0 : 1) : undefined; }
   tick() { this.set('#fl-st', this.stateNote() || `AO = <b>${this.volts().toFixed(2)} V</b> · DO = <b>${this.lvl > this.thr ? 'LOW (flame detected)' : 'HIGH (no flame)'}</b>`); }
 }
@@ -384,5 +386,43 @@ class Fan extends Dev {
   }
 }
 
-const REG = { abuz: ABuz, rc: RC, swt: Swt, seg7: Seg7, max7219: Max7219, tft: TFT, gas: Gas, flame: Flame, rfid: RFID, gps: GPS, rtc: RTC, a4988: A4988, sd: SD, peer: Peer, hc05: HC05, nrf: NRF, irq: IRQ, eeprom: EEPROM, fan: Fan };
+// ------------------------------------------------------------------------------------------------ classic Bluetooth built into the ESP32 (BluetoothSerial) and the phone
+class BTC extends HC05 {
+  wired() { return true; }
+  on() { return this.app.board.powered; }
+  html() { return this.box('Phone', '<div class="io-tools"><button id="bt-pair" class="hold small">Pair with “ESP32-Lab”</button></div><pre id="bt-log" class="io-val" style="white-space:pre-wrap;margin:4px 0 0;max-height:110px;overflow:auto;font-size:11px">—</pre><div class="io-tools"><input id="bt-in" type="text" maxlength="20" placeholder="type here" style="flex:1"><button id="bt-send" class="hold small">Send</button><button id="bt-1" class="hold small">1</button><button id="bt-0" class="hold small">0</button></div>', 'The ESP32 has classic Bluetooth on the chip: no extra module. Pairing is done in the phone’s Bluetooth settings; the app is a Bluetooth serial terminal (Android).'); }
+  tick() { const b = $('#bt-pair'); if (b) b.textContent = this.paired ? 'Disconnect the phone' : 'Pair with “ESP32-Lab”'; this.set('#bt-log', !this.app.board.powered ? 'USB is not plugged in — the board has no power.' : !this.running() ? 'Press <b>▶ Run</b> (the name “ESP32-Lab” is only visible while the sketch runs).' : this.log.join('\n') || '(not connected)'); }
+}
+
+// ------------------------------------------------------------------------------------------------ ESP-NOW: a second ESP32 that receives the packets
+class EspNow extends Dev {
+  name = 'espnow'; rxOn = 1; macOk = 1; got = []; inited = false; peers = [];
+  wired() { return true; }
+  on() { return this.app.board.powered; }
+  html() { return this.box('Receiver board', '<div class="io-tools"><button id="en-on" class="hold small">Receiver: on</button><button id="en-mac" class="hold small">Receiver MAC: matches</button></div><pre id="en-log" class="io-val" style="white-space:pre-wrap;margin:4px 0 0;max-height:110px;overflow:auto;font-size:11px">—</pre>', 'ESP-NOW sends small packets (up to 250 bytes) straight from board to board, with no router. The sender needs the receiver’s MAC address; the MAC here is made up.'); }
+  bind() { $('#en-on').onclick = () => { this.rxOn ^= 1; $('#en-on').textContent = 'Receiver: ' + (this.rxOn ? 'on' : 'off'); }; $('#en-mac').onclick = () => { this.macOk ^= 1; $('#en-mac').textContent = 'Receiver MAC: ' + (this.macOk ? 'matches' : 'is different (wrong address in the sketch)'); }; }
+  reset() { this.got = []; this.inited = false; this.peers = []; }
+  call(op, a, b) {
+    if (!this.on()) return false;
+    if (op === 'init') { this.inited = true; return true; }
+    if (op === 'addPeer') { this.peers.push(a); return true; }
+    if (op === 'send') { if (!this.inited || !this.peers.includes(a)) return false; const ok = !!this.rxOn && !!this.macOk; if (ok) { this.got.push(String(b)); if (this.got.length > 8) this.got.shift(); } return ok; }
+    return undefined;
+  }
+  tick() { this.set('#en-log', !this.on() ? 'USB is not plugged in — the board has no power.' : this.got.length ? this.got.map(s => 'Receiver got: ' + s).join('\n') : 'The receiver has got nothing.'); }
+}
+
+// ------------------------------------------------------------------------------------------------ Preferences (flash key-value store, kept in the browser)
+class Prefs extends Dev {
+  name = 'prefs';
+  constructor(app) { super(app); if (!this.keep.pf) { let o = null; try { o = JSON.parse(localStorage.getItem('e32_prefs') || 'null'); } catch (e) { o = null; } this.keep.pf = o && typeof o === 'object' ? o : {}; } }
+  wired() { return true; }
+  html() { return this.box('Preferences (flash, namespace “lab”)', '<pre id="pf-v" class="io-val" style="white-space:pre;margin:0">—</pre><div class="io-tools"><button id="pf-clr" class="hold small">Erase the namespace</button></div>', 'The values stay after you stop the sketch or reload the page (stored in your browser, like the ESP32 keeps them in flash).'); }
+  bind() { $('#pf-clr').onclick = () => { this.keep.pf = {}; this.save(); }; }
+  save() { try { localStorage.setItem('e32_prefs', JSON.stringify(this.keep.pf)); } catch (e) { /* storage blocked */ } }
+  call(op, k, v) { if (op === 'get') return k in this.keep.pf ? this.keep.pf[k] : v; if (op === 'put') { this.keep.pf[k] = v; this.save(); } return undefined; }
+  tick() { const k = Object.keys(this.keep.pf); this.set('#pf-v', k.length ? k.map(x => x + ' = ' + this.keep.pf[x]).join('\n') : '(the namespace is empty)'); }
+}
+
+const REG = { btc: BTC, espnow: EspNow, prefs: Prefs, abuz: ABuz, rc: RC, swt: Swt, seg7: Seg7, max7219: Max7219, tft: TFT, gas: Gas, flame: Flame, rfid: RFID, gps: GPS, rtc: RTC, a4988: A4988, sd: SD, peer: Peer, hc05: HC05, nrf: NRF, irq: IRQ, eeprom: EEPROM, fan: Fan };
 export function makeDevice(name, app) { const C = REG[name]; return C ? new C(app) : null; }

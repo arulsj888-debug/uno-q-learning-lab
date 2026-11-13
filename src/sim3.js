@@ -15,16 +15,17 @@ export const PROGRAMS3 = {
     }
   },
 
-  async u3_rc(rt) {
+  async u3_rc(rt, opts = {}) {
+    const VMAX = opts.v || 5, ADC = opts.adc || 1023;
     await rt.at(1); await rt.at(2);
     await rt.at(5); rt.pinMode('D8', 'OUTPUT');
     await rt.at(6); rt.serialBegin(9600);
     for (;;) {
       await rt.at(9);
       await rt.at(10); rt.digitalWrite('D8', 1);
-      for (let i = 0; i < 6; i++) { await rt.at(11); await rt.at(12); rt.println(rt.analogRead('A0') * 5.0 / 1023.0, 2); await rt.at(13); await rt.delay(500); }
+      for (let i = 0; i < 6; i++) { await rt.at(11); await rt.at(12); rt.println(rt.analogRead('A0') * VMAX / ADC, 2); await rt.at(13); await rt.delay(500); }
       await rt.at(15); rt.digitalWrite('D8', 0);
-      for (let i = 0; i < 6; i++) { await rt.at(16); await rt.at(17); rt.println(rt.analogRead('A0') * 5.0 / 1023.0, 2); await rt.at(18); await rt.delay(500); }
+      for (let i = 0; i < 6; i++) { await rt.at(16); await rt.at(17); rt.println(rt.analogRead('A0') * VMAX / ADC, 2); await rt.at(18); await rt.delay(500); }
     }
   },
 

@@ -173,3 +173,9 @@ Description: <one short paragraph: what was done today and what comes next>
 - `sim.js`: new rt calls `dev`, `attachInterrupt`, `detachInterrupt`, `timerEvery`, and `Sim.edge(pin, level)` (called when the lesson button changes).
 - `tools/check_lessons.mjs` now checks `dev:` ios (module pin on the right header pin, supply pins on the right nets) and has legs for cap / reed / tilt / slide switch.
 - NOT verified: library calls (LedControl, Adafruit ST7735, MFRC522, SD, TinyGPSPlus, RTClib, RF24, TimerOne) were written from knowledge, not compiled; source URLs were not re-opened; 3D positions of the modules were only checked in a few screenshots; module pin orders are typical, not those of one specific product; simulated sensor values are labelled typical.
+
+## ESP32 lessons 42-61 (20 new lessons)
+- 42 active buzzer, 43 RC, 44 slide/reed/tilt, 45 7-segment, 46 MAX7219, 47 TFT, 48 RFID, 49 SD, 50 MQ-2 (divider), 51 flame, 52 GPS (UART2), 53 DS3231, 54 A4988 + NEMA 17, 55 fan on MOSFET (LEDC), 56 UART (Serial2), 57 classic Bluetooth, 58 ESP-NOW, 59 nRF24L01+, 60 hardware timer, 61 Preferences. Modules 13-18.
+- Files: `src/esp32/lessons4.js`, `src/esp32/code4.js` (listings derived from `code3.js` where the lines match; `CHECKS4` run by check_code), `src/sim4.js` (wrappers that remap R3 programs' pins + new programs), devices `btc`, `espnow`, `prefs` in `src/devices.js`; devices read `app.logicV` (3.3 V). Modules connect through the breadboard (module pin -> row a, board pin -> row b of the same column) because the ESP32 header has male pins.
+- Skipped on purpose: ESP32-CAM (other board), two-device I2C scanner (needs a shared socket), servo lesson, interrupts (ESP32 lesson 31 exists).
+- NOT verified: library and core-3.x calls (timerBegin/timerAlarm, ledcAttach, esp_now callback signature, BluetoothSerial, Preferences) from memory, not compiled; URLs not re-opened; ADC modelled linear (real ESP32 ADC is not).
