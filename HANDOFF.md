@@ -206,3 +206,10 @@ Description: <one short paragraph: what was done today and what comes next>
 - All 56 Pi Python listings pass py_compile (syntax only; not run).
 - ESP32 car (e75) now uses view 'farq'; Pi ADS1115 module moved next to the breadboard.
 - NOT done: compiling the Arduino/ESP32 sketches with arduino-cli (download of the tool was refused by the safety check). Do it in the Arduino IDE or allow arduino-cli.
+
+## UNO Q interrupt lesson (q73) and link re-check
+- q73 "Interrupts: react to a button at once" (src/extra/f.js, ported from R3 u44, program q_irq). Verified in ArduinoCore-zephyr cores/arduino/WInterrupts.cpp: attachInterrupt with LOW/HIGH/CHANGE/FALLING/RISING; the core accepts the pins of the variant's digital pin list (D0-D13, D20, D21). NOT verified: that every pin fires on the STM32U585 (EXTI lines shared by pins with the same number); no official UNO Q example uses attachInterrupt. The lesson uses one interrupt on D2 and carries a warning saying this. Browser run (counts 1, 2) and Back/Next pass.
+- Button panel on UNO Q now names the lesson's pin (was a fixed "D4").
+- Still NOT written for UNO Q: EEPROM (no library in the core) and a timer lesson (no Arduino-level timer API found).
+- Links re-checked in Chrome: 206 URLs. Raspberry Pi docs (17), allaboutcircuits (2), analog.com DS18B20, digikey, thepihut, ST STM32U585 PDF and 3 Vishay PDFs still refuse automated visits: check in a browser.
+- Still NOT done: compile check with arduino-cli (download refused by the safety check).
