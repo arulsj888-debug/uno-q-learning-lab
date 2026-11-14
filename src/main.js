@@ -83,6 +83,7 @@ const VIEWS = {
   pibench: { t: new THREE.Vector3(-4, 0, -30), d: new THREE.Vector3(-0.1, 0.9, 0.42), dist: 235 },
   pibb: { t: new THREE.Vector3(-6, 2, -57), d: new THREE.Vector3(-0.08, 0.88, 0.47), dist: 118 },
   picam: { t: new THREE.Vector3(-34, 8, 14), d: new THREE.Vector3(-0.12, 0.8, 0.6), dist: 230 },
+  pimid: { t: new THREE.Vector3(55, 0, -60), d: new THREE.Vector3(-0.06, 0.9, 0.44), dist: 400 },
   pidesk: { t: new THREE.Vector3(-65, 62, -95), d: new THREE.Vector3(-0.04, 0.42, 0.9), dist: 650 },
   pifront: { t: new THREE.Vector3(-4, 0, 26), d: new THREE.Vector3(-0.25, 0.55, 0.8), dist: 125 },
   piports: { t: new THREE.Vector3(42, 4, -2), d: new THREE.Vector3(0.78, 0.48, 0.4), dist: 150 },

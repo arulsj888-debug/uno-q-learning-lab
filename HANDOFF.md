@@ -196,3 +196,7 @@ Description: <one short paragraph: what was done today and what comes next>
 - Pi lesson 38 prints the 5-byte number the mfrc522 library returns (UID + XOR check byte), e.g. 0xdeadbeef22.
 - Button panel initial text is now board-aware (Pi GPIO2, ESP32 GPIO17, R3 lesson pin).
 - Still open for a testing phase: compile every sketch/Python file with real libraries, re-open all source URLs, screenshot-review the 3D layouts of the new modules.
+
+## Screenshot review (done)
+- Looked at ~22 screenshots of new modules (R3 u60-u70, ESP32 e70/e72/e73/e75, Pi p54-p61). Fixed: Pi servo and Pi projects were framed too close (servo body / PIR / motors off screen): servo steps now use view 'pibench', Pi project lessons use the new view 'pimid' (src/main.js VIEWS).
+- Known nit left: ESP32 car (e75) second motor is slightly cut off at the top of the frame; Pi ADS1115 module (p58) sits far to the right of the breadboard.
