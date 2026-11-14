@@ -213,3 +213,7 @@ Description: <one short paragraph: what was done today and what comes next>
 - Still NOT written for UNO Q: EEPROM (no library in the core) and a timer lesson (no Arduino-level timer API found).
 - Links re-checked in Chrome: 206 URLs. Raspberry Pi docs (17), allaboutcircuits (2), analog.com DS18B20, digikey, thepihut, ST STM32U585 PDF and 3 Vishay PDFs still refuse automated visits: check in a browser.
 - Still NOT done: compile check with arduino-cli (download refused by the safety check).
+
+## Bot-blocked links checked by a fetch agent
+- Raspberry Pi documentation pages load. Anchors camera.html#camera-module-3 and #install-a-raspberry-pi-camera do not exist: removed (link now opens the page). Anchors #i2c, #led-warning-flash-codes, #users, #update-software, #gpio, #power-supply could not be confirmed in the part of the page read (pages are very long): the page itself loads.
+- allaboutcircuits (2 URLs) return 403 to every automated fetch; analog.com DS18B20 timed out; thepihut rate-limited (429). Open these four in a browser. DigiKey solenoid page OK. The three Vishay PDFs download (HTTP 200) but their text was not read.
