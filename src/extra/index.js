@@ -1,6 +1,6 @@
 // Merges the extra lessons of slots a..e. Lesson ids are assigned when the lesson is added to a board (see addExtra).
-import a from './a.js'; import b from './b.js'; import c from './c.js'; import d from './d.js'; import e from './e.js';
-const SLOTS = [a, b, c, d, e];
+import a from './a.js'; import b from './b.js'; import c from './c.js'; import d from './d.js'; import e from './e.js'; import f from './f.js'; import g from './g.js'; import h from './h.js'; import i from './i.js';
+const SLOTS = [a, b, c, d, e, f, g, h, i];
 export const EXTRA = { programs: {}, code: {}, checks: {} };
 for (const s of SLOTS) { Object.assign(EXTRA.programs, s.programs); Object.assign(EXTRA.code, s.code); Object.assign(EXTRA.checks, s.checks); }
 const PREFIX = { u3: 'u', e32: 'e', uq: 'q', pi: 'p' };

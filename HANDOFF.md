@@ -188,4 +188,11 @@ Description: <one short paragraph: what was done today and what comes next>
 - Pi 33-46: buzzer, switches, 7-segment, MAX7219, TFT, RFID, GPS, RTC, A4988, fan, flame, UART, threading.Timer, settings file (`src/pi4/lessons5.js`, `code5.js`, `src/sim6.js`). Python library calls NOT run on a real Pi.
 - Five agents each added lessons through slot files `src/extra/{a..e}.js` (+ `*_ui.js` for 3D models, info cards and devices; `ui.js` imports them; `index.js` numbers the lessons per board): a = vibration / Hall / line-follow (all boards), b = solenoid + e-paper, c = LoRa + Zigbee/XBee, d = Pi servo / IR / BLE + I2C scanner (ESP32, UNO Q) + ESP32-CAM concept, e = projects (motion alarm, smart door, pump plant watering, two-motor car; R3 + UNO Q, ESP32 plant only).
 - Fixed after the smoke test: UNO Q scanner used female jumpers from board pins (UNO Q header is female: use male `wire`). Flame panel no longer shows AO when no analog pin is wired (Pi).
-- Open: IR receiver supply in the older R3/ESP32 IR lessons says 2.0-5.5 V; the agent's sources say about 2.5-5.5 V (check the Vishay TSOP38238 datasheet). 3D positions of many new modules are guesses (Pi servo bx 80 / bz -58, ESP32-CAM, FTDI). Nothing compiled; no URLs re-opened.
+- IR receiver supply checked against the Vishay TSOP382/384 datasheet (doc 82491 rev 2.1): 2.0 to 5.5 V, absolute max 6 V; the older R3/ESP32 lessons were right, the new Pi IR lesson said 2.5 V and was corrected. 3D positions of many new modules are guesses (Pi servo bx 80 / bz -58, ESP32-CAM, FTDI). Nothing compiled; no URLs re-opened.
+
+## Second agent batch (slots f-i) and wrap-up
+- UNO Q interrupts / timer / EEPROM: NOT written. Research found no primary-source confirmation (see COVERAGE.md). Revisit when ArduinoCore-zephyr source (cores/arduino, variants, libraries/Storage) can be read.
+- g: Pi nRF24L01+ (pyRF24) and ADS1115 + RC capacitor (new device `ads`, model `mod_ads1115`). h: ESP32 servo, motion alarm, smart door, two-motor car (devices dv:sv32, dv:pir32, dv:sonar32, dv:car32 because the built-in pir/servo/hcsr04/motor widgets are tied to UNO pins in main.js). i: Pi motion alarm, smart door, car (devices ipir, isonar, imot).
+- Pi lesson 38 prints the 5-byte number the mfrc522 library returns (UID + XOR check byte), e.g. 0xdeadbeef22.
+- Button panel initial text is now board-aware (Pi GPIO2, ESP32 GPIO17, R3 lesson pin).
+- Still open for a testing phase: compile every sketch/Python file with real libraries, re-open all source URLs, screenshot-review the 3D layouts of the new modules.

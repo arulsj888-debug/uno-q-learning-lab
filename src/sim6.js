@@ -87,7 +87,7 @@ export const PROGRAMS6 = {
       await rt.at(9);
       let uid = null;
       while (!uid) { uid = rt.dev('rfid', 'read'); if (!uid) await rt.yield(); }
-      await rt.at(10); rt.println('UID: 0x' + uid.map(b => b.toString(16).padStart(2, '0')).join(''));
+      await rt.at(10); const chk = uid.reduce((a, b) => a ^ b, 0); rt.println('UID: 0x' + [...uid, chk].map(b => b.toString(16).padStart(2, '0')).join(''));   // read_id() returns 5 bytes: the 4 UID bytes and the check byte (XOR of them)
       await rt.delay(400);
     }
   },
