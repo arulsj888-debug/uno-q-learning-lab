@@ -35,7 +35,7 @@ const SRC = {
   bwd: { t: 'Arduino example: Blink Without Delay', u: 'https://docs.arduino.cc/built-in-examples/digital/BlinkWithoutDelay/' },
   httpc: { t: 'Arduino-ESP32 HTTPClient example: BasicHttpClient', u: 'https://github.com/espressif/arduino-esp32/tree/master/libraries/HTTPClient/examples/BasicHttpClient' },
   httpmdn: { t: 'MDN: HTTP response status codes', u: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Status' },
-  pubsub: { t: 'PubSubClient library (Arduino MQTT client) by Nick O’Leary', u: 'https://pubsubclient.knolleary.net/' },
+  pubsub: { t: 'PubSubClient library (Arduino MQTT client) by Nick O’Leary', u: 'https://github.com/knolleary/pubsubclient' },
   mqtt: { t: 'MQTT.org: what is MQTT (publish/subscribe, topics, broker)', u: 'https://mqtt.org/' },
   ntppool: { t: 'NTP Pool Project: pool.ntp.org', u: 'https://www.ntppool.org/' },
   cfgtime: { t: 'Arduino-ESP32 example: SimpleTime (configTime, getLocalTime)', u: 'https://github.com/espressif/arduino-esp32/tree/master/libraries/ESP32/examples/Time/SimpleTime' },

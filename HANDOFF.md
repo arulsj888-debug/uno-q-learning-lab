@@ -200,3 +200,9 @@ Description: <one short paragraph: what was done today and what comes next>
 ## Screenshot review (done)
 - Looked at ~22 screenshots of new modules (R3 u60-u70, ESP32 e70/e72/e73/e75, Pi p54-p61). Fixed: Pi servo and Pi projects were framed too close (servo body / PIR / motors off screen): servo steps now use view 'pibench', Pi project lessons use the new view 'pimid' (src/main.js VIEWS).
 - Known nit left: ESP32 car (e75) second motor is slightly cut off at the top of the frame; Pi ADS1115 module (p58) sits far to the right of the breadboard.
+
+## Final checks (links, Python, framing)
+- Source links: 197 URLs checked by HTTP GET. 174 OK; fixed the ESP32 UART page (404 -> api/serial.html) and PubSubClient (its https site has a certificate error -> GitHub repo). 21 return 403 to automated requests (raspberrypi.com docs, analog.com, digikey, allaboutcircuits): not verifiable from a script, re-check in a browser.
+- All 56 Pi Python listings pass py_compile (syntax only; not run).
+- ESP32 car (e75) now uses view 'farq'; Pi ADS1115 module moved next to the breadboard.
+- NOT done: compiling the Arduino/ESP32 sketches with arduino-cli (download of the tool was refused by the safety check). Do it in the Arduino IDE or allow arduino-cli.

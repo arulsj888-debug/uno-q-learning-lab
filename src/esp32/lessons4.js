@@ -27,7 +27,7 @@ const S = {
   a4988: R('Pololu A4988 stepper motor driver carrier (product page)', 'https://www.pololu.com/product/1182'),
   a4988ds: R('A4988 datasheet (Allegro)', 'https://www.allegromicro.com/-/media/files/datasheets/a4988-datasheet.pdf'),
   irlz44n: R('Infineon IRLZ44NPbF datasheet', 'https://www.infineon.com/dgdl/irlz44npbf.pdf?fileId=5546d462533600a40153567206892720'),
-  serial: R('Arduino-ESP32 documentation: UART (HardwareSerial)', 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/uart.html'),
+  serial: R('Arduino-ESP32 documentation: Serial (UART)', 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/serial.html'),
   bt: R('Arduino-ESP32 library: BluetoothSerial (SerialToSerialBT example)', 'https://github.com/espressif/arduino-esp32/tree/master/libraries/BluetoothSerial'),
   espnow: R('Espressif ESP-NOW documentation', 'https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html'),
   nrf: R('nRF24L01+ product specification (Nordic Semiconductor)', 'https://www.sparkfun.com/datasheets/Components/SMD/nRF24L01Pluss_Preliminary_Product_Specification_v1_0.pdf'),

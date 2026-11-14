@@ -15,7 +15,7 @@ const S = {
   xbeeug: R('Digi XBee/XBee-PRO S2C Zigbee RF module user guide', 'https://docs.digi.com/resources/documentation/digidocs/90002002/default.htm'),
   softser: R('Arduino SoftwareSerial library', 'https://docs.arduino.cc/learn/built-in-libraries/software-serial/'),
   serial: R('Arduino reference: Serial', 'https://docs.arduino.cc/language-reference/en/functions/communication/serial/'),
-  espser: R('Arduino-ESP32 documentation: Serial / UART', 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/uart.html'),
+  espser: R('Arduino-ESP32 documentation: Serial / UART', 'https://docs.espressif.com/projects/arduino-esp32/en/latest/api/serial.html'),
   pyserial: R('pySerial documentation', 'https://pyserial.readthedocs.io/en/latest/shortintro.html'),
   pins: R('Raspberry Pi documentation: GPIO and the 40-pin header', 'https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#gpio'),
 };

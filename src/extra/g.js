@@ -182,7 +182,7 @@ programs.g_ads_rc_pi = async (rt) => {
 };
 
 // module pins land in a10..a15 (VDD, GND, SCL, SDA, ADDR, A0); the RC parts sit in columns 15 to 20
-const ADS = [mod('ad1', 'mod_ads1115'), ...bb('ad1', [['VDD', 'p1'], ['GND', 'p6'], ['SCL', 'p5'], ['SDA', 'p3'], ['ADDR', 'p9'], ['A0', null]]),
+const ADS = [mod('ad1', 'mod_ads1115', 60, -88), ...bb('ad1', [['VDD', 'p1'], ['GND', 'p6'], ['SCL', 'p5'], ['SDA', 'p3'], ['ADDR', 'p9'], ['A0', null]]),
   { id: 'r1', type: 'resistor', a: 'c15', b: 'c20', ohms: 10000 }, { id: 'c1', type: 'cap', uf: 100, a: 'd15', k: 'd17' },
   fw('wd', 'p11', 'a20', 'orange', 30), fw('wg', 'p14', 'a17', 'black', 36)];
 
